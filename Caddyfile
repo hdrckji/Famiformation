@@ -1,0 +1,32 @@
+{
+	frankenphp
+	order php_server before file_server
+	# Railway termine le TLS en amont : pas de HTTPS auto dans le conteneur
+	auto_https off
+}
+
+# Ecoute sur le port fourni par Railway ($PORT), 8080 par defaut en local
+:{$PORT:8080} {
+	root * /app/public
+	encode zstd gzip
+
+	route {
+		# Bloque l'acces direct au dossier vendor/
+		@vendor path /vendor/*
+		respond @vendor 403
+
+		# Bloque les fichiers sensibles (logs, dumps, backups, fichiers projet)
+		@sensitive path *.log *.sql *.bak /composer.json /composer.lock /composer.phar /README.md /CHANGELOG.md /mode_emploi_admin.txt /INSTALL_PHPMailer.txt /mon_horaire_test.php /evaluation_temp.json
+		respond @sensitive 403
+
+		# Bloque les fichiers de test (test*.php / test*.xlsx)
+		@testfiles path_regexp testfiles ^/test[^/]*\.(php|xlsx)$
+		respond @testfiles 403
+
+		# Bloque les fichiers caches (.env, .htaccess, .gitignore, ...)
+		@dotfiles path_regexp dotfiles /\.[^/]+$
+		respond @dotfiles 403
+
+		php_server
+	}
+}
