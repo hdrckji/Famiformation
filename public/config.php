@@ -197,3 +197,33 @@ if (isset($connectionException)) {
 if (isset($_SESSION['user_id'])) {
     // ...fin du bloc PHP, suppression du script HTML injecté...
 }
+
+// 8. AFFICHAGE DES PDF SUR MOBILE
+// Injecte automatiquement le visualiseur PDF.js (pdf-viewer.js) dans les pages
+// qui affichent un PDF via <iframe>/<embed>/<object>. Sur ordinateur le script
+// ne fait rien ; sur mobile il remplace l'iframe par un rendu intégré.
+// Le garde n'agit que sur des pages HTML embarquant réellement un PDF :
+// les réponses JSON / fichiers Excel (sans </body> + iframe PDF) ne sont jamais modifiées.
+if (!function_exists('famiInjectPdfViewer')) {
+    function famiInjectPdfViewer($buffer)
+    {
+        if (!is_string($buffer) || $buffer === '') {
+            return $buffer;
+        }
+        if (stripos($buffer, '</body>') === false) {
+            return $buffer;
+        }
+        if (!preg_match('/<(?:iframe|embed|object)\b[^>]*\.pdf/i', $buffer)) {
+            return $buffer;
+        }
+        if (stripos($buffer, 'pdf-viewer.js') !== false) {
+            return $buffer; // déjà présent
+        }
+        $pos = strripos($buffer, '</body>');
+        $tag = "\n<script src=\"/pdf-viewer.js\" defer></script>\n";
+        return substr($buffer, 0, $pos) . $tag . substr($buffer, $pos);
+    }
+}
+if (PHP_SAPI !== 'cli') {
+    ob_start('famiInjectPdfViewer');
+}
