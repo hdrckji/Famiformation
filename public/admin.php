@@ -128,8 +128,8 @@ if (isset($_POST['creer_user'])) {
                     $mailError = trim((string) getLastMailError());
                     $details = $mailError !== '' ? '<br><small>Détail SMTP : ' . e($mailError) . '</small>' : '';
                     $message = $mdp === ''
-                        ? "<div class='alert success'>✅ Collaborateur créé avec succès.<br><strong>Le mail de bienvenue étudiant avec lien de création du mot de passe n'a pas pu être envoyé.</strong>{$details}</div>"
-                        : "<div class='alert success'>✅ Collaborateur créé avec succès.<br><strong>Le mail de bienvenue étudiant n'a pas pu être envoyé.</strong>{$details}</div>";
+                        ? "<div class='alert warning'>⚠️ Collaborateur créé, mais <strong>en attente d'activation</strong> : le mail avec le lien de création du mot de passe n'a pas pu être envoyé. Le compte ne pourra pas se connecter tant que la procédure n'est pas terminée.{$details}</div>"
+                        : "<div class='alert warning'>⚠️ Collaborateur créé, mais <strong>le mail de bienvenue étudiant n'a pas pu être envoyé.</strong>{$details}</div>";
                 }
             } elseif ($mdp === '' && $email !== '') {
                 $activationMailSent = sendAccountActivationEmail($db, $userId);
@@ -138,7 +138,7 @@ if (isset($_POST['creer_user'])) {
                 } else {
                     $mailError = trim((string) getLastMailError());
                     $details = $mailError !== '' ? '<br><small>Détail SMTP : ' . e($mailError) . '</small>' : '';
-                    $message = "<div class='alert success'>✅ Collaborateur créé avec succès.<br><strong>Le mail d'activation n'a pas pu être envoyé.</strong>{$details}</div>";
+                    $message = "<div class='alert warning'>⚠️ Collaborateur créé, mais <strong>en attente d'activation</strong> : le mail d'activation n'a pas pu être envoyé. Le compte ne pourra pas se connecter tant que la procédure n'est pas terminée.{$details}</div>";
                 }
             }
         } catch (Exception $e) { $message = "<div class='alert error'>❌ Erreur : Identifiant déjà utilisé.</div>"; }
@@ -260,6 +260,7 @@ $users = $db->query($query_str)->fetchAll();
         .alert { padding: 15px; margin-bottom: 20px; border-radius: 8px; font-weight: bold; text-align: center; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
         .card { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; overflow: hidden; }
         .card-header { background: #2d5a37; color: white; padding: 15px 25px; font-weight: bold; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center; }
         .card-body { padding: 25px; }
@@ -291,6 +292,7 @@ $users = $db->query($query_str)->fetchAll();
         .status-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 92px; padding: 8px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 700; }
         .status-active { background: #e8f5e9; color: #2d5a37; }
         .status-inactive { background: #f9e1e1; color: #a83232; }
+        .status-pending { background: #fff3cd; color: #856404; }
         .action-stack { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 130px; }
         .action-stack form,
         .action-stack a { margin: 0; }
@@ -455,6 +457,8 @@ $users = $db->query($query_str)->fetchAll();
                         <td class="status-cell">
                             <?php if (($u['statut'] ?? '') === 'inactif'): ?>
                                 <span class="status-badge status-inactive">Inactif</span>
+                            <?php elseif (!empty($u['account_activation_pending'])): ?>
+                                <span class="status-badge status-pending">En attente</span>
                             <?php else: ?>
                                 <span class="status-badge status-active">Actif</span>
                             <?php endif; ?>
