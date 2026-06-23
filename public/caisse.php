@@ -149,7 +149,7 @@ verifierConnexion($db);
                 'rel': 0, 
                 'modestbranding': 1,
                 'autoplay': 0,
-                'controls': 0, // Désactive les contrôles
+                'controls': 1, // Désactive les contrôles
                 'disablekb': 1, // Désactive les raccourcis clavier
                 'fs': 0, // Désactive le plein écran
                 'showinfo': 0,
@@ -183,5 +183,6 @@ verifierConnexion($db);
     }
 </script>
 
+    <script src="/video-lock.js" defer></script>
 </body>
 </html>

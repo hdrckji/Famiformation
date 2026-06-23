@@ -52,7 +52,7 @@ verifierConnexion($db);
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 videoId: 'JLcDiOHPHTE',
-                playerVars: { 'controls': 0, 'disablekb': 1, 'rel': 0, 'modestbranding': 1 },
+                playerVars: { 'controls': 1, 'disablekb': 1, 'rel': 0, 'modestbranding': 1 },
                 events: { 'onStateChange': onPlayerStateChange }
             });
         }
@@ -67,5 +67,6 @@ verifierConnexion($db);
             }
         }
     </script>
+    <script src="/video-lock.js" defer></script>
 </body>
 </html>

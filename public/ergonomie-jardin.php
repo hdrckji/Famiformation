@@ -131,7 +131,7 @@ verifierConnexion($db);
             player = new YT.Player('player', {
                 videoId: 'nI_mwaRRKRM', // ID de la vidéo Ergonomie
                 playerVars: { 
-                    'controls': 0,        // Désactive les contrôles (barre de progression)
+                    'controls': 1,        // Désactive les contrôles (barre de progression)
                     'disablekb': 1,      // Désactive le clavier (flèches, etc.)
                     'rel': 0,
                     'modestbranding': 1
@@ -160,5 +160,6 @@ verifierConnexion($db);
     }
 }
     </script>
+    <script src="/video-lock.js" defer></script>
 </body>
 </html>

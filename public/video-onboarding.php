@@ -76,7 +76,7 @@ if (getCurrentRole() === 'etudiant' && !hasUnlockedOnboarding(getCurrentUserId()
                 playerVars: { 
                     'rel': 0, 
                     'modestbranding': 1,
-                    'controls': 0, // Désactive les contrôles
+                    'controls': 1, // Désactive les contrôles
                     'disablekb': 1, // Désactive les raccourcis clavier
                     'fs': 0 // Désactive le plein écran
                 },
@@ -93,5 +93,6 @@ if (getCurrentRole() === 'etudiant' && !hasUnlockedOnboarding(getCurrentUserId()
             }
         }
     </script>
+    <script src="/video-lock.js" defer></script>
 </body>
 </html>
