@@ -83,5 +83,6 @@
         });
     });
     </script>
+    <script src="/video-lock.js" defer></script>
 </body>
 </html>

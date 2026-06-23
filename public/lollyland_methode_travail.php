@@ -135,5 +135,6 @@ verifierConnexion($db);
 
     <a href="lollyland_menu.php" class="back-link">← Retour à Lollyland</a>
 
+    <script src="/video-lock.js" defer></script>
 </body>
 </html>

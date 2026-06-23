@@ -37,5 +37,6 @@ verifierConnexion($db);
             <a href="quiz_engine.php?theme=quiz_fleurs_artificielles" style="display:inline-block; background:#2d5a37; color:#fff; font-weight:bold; padding:18px 40px; border-radius:30px; font-size:1.2rem; text-decoration:none; box-shadow:0 4px 16px rgba(45,90,55,0.12); transition:background 0.3s;">Lancer le quizz Fleurs Artificielles (Video)</a>
         </div>
     </div>
+    <script src="/video-lock.js" defer></script>
 </body>
 </html>
