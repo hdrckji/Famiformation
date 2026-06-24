@@ -332,14 +332,16 @@ $users = $db->query($query_str)->fetchAll();
         .filter-select { padding: 5px; border-radius: 4px; border: none; font-size: 0.85rem; cursor: pointer; }
         .hint { color: #666; font-size: 0.85rem; margin-top: 10px; }
         .table-wrap { overflow-x: auto; padding: 0 0 8px 0; }
-        .col-name { width: 17%; }
-        .col-login { width: 10%; }
-        .col-email { width: 16%; }
-        .col-interim { width: 15%; }
-        .col-quiz { width: 9%; text-align: center; }
-        .col-role { width: 18%; }
+        .col-name { width: 15%; }
+        .col-login { width: 9%; }
+        .col-email { width: 14%; }
+        .col-interim { width: 13%; }
+        .col-quiz { width: 8%; text-align: center; }
+        .col-role { width: 14%; }
         .col-status { width: 7%; }
-        .col-actions { width: 14%; }
+        .col-status-date { width: 8%; }
+        .col-actions { width: 12%; }
+        .status-date-cell { text-align: center; white-space: nowrap; font-size: 0.85rem; }
         .name-link { color: #1d6f42; text-decoration: none; font-weight: 700; }
         .name-link:hover { text-decoration: underline; }
         .muted-code { display: inline-block; background: #f4f7f6; border-radius: 6px; padding: 4px 8px; font-size: 0.85rem; }
@@ -555,19 +557,7 @@ $users = $db->query($query_str)->fetchAll();
                             <?php
                                 $statutDate = $u['statut_date'] ?? null;
                                 $tsStatut = $statutDate ? strtotime((string) $statutDate) : false;
-                                if ($tsStatut) {
-                                    if (($u['statut'] ?? '') === 'inactif') {
-                                        $libelleDate = 'Désactivé le';
-                                    } elseif (!empty($u['account_activation_pending'])) {
-                                        $libelleDate = 'Créé le';
-                                    } else {
-                                        $libelleDate = 'Activé le';
-                                    }
-                                    echo '<span class="cell-note">' . $libelleDate . '</span>';
-                                    echo '<div>' . htmlspecialchars(date('d/m/Y H:i', $tsStatut)) . '</div>';
-                                } else {
-                                    echo '<span class="muted-code">—</span>';
-                                }
+                                echo $tsStatut ? htmlspecialchars(date('d/m/Y', $tsStatut)) : '<span class="muted-code">—</span>';
                             ?>
                         </td>
                         <td>
