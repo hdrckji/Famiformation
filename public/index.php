@@ -152,6 +152,10 @@ if (!empty($_SESSION['module_flash'])) {
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
         .tile-inactive { opacity: 0.45; }
+        .btn-param { background: rgba(255,255,255,0.9); color: #2d5a37; text-decoration: none; padding: 12px 18px; border-radius: 30px; font-weight: bold; font-size: 0.9rem; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+        .btn-param:hover { background: #fff; transform: scale(1.05); }
+        .quick-create-btn { position: fixed; bottom: 20px; right: 20px; background: #2d5a37; color: #fff; border: none; border-radius: 30px; padding: 12px 20px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,0.2); z-index: 1500; }
+        .quick-create-btn:hover { background: #357a44; }
         .module-flash { background: #fff8e1; border: 1px solid #ffe082; color: #6a5400; padding: 12px 20px; border-radius: 14px; font-weight: 700; margin: 8px auto 0; max-width: 600px; text-align: center; }
 
         /* Bloc jaune "Gestion des modules" (admin, en bas à droite) */
@@ -191,7 +195,12 @@ if (!empty($_SESSION['module_flash'])) {
             <?php endif; ?>
             <span><?= htmlspecialchars($userNom ?: ($_SESSION['username'] ?? '')) ?></span>
         </a>
-        <a href="logout.php" class="btn-logout">Déconnexion</a>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <?php if ($isAdmin): ?>
+            <a href="parametres.php" class="btn-param" title="Paramètres">⚙️ Paramètres</a>
+            <?php endif; ?>
+            <a href="logout.php" class="btn-logout">Déconnexion</a>
+        </div>
     </div>
 
     <div class="header">
@@ -338,6 +347,7 @@ if (!empty($_SESSION['module_flash'])) {
         <?php endif; ?>
 
         <?php foreach ($dynamicModules as $mod): ?>
+        <?php if (!$isAdmin && !userCanSeeModule($mod, $role)) { continue; } ?>
         <a href="module.php?id=<?= (int) $mod['id'] ?>" class="tile<?= ((int) $mod['is_active'] !== 1) ? ' tile-inactive' : '' ?>">
             <div class="tile-media"><span class="tile-icon"><?= moduleIcon($mod) ?></span></div>
             <div class="tile-title"><?= htmlspecialchars($mod['nom']) ?></div>
@@ -347,24 +357,7 @@ if (!empty($_SESSION['module_flash'])) {
     </div>
 
     <?php if ($isAdmin): ?>
-    <div class="module-manager">
-        <div class="module-manager-header">🧩 Gestion des modules</div>
-        <button type="button" class="btn-mm-create" onclick="document.getElementById('moduleCreateModal').style.display='flex';">➕ Créer un module</button>
-        <div class="module-manager-list">
-            <?php foreach ($dynamicModules as $mod): ?>
-                <div class="mm-item">
-                    <a href="module.php?id=<?= (int) $mod['id'] ?>" title="<?= htmlspecialchars($mod['nom']) ?>"><?= moduleIcon($mod) ?> <?= htmlspecialchars($mod['nom']) ?><?= ((int) $mod['is_active'] !== 1) ? ' (inactif)' : '' ?></a>
-                    <form method="POST" action="module_save.php" onsubmit="return confirm('Supprimer définitivement ce module ?');">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="id" value="<?= (int) $mod['id'] ?>">
-                        <button type="submit" class="mm-del" title="Supprimer">🗑</button>
-                    </form>
-                </div>
-            <?php endforeach; ?>
-            <?php if (empty($dynamicModules)): ?><div class="mm-empty">Aucun module créé pour l'instant.</div><?php endif; ?>
-        </div>
-    </div>
+    <button type="button" class="quick-create-btn" onclick="document.getElementById('moduleCreateModal').style.display='flex';">➕ Créer un module</button>
 
     <div id="moduleCreateModal" class="mm-modal-backdrop">
         <div class="mm-modal-card">

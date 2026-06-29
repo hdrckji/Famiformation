@@ -5,7 +5,7 @@
 
 if (!function_exists('ensureModulesTable')) {
     /**
-     * Crée la table `modules` si elle n'existe pas encore.
+     * Crée la table `modules` si elle n'existe pas + colonnes ajoutées après coup.
      */
     function ensureModulesTable(PDO $db)
     {
@@ -26,9 +26,52 @@ if (!function_exists('ensureModulesTable')) {
                     INDEX idx_modules_active (is_active)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
             );
+
+            // Colonnes ajoutées après coup (icône, profils ayant accès)
+            $extraColumns = [
+                'icon'  => "ALTER TABLE modules ADD COLUMN icon VARCHAR(16) NULL",
+                'roles' => "ALTER TABLE modules ADD COLUMN roles VARCHAR(255) NULL",
+            ];
+            foreach ($extraColumns as $col => $ddl) {
+                $check = $db->query("SHOW COLUMNS FROM modules LIKE " . $db->quote($col));
+                if ($check && !$check->fetch()) {
+                    $db->exec($ddl);
+                }
+            }
         } catch (Exception $e) {
             // table déjà présente ou base indisponible : on ignore
         }
+    }
+
+    /**
+     * Liste des profils existants (clé => libellé). Sert au ciblage d'accès.
+     * NB: deviendra dynamique quand on fera "Gestion des profils".
+     */
+    function moduleProfiles()
+    {
+        return [
+            'etudiant'           => 'Étudiant',
+            'employe_magasin'    => 'Magasin',
+            'teamcoach'          => 'Teamcoach',
+            'mentor'             => 'Mentor',
+            'employe_logistique' => 'Logistique',
+            'admin'              => 'Admin',
+            'evaluateur'         => 'Évaluateur',
+        ];
+    }
+
+    /**
+     * Un utilisateur de rôle $role peut-il voir ce module ?
+     * roles vide / NULL = visible par tous.
+     */
+    function userCanSeeModule(array $module, $role)
+    {
+        $roles = trim((string) ($module['roles'] ?? ''));
+        if ($roles === '') {
+            return true; // tous
+        }
+        $allowed = array_filter(array_map('trim', explode(',', $roles)));
+        return in_array($role, $allowed, true);
     }
 
     /**
@@ -64,10 +107,22 @@ if (!function_exists('ensureModulesTable')) {
     }
 
     /**
-     * Icône par défaut selon le type de module.
+     * Icône à afficher : celle choisie, sinon une par défaut.
      */
     function moduleIcon(array $module)
     {
+        $icon = trim((string) ($module['icon'] ?? ''));
+        if ($icon !== '') {
+            return $icon;
+        }
         return !empty($module['is_container']) ? '📂' : '📄';
+    }
+
+    /**
+     * Jeu d'icônes proposées dans le sélecteur.
+     */
+    function moduleIconChoices()
+    {
+        return ['📄','📂','📦','🎓','🛒','🧑‍💼','📊','🦺','🚀','🏆','🗓️','🔧','📚','💡','⭐','🎯','🎬','📁','🧩','🔒'];
     }
 }
