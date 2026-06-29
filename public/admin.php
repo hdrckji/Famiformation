@@ -62,6 +62,9 @@ $createForm = [
     'new_email' => '', 'new_interim' => '', 'new_role' => 'etudiant',
 ];
 $showDuplicateModal = false;
+$showNoEmailModal = false;
+$confirmDuplicate = false;
+$confirmNoEmail = false;
 
 // Querystring des filtres mémorisés -> permet de revenir à la même vue après une action
 function adminFilterQuery() {
@@ -126,6 +129,7 @@ if (isset($_POST['creer_user'])) {
     $mdp     = $_POST['new_password'] ?? '';
     $role    = $_POST['new_role'] ?? '';
     $confirmDuplicate = (($_POST['confirm_duplicate'] ?? '') === '1');
+    $confirmNoEmail   = (($_POST['confirm_no_email'] ?? '') === '1');
 
     // Conserver les valeurs saisies pour les réafficher
     $createForm = [
@@ -134,19 +138,18 @@ if (isset($_POST['creer_user'])) {
         'new_role' => $role !== '' ? $role : 'etudiant',
     ];
 
-    // Tous les champs sont obligatoires SAUF le mot de passe
+    // Tous les champs sont obligatoires SAUF le mot de passe ET l'email
     $manquants = [];
     if ($id === '')      { $manquants[] = 'Identifiant'; }
     if ($nom === '')     { $manquants[] = 'Nom'; }
     if ($prenom === '')  { $manquants[] = 'Prénom'; }
-    if ($email === '')   { $manquants[] = 'Email'; }
     if ($interim === '') { $manquants[] = 'Agence intérim'; }
     if ($role === '')    { $manquants[] = 'Profil'; }
 
     if (!$hasInterimColumn) {
         $message = "<div class='alert error'>❌ La colonne Intérim n'est pas disponible en base de données.</div>";
     } elseif (!empty($manquants)) {
-        $message = "<div class='alert error'>❌ Tous les champs sont obligatoires (sauf le mot de passe). Manquant(s) : " . e(implode(', ', $manquants)) . ".</div>";
+        $message = "<div class='alert error'>❌ Tous les champs sont obligatoires (sauf le mot de passe et l'email). Manquant(s) : " . e(implode(', ', $manquants)) . ".</div>";
     } else {
         // L'identifiant doit être unique
         $checkId = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE identifiant = ?");
@@ -154,16 +157,26 @@ if (isset($_POST['creer_user'])) {
         if ((int) $checkId->fetchColumn() > 0) {
             $message = "<div class='alert error'>❌ Cet identifiant est déjà utilisé. Choisissez-en un autre.</div>";
         } else {
+            // Avertissement (modale) si aucun email n'est renseigné
+            if ($email === '' && !$confirmNoEmail) {
+                $showNoEmailModal = true;
+            }
+
             // Avertissement (modale) si l'email OU le couple nom + prénom existe déjà
-            if (!$confirmDuplicate) {
-                $checkDup = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE email = ? OR (LOWER(nom) = LOWER(?) AND LOWER(prenom) = LOWER(?))");
-                $checkDup->execute([$email, $nom, $prenom]);
+            if (!$showNoEmailModal && !$confirmDuplicate) {
+                if ($email !== '') {
+                    $checkDup = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE email = ? OR (LOWER(nom) = LOWER(?) AND LOWER(prenom) = LOWER(?))");
+                    $checkDup->execute([$email, $nom, $prenom]);
+                } else {
+                    $checkDup = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE LOWER(nom) = LOWER(?) AND LOWER(prenom) = LOWER(?)");
+                    $checkDup->execute([$nom, $prenom]);
+                }
                 if ((int) $checkDup->fetchColumn() > 0) {
                     $showDuplicateModal = true;
                 }
             }
 
-            if (!$showDuplicateModal) {
+            if (!$showNoEmailModal && !$showDuplicateModal) {
                 // Le compte n'est réellement créé QUE si le mail part correctement
                 ensureUserAccountAccessColumns($db); // hors transaction (évite un ALTER pendant la transaction)
                 $hash = $mdp !== ''
@@ -175,21 +188,31 @@ if (isset($_POST['creer_user'])) {
                     $db->beginTransaction();
                     $ins = $db->prepare("INSERT INTO utilisateurs (identifiant, nom, prenom, email, interim, mot_de_passe, role, account_activation_pending, statut_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
                     $interimStore = ($interim === '' || $interim === '__none__') ? null : $interim;
-                    $ins->execute([$id, $nom, $prenom, $email, $interimStore, $hash, $role, $activationPending]);
+                    $emailStore = ($email === '') ? null : $email;
+                    $ins->execute([$id, $nom, $prenom, $emailStore, $interimStore, $hash, $role, $activationPending]);
                     $userId = (int) $db->lastInsertId();
 
-                    $mailSent = ($mdp === '')
-                        ? sendAccountActivationEmail($db, $userId)
-                        : sendStudentWelcomeEmail($email, $id, null);
-
-                    if ($mailSent) {
+                    if ($email === '') {
+                        // Aucun email : on crée le compte sans aucun envoi de mail
                         $db->commit();
-                        adminRedirect("<div class='alert success'>✅ Collaborateur créé. 📨 Le mail a bien été envoyé à " . e($email) . ".</div>");
+                        $note = ($mdp === '')
+                            ? " ⚠️ Aucun mot de passe ni email : définissez un mot de passe manuellement pour permettre la connexion."
+                            : '';
+                        adminRedirect("<div class='alert success'>✅ Collaborateur créé sans email." . $note . "</div>");
                     } else {
-                        $db->rollBack();
-                        $mailError = trim((string) getLastMailError());
-                        $details = $mailError !== '' ? '<br><small>Détail technique : ' . e($mailError) . '</small>' : '';
-                        $message = "<div class='alert error'>❌ Le mail n'a pas pu être envoyé : le compte n'a donc <strong>pas été créé</strong>. Réessayez plus tard ou contactez le service IT.{$details}</div>";
+                        $mailSent = ($mdp === '')
+                            ? sendAccountActivationEmail($db, $userId)
+                            : sendStudentWelcomeEmail($email, $id, null);
+
+                        if ($mailSent) {
+                            $db->commit();
+                            adminRedirect("<div class='alert success'>✅ Collaborateur créé. 📨 Le mail a bien été envoyé à " . e($email) . ".</div>");
+                        } else {
+                            $db->rollBack();
+                            $mailError = trim((string) getLastMailError());
+                            $details = $mailError !== '' ? '<br><small>Détail technique : ' . e($mailError) . '</small>' : '';
+                            $message = "<div class='alert error'>❌ Le mail n'a pas pu être envoyé : le compte n'a donc <strong>pas été créé</strong>. Réessayez plus tard ou contactez le service IT.{$details}</div>";
+                        }
                     }
                 } catch (Exception $e) {
                     if ($db->inTransaction()) { $db->rollBack(); }
@@ -398,11 +421,12 @@ $users = $db->query($query_str)->fetchAll();
         <div class="card-body">
             <form method="POST" action="admin.php" id="createUserForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
                 <?php echo csrfField(); ?>
-                <input type="hidden" id="confirm_duplicate" name="confirm_duplicate" value="">
+                <input type="hidden" id="confirm_duplicate" name="confirm_duplicate" value="<?php echo $confirmDuplicate ? '1' : ''; ?>">
+                <input type="hidden" id="confirm_no_email" name="confirm_no_email" value="<?php echo $confirmNoEmail ? '1' : ''; ?>">
                 <input type="text" name="new_username" value="<?php echo htmlspecialchars($createForm['new_username']); ?>" placeholder="Identifiant" required class="input-mini">
                 <input type="text" name="new_nom" value="<?php echo htmlspecialchars($createForm['new_nom']); ?>" placeholder="Nom" required class="input-mini">
                 <input type="text" name="new_prenom" value="<?php echo htmlspecialchars($createForm['new_prenom']); ?>" placeholder="Prénom" required class="input-mini">
-                <input type="email" name="new_email" value="<?php echo htmlspecialchars($createForm['new_email']); ?>" placeholder="Email" required class="input-mini">
+                <input type="email" name="new_email" value="<?php echo htmlspecialchars($createForm['new_email']); ?>" placeholder="Email (optionnel)" class="input-mini">
                 <select name="new_interim" id="new_interim" class="input-mini" required>
                     <option value="" <?php if ($createForm['new_interim'] === '') echo 'selected'; ?>>Sélectionner une agence intérim</option>
                     <option value="__none__" <?php if ($createForm['new_interim'] === '__none__') echo 'selected'; ?>>Aucune agence</option>
@@ -422,7 +446,7 @@ $users = $db->query($query_str)->fetchAll();
                 </select>
                 <button type="submit" name="creer_user" class="btn-save" style="height: 40px;">Créer le compte</button>
             </form>
-            <div class="hint">Tous les champs sont obligatoires sauf le mot de passe. Si le mot de passe est laissé vide, un mail d'activation est envoyé et le compte n'est créé que si ce mail part correctement. La liste des agences vient de la page Agences Intérim.</div>
+            <div class="hint">Tous les champs sont obligatoires sauf le mot de passe et l'email. Si le mot de passe est laissé vide et qu'un email est renseigné, un mail d'activation est envoyé et le compte n'est créé que si ce mail part correctement. Sans email, le compte est créé directement (une confirmation est demandée). La liste des agences vient de la page Agences Intérim.</div>
         </div>
     </div>
 
@@ -435,6 +459,19 @@ $users = $db->query($query_str)->fetchAll();
             <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:22px;">
                 <button type="button" class="btn-cancel" onclick="document.getElementById('dupModal').style.display='none';">Annuler</button>
                 <button type="button" class="btn-save" onclick="document.getElementById('confirm_duplicate').value='1'; document.getElementById('createUserForm').submit();">Confirmer l'ajout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale : création sans email -->
+    <div id="noEmailModal" class="modal-backdrop"<?php if (!$showNoEmailModal) echo ' style="display:none;"'; ?>>
+        <div class="modal-card">
+            <h3 style="margin-top:0; color:#856404;">⚠️ Créer sans email ?</h3>
+            <p style="line-height:1.6;">Aucune adresse email n'a été renseignée. Le compte sera créé <strong>sans envoi de mail</strong> (pas d'activation ni de mail de bienvenue).</p>
+            <p style="line-height:1.6;">Êtes-vous sûr de vouloir créer le compte sans email ?</p>
+            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:22px;">
+                <button type="button" class="btn-cancel" onclick="document.getElementById('noEmailModal').style.display='none';">Annuler</button>
+                <button type="button" class="btn-save" onclick="document.getElementById('confirm_no_email').value='1'; document.getElementById('createUserForm').submit();">Oui, créer sans email</button>
             </div>
         </div>
     </div>
