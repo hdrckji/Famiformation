@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lollyland — Personnalise ton étiquette</title>
+
+<!-- Polices script proches de l'étiquette originale -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Lobster&family=Yellowtail&family=Sacramento&family=Great+Vibes&display=swap" rel="stylesheet">
+
+<style>
+    * { box-sizing: border-box; }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: linear-gradient(135deg, #ffd8e8 0%, #ffeef5 100%);
+        font-family: 'Segoe UI', Tahoke, sans-serif;
+        color: #4a154b;
+        overflow-x: hidden;
+    }
+
+    header {
+        background: #e91e63;
+        color: white;
+        padding: 18px;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    header h1 {
+        margin: 0;
+        font-family: 'Pacifico', cursive;
+        font-weight: 400;
+        font-size: 36px;
+        letter-spacing: 1px;
+    }
+
+    header p {
+        margin: 6px 0 0;
+        font-size: 16px;
+        opacity: 0.95;
+    }
+
+    main {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 40px;
+        padding: 30px 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* ---------- ÉTIQUETTE ---------- */
+    .sticker-wrap {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .sticker {
+        position: relative;
+        width: 500px;
+        height: 500px;
+        max-width: 90vw;
+        max-height: 90vw;
+    }
+
+    .sticker img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        user-select: none;
+        -webkit-user-drag: none;
+    }
+
+    /* Zone texte centrée (sous le logo, au-dessus des lollipops) */
+    .sticker .text {
+        position: absolute;
+        top: 42%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 78%;
+        text-align: center;
+        color: #e6308a;             /* rose magenta proche de l'original */
+        font-family: 'Pacifico', cursive;
+        font-size: 64px;
+        line-height: 1.05;
+        word-wrap: break-word;
+        pointer-events: none;
+        text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+    }
+
+    /* ---------- PANNEAU DE CONTRÔLE ---------- */
+    .panel {
+        flex: 1 1 360px;
+        max-width: 480px;
+        background: white;
+        border-radius: 20px;
+        padding: 28px;
+        box-shadow: 0 8px 25px rgba(233, 30, 99, 0.15);
+    }
+
+    .panel h2 {
+        margin: 0 0 18px;
+        color: #e91e63;
+        font-family: 'Pacifico', cursive;
+        font-weight: 400;
+        font-size: 28px;
+    }
+
+    label {
+        display: block;
+        font-weight: 600;
+        margin: 18px 0 8px;
+        color: #4a154b;
+        font-size: 15px;
+    }
+
+    textarea, input[type="text"] {
+        width: 100%;
+        font-size: 22px;
+        padding: 14px;
+        border: 2px solid #f8bbd0;
+        border-radius: 12px;
+        outline: none;
+        font-family: inherit;
+        transition: border-color 0.2s;
+        resize: vertical;
+    }
+
+    textarea {
+        min-height: 90px;
+    }
+
+    textarea:focus, input:focus {
+        border-color: #e91e63;
+    }
+
+    .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .row > * { flex: 1; min-width: 120px; }
+
+    select, input[type="range"] {
+        width: 100%;
+        font-size: 18px;
+        padding: 10px;
+        border: 2px solid #f8bbd0;
+        border-radius: 12px;
+        background: white;
+        font-family: inherit;
+    }
+
+    input[type="range"] {
+        padding: 0;
+        accent-color: #e91e63;
+    }
+
+    .size-value {
+        flex: 0 0 50px;
+        text-align: center;
+        font-weight: 600;
+        color: #e91e63;
+    }
+
+    .presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .presets button {
+        flex: 1 1 auto;
+        background: #fce4ec;
+        color: #e91e63;
+        border: 2px solid transparent;
+        padding: 10px 14px;
+        border-radius: 20px;
+        font-size: 15px;
+        cursor: pointer;
+        font-family: 'Pacifico', cursive;
+        transition: all 0.2s;
+    }
+
+    .presets button:hover {
+        background: #f8bbd0;
+        border-color: #e91e63;
+    }
+
+    .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 28px;
+        flex-wrap: wrap;
+    }
+
+    .actions button {
+        flex: 1 1 140px;
+        font-size: 18px;
+        padding: 16px 20px;
+        border: none;
+        border-radius: 14px;
+        cursor: pointer;
+        font-weight: 700;
+        transition: transform 0.1s, box-shadow 0.2s;
+    }
+
+    .btn-primary {
+        background: #e91e63;
+        color: white;
+        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
+    }
+
+    .btn-primary:hover { background: #d81b60; }
+    .btn-primary:active { transform: scale(0.97); }
+
+    .btn-secondary {
+        background: white;
+        color: #e91e63;
+        border: 2px solid #e91e63 !important;
+    }
+
+    .btn-secondary:hover { background: #fce4ec; }
+
+    /* ---------- IMPRESSION ---------- */
+    @media print {
+        @page { size: auto; margin: 0; }
+        body { background: white; }
+        header, .panel, .sticker-wrap > .hint { display: none !important; }
+        main { padding: 0; gap: 0; display: block; }
+        .sticker-wrap { display: block; }
+        .sticker {
+            width: 10cm;
+            height: 10cm;
+            margin: 0 auto;
+        }
+    }
+
+    .hint {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #888;
+        text-align: center;
+        max-width: 500px;
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Lollyland — Personnalise ton étiquette</h1>
+    <p>Tape ton message, choisis ta police, et imprime !</p>
+</header>
+
+<main>
+    <div class="sticker-wrap">
+        <div class="sticker" id="sticker">
+            <img src="modèle.png" alt="Étiquette Lollyland">
+            <div class="text" id="previewText">Shh,<br>niet delen!</div>
+        </div>
+        <p class="hint">Aperçu en temps réel</p>
+    </div>
+
+    <section class="panel">
+        <h2>Ton message</h2>
+
+        <label for="messageInput">Texte personnalisé</label>
+        <textarea id="messageInput" maxlength="60" placeholder="Écris ton message ici…">Shh,
+niet delen!</textarea>
+
+        <label>Suggestions rapides</label>
+        <div class="presets" id="presets">
+            <button data-text="Shh,&#10;niet delen!">Shh, niet delen!</button>
+            <button data-text="Voor jou&#10;met liefde">Voor jou met liefde</button>
+            <button data-text="Proficiat!">Proficiat!</button>
+            <button data-text="Bedankt!">Bedankt!</button>
+            <button data-text="I love&#10;you!">I love you!</button>
+        </div>
+
+        <label for="fontSelect">Police</label>
+        <select id="fontSelect">
+            <option value="Pacifico" selected>Pacifico (recommandé)</option>
+            <option value="Lobster">Lobster</option>
+            <option value="Yellowtail">Yellowtail</option>
+            <option value="Sacramento">Sacramento</option>
+            <option value="Great Vibes">Great Vibes</option>
+        </select>
+
+        <label for="sizeRange">Taille du texte</label>
+        <div class="row">
+            <input type="range" id="sizeRange" min="28" max="100" value="64">
+            <span class="size-value" id="sizeValue">64</span>
+        </div>
+
+        <div class="actions">
+            <button class="btn-secondary" id="resetBtn">Réinitialiser</button>
+            <button class="btn-primary" id="printBtn">Imprimer 🖨</button>
+        </div>
+    </section>
+</main>
+
+<script>
+    const input    = document.getElementById('messageInput');
+    const preview  = document.getElementById('previewText');
+    const fontSel  = document.getElementById('fontSelect');
+    const sizeRng  = document.getElementById('sizeRange');
+    const sizeVal  = document.getElementById('sizeValue');
+    const presets  = document.getElementById('presets');
+    const resetBtn = document.getElementById('resetBtn');
+    const printBtn = document.getElementById('printBtn');
+
+    const DEFAULTS = {
+        text: 'Shh,\nniet delen!',
+        font: 'Pacifico',
+        size: 64
+    };
+
+    function escapeHtml(s) {
+        return s.replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+
+    function updatePreview() {
+        const txt = input.value || ' ';
+        preview.innerHTML = escapeHtml(txt).replace(/\n/g, '<br>');
+        preview.style.fontFamily = `'${fontSel.value}', cursive`;
+        preview.style.fontSize   = sizeRng.value + 'px';
+        sizeVal.textContent      = sizeRng.value;
+    }
+
+    input.addEventListener('input', updatePreview);
+    fontSel.addEventListener('change', updatePreview);
+    sizeRng.addEventListener('input', updatePreview);
+
+    presets.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-text]');
+        if (!btn) return;
+        input.value = btn.dataset.text.replace(/&#10;/g, '\n');
+        updatePreview();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        input.value     = DEFAULTS.text;
+        fontSel.value   = DEFAULTS.font;
+        sizeRng.value   = DEFAULTS.size;
+        updatePreview();
+    });
+
+    printBtn.addEventListener('click', () => window.print());
+
+    updatePreview();
+</script>
+
+</body>
+</html>

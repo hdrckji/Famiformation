@@ -1,0 +1,9 @@
+- [x] Verify that the copilot-instructions.md file in the .github directory is created.
+- [x] Clarify Project Requirements: boutique Famipyro en PHP, HTML et MySQL avec panier, impression et espace admin.
+- [x] Scaffold the Project: structure complète créée dans le dossier courant.
+- [x] Customize the Project: vitrine style borne verte, catégories, panier, commande imprimable et gestion admin ajoutées.
+- [x] Install Required Extensions: aucune extension requise.
+- [x] Compile the Project: diagnostics de fichiers OK, mais PHP n'est pas installé sur ce poste pour lancer le serveur local.
+- [x] Create and Run Task: tâche de lancement local ajoutée.
+- [ ] Launch the Project: à lancer dès que PHP est disponible localement ou après déploiement IONOS.
+- [x] Ensure Documentation is Complete: README présent et mis à jour.

@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Famipyro PHP server",
+			"type": "shell",
+			"command": "C:\\php\\php.exe",
+			"args": [
+				"-S",
+				"localhost:8000"
+			],
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}
