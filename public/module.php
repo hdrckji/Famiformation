@@ -65,6 +65,17 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         .role-chk { font-weight:600; display:flex; align-items:center; gap:6px; }
         .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
         .btn-cancel { background:#e9ecef; color:#333; }
+        /* Zones d'upload (PDF / vidéo) */
+        .drop-zone { position: relative; border: 2.5px dashed #b9cdbf; border-radius: 14px; background:#f6faf7; padding: 26px 16px; text-align:center; cursor:pointer; transition: all .15s ease; margin: 14px 0 4px; }
+        .drop-zone:hover { border-color:#2d5a37; background:#eef7f0; }
+        .drop-zone.over { border-color:#2d5a37; background:#e3f2e7; }
+        .drop-zone.has-file { border-style: solid; border-color:#2d5a37; background:#e8f5e9; }
+        .dz-input { position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+        .dz-icon { font-size:2.6rem; line-height:1; }
+        .dz-title { font-weight:800; color:#2d5a37; font-size:1.15rem; margin-top:6px; }
+        .dz-hint { color:#6c7a70; font-size:0.85rem; margin-top:4px; }
+        .dz-file { margin-top:8px; font-weight:700; color:#244230; word-break:break-all; }
+        .dz-existing { font-size:0.85rem; color:#555; margin:4px 0 2px; }
     </style>
 </head>
 <body>
@@ -170,31 +181,43 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php if (!$isContainer): ?>
         <!-- Modale : gérer le contenu (PDF / vidéo) -->
         <div id="contentModal" class="modal-backdrop">
-            <div class="modal-card">
+            <div class="modal-card" style="max-width:620px;">
                 <h3>Contenu du module</h3>
-                <form method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return confirm('Enregistrer le contenu de ce module ?');">
+                <form id="contentForm" method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return validateContent();">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="content">
                     <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
                     <input type="hidden" name="return" value="module.php?id=<?= (int) $module['id'] ?>">
 
-                    <label>📄 PDF</label>
+                    <!-- Grand bloc PDF -->
+                    <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
+                        <input type="file" name="pdf_file" accept="application/pdf" class="dz-input">
+                        <div class="dz-icon">📄</div>
+                        <div class="dz-title">PDF</div>
+                        <div class="dz-hint">Glissez votre PDF ici ou cliquez pour parcourir</div>
+                        <div class="dz-file" hidden></div>
+                    </div>
                     <?php if (!empty($module['pdf_path'])): ?>
-                        <div style="margin-bottom:6px;">
+                        <div class="dz-existing">
                             <a href="<?= htmlspecialchars($module['pdf_path']) ?>" download>⬇ Télécharger le PDF actuel</a>
                             <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_pdf" value="1"> Supprimer</label>
                         </div>
                     <?php endif; ?>
-                    <input type="file" name="pdf_file" accept="application/pdf">
 
-                    <label style="margin-top:16px;">🎬 Vidéo</label>
+                    <!-- Grand bloc Vidéo -->
+                    <div class="drop-zone" id="dz_video" data-has-existing="<?= !empty($module['video_path']) ? '1' : '0' ?>" data-remove="remove_video">
+                        <input type="file" name="video_file" accept="video/*" class="dz-input">
+                        <div class="dz-icon">🎬</div>
+                        <div class="dz-title">Vidéo</div>
+                        <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir</div>
+                        <div class="dz-file" hidden></div>
+                    </div>
                     <?php if (!empty($module['video_path'])): ?>
-                        <div style="margin-bottom:6px;">
+                        <div class="dz-existing">
                             <a href="<?= htmlspecialchars($module['video_path']) ?>" download>⬇ Télécharger la vidéo actuelle</a>
                             <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_video" value="1"> Supprimer</label>
                         </div>
                     <?php endif; ?>
-                    <input type="file" name="video_file" accept="video/*">
 
                     <p style="font-size:0.82rem; color:#777; margin-top:14px;">« Valider et uniformiser » affiche le PDF dans une mise en page intégrée au site (au lieu du lecteur PDF brut).</p>
                     <div class="modal-actions">
@@ -205,6 +228,55 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                 </form>
             </div>
         </div>
+        <script>
+        (function () {
+            var zones = document.querySelectorAll('#contentForm .drop-zone');
+            for (var i = 0; i < zones.length; i++) {
+                (function (dz) {
+                    var input = dz.querySelector('.dz-input');
+                    var label = dz.querySelector('.dz-file');
+                    input.addEventListener('change', function () {
+                        if (input.files && input.files.length) {
+                            label.textContent = '✓ ' + input.files[0].name;
+                            label.hidden = false;
+                            dz.classList.add('has-file');
+                        } else {
+                            label.hidden = true;
+                            dz.classList.remove('has-file');
+                        }
+                    });
+                    ['dragenter', 'dragover'].forEach(function (ev) {
+                        dz.addEventListener(ev, function () { dz.classList.add('over'); });
+                    });
+                    ['dragleave', 'drop'].forEach(function (ev) {
+                        dz.addEventListener(ev, function () { dz.classList.remove('over'); });
+                    });
+                })(zones[i]);
+            }
+        })();
+        function dzPresent(id) {
+            var dz = document.getElementById(id);
+            if (!dz) { return false; }
+            var input = dz.querySelector('.dz-input');
+            if (input && input.files && input.files.length) { return true; }
+            if (dz.getAttribute('data-has-existing') === '1') {
+                var rm = document.querySelector('input[name="' + dz.getAttribute('data-remove') + '"]');
+                return !(rm && rm.checked);
+            }
+            return false;
+        }
+        function validateContent() {
+            var n = (dzPresent('dz_pdf') ? 1 : 0) + (dzPresent('dz_video') ? 1 : 0);
+            if (n === 0) {
+                alert("Aucun fichier : ajoutez au moins un PDF ou une vidéo pour enregistrer du contenu.");
+                return false;
+            }
+            if (n === 1) {
+                return confirm("Un seul des deux fichiers est renseigné (PDF ou vidéo). Voulez-vous continuer quand même ?");
+            }
+            return confirm("Enregistrer le contenu de ce module ?");
+        }
+        </script>
         <?php endif; ?>
 
         <?= moduleFormScript() ?>
