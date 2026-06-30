@@ -64,7 +64,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
     <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main"><br>
-        <h1><?= moduleIcon($module) ?> <?= htmlspecialchars($module['nom']) ?></h1>
+        <h1><?= moduleIconHtml($module, '1.6rem') ?> <?= htmlspecialchars($module['nom']) ?></h1>
         <?php if (!empty($module['description'])): ?>
             <div class="desc"><?= htmlspecialchars($module['description']) ?></div>
         <?php endif; ?>
@@ -76,7 +76,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <div class="tiles-container">
             <?php foreach ($children as $child): ?>
                 <a href="module.php?id=<?= (int) $child['id'] ?>" class="tile <?= ((int) $child['is_active'] !== 1) ? 'inactive' : '' ?>">
-                    <div class="tile-icon"><?= moduleIcon($child) ?></div>
+                    <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
                     <div class="tile-title"><?= htmlspecialchars($child['nom']) ?></div>
                     <div class="tile-desc"><?= htmlspecialchars($child['description'] ?? '') ?></div>
                     <?php if ($isAdmin): ?>

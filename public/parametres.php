@@ -20,51 +20,7 @@ if (!empty($_SESSION['module_flash'])) {
 $modules  = getModules($db, null, false); // tous les modules racine (actifs + inactifs)
 $profiles = moduleProfiles();
 $icons    = moduleIconChoices();
-
-/**
- * Affiche les champs communs d'un module (création ou édition).
- */
-function renderModuleFields($formId, $module, $profiles, $icons)
-{
-    $nom         = htmlspecialchars($module['nom'] ?? '');
-    $desc        = htmlspecialchars($module['description'] ?? '');
-    $isContainer = !empty($module['is_container']);
-    $curIcon     = trim((string) ($module['icon'] ?? ''));
-    $curRoles    = array_filter(array_map('trim', explode(',', (string) ($module['roles'] ?? ''))));
-    ?>
-    <label>Nom du module</label>
-    <input type="text" name="nom" required maxlength="150" value="<?= $nom ?>">
-    <label>Description (quelques mots)</label>
-    <textarea name="description" rows="2" maxlength="500"><?= $desc ?></textarea>
-    <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
-    <label>Icône</label>
-    <input type="hidden" name="icon" id="<?= $formId ?>_icon" value="<?= htmlspecialchars($curIcon) ?>">
-    <div class="icon-wrap" id="<?= $formId ?>_iconwrap">
-        <?php foreach ($icons as $em): ?>
-            <button type="button" class="icon-opt <?= ($em === $curIcon) ? 'sel' : '' ?>" onclick="pickIcon('<?= $formId ?>','<?= $em ?>',this)"><?= $em ?></button>
-        <?php endforeach; ?>
-    </div>
-    <label>Accès — quels profils voient ce module ? <small>(aucun coché = visible par tous)</small></label>
-    <div class="roles-wrap">
-        <?php foreach ($profiles as $key => $lbl): ?>
-            <label class="role-chk"><input type="checkbox" name="roles[]" value="<?= $key ?>" <?= in_array($key, $curRoles, true) ? 'checked' : '' ?>> <?= htmlspecialchars($lbl) ?></label>
-        <?php endforeach; ?>
-    </div>
-    <?php
-}
-
-function rolesLabel($module, $profiles)
-{
-    $roles = array_filter(array_map('trim', explode(',', (string) ($module['roles'] ?? ''))));
-    if (empty($roles)) {
-        return 'Tous';
-    }
-    $labels = [];
-    foreach ($roles as $r) {
-        $labels[] = $profiles[$r] ?? $r;
-    }
-    return implode(', ', $labels);
-}
+// renderModuleFields(), rolesLabel(), moduleIconHtml() viennent de includes/modules.php
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -128,10 +84,9 @@ function rolesLabel($module, $profiles)
 
     <div class="tabs">
         <button class="tab-btn active" onclick="showTab('modules', this)">Gestion des modules</button>
-        <button class="tab-btn" onclick="showTab('histmod', this)">Historique des modules</button>
-        <button class="tab-btn" onclick="showTab('histuser', this)">Historique des utilisateurs</button>
-        <button class="tab-btn" onclick="showTab('histprofil', this)">Historique des profils</button>
-        <button class="tab-btn" onclick="showTab('histagence', this)">Historique des agences</button>
+        <button class="tab-btn" onclick="showTab('histuser', this)">Gestion des utilisateurs</button>
+        <button class="tab-btn" onclick="showTab('histprofil', this)">Gestion des profils</button>
+        <button class="tab-btn" onclick="showTab('histagence', this)">Gestion des agences</button>
         <button class="tab-btn" onclick="showTab('prefs', this)">Préférences</button>
     </div>
 
@@ -149,7 +104,7 @@ function rolesLabel($module, $profiles)
                 <tbody>
                     <?php foreach ($modules as $m): ?>
                     <tr>
-                        <td style="font-size:1.4rem;"><?= moduleIcon($m) ?></td>
+                        <td><?= moduleIconHtml($m, '1.8rem') ?></td>
                         <td>
                             <strong><?= htmlspecialchars($m['nom']) ?></strong>
                             <div class="muted" style="font-size:0.82rem;"><?= htmlspecialchars($m['description'] ?? '') ?></div>
@@ -193,10 +148,9 @@ function rolesLabel($module, $profiles)
     </div>
 
     <!-- ONGLETS à venir -->
-    <div id="tab-histmod" class="tab-content"><div class="card"><div class="soon">Historique des modules — à venir.</div></div></div>
-    <div id="tab-histuser" class="tab-content"><div class="card"><div class="soon">Historique des utilisateurs — à venir.</div></div></div>
-    <div id="tab-histprofil" class="tab-content"><div class="card"><div class="soon">Historique des profils — à venir.</div></div></div>
-    <div id="tab-histagence" class="tab-content"><div class="card"><div class="soon">Historique des agences — à venir.</div></div></div>
+    <div id="tab-histuser" class="tab-content"><div class="card"><div class="soon">Gestion des utilisateurs — à venir.</div></div></div>
+    <div id="tab-histprofil" class="tab-content"><div class="card"><div class="soon">Gestion des profils — à venir.</div></div></div>
+    <div id="tab-histagence" class="tab-content"><div class="card"><div class="soon">Gestion des agences — à venir.</div></div></div>
     <div id="tab-prefs" class="tab-content"><div class="card"><div class="soon">Préférences (langue FR/NL, personnalisation) — à venir.</div></div></div>
 </div>
 
@@ -204,7 +158,7 @@ function rolesLabel($module, $profiles)
 <div id="createModal" class="modal-backdrop">
     <div class="modal-card">
         <h3>Nouveau module</h3>
-        <form method="POST" action="module_save.php">
+        <form method="POST" action="module_save.php" enctype="multipart/form-data">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="create">
             <input type="hidden" name="return" value="parametres.php">
@@ -222,7 +176,7 @@ function rolesLabel($module, $profiles)
 <div id="editModal_<?= (int) $m['id'] ?>" class="modal-backdrop">
     <div class="modal-card">
         <h3>Modifier « <?= htmlspecialchars($m['nom']) ?> »</h3>
-        <form method="POST" action="module_save.php" onsubmit="return confirm('Enregistrer les modifications de ce module ?');">
+        <form method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return confirm('Enregistrer les modifications de ce module ?');">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">

@@ -26,3 +26,6 @@ backups/
 
 # node_modules (si futur)
 node_modules/
+
+# Fichiers uploadés des modules (stockés sur le Volume Railway, pas dans git)
+uploads/modules/

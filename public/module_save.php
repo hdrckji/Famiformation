@@ -34,6 +34,39 @@ function safeReturn($value, $default = 'index.php')
     return $default;
 }
 
+// Gère l'upload d'une image d'icône -> renvoie le chemin relatif, ou null
+function handleModuleIconUpload()
+{
+    if (empty($_FILES['icon_image']) || ($_FILES['icon_image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+    $f = $_FILES['icon_image'];
+    if ($f['error'] !== UPLOAD_ERR_OK || $f['size'] <= 0 || $f['size'] > 2 * 1024 * 1024) {
+        return null; // 2 Mo max
+    }
+    $mime = function_exists('mime_content_type') ? @mime_content_type($f['tmp_name']) : '';
+    $map = [
+        'image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif',
+        'image/webp' => 'webp', 'image/svg+xml' => 'svg',
+    ];
+    if (isset($map[$mime])) {
+        $ext = $map[$mime];
+    } else {
+        $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'], true)) {
+            return null;
+        }
+        if ($ext === 'jpeg') { $ext = 'jpg'; }
+    }
+    $dir = __DIR__ . '/uploads/modules/icons';
+    if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+    $name = 'icon_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
+        return null;
+    }
+    return 'uploads/modules/icons/' . $name;
+}
+
 $redirectTo = safeReturn($_POST['return'] ?? '', 'index.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -51,8 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($nom === '') {
             $_SESSION['module_flash'] = "❌ Le nom du module est obligatoire.";
         } else {
+            $iconImage = handleModuleIconUpload();
             $stmt = $db->prepare(
-                "INSERT INTO modules (nom, description, is_container, parent_id, icon, roles) VALUES (?, ?, ?, ?, ?, ?)"
+                "INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, icon_image) VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->execute([
                 mb_substr($nom, 0, 150),
@@ -61,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $parentId,
                 mb_substr($icon, 0, 16),
                 $roles,
+                $iconImage,
             ]);
             $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé.";
         }
@@ -77,8 +112,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $roles = sanitizeModuleRoles($_POST['roles'] ?? []);
 
         if ($id > 0 && $nom !== '') {
+            $existing = getModuleById($db, $id);
+            $iconImage = $existing['icon_image'] ?? null;
+            if (!empty($_POST['remove_icon_image'])) { $iconImage = null; }
+            $uploaded = handleModuleIconUpload();
+            if ($uploaded !== null) { $iconImage = $uploaded; }
+
             $stmt = $db->prepare(
-                "UPDATE modules SET nom = ?, description = ?, is_container = ?, icon = ?, roles = ? WHERE id = ?"
+                "UPDATE modules SET nom = ?, description = ?, is_container = ?, icon = ?, roles = ?, icon_image = ? WHERE id = ?"
             );
             $stmt->execute([
                 mb_substr($nom, 0, 150),
@@ -86,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $isContainer,
                 mb_substr($icon, 0, 16),
                 $roles,
+                $iconImage,
                 $id,
             ]);
             $_SESSION['module_flash'] = "✅ Module « " . $nom . " » modifié.";

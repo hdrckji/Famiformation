@@ -171,13 +171,22 @@ if (!empty($_SESSION['module_flash'])) {
 
         /* Modale de création de module */
         .mm-modal-backdrop { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
-        .mm-modal-card { background: #fff; border-radius: 14px; padding: 28px; max-width: 460px; width: 90%; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .mm-modal-card { background: #fff; border-radius: 14px; padding: 28px; max-width: 460px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
         .mm-modal-card h3 { margin-top: 0; color: #2d5a37; }
         .mm-modal-card label { display: block; font-weight: 700; color: #244230; margin: 12px 0 4px; }
         .mm-modal-card input[type=text], .mm-modal-card textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font: inherit; }
         .mm-modal-card .mm-check { font-weight: 600; display: flex; align-items: center; gap: 8px; }
         .mm-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
         .btn-cancel { background: #e9ecef; color: #333; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; cursor: pointer; }
+        /* Champs du formulaire de module (icône / accès) */
+        .mm-modal-card .chk { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .mm-modal-card label { display: block; font-weight: 700; color: #244230; margin: 12px 0 4px; }
+        .mm-modal-card input[type=file] { width: 100%; }
+        .icon-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+        .icon-opt { font-size: 1.3rem; background: #f4f7f6; border: 2px solid transparent; border-radius: 10px; padding: 6px 8px; cursor: pointer; }
+        .icon-opt.sel { border-color: #2d5a37; background: #e8f5e9; }
+        .roles-wrap { display: flex; flex-wrap: wrap; gap: 12px; }
+        .role-chk { font-weight: 600; display: flex; align-items: center; gap: 6px; }
     </style>
 </head>
 <body>
@@ -349,7 +358,7 @@ if (!empty($_SESSION['module_flash'])) {
         <?php foreach ($dynamicModules as $mod): ?>
         <?php if (!$isAdmin && !userCanSeeModule($mod, $role)) { continue; } ?>
         <a href="module.php?id=<?= (int) $mod['id'] ?>" class="tile<?= ((int) $mod['is_active'] !== 1) ? ' tile-inactive' : '' ?>">
-            <div class="tile-media"><span class="tile-icon"><?= moduleIcon($mod) ?></span></div>
+            <div class="tile-media"><?= moduleIconHtml($mod) ?></div>
             <div class="tile-title"><?= htmlspecialchars($mod['nom']) ?></div>
             <div class="tile-desc"><?= htmlspecialchars($mod['description'] ?? '') ?></div>
         </a>
@@ -362,14 +371,11 @@ if (!empty($_SESSION['module_flash'])) {
     <div id="moduleCreateModal" class="mm-modal-backdrop">
         <div class="mm-modal-card">
             <h3>Nouveau module</h3>
-            <form method="POST" action="module_save.php">
+            <form method="POST" action="module_save.php" enctype="multipart/form-data">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="create">
-                <label>Nom du module</label>
-                <input type="text" name="nom" required maxlength="150">
-                <label>Description (quelques mots)</label>
-                <textarea name="description" rows="2" maxlength="500"></textarea>
-                <label class="mm-check"><input type="checkbox" name="is_container" value="1"> Mon module contient d'autres modules</label>
+                <input type="hidden" name="return" value="index.php">
+                <?php renderModuleFields('qcreate', [], moduleProfiles(), moduleIconChoices()); ?>
                 <div class="mm-modal-actions">
                     <button type="button" class="btn-cancel" onclick="document.getElementById('moduleCreateModal').style.display='none';">Annuler</button>
                     <button type="submit" class="btn-mm-create">Créer le module</button>
@@ -377,6 +383,7 @@ if (!empty($_SESSION['module_flash'])) {
             </form>
         </div>
     </div>
+    <?= moduleFormScript() ?>
     <?php endif; ?>
 
 </body>
