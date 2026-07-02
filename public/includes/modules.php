@@ -98,6 +98,13 @@ if (!function_exists('ensureModulesTable')) {
                 $db->exec("UPDATE modules SET is_locked = 1");
                 $setFlag('lock_existing_v1');
             }
+
+            // 3) Verrouiller les profils de base (une seule fois)
+            if (!$hasFlag('profiles_lock_base_v1')) {
+                ensureProfilesTable($db);
+                $db->exec("UPDATE profils SET is_locked = 1 WHERE is_core = 1");
+                $setFlag('profiles_lock_base_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
@@ -115,16 +122,22 @@ if (!function_exists('ensureModulesTable')) {
                     cle VARCHAR(50) NOT NULL UNIQUE,
                     libelle VARCHAR(100) NOT NULL,
                     is_core TINYINT(1) NOT NULL DEFAULT 0,
+                    is_locked TINYINT(1) NOT NULL DEFAULT 0,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
             );
+            // Colonne is_locked ajoutée après coup (installations existantes)
+            $chk = $db->query("SHOW COLUMNS FROM profils LIKE 'is_locked'");
+            if ($chk && !$chk->fetch()) {
+                $db->exec("ALTER TABLE profils ADD COLUMN is_locked TINYINT(1) NOT NULL DEFAULT 0");
+            }
             $count = (int) $db->query("SELECT COUNT(*) FROM profils")->fetchColumn();
             if ($count === 0) {
                 $seed = [
                     ['etudiant', 'Étudiant'], ['employe_magasin', 'Magasin'], ['teamcoach', 'Teamcoach'],
                     ['mentor', 'Mentor'], ['employe_logistique', 'Logistique'], ['admin', 'Admin'], ['evaluateur', 'Évaluateur'],
                 ];
-                $ins = $db->prepare("INSERT INTO profils (cle, libelle, is_core) VALUES (?, ?, 1)");
+                $ins = $db->prepare("INSERT INTO profils (cle, libelle, is_core, is_locked) VALUES (?, ?, 1, 1)");
                 foreach ($seed as $s) {
                     $ins->execute($s);
                 }
@@ -327,19 +340,26 @@ if (!function_exists('ensureModulesTable')) {
             echo moduleFieldsAssets();
         }
         ?>
+        <?php if (!empty($module['is_locked'])): ?>
+            <div class="lock-note">🔒 Module verrouillé — saisissez le mot de passe de verrouillage pour enregistrer une modification.</div>
+            <label>Mot de passe de verrouillage</label>
+            <input type="password" name="admin_password" placeholder="Mot de passe de verrouillage" required autocomplete="off" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px; font:inherit;">
+        <?php endif; ?>
         <label>Nom du module</label>
         <input type="text" name="nom" required maxlength="150" value="<?= $nom ?>">
         <label>Description (quelques mots)</label>
         <textarea name="description" rows="2" maxlength="500"><?= $desc ?></textarea>
         <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
 
-        <label>Accès — profils qui voient ce module <small>(rien de sélectionné = visible par tous)</small></label>
-        <select name="roles[]" multiple class="roles-select" size="<?= max(4, min(9, count($profiles))) ?>">
-            <?php foreach ($profiles as $key => $lbl): ?>
-                <option value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $curRoles, true) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <div class="roles-hint">Maintenez Ctrl (⌘ sur Mac) pour sélectionner plusieurs profils, ou glissez la souris.</div>
+        <label>Accès <small>(rien de coché = visible par tous)</small></label>
+        <details class="access-drop">
+            <summary>Choisir les profils…</summary>
+            <div class="roles-wrap">
+                <?php foreach ($profiles as $key => $lbl): ?>
+                    <label class="role-chk"><input type="checkbox" name="roles[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $curRoles, true) ? 'checked' : '' ?>> <?= htmlspecialchars($lbl) ?></label>
+                <?php endforeach; ?>
+            </div>
+        </details>
 
         <details class="adv-options">
             <summary>Options avancées — icône &amp; image</summary>
@@ -386,10 +406,14 @@ if (!function_exists('ensureModulesTable')) {
         .adv-options[open] > summary::before { content: '▾ '; }
         .adv-body { padding: 4px 2px 12px; }
         .adv-note { font-size: 0.82rem; color: #777; margin: 0 0 10px; }
-        .roles-select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font: inherit; background: #fff; }
-        .roles-select option { padding: 5px 8px; border-radius: 6px; }
-        .roles-select option:checked { background: #2d5a37 linear-gradient(0deg, #2d5a37, #2d5a37); color: #fff; }
-        .roles-hint { font-size: 0.8rem; color: #888; margin-top: 4px; }
+        .access-drop { margin-top: 4px; border: 1px solid #cdd8d0; border-radius: 10px; padding: 2px 12px; background: #fff; }
+        .access-drop > summary { cursor: pointer; font-weight: 600; color: #2d5a37; padding: 10px 2px; list-style: none; }
+        .access-drop > summary::-webkit-details-marker { display: none; }
+        .access-drop > summary::before { content: '▸ '; }
+        .access-drop[open] > summary::before { content: '▾ '; }
+        .access-drop .roles-wrap { display: flex; flex-wrap: wrap; gap: 10px 16px; padding: 6px 2px 12px; }
+        .access-drop .role-chk { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .lock-note { background: #fff8e1; border: 1px solid #ffe082; color: #6a5400; padding: 10px 12px; border-radius: 10px; font-weight: 700; font-size: 0.86rem; margin-top: 6px; }
         .dzm { position: relative; border: 2px dashed #b9cdbf; border-radius: 12px; background: #f6faf7; padding: 16px; text-align: center; cursor: pointer; margin-top: 4px; transition: all .15s ease; }
         .dzm:hover { border-color: #2d5a37; background: #eef7f0; }
         .dzm.over { border-color: #2d5a37; background: #e3f2e7; }

@@ -25,7 +25,7 @@ $icons    = moduleIconChoices();
 ensureProfilesTable($db);
 $profilsRows = [];
 try {
-    $profilsRows = $db->query("SELECT id, cle, libelle, is_core FROM profils ORDER BY libelle ASC")->fetchAll(PDO::FETCH_ASSOC);
+    $profilsRows = $db->query("SELECT id, cle, libelle, is_core, is_locked FROM profils ORDER BY libelle ASC")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     $profilsRows = [];
 }
@@ -246,7 +246,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </form>
 
             <table>
-                <thead><tr><th>Profil</th><th>Clé technique</th><th>Utilisateurs</th><th>Action</th></tr></thead>
+                <thead><tr><th>Profil</th><th>Clé technique</th><th>Utilisateurs</th><th>Verrou</th><th>Action</th></tr></thead>
                 <tbody>
                     <?php foreach ($profilsRows as $p): ?>
                     <tr>
@@ -254,20 +254,23 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         <td class="muted"><?= htmlspecialchars($p['cle']) ?></td>
                         <td><?= (int) ($roleCounts[$p['cle']] ?? 0) ?></td>
                         <td>
-                            <?php if (empty($p['is_core'])): ?>
+                            <button type="button" class="btn btn-light" onclick="askPassword('toggle_lock_profile', <?= (int) $p['id'] ?>)"><?= !empty($p['is_locked']) ? '🔓 Déverrouiller' : '🔒 Verrouiller' ?></button>
+                        </td>
+                        <td>
+                            <?php if (!empty($p['is_locked'])): ?>
+                                <button type="button" class="btn btn-danger" onclick="askPassword('delete_profile', <?= (int) $p['id'] ?>)" title="Supprimer (verrouillé)">Supprimer</button>
+                            <?php else: ?>
                                 <form method="POST" action="module_save.php" onsubmit="return confirm('Supprimer le profil « <?= htmlspecialchars(addslashes($p['libelle'])) ?> » ?');" style="display:inline;">
                                     <?= csrfField() ?>
                                     <input type="hidden" name="action" value="delete_profile">
                                     <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
                                     <button type="submit" class="btn btn-danger" style="padding:6px 12px;">Supprimer</button>
                                 </form>
-                            <?php else: ?>
-                                <span class="muted">—</span>
                             <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
-                    <?php if (empty($profilsRows)): ?><tr><td colspan="4" class="muted">Aucun profil.</td></tr><?php endif; ?>
+                    <?php if (empty($profilsRows)): ?><tr><td colspan="5" class="muted">Aucun profil.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -358,13 +361,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 <div id="pwdModal" class="modal-backdrop">
     <div class="modal-card">
         <h3 id="pwdTitle">Confirmation</h3>
-        <p>Entrez votre <strong>mot de passe administrateur</strong> pour confirmer.</p>
+        <p>Entrez le <strong>mot de passe de verrouillage</strong> pour confirmer.</p>
         <form method="POST" action="module_save.php">
             <?= csrfField() ?>
             <input type="hidden" name="action" id="pwdAction" value="">
             <input type="hidden" name="id" id="pwdId" value="">
             <input type="hidden" name="return" value="parametres.php">
-            <input type="password" name="admin_password" id="pwdInput" placeholder="Mot de passe admin" required style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
+            <input type="password" name="admin_password" id="pwdInput" placeholder="Mot de passe de verrouillage" required style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
             <div class="modal-actions">
                 <button type="button" class="btn btn-light" onclick="closeModal('pwdModal')">Annuler</button>
                 <button type="submit" class="btn btn-primary">Confirmer</button>
@@ -377,7 +380,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     function askPassword(action, id) {
         document.getElementById('pwdAction').value = action;
         document.getElementById('pwdId').value = id;
-        document.getElementById('pwdTitle').textContent = (action === 'delete') ? 'Supprimer ce module verrouillé' : 'Verrouiller / déverrouiller le module';
+        var titles = {
+            'delete': 'Supprimer ce module verrouillé',
+            'toggle_lock': 'Verrouiller / déverrouiller le module',
+            'delete_profile': 'Supprimer ce profil verrouillé',
+            'toggle_lock_profile': 'Verrouiller / déverrouiller le profil'
+        };
+        document.getElementById('pwdTitle').textContent = titles[action] || 'Confirmation';
         document.getElementById('pwdInput').value = '';
         openModal('pwdModal');
     }

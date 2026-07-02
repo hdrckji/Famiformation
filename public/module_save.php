@@ -142,24 +142,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0 && $nom !== '') {
             $existing = getModuleById($db, $id);
-            $iconImage = $existing['icon_image'] ?? null;
-            if (!empty($_POST['remove_icon_image'])) { $iconImage = null; }
-            $uploaded = handleModuleIconUpload();
-            if ($uploaded !== null) { $iconImage = $uploaded; }
+            if ($existing && !empty($existing['is_locked']) && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+                $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage requis, modification annulée.";
+            } else {
+                $iconImage = $existing['icon_image'] ?? null;
+                if (!empty($_POST['remove_icon_image'])) { $iconImage = null; }
+                $uploaded = handleModuleIconUpload();
+                if ($uploaded !== null) { $iconImage = $uploaded; }
 
-            $stmt = $db->prepare(
-                "UPDATE modules SET nom = ?, description = ?, is_container = ?, icon = ?, roles = ?, icon_image = ? WHERE id = ?"
-            );
-            $stmt->execute([
-                mb_substr($nom, 0, 150),
-                mb_substr($description, 0, 500),
-                $isContainer,
-                mb_substr($icon, 0, 16),
-                $roles,
-                $iconImage,
-                $id,
-            ]);
-            $_SESSION['module_flash'] = "✅ Module « " . $nom . " » modifié.";
+                $stmt = $db->prepare(
+                    "UPDATE modules SET nom = ?, description = ?, is_container = ?, icon = ?, roles = ?, icon_image = ? WHERE id = ?"
+                );
+                $stmt->execute([
+                    mb_substr($nom, 0, 150),
+                    mb_substr($description, 0, 500),
+                    $isContainer,
+                    mb_substr($icon, 0, 16),
+                    $roles,
+                    $iconImage,
+                    $id,
+                ]);
+                $_SESSION['module_flash'] = "✅ Module « " . $nom . " » modifié.";
+            }
         } else {
             $_SESSION['module_flash'] = "❌ Modification impossible (nom obligatoire).";
         }
@@ -172,7 +176,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'content') {
         $id = (int) ($_POST['id'] ?? 0);
         $module = $id > 0 ? getModuleById($db, $id) : null;
-        if ($module) {
+        if ($module && !empty($module['is_locked']) && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+            $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage requis, contenu inchangé.";
+            $redirectTo = 'module.php?id=' . $id;
+        } elseif ($module) {
             $pdfPath   = $module['pdf_path'];
             $videoPath = $module['video_path'];
 
@@ -247,16 +254,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ensureProfilesTable($db);
         $id = (int) ($_POST['id'] ?? 0);
         if ($id > 0) {
-            $stmt = $db->prepare("SELECT libelle, is_core FROM profils WHERE id = ? LIMIT 1");
+            $stmt = $db->prepare("SELECT libelle, is_locked FROM profils WHERE id = ? LIMIT 1");
             $stmt->execute([$id]);
             $prof = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$prof) {
                 $_SESSION['module_flash'] = "❌ Profil introuvable.";
-            } elseif (!empty($prof['is_core'])) {
-                $_SESSION['module_flash'] = "❌ Le profil « " . $prof['libelle'] . " » est un profil de base : il ne peut pas être supprimé.";
+            } elseif (!empty($prof['is_locked']) && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+                $_SESSION['module_flash'] = "❌ Profil verrouillé : mot de passe de verrouillage incorrect, suppression annulée.";
             } else {
                 $db->prepare("DELETE FROM profils WHERE id = ?")->execute([$id]);
                 $_SESSION['module_flash'] = "✅ Profil « " . $prof['libelle'] . " » supprimé.";
+            }
+        }
+        $redirectTo = 'parametres.php';
+    } elseif ($action === 'toggle_lock_profile') {
+        ensureProfilesTable($db);
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            if (adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+                $db->prepare("UPDATE profils SET is_locked = 1 - is_locked WHERE id = ?")->execute([$id]);
+                $_SESSION['module_flash'] = "✅ Verrouillage du profil mis à jour.";
+            } else {
+                $_SESSION['module_flash'] = "❌ Mot de passe de verrouillage incorrect : verrouillage inchangé.";
             }
         }
         $redirectTo = 'parametres.php';

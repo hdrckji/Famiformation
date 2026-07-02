@@ -16,10 +16,16 @@ if ($role === 'etudiant') {
 }
 
 
-// Restriction accès planning pour étudiant sans quizz validés
+// Vue courante : landing (2 modules), présentiel, ou en ligne
+$vue = $_GET['vue'] ?? '';
+if (!in_array($vue, ['presentiel', 'enligne'], true)) {
+    $vue = '';
+}
+
+// Restriction accès planning pour étudiant sans quizz validés (uniquement en présentiel)
 // Flag pour le pop-up
 $hasPlanningAccess = ($role !== 'etudiant' || hasCompletedCaisseQuizzes($user_id));
-$showQuizzPopup = !$hasPlanningAccess;
+$showQuizzPopup = ($vue === 'presentiel') && !$hasPlanningAccess;
 
 // 1. Inscription à un créneau
 if (isset($_POST['inscrire'])) {
@@ -274,15 +280,27 @@ $publicLabels = [
 </head>
 <body>
     <div class="container">
-        <?php if ($role === 'admin' || $role === 'employe_magasin' || $role === 'teamcoach' || $role === 'mentor'): ?>
-              <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'teamcoach') : ?>
-                 <a href="admin_formations.php" class="btn-admin-top">⚙️ Gérer les sessions</a>
-              <?php endif; ?>
-        <?php endif; ?>
+        <?php if ($vue === ''): ?>
+        <h1>🎓 Formation</h1>
+        <p style="color:#666; margin-bottom:30px;">Choisissez un type de formation.</p>
+        <div class="formations-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+            <a href="formation.php?vue=enligne" class="formation-card" style="text-decoration:none; color:inherit; text-align:center;">
+                <div style="font-size:3rem;">💻</div>
+                <div class="formation-title" style="text-align:center;">En ligne</div>
+                <div class="formation-desc" style="text-align:center;">Formations à faire directement sur le site.</div>
+            </a>
+            <a href="formation.php?vue=presentiel" class="formation-card" style="text-decoration:none; color:inherit; text-align:center;">
+                <div style="font-size:3rem;">📅</div>
+                <div class="formation-title" style="text-align:center;">Présentiel</div>
+                <div class="formation-desc" style="text-align:center;">Sessions de formation pratique en magasin.</div>
+            </a>
+        </div>
 
-        <?php if (!empty($formationsEnLigne)): ?>
+        <?php elseif ($vue === 'enligne'): ?>
+        <a href="formation.php" style="display:inline-block; color:#2d5a37; font-weight:bold; text-decoration:none; margin-bottom:10px;">⬅ Retour</a>
         <h1>💻 Formations en ligne</h1>
         <p style="color: #666; margin-bottom: 30px;">Formations à réaliser directement sur le site. Consultez le contenu, vous serez ensuite évalué.</p>
+        <?php if (!empty($formationsEnLigne)): ?>
         <div class="formations-grid">
             <?php foreach ($formationsEnLigne as $fl): ?>
             <div class="formation-card">
@@ -294,7 +312,16 @@ $publicLabels = [
             </div>
             <?php endforeach; ?>
         </div>
-        <hr style="margin:34px 0 28px; border:none; border-top:1px solid #e3e3e3;">
+        <?php else: ?>
+        <div class="formation-card" style="text-align:center;">Aucune formation en ligne pour l'instant.</div>
+        <?php endif; ?>
+
+        <?php else: ?>
+        <a href="formation.php" style="display:inline-block; color:#2d5a37; font-weight:bold; text-decoration:none; margin-bottom:10px;">⬅ Retour</a>
+        <?php if ($role === 'admin' || $role === 'employe_magasin' || $role === 'teamcoach' || $role === 'mentor'): ?>
+              <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'teamcoach') : ?>
+                 <a href="admin_formations.php" class="btn-admin-top">⚙️ Gérer les sessions</a>
+              <?php endif; ?>
         <?php endif; ?>
 
         <h1>📅 Formations Présentielles</h1>
@@ -403,6 +430,7 @@ $publicLabels = [
                 <button type="submit" name="suggest_formation" class="btn-suggest">Envoyer ma suggestion</button>
             </form>
         </div>
+        <?php endif; ?>
 
         <a href="index.php" class="btn-back-home">⬅ Retour au menu principal</a>
     </div>

@@ -195,6 +195,12 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                     <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
                     <input type="hidden" name="return" value="module.php?id=<?= (int) $module['id'] ?>">
 
+                    <?php if (!empty($module['is_locked'])): ?>
+                        <div style="background:#fff8e1; border:1px solid #ffe082; color:#6a5400; padding:10px 12px; border-radius:10px; font-weight:700; font-size:0.86rem;">🔒 Module verrouillé — mot de passe requis pour enregistrer.</div>
+                        <label style="display:block; font-weight:700; color:#244230; margin:12px 0 4px;">Mot de passe de verrouillage</label>
+                        <input type="password" name="admin_password" required autocomplete="off" placeholder="Mot de passe de verrouillage" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
+                    <?php endif; ?>
+
                     <!-- Grand bloc PDF -->
                     <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
                         <input type="file" name="pdf_file" accept="application/pdf" class="dz-input">
