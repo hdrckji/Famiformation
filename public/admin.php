@@ -540,7 +540,7 @@ $users = $db->query($query_str)->fetchAll();
                                 <?php echo csrfField(); ?>
                                 <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
                                 <input type="hidden" name="nouveau_interim" value="<?php echo htmlspecialchars($u['interim'] ?? ''); ?>">
-                                <select name="nouveau_role" class="input-mini">
+                                <select name="nouveau_role" class="input-mini" data-original="<?php echo htmlspecialchars($u['role']); ?>">
                                     <option value="etudiant" <?php if($u['role']=='etudiant') echo 'selected'; ?>>Étudiant</option>
                                     <option value="employe_magasin" <?php if($u['role']=='employe_magasin') echo 'selected'; ?>>Magasin</option>
                                     <option value="teamcoach" <?php if($u['role']=='teamcoach') echo 'selected'; ?>>Teamcoach</option>
@@ -601,13 +601,21 @@ $users = $db->query($query_str)->fetchAll();
     </div>
 </div>
 <script>
-// Confirmation seulement si un nouveau mot de passe est réellement saisi
+// Confirmation si le profil change et/ou si un nouveau mot de passe est saisi
 function confirmRoleForm(form) {
+    var changes = [];
+    var role = form.querySelector('select[name="nouveau_role"]');
+    if (role && role.value !== role.getAttribute('data-original')) {
+        changes.push('le profil');
+    }
     var pw = form.querySelector('input[name="nouveau_mdp"]');
     if (pw && pw.value.trim() !== '') {
-        return confirm('Modifier le mot de passe de ce collaborateur ?');
+        changes.push('le mot de passe');
     }
-    return true;
+    if (changes.length === 0) {
+        return true;
+    }
+    return confirm('Modifier ' + changes.join(' et ') + ' de ce collaborateur ?');
 }
 
 const roleField = document.getElementById('new_role');
