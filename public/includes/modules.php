@@ -83,7 +83,7 @@ if (!function_exists('ensureModulesTable')) {
                    ->execute([
                        'Aide',
                        "Bloqué ? Vous avez besoin d'un renseignement ? Ce module est là pour ça : vous y trouverez les réponses à vos questions.",
-                       '🆘',
+                       '🛠️',
                        $roles,
                    ]);
                 $aideId = (int) $db->lastInsertId();
@@ -151,6 +151,12 @@ if (!function_exists('ensureModulesTable')) {
                     $db->prepare("UPDATE modules SET parent_id = ? WHERE parent_id IS NULL AND link IS NOT NULL AND link <> '' AND nom IN ('Becosoft', 'Logistique', 'Magasin')")->execute([$aideId]);
                 }
                 $setFlag('reorg_aide_v2');
+            }
+
+            // 6) Icône du module « Aide » : outils au lieu du SOS
+            if (!$hasFlag('aide_icon_tools_v1')) {
+                $db->prepare("UPDATE modules SET icon = ? WHERE nom = 'Aide' AND parent_id IS NULL")->execute(['🛠️']);
+                $setFlag('aide_icon_tools_v1');
             }
         } catch (Exception $e) {
             // migration non critique : on ignore
