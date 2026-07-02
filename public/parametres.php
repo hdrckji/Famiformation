@@ -21,6 +21,15 @@ $profiles = moduleProfiles($db);
 $icons    = moduleIconChoices();
 // renderModuleFields(), rolesLabel(), moduleIconHtml(), adminPasswordOk() viennent de includes/modules.php
 
+// Profils gérables (table `profils`), pour l'ajout / suppression
+ensureProfilesTable($db);
+$profilsRows = [];
+try {
+    $profilsRows = $db->query("SELECT id, cle, libelle, is_core FROM profils ORDER BY libelle ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $profilsRows = [];
+}
+
 // Tous les modules, organisés en arbre (parents puis enfants indentés)
 $allModules = getAllModules($db);
 $byParent = [];
@@ -224,12 +233,62 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     <div id="tab-histprofil" class="tab-content">
         <div class="card">
             <h2 style="margin-top:0; color:#2d5a37;">Profils</h2>
-            <p class="muted">Profils existants et nombre d'utilisateurs. La création/suppression de profils (rôles dynamiques) arrivera dans une prochaine étape.</p>
+            <p class="muted">Ajoutez ou supprimez des profils. Un nouveau profil apparaît automatiquement dans la liste d'accès des modules.</p>
+
+            <form method="POST" action="module_save.php" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="add_profile">
+                <div>
+                    <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Nom du profil</label>
+                    <input type="text" name="profile_label" required maxlength="100" placeholder="Ex : Responsable rayon" style="padding:9px 10px; border:1px solid #ccc; border-radius:8px; min-width:220px;">
+                </div>
+                <button type="submit" class="btn btn-primary">➕ Ajouter le profil</button>
+            </form>
+
             <table>
-                <thead><tr><th>Profil</th><th>Clé technique</th><th>Utilisateurs</th></tr></thead>
+                <thead><tr><th>Profil</th><th>Clé technique</th><th>Utilisateurs</th><th>Action</th></tr></thead>
+                <tbody>
+                    <?php foreach ($profilsRows as $p): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($p['libelle']) ?><?= !empty($p['is_core']) ? ' <span class="pill on">base</span>' : '' ?></td>
+                        <td class="muted"><?= htmlspecialchars($p['cle']) ?></td>
+                        <td><?= (int) ($roleCounts[$p['cle']] ?? 0) ?></td>
+                        <td>
+                            <?php if (empty($p['is_core'])): ?>
+                                <form method="POST" action="module_save.php" onsubmit="return confirm('Supprimer le profil « <?= htmlspecialchars(addslashes($p['libelle'])) ?> » ?');" style="display:inline;">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="action" value="delete_profile">
+                                    <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                                    <button type="submit" class="btn btn-danger" style="padding:6px 12px;">Supprimer</button>
+                                </form>
+                            <?php else: ?>
+                                <span class="muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($profilsRows)): ?><tr><td colspan="4" class="muted">Aucun profil.</td></tr><?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+            <h2 style="margin-top:0; color:#2d5a37;">Accès aux modules par profil</h2>
+            <p class="muted">Modules visibles par chaque profil. Pour modifier un accès, ouvrez le module dans « Gestion des modules ». Admin et Teamcoach voient tous les modules.</p>
+            <table>
+                <thead><tr><th>Profil</th><th>Modules visibles</th></tr></thead>
                 <tbody>
                     <?php foreach ($profiles as $key => $lbl): ?>
-                    <tr><td><?= htmlspecialchars($lbl) ?></td><td class="muted"><?= htmlspecialchars($key) ?></td><td><?= (int) ($roleCounts[$key] ?? 0) ?></td></tr>
+                        <?php
+                        $vis = [];
+                        foreach ($allModules as $m) {
+                            if (userCanSeeModule($m, $key)) { $vis[] = $m['nom']; }
+                        }
+                        ?>
+                        <tr>
+                            <td><?= htmlspecialchars($lbl) ?></td>
+                            <td><?= empty($vis) ? '<span class="muted">Aucun</span>' : htmlspecialchars(implode(', ', $vis)) ?></td>
+                        </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>

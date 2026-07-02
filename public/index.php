@@ -247,8 +247,8 @@ if (!empty($_SESSION['module_flash'])) {
                 <span class="badge-new"><?= t('NOUVEAU', 'NIEUW') ?></span>
             <?php endif; ?>
             <div class="tile-media"><span class="tile-icon">📅</span></div>
-            <div class="tile-title"><?= t('Planning Formations', 'Opleidingsplanning') ?></div>
-            <div class="tile-desc"><?= t('Inscrivez-vous aux sessions en présentiel.', 'Schrijf je in voor de sessies ter plaatse.') ?></div>
+            <div class="tile-title"><?= t('Formation', 'Opleiding') ?></div>
+            <div class="tile-desc"><?= t('Formations en ligne et en présentiel.', 'Opleidingen online en ter plaatse.') ?></div>
         </a>
 
         <?php if ($role === 'admin' || $role === 'teamcoach' || $role === 'mentor' || $role === 'employe_magasin'): ?>

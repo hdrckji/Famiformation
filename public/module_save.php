@@ -202,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare("UPDATE modules SET is_locked = 1 - is_locked WHERE id = ?")->execute([$id]);
                 $_SESSION['module_flash'] = "✅ Verrouillage du module mis à jour.";
             } else {
-                $_SESSION['module_flash'] = "❌ Mot de passe admin incorrect : verrouillage inchangé.";
+                $_SESSION['module_flash'] = "❌ Mot de passe de verrouillage incorrect : verrouillage inchangé.";
             }
         }
     } elseif ($action === 'delete') {
@@ -212,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($module) {
                 $locked = !empty($module['is_locked']);
                 if ($locked && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
-                    $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe admin incorrect, suppression annulée.";
+                    $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage incorrect, suppression annulée.";
                 } else {
                     // Supprime aussi les éventuels sous-modules
                     $db->prepare("DELETE FROM modules WHERE id = ? OR parent_id = ?")->execute([$id, $id]);
@@ -223,6 +223,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif ($action === 'add_profile') {
+        ensureProfilesTable($db);
+        $libelle = trim((string) ($_POST['profile_label'] ?? ''));
+        $cle     = trim((string) ($_POST['profile_key'] ?? ''));
+        if ($cle === '') { $cle = $libelle; }
+        $cle = strtolower($cle);
+        $cle = preg_replace('/[^a-z0-9]+/', '_', $cle);
+        $cle = trim((string) $cle, '_');
+        if ($libelle === '' || $cle === '') {
+            $_SESSION['module_flash'] = "❌ Nom de profil invalide.";
+        } else {
+            try {
+                $db->prepare("INSERT INTO profils (cle, libelle, is_core) VALUES (?, ?, 0)")
+                   ->execute([mb_substr($cle, 0, 50), mb_substr($libelle, 0, 100)]);
+                $_SESSION['module_flash'] = "✅ Profil « " . $libelle . " » ajouté.";
+            } catch (Exception $e) {
+                $_SESSION['module_flash'] = "❌ Ce profil existe déjà (clé « " . $cle . " »).";
+            }
+        }
+        $redirectTo = 'parametres.php';
+    } elseif ($action === 'delete_profile') {
+        ensureProfilesTable($db);
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $stmt = $db->prepare("SELECT libelle, is_core FROM profils WHERE id = ? LIMIT 1");
+            $stmt->execute([$id]);
+            $prof = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$prof) {
+                $_SESSION['module_flash'] = "❌ Profil introuvable.";
+            } elseif (!empty($prof['is_core'])) {
+                $_SESSION['module_flash'] = "❌ Le profil « " . $prof['libelle'] . " » est un profil de base : il ne peut pas être supprimé.";
+            } else {
+                $db->prepare("DELETE FROM profils WHERE id = ?")->execute([$id]);
+                $_SESSION['module_flash'] = "✅ Profil « " . $prof['libelle'] . " » supprimé.";
+            }
+        }
+        $redirectTo = 'parametres.php';
     }
 }
 

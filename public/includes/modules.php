@@ -42,8 +42,95 @@ if (!function_exists('ensureModulesTable')) {
                     $db->exec($ddl);
                 }
             }
+
+            runModuleMigrations($db);
         } catch (Exception $e) {
             // table déjà présente ou base indisponible : on ignore
+        }
+    }
+
+    /**
+     * Migrations de données jouées une seule fois (drapeaux dans `modules_meta`).
+     * - Crée le module « Aide » et ses sous-modules.
+     * - Verrouille tous les modules déjà présents.
+     */
+    function runModuleMigrations(PDO $db)
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        try {
+            $db->exec("CREATE TABLE IF NOT EXISTS modules_meta (mkey VARCHAR(64) PRIMARY KEY, mval VARCHAR(255) NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $hasFlag = function ($k) use ($db) {
+                $s = $db->prepare("SELECT 1 FROM modules_meta WHERE mkey = ?");
+                $s->execute([$k]);
+                return (bool) $s->fetchColumn();
+            };
+            $setFlag = function ($k) use ($db) {
+                $db->prepare("INSERT IGNORE INTO modules_meta (mkey, mval) VALUES (?, '1')")->execute([$k]);
+            };
+
+            // 1) Module « Aide » (une seule fois)
+            if (!$hasFlag('seed_aide_v1')) {
+                $roles = 'employe_magasin,etudiant,mentor,employe_logistique';
+                $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active) VALUES (?, ?, 1, NULL, ?, ?, 1)")
+                   ->execute([
+                       'Aide',
+                       "Bloqué ? Vous avez besoin d'un renseignement ? Ce module est là pour ça : vous y trouverez les réponses à vos questions.",
+                       '🆘',
+                       $roles,
+                   ]);
+                $aideId = (int) $db->lastInsertId();
+                if ($aideId > 0) {
+                    $insChild = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active) VALUES (?, '', 0, ?, ?, ?, 1)");
+                    foreach ([['Becosoft', '💻'], ['Logistique', '🚚'], ['Magasin', '🛒']] as $c) {
+                        $insChild->execute([$c[0], $aideId, $c[1], $roles]);
+                    }
+                }
+                $setFlag('seed_aide_v1');
+            }
+
+            // 2) Verrouiller tous les modules déjà présents (une seule fois)
+            if (!$hasFlag('lock_existing_v1')) {
+                $db->exec("UPDATE modules SET is_locked = 1");
+                $setFlag('lock_existing_v1');
+            }
+        } catch (Exception $e) {
+            // migration non critique : on ignore
+        }
+    }
+
+    /**
+     * Crée la table des profils si besoin et amorce les profils de base.
+     */
+    function ensureProfilesTable(PDO $db)
+    {
+        try {
+            $db->exec(
+                "CREATE TABLE IF NOT EXISTS profils (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    cle VARCHAR(50) NOT NULL UNIQUE,
+                    libelle VARCHAR(100) NOT NULL,
+                    is_core TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+            );
+            $count = (int) $db->query("SELECT COUNT(*) FROM profils")->fetchColumn();
+            if ($count === 0) {
+                $seed = [
+                    ['etudiant', 'Étudiant'], ['employe_magasin', 'Magasin'], ['teamcoach', 'Teamcoach'],
+                    ['mentor', 'Mentor'], ['employe_logistique', 'Logistique'], ['admin', 'Admin'], ['evaluateur', 'Évaluateur'],
+                ];
+                $ins = $db->prepare("INSERT INTO profils (cle, libelle, is_core) VALUES (?, ?, 1)");
+                foreach ($seed as $s) {
+                    $ins->execute($s);
+                }
+            }
+        } catch (Exception $e) {
+            // base indisponible : on ignore
         }
     }
 
@@ -54,7 +141,7 @@ if (!function_exists('ensureModulesTable')) {
      */
     function moduleProfiles(PDO $db = null)
     {
-        $profiles = [
+        $fallback = [
             'etudiant'           => 'Étudiant',
             'employe_magasin'    => 'Magasin',
             'teamcoach'          => 'Teamcoach',
@@ -63,18 +150,32 @@ if (!function_exists('ensureModulesTable')) {
             'admin'              => 'Admin',
             'evaluateur'         => 'Évaluateur',
         ];
-        if ($db instanceof PDO) {
-            try {
-                $rows = $db->query("SELECT DISTINCT role FROM utilisateurs WHERE role IS NOT NULL AND role <> ''")->fetchAll(PDO::FETCH_COLUMN);
-                foreach ($rows as $r) {
-                    $r = trim((string) $r);
-                    if ($r !== '' && !isset($profiles[$r])) {
-                        $profiles[$r] = ucwords(str_replace('_', ' ', $r));
-                    }
-                }
-            } catch (Exception $e) {
-                // table indisponible : on garde la liste connue
+        if (!($db instanceof PDO)) {
+            return $fallback;
+        }
+        ensureProfilesTable($db);
+        $profiles = [];
+        try {
+            foreach ($db->query("SELECT cle, libelle FROM profils ORDER BY libelle ASC")->fetchAll(PDO::FETCH_ASSOC) as $p) {
+                $profiles[$p['cle']] = $p['libelle'];
             }
+        } catch (Exception $e) {
+            $profiles = [];
+        }
+        if (empty($profiles)) {
+            $profiles = $fallback;
+        }
+        // Ajoute tout rôle présent dans `utilisateurs` mais absent de la table profils
+        try {
+            $rows = $db->query("SELECT DISTINCT role FROM utilisateurs WHERE role IS NOT NULL AND role <> ''")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($rows as $r) {
+                $r = trim((string) $r);
+                if ($r !== '' && !isset($profiles[$r])) {
+                    $profiles[$r] = ucwords(str_replace('_', ' ', $r));
+                }
+            }
+        } catch (Exception $e) {
+            // on garde la liste courante
         }
         return $profiles;
     }
@@ -85,6 +186,10 @@ if (!function_exists('ensureModulesTable')) {
      */
     function userCanSeeModule(array $module, $role)
     {
+        // Rôles gestionnaires : voient tous les modules (pour gérer le contenu)
+        if ($role === 'admin' || $role === 'teamcoach') {
+            return true;
+        }
         $roles = trim((string) ($module['roles'] ?? ''));
         if ($roles === '') {
             return true; // tous
@@ -135,18 +240,24 @@ if (!function_exists('ensureModulesTable')) {
     }
 
     /**
-     * Vérifie le mot de passe de l'admin connecté.
+     * Mot de passe UNIQUE pour verrouiller/déverrouiller ou supprimer un module
+     * verrouillé. Volontairement distinct du mot de passe personnel de chaque
+     * admin, pour qu'un module ne puisse pas être supprimé trop facilement.
+     * Surchargeable via la variable d'environnement MODULE_LOCK_PASSWORD.
+     */
+    function moduleLockPassword()
+    {
+        $env = getenv('MODULE_LOCK_PASSWORD');
+        return ($env !== false && $env !== '') ? $env : 'Admin+formation2026!';
+    }
+
+    /**
+     * Vérifie le mot de passe unique de verrouillage des modules.
+     * ($db conservé pour compatibilité des appels existants.)
      */
     function adminPasswordOk(PDO $db, $password)
     {
-        $uid = $_SESSION['user_id'] ?? 0;
-        if (!$uid || $password === '') {
-            return false;
-        }
-        $stmt = $db->prepare("SELECT mot_de_passe FROM utilisateurs WHERE id = ? LIMIT 1");
-        $stmt->execute([(int) $uid]);
-        $hash = $stmt->fetchColumn();
-        return $hash && password_verify($password, $hash);
+        return is_string($password) && $password !== '' && hash_equals(moduleLockPassword(), $password);
     }
 
     /**
@@ -222,12 +333,13 @@ if (!function_exists('ensureModulesTable')) {
         <textarea name="description" rows="2" maxlength="500"><?= $desc ?></textarea>
         <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
 
-        <label>Accès — quels profils voient ce module ? <small>(aucun coché = visible par tous)</small></label>
-        <div class="roles-wrap">
+        <label>Accès — profils qui voient ce module <small>(rien de sélectionné = visible par tous)</small></label>
+        <select name="roles[]" multiple class="roles-select" size="<?= max(4, min(9, count($profiles))) ?>">
             <?php foreach ($profiles as $key => $lbl): ?>
-                <label class="role-chk"><input type="checkbox" name="roles[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $curRoles, true) ? 'checked' : '' ?>> <?= htmlspecialchars($lbl) ?></label>
+                <option value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $curRoles, true) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
             <?php endforeach; ?>
-        </div>
+        </select>
+        <div class="roles-hint">Maintenez Ctrl (⌘ sur Mac) pour sélectionner plusieurs profils, ou glissez la souris.</div>
 
         <details class="adv-options">
             <summary>Options avancées — icône &amp; image</summary>
@@ -274,6 +386,10 @@ if (!function_exists('ensureModulesTable')) {
         .adv-options[open] > summary::before { content: '▾ '; }
         .adv-body { padding: 4px 2px 12px; }
         .adv-note { font-size: 0.82rem; color: #777; margin: 0 0 10px; }
+        .roles-select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font: inherit; background: #fff; }
+        .roles-select option { padding: 5px 8px; border-radius: 6px; }
+        .roles-select option:checked { background: #2d5a37 linear-gradient(0deg, #2d5a37, #2d5a37); color: #fff; }
+        .roles-hint { font-size: 0.8rem; color: #888; margin-top: 4px; }
         .dzm { position: relative; border: 2px dashed #b9cdbf; border-radius: 12px; background: #f6faf7; padding: 16px; text-align: center; cursor: pointer; margin-top: 4px; transition: all .15s ease; }
         .dzm:hover { border-color: #2d5a37; background: #eef7f0; }
         .dzm.over { border-color: #2d5a37; background: #e3f2e7; }
