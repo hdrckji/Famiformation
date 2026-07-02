@@ -173,15 +173,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 style="margin:0; color:#2d5a37;">Modules</h2>
-                <div style="display:flex; gap:8px;">
-                    <form method="POST" action="module_save.php" style="display:inline;" onsubmit="return confirm('Traduire en néerlandais tous les modules qui n\'ont pas encore de traduction ?');">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="action" value="translate_all">
-                        <input type="hidden" name="return" value="parametres.php">
-                        <button type="submit" class="btn btn-light" title="Traduit en NL les modules sans traduction (ex : Aide)">🌐 Traduire en NL</button>
-                    </form>
-                    <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer un module</button>
-                </div>
+                <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer un module</button>
             </div>
             <table>
                 <thead>
