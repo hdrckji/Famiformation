@@ -47,6 +47,37 @@ function flattenModules(array $byParent, $parentId, $depth, array &$out)
         flattenModules($byParent, (int) $mod['id'], $depth + 1, $out);
     }
 }
+
+/**
+ * Rendu en arborescence des modules visibles par un profil.
+ * - À la racine : on filtre par accès ($checkVisibility).
+ * - Dans les sous-modules : tout est hérité (comme sur le site), donc pas de re-filtre.
+ */
+function renderProfileModuleTree(array $byParent, $parentId, $profileKey, $depth, $checkVisibility)
+{
+    if (empty($byParent[$parentId])) {
+        return '';
+    }
+    $html = '';
+    foreach ($byParent[$parentId] as $mod) {
+        if ((int) ($mod['is_active'] ?? 1) !== 1) {
+            continue; // module inactif : non visible par les utilisateurs
+        }
+        if ($checkVisibility && !userCanSeeModule($mod, $profileKey)) {
+            continue;
+        }
+        $pad = 6 + $depth * 20;
+        $icon = function_exists('moduleIcon') ? moduleIcon($mod) : '📄';
+        $html .= '<div style="padding:3px 0 3px ' . $pad . 'px;">'
+            . ($depth > 0 ? '<span style="color:#9bb3a3;">↳ </span>' : '')
+            . '<span>' . $icon . '</span> '
+            . '<span style="font-weight:' . ($depth === 0 ? '700' : '600') . '; color:#244230;">' . htmlspecialchars($mod['nom']) . '</span>'
+            . '</div>';
+        $html .= renderProfileModuleTree($byParent, (int) $mod['id'], $profileKey, $depth + 1, false);
+    }
+    return $html;
+}
+
 $orderedModules = [];
 flattenModules($byParent, 0, 0, $orderedModules);
 
@@ -318,24 +349,16 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 
         <div class="card" style="margin-top:20px;">
             <h2 style="margin-top:0; color:#2d5a37;">Accès aux modules par profil</h2>
-            <p class="muted">Modules visibles par chaque profil. Pour modifier un accès, ouvrez le module dans « Gestion des modules ». Admin et Teamcoach voient tous les modules.</p>
-            <table>
-                <thead><tr><th>Profil</th><th>Modules visibles</th></tr></thead>
-                <tbody>
-                    <?php foreach ($profiles as $key => $lbl): ?>
-                        <?php
-                        $vis = [];
-                        foreach ($allModules as $m) {
-                            if (userCanSeeModule($m, $key)) { $vis[] = $m['nom']; }
-                        }
-                        ?>
-                        <tr>
-                            <td><?= htmlspecialchars($lbl) ?></td>
-                            <td><?= empty($vis) ? '<span class="muted">Aucun</span>' : htmlspecialchars(implode(', ', $vis)) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <p class="muted">Aperçu (lecture seule) de l'arborescence des modules vue par chaque profil, pour vérifier. Pour modifier un accès, ouvrez le module dans « Gestion des modules ». Admin et Teamcoach voient tous les modules.</p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px;">
+                <?php foreach ($profiles as $key => $lbl): ?>
+                    <?php $tree = renderProfileModuleTree($byParent, 0, $key, 0, true); ?>
+                    <div style="border:1px solid #e3ece5; border-radius:12px; padding:14px; background:#fafcfb;">
+                        <div style="font-weight:800; color:#2d5a37; margin-bottom:8px; border-bottom:1px solid #e3ece5; padding-bottom:6px;"><?= htmlspecialchars($lbl) ?></div>
+                        <?= $tree !== '' ? $tree : '<div class="muted">Aucun module.</div>' ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
 
