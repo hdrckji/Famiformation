@@ -49,18 +49,6 @@ try {
     $db->prepare("UPDATE utilisateurs SET interim = NULL WHERE interim = ?")->execute(["Pas d'agence"]);
 } catch (Exception $e) { /* ignore */ }
 
-// L'appli autorise volontairement les emails en double (modale "ajouter quand même").
-// On retire donc toute contrainte UNIQUE éventuelle sur la colonne `email`,
-// sinon la base rejette la création d'un 2e compte avec le même email.
-try {
-    $emailIdx = $db->query("SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'utilisateurs' AND COLUMN_NAME = 'email' AND NON_UNIQUE = 0")->fetchAll(PDO::FETCH_COLUMN);
-    foreach ($emailIdx as $indexName) {
-        if ($indexName && strtoupper((string) $indexName) !== 'PRIMARY') {
-            $db->exec("ALTER TABLE utilisateurs DROP INDEX `" . str_replace('`', '', (string) $indexName) . "`");
-        }
-    }
-} catch (Exception $e) { /* pas de contrainte ou base indisponible : on ignore */ }
-
 $message = "";
 // Message "flash" survivant à une redirection (motif Post/Redirect/Get)
 if (!empty($_SESSION['admin_flash'])) {
@@ -150,47 +138,40 @@ if (isset($_POST['creer_user'])) {
         'new_role' => $role !== '' ? $role : 'etudiant',
     ];
 
-    // Tous les champs sont obligatoires SAUF le mot de passe ET l'email
+    // Obligatoires : nom d'utilisateur, nom, prénom, profil (+ agence pour un étudiant).
     $manquants = [];
-    if ($id === '')      { $manquants[] = 'Identifiant'; }
-    if ($nom === '')     { $manquants[] = 'Nom'; }
-    if ($prenom === '')  { $manquants[] = 'Prénom'; }
-    if ($interim === '') { $manquants[] = 'Agence intérim'; }
-    if ($role === '')    { $manquants[] = 'Profil'; }
+    if ($id === '')     { $manquants[] = "Nom d'utilisateur"; }
+    if ($nom === '')    { $manquants[] = 'Nom'; }
+    if ($prenom === '') { $manquants[] = 'Prénom'; }
+    if ($role === '')   { $manquants[] = 'Profil'; }
+    if ($role === 'etudiant' && $interim === '') { $manquants[] = 'Agence intérim'; }
 
     if (!$hasInterimColumn) {
         $message = "<div class='alert error'>❌ La colonne Intérim n'est pas disponible en base de données.</div>";
     } elseif (!empty($manquants)) {
-        $message = "<div class='alert error'>❌ Tous les champs sont obligatoires (sauf le mot de passe et l'email). Manquant(s) : " . e(implode(', ', $manquants)) . ".</div>";
+        $message = "<div class='alert error'>❌ Champs obligatoires manquant(s) : " . e(implode(', ', $manquants)) . ".</div>";
+    } elseif ($email === '' && $mdp === '') {
+        $message = "<div class='alert error'>❌ Renseignez au moins un <strong>email</strong> ou un <strong>mot de passe</strong> (l'un des deux suffit pour permettre la connexion).</div>";
     } else {
-        // L'identifiant doit être unique
+        // Blocages nets (pas de "confirmer") : identifiant OU email déjà utilisé.
+        // Les doublons nom + prénom sont autorisés (des personnes peuvent avoir le même nom).
         $checkId = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE identifiant = ?");
         $checkId->execute([$id]);
-        if ((int) $checkId->fetchColumn() > 0) {
-            $message = "<div class='alert error'>❌ Cet identifiant est déjà utilisé. Choisissez-en un autre.</div>";
+        $identifiantExiste = ((int) $checkId->fetchColumn() > 0);
+
+        $emailExiste = false;
+        if ($email !== '') {
+            $checkEmail = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE email = ?");
+            $checkEmail->execute([$email]);
+            $emailExiste = ((int) $checkEmail->fetchColumn() > 0);
+        }
+
+        if ($identifiantExiste) {
+            $message = "<div class='alert error'>❌ Ce nom d'utilisateur (identifiant) est déjà utilisé. Choisissez-en un autre.</div>";
+        } elseif ($emailExiste) {
+            $message = "<div class='alert error'>❌ Cet email est déjà utilisé par un autre compte : impossible de créer un second compte avec le même email.</div>";
         } else {
-            // Avertissement (modale) si aucun email n'est renseigné
-            if ($email === '' && !$confirmNoEmail) {
-                $showNoEmailModal = true;
-            }
-
-            // Avertissement (modale) si l'email OU le couple nom + prénom existe déjà.
-            // Si la création sans email a déjà été confirmée, on ne redemande pas de
-            // confirmation de doublon : on va directement à la création.
-            if (!$showNoEmailModal && !$confirmDuplicate && !$confirmNoEmail) {
-                if ($email !== '') {
-                    $checkDup = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE email = ? OR (LOWER(nom) = LOWER(?) AND LOWER(prenom) = LOWER(?))");
-                    $checkDup->execute([$email, $nom, $prenom]);
-                } else {
-                    $checkDup = $db->prepare("SELECT COUNT(*) FROM utilisateurs WHERE LOWER(nom) = LOWER(?) AND LOWER(prenom) = LOWER(?)");
-                    $checkDup->execute([$nom, $prenom]);
-                }
-                if ((int) $checkDup->fetchColumn() > 0) {
-                    $showDuplicateModal = true;
-                }
-            }
-
-            if (!$showNoEmailModal && !$showDuplicateModal) {
+            {
                 // Le compte n'est réellement créé QUE si le mail part correctement
                 ensureUserAccountAccessColumns($db); // hors transaction (évite un ALTER pendant la transaction)
                 $hash = $mdp !== ''
@@ -221,10 +202,6 @@ if (isset($_POST['creer_user'])) {
                         if ($mailSent) {
                             $db->commit();
                             adminRedirect("<div class='alert success'>✅ Collaborateur créé. 📨 Le mail a bien été envoyé à " . e($email) . ".</div>");
-                        } elseif ($confirmDuplicate) {
-                            // Doublon confirmé par l'admin : on crée le compte même si le mail échoue
-                            $db->commit();
-                            adminRedirect("<div class='alert success'>✅ Collaborateur créé (doublon confirmé). ⚠️ Le mail n'a pas pu être envoyé — pensez à définir un mot de passe manuellement si besoin.</div>");
                         } else {
                             $db->rollBack();
                             $mailError = trim((string) getLastMailError());
@@ -439,8 +416,6 @@ $users = $db->query($query_str)->fetchAll();
         <div class="card-body">
             <form method="POST" action="admin.php" id="createUserForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
                 <?php echo csrfField(); ?>
-                <input type="hidden" id="confirm_duplicate" name="confirm_duplicate" value="<?php echo $confirmDuplicate ? '1' : ''; ?>">
-                <input type="hidden" id="confirm_no_email" name="confirm_no_email" value="<?php echo $confirmNoEmail ? '1' : ''; ?>">
                 <input type="text" name="new_username" value="<?php echo htmlspecialchars($createForm['new_username']); ?>" placeholder="Identifiant" required class="input-mini">
                 <input type="text" name="new_nom" value="<?php echo htmlspecialchars($createForm['new_nom']); ?>" placeholder="Nom" required class="input-mini">
                 <input type="text" name="new_prenom" value="<?php echo htmlspecialchars($createForm['new_prenom']); ?>" placeholder="Prénom" required class="input-mini">
@@ -463,33 +438,7 @@ $users = $db->query($query_str)->fetchAll();
                 </select>
                 <button type="submit" name="creer_user" class="btn-save" style="height: 40px;">Créer le compte</button>
             </form>
-            <div class="hint">Tous les champs sont obligatoires sauf le mot de passe et l'email. Si le mot de passe est laissé vide et qu'un email est renseigné, un mail d'activation est envoyé et le compte n'est créé que si ce mail part correctement. Sans email, le compte est créé directement (une confirmation est demandée). La liste des agences vient de la page Agences Intérim.</div>
-        </div>
-    </div>
-
-    <!-- Modale : collaborateur potentiellement déjà existant -->
-    <div id="dupModal" class="modal-backdrop"<?php if (!$showDuplicateModal) echo ' style="display:none;"'; ?>>
-        <div class="modal-card">
-            <h3 style="margin-top:0; color:#856404;">⚠️ Collaborateur déjà existant ?</h3>
-            <p style="line-height:1.6;">Un collaborateur avec le <strong>même email</strong> ou le <strong>même nom et prénom</strong> existe déjà dans la base.</p>
-            <p style="line-height:1.6;">Voulez-vous quand même l'ajouter ?</p>
-            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:22px;">
-                <button type="button" class="btn-cancel" onclick="document.getElementById('dupModal').style.display='none';">Annuler</button>
-                <button type="button" class="btn-save" onclick="document.getElementById('confirm_duplicate').value='1'; document.getElementById('createUserForm').submit();">Confirmer l'ajout</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modale : création sans email -->
-    <div id="noEmailModal" class="modal-backdrop"<?php if (!$showNoEmailModal) echo ' style="display:none;"'; ?>>
-        <div class="modal-card">
-            <h3 style="margin-top:0; color:#856404;">⚠️ Créer sans email ?</h3>
-            <p style="line-height:1.6;">Aucune adresse email n'a été renseignée. Le compte sera créé <strong>sans envoi de mail</strong> (pas d'activation ni de mail de bienvenue).</p>
-            <p style="line-height:1.6;">Êtes-vous sûr de vouloir créer le compte sans email ?</p>
-            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:22px;">
-                <button type="button" class="btn-cancel" onclick="document.getElementById('noEmailModal').style.display='none';">Annuler</button>
-                <button type="button" class="btn-save" onclick="document.getElementById('confirm_no_email').value='1'; document.getElementById('createUserForm').submit();">Oui, créer sans email</button>
-            </div>
+            <div class="hint">Obligatoires : nom d'utilisateur, nom, prénom, et <strong>au moins l'un des deux</strong> : email ou mot de passe. Avec un mot de passe, le compte est créé directement. Avec un email seul (sans mot de passe), un mail d'activation est envoyé et le compte n'est créé que si ce mail part correctement. L'identifiant et l'email ne peuvent pas être en double (nom + prénom identiques sont autorisés). La liste des agences vient de la page Agences Intérim.</div>
         </div>
     </div>
 
