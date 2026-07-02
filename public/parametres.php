@@ -154,7 +154,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </div>
             <table>
                 <thead>
-                    <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Accès</th><th>Statut</th><th>Verrou</th><th>Actions</th></tr>
+                    <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Verrou</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); ?>
@@ -169,6 +169,30 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                             </div>
                         </td>
                         <td><?= !empty($m['is_container']) ? 'Conteneur' : 'Contenu' ?></td>
+                        <td>
+                            <form method="POST" action="module_save.php" style="display:inline-block;">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="module_move">
+                                <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
+                                <input type="hidden" name="return" value="parametres.php">
+                                <button type="submit" name="dir" value="up" class="btn btn-light" style="padding:3px 8px;" title="Monter">↑</button>
+                                <button type="submit" name="dir" value="down" class="btn btn-light" style="padding:3px 8px;" title="Descendre">↓</button>
+                            </form>
+                            <form method="POST" action="module_save.php" style="display:flex; gap:4px; margin-top:5px;">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="module_reparent">
+                                <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
+                                <input type="hidden" name="return" value="parametres.php">
+                                <select name="new_parent" style="max-width:150px; padding:5px; border:1px solid #ccc; border-radius:6px; font-size:0.82rem;">
+                                    <option value="0" <?= empty($m['parent_id']) ? 'selected' : '' ?>>— Racine —</option>
+                                    <?php foreach ($orderedModules as $cand): ?>
+                                        <?php if ((int) $cand['id'] === (int) $m['id']) { continue; } ?>
+                                        <option value="<?= (int) $cand['id'] ?>" <?= ((int) ($m['parent_id'] ?? 0) === (int) $cand['id']) ? 'selected' : '' ?>><?= str_repeat('— ', (int) ($cand['_depth'] ?? 0)) . htmlspecialchars($cand['nom']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="submit" class="btn btn-light" style="padding:3px 8px;" title="Déplacer dans ce module">→</button>
+                            </form>
+                        </td>
                         <td><?= htmlspecialchars(rolesLabel($m, $profiles)) ?></td>
                         <td>
                             <?php if ((int) $m['is_active'] === 1): ?><span class="pill on">Actif</span><?php else: ?><span class="pill off">Inactif</span><?php endif; ?>
@@ -206,7 +230,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     </tr>
                     <?php endforeach; ?>
                     <?php if (empty($orderedModules)): ?>
-                    <tr><td colspan="7" class="muted" style="text-align:center;">Aucun module créé pour l'instant.</td></tr>
+                    <tr><td colspan="8" class="muted" style="text-align:center;">Aucun module créé pour l'instant.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>

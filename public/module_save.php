@@ -303,6 +303,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $_SESSION['module_flash'] = "✅ Traduction NL : " . $done . " module(s) mis à jour.";
         $redirectTo = 'parametres.php';
+    } elseif ($action === 'module_move') {
+        // Réordonne un module parmi ses frères (même parent)
+        $id = (int) ($_POST['id'] ?? 0);
+        $dir = (($_POST['dir'] ?? '') === 'up') ? 'up' : 'down';
+        $m = $id > 0 ? getModuleById($db, $id) : null;
+        if ($m) {
+            $parent = $m['parent_id'];
+            if ($parent === null) {
+                $sib = $db->query("SELECT id FROM modules WHERE parent_id IS NULL ORDER BY sort_order ASC, nom ASC")->fetchAll(PDO::FETCH_COLUMN);
+            } else {
+                $st = $db->prepare("SELECT id FROM modules WHERE parent_id = ? ORDER BY sort_order ASC, nom ASC");
+                $st->execute([(int) $parent]);
+                $sib = $st->fetchAll(PDO::FETCH_COLUMN);
+            }
+            $sib = array_map('intval', $sib);
+            // Réindexe l'ordre 0..n selon l'affichage courant
+            $upd = $db->prepare("UPDATE modules SET sort_order = ? WHERE id = ?");
+            foreach ($sib as $i => $sid) { $upd->execute([$i, $sid]); }
+            $pos = array_search($id, $sib, true);
+            $swap = ($dir === 'up') ? $pos - 1 : $pos + 1;
+            if ($pos !== false && $swap >= 0 && $swap < count($sib)) {
+                $upd->execute([$swap, $sib[$pos]]);
+                $upd->execute([$pos, $sib[$swap]]);
+                $_SESSION['module_flash'] = "✅ Ordre mis à jour.";
+            }
+        }
+        $redirectTo = 'parametres.php';
+    } elseif ($action === 'module_reparent') {
+        // Déplace un module dans un autre (ou à la racine)
+        $id = (int) ($_POST['id'] ?? 0);
+        $raw = $_POST['new_parent'] ?? '';
+        $newParent = ($raw === '' || $raw === '0') ? null : (int) $raw;
+        $m = $id > 0 ? getModuleById($db, $id) : null;
+        if ($m && $newParent !== $id) {
+            // Empêche les cycles : le nouveau parent ne doit pas être un descendant de $id
+            $ok = true;
+            if ($newParent !== null) {
+                $cursor = $newParent;
+                $guard = 0;
+                while ($cursor !== null && $guard++ < 100) {
+                    if ((int) $cursor === $id) { $ok = false; break; }
+                    $st = $db->prepare("SELECT parent_id FROM modules WHERE id = ?");
+                    $st->execute([(int) $cursor]);
+                    $p = $st->fetchColumn();
+                    $cursor = ($p === false || $p === null) ? null : (int) $p;
+                }
+            }
+            if ($ok) {
+                $db->prepare("UPDATE modules SET parent_id = ? WHERE id = ?")->execute([$newParent, $id]);
+                if ($newParent !== null) {
+                    $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?")->execute([$newParent]);
+                }
+                $_SESSION['module_flash'] = "✅ Module déplacé.";
+            } else {
+                $_SESSION['module_flash'] = "❌ Déplacement impossible : on ne peut pas mettre un module dans l'un de ses propres sous-modules.";
+            }
+        }
+        $redirectTo = 'parametres.php';
     }
 }
 
