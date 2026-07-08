@@ -125,7 +125,7 @@ if (!function_exists('ensureModulesTable')) {
                     ['Logistique', 'Gestion des flux et des stocks.', '📦', 'admin,employe_logistique,teamcoach,mentor', 'logistique.php'],
                     ['Classement', 'Tableau des scores et points.', '🏆', $nonEtu, 'classement.php'],
                     ['Sécurité au travail', 'Chaussures de sécurité & secourisme.', '🦺', $nonEtu, 'securite_travail.php'],
-                    ['Famijob', 'Plateforme Famijob (gestion des jobs étudiants).', '💼', 'admin,teamcoach', 'https://student.famiformation.com'],
+                    ['Famijob', 'Plateforme Famijob (gestion des jobs étudiants).', '💼', 'admin,teamcoach', 'famijob/index.php'],
                     ['Demandes Horaires Intérim', 'Créer/modifier/supprimer les demandes d\'horaires intérim.', '📝', 'admin', 'interim_horaires_demandes.php'],
                     ['Matching Intérim', 'Assigner les étudiants aux créneaux intérim.', '🤝', 'admin', 'interim_horaires.php'],
                     ['Validation demandes horaires', 'Valider ou refuser les demandes d\'horaires.', '✅', 'admin', 'validation_demandes_horaires.php'],

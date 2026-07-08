@@ -12,7 +12,7 @@ if (!function_exists('fjhT')) {
 
 $role = getCurrentRole();
 if (!in_array($role, ['admin', 'teamcoach'], true)) {
-    header('Location: ../public/index.php');
+    header('Location: ../index.php');
     exit();
 }
 

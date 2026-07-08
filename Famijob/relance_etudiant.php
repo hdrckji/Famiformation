@@ -12,7 +12,7 @@ if (!function_exists('fjrT')) {
 
 $role = $_SESSION['role'] ?? '';
 if (!in_array($role, ['admin'], true)) {
-    header('Location: ../public/index.php');
+    header('Location: ../index.php');
     exit();
 }
 
