@@ -628,7 +628,45 @@ if (isset($_POST['create_requests']) && $createFailed) {
             width: 18px;
             height: 18px;
             cursor: pointer;
+            accent-color: var(--accent);
         }
+
+        .grid-table th .col-toggle {
+            width: 16px;
+            height: 16px;
+            opacity: 0.75;
+            transition: opacity .15s ease, transform .15s ease;
+        }
+        .grid-table th:hover .col-toggle { opacity: 1; transform: scale(1.1); }
+
+        /* Boutons raccourcis d'une ligne (7/7, dupliquer, retirer) */
+        .grid-table td.row-actions { white-space: nowrap; }
+        .mini-group { display: inline-flex; gap: 6px; justify-content: center; }
+        .btn-mini {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 30px;
+            height: 30px;
+            padding: 0 9px;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: #fff;
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-weight: 800;
+            line-height: 1;
+            cursor: pointer;
+            transition: transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease, border-color .12s ease;
+        }
+        .btn-mini:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(22, 49, 33, 0.14); }
+        .btn-mini:active { transform: translateY(0); box-shadow: none; }
+        .btn-mini.mini-days { background: var(--accent-soft); color: var(--accent); border-color: #cfe3d5; }
+        .btn-mini.mini-days:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn-mini.mini-dup { background: #eef3fb; color: #2f5fa8; border-color: #d5e1f3; font-size: 1rem; }
+        .btn-mini.mini-dup:hover { background: #2f5fa8; color: #fff; border-color: #2f5fa8; }
+        .btn-mini.mini-del { background: #fae4e1; color: var(--warn); border-color: #f1cfca; font-size: 1.1rem; }
+        .btn-mini.mini-del:hover { background: var(--warn); color: #fff; border-color: var(--warn); }
 
         .card {
             background: var(--card);
@@ -970,10 +1008,12 @@ if (isset($_POST['create_requests']) && $createFailed) {
             '<td class="cell-horaire"><input type="text" name="row_horaire[' + idx + ']" value="' + esc(h || '') + '" placeholder="9h30-12h30" style="width:100%;"></td>' +
             '<td><input type="number" min="1" max="30" name="row_nombre[' + idx + ']" value="' + (parseInt(n, 10) > 0 ? parseInt(n, 10) : 1) + '" style="width:64px;"></td>' +
             dayCellsHtml(idx, days) +
-            '<td style="white-space:nowrap;">' +
-                '<button type="button" class="btn-mini" title="' + esc(T_ALLDAYS) + '" onclick="toggleRowDays(this)">7/7</button> ' +
-                '<button type="button" class="btn-mini" title="' + esc(T_DUP) + '" onclick="duplicateRow(this)">&#10697;</button> ' +
-                '<button type="button" class="btn-mini" title="' + esc(T_REMOVE) + '" onclick="this.closest(\'tr\').remove();">&times;</button>' +
+            '<td class="row-actions">' +
+                '<div class="mini-group">' +
+                    '<button type="button" class="btn-mini mini-days" title="' + esc(T_ALLDAYS) + '" onclick="toggleRowDays(this)">7/7</button>' +
+                    '<button type="button" class="btn-mini mini-dup" title="' + esc(T_DUP) + '" onclick="duplicateRow(this)">&#10697;</button>' +
+                    '<button type="button" class="btn-mini mini-del" title="' + esc(T_REMOVE) + '" onclick="this.closest(\'tr\').remove();">&times;</button>' +
+                '</div>' +
             '</td>';
         document.getElementById('gridBody').appendChild(tr);
         var horaireInput = tr.querySelector('input[name^="row_horaire"]');
