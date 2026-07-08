@@ -1,0 +1,3 @@
+# Fichiers d'environnement (secrets) — fournis via les variables Railway
+.env
+*/.env
