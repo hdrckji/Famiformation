@@ -128,6 +128,7 @@ $selectedWeek = $weekOptions[$selectedWeekKey];
 
 $message = '';
 $createFailed = false;
+$createFailedByday = false;
 $currentUserId = (int) ($_SESSION['user_id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -217,6 +218,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $message = "<div class='alert error'>" . e(fjdT('Coche au moins un jour pour chaque horaire saisi.', 'Vink minstens één dag aan voor elk ingevoerd uurrooster.')) . "</div>";
                 $createFailed = true;
+            }
+        }
+    }
+
+    // Onglet "ancienne méthode" : saisie par jour, un horaire par ligne (copier-coller).
+    if (isset($_POST['create_requests_byday'])) {
+        $departmentName = trim((string) ($_POST['department_name_byday'] ?? ''));
+        $globalComment = trim((string) ($_POST['global_comment_byday'] ?? ''));
+
+        $dayText = $_POST['day_text'] ?? [];
+        if (!is_array($dayText)) { $dayText = []; }
+
+        $weekStartStr = $selectedWeek['start']->format('Y-m-d');
+        $weekEndStr = $selectedWeek['end']->format('Y-m-d');
+
+        if (!in_array($departmentName, $departmentOptions, true)) {
+            $message = "<div class='alert error'>" . e(fjdT('Département invalide. Utilise un département de la liste synchronisée.', 'Ongeldige afdeling. Gebruik een afdeling uit de gesynchroniseerde lijst.')) . "</div>";
+            $createFailedByday = true;
+        } else {
+            $upsertBydayStmt = $db->prepare(
+                "INSERT INTO interim_shift_requests (shift_date, department_name, time_slot, seats_required, comment, validation_status, validated_by_user_id, validated_at, created_by_user_id)
+                 VALUES (?, ?, ?, ?, ?, 'pending', NULL, NULL, ?)
+                 ON DUPLICATE KEY UPDATE
+                    seats_required = VALUES(seats_required),
+                    comment = VALUES(comment),
+                    validation_status = 'pending',
+                    validated_by_user_id = NULL,
+                    validated_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP"
+            );
+
+            $createdCount = 0;
+            $hasSlot = false;
+            foreach ($dayText as $dateKey => $content) {
+                $dateKey = trim((string) $dateKey);
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateKey) !== 1
+                    || $dateKey < $weekStartStr || $dateKey > $weekEndStr) {
+                    continue;
+                }
+
+                // Une ligne = un horaire. Deux lignes identiques = 2 personnes (seats).
+                $lines = preg_split('/\r\n|\r|\n/', (string) $content);
+                $counts = [];
+                foreach ($lines as $line) {
+                    $slot = trim((string) $line);
+                    if ($slot === '') { continue; }
+                    $slot = mb_substr($slot, 0, 60);
+                    $hasSlot = true;
+                    if (!isset($counts[$slot])) { $counts[$slot] = 0; }
+                    $counts[$slot]++;
+                }
+
+                foreach ($counts as $slot => $cnt) {
+                    $seats = max(1, min(30, (int) $cnt));
+                    $upsertBydayStmt->execute([
+                        $dateKey,
+                        $departmentName,
+                        $slot,
+                        $seats,
+                        $globalComment !== '' ? $globalComment : null,
+                        $currentUserId,
+                    ]);
+                    $createdCount++;
+                }
+            }
+
+            if ($createdCount > 0) {
+                $message = "<div class='alert success'>" . $createdCount . ' ' . e(fjdT('créneau(x) enregistré(s).', 'tijdsblok(ken) geregistreerd.')) . "</div>";
+            } elseif (!$hasSlot) {
+                $message = "<div class='alert error'>" . e(fjdT('Ajoute au moins un horaire dans une journée.', 'Voeg minstens één uurrooster toe in een dag.')) . "</div>";
+                $createFailedByday = true;
             }
         }
     }
@@ -353,6 +425,18 @@ foreach ($blocksStmt->fetchAll(PDO::FETCH_ASSOC) as $blockRow) {
 $blocksForJs = [];
 foreach ($userBlocks as $b) {
     $blocksForJs[(string) $b['id']] = ['name' => $b['name'], 'rows' => $b['rows']];
+}
+
+// Onglet actif (après un envoi "par jour", on y reste) et texte à réafficher dans les zones par jour.
+$activeTab = isset($_POST['create_requests_byday']) ? 'byday' : 'grid';
+$bydayText = [];
+if (isset($_POST['create_requests_byday'])) {
+    $rawDayText = $_POST['day_text'] ?? [];
+    if (is_array($rawDayText)) {
+        foreach ($rawDayText as $k => $v) {
+            $bydayText[(string) $k] = (string) $v;
+        }
+    }
 }
 
 // Lignes a reafficher dans la grille apres un POST (erreur de creation ou enregistrement de bloc).
@@ -668,6 +752,52 @@ if (isset($_POST['create_requests']) && $createFailed) {
         .btn-mini.mini-del { background: #fae4e1; color: var(--warn); border-color: #f1cfca; font-size: 1.1rem; }
         .btn-mini.mini-del:hover { background: var(--warn); color: #fff; border-color: var(--warn); }
 
+        /* Onglets de mode de saisie (Grille / Par jour) */
+        .mode-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+        .mode-tab {
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--muted);
+            padding: 9px 16px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background .12s ease, color .12s ease, border-color .12s ease;
+        }
+        .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+        .mode-tab.is-active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        /* Onglet "par jour" (copier-coller) */
+        .byday-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .byday-day { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+        .byday-day-head {
+            background: #f7fbf8;
+            border-bottom: 1px solid var(--line);
+            padding: 8px 10px;
+            font-weight: 700;
+            font-size: 0.86rem;
+        }
+        .byday-day-head .th-date { color: var(--accent); font-weight: 600; }
+        .byday-day textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: none;
+            padding: 10px;
+            min-height: 130px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.55;
+            color: var(--text);
+        }
+        .byday-day textarea:focus { outline: 2px solid var(--accent-soft); outline-offset: -2px; }
+
         .card {
             background: var(--card);
             border-radius: 18px;
@@ -827,6 +957,12 @@ if (isset($_POST['create_requests']) && $createFailed) {
             <section class="card" style="margin-bottom:18px;">
                 <div class="card-head"><?php echo e(fjdT('Création rapide', 'Snel aanmaken')); ?></div>
                 <div class="card-body">
+                    <div class="mode-tabs">
+                        <button type="button" class="mode-tab <?php echo $activeTab === 'grid' ? 'is-active' : ''; ?>" data-panel="panel-grid" onclick="switchPanel('panel-grid', this)"><?php echo e(fjdT('Grille (par horaire)', 'Rooster (per uurrooster)')); ?></button>
+                        <button type="button" class="mode-tab <?php echo $activeTab === 'byday' ? 'is-active' : ''; ?>" data-panel="panel-byday" onclick="switchPanel('panel-byday', this)"><?php echo e(fjdT('Par jour (copier-coller)', 'Per dag (kopiëren-plakken)')); ?></button>
+                    </div>
+
+                    <div id="panel-grid" class="tab-panel" style="display:<?php echo $activeTab === 'grid' ? 'block' : 'none'; ?>;">
                     <form method="POST" id="createForm">
                         <?php echo csrfField(); ?>
                         <input type="hidden" name="create_requests" value="1">
@@ -904,6 +1040,45 @@ if (isset($_POST['create_requests']) && $createFailed) {
                         <input type="hidden" name="week" value="<?php echo e($selectedWeekKey); ?>">
                         <input type="hidden" name="block_id" id="deleteBlockIdField">
                     </form>
+                    </div><!-- /panel-grid -->
+
+                    <div id="panel-byday" class="tab-panel" style="display:<?php echo $activeTab === 'byday' ? 'block' : 'none'; ?>;">
+                        <form method="POST" id="createFormByday">
+                            <?php echo csrfField(); ?>
+                            <input type="hidden" name="create_requests_byday" value="1">
+                            <input type="hidden" name="week" value="<?php echo e($selectedWeekKey); ?>">
+
+                            <div style="margin-bottom:12px;max-width:420px;">
+                                <label for="department_name_byday"><?php echo e(fjdT('Département', 'Afdeling')); ?></label>
+                                <select id="department_name_byday" name="department_name_byday" required>
+                                    <option value=""><?php echo e(fjdT('Sélectionner', 'Selecteren')); ?></option>
+                                    <?php foreach ($departmentOptions as $bydayDept): ?>
+                                        <option value="<?php echo e($bydayDept); ?>" <?php echo (($_POST['department_name_byday'] ?? '') === $bydayDept) ? 'selected' : ''; ?>><?php echo e($bydayDept); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="byday-grid">
+                                <?php foreach ($weekDays as $weekDay): ?>
+                                    <div class="byday-day">
+                                        <div class="byday-day-head"><?php echo e($weekDay['label']); ?> <span class="th-date"><?php echo e($weekDay['date']); ?></span></div>
+                                        <textarea name="day_text[<?php echo e($weekDay['key']); ?>]" placeholder="<?php echo e(fjdT('Un horaire par ligne, ex : 9h30-18h30', 'Eén uurrooster per regel, bijv. 9h30-18h30')); ?>"><?php echo e($bydayText[$weekDay['key']] ?? ''); ?></textarea>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <div style="margin:14px 0;max-width:420px;">
+                                <label for="global_comment_byday"><?php echo e(fjdT('Commentaire (optionnel)', 'Opmerking (optioneel)')); ?></label>
+                                <input type="text" id="global_comment_byday" name="global_comment_byday" value="<?php echo e((string) ($_POST['global_comment_byday'] ?? '')); ?>" placeholder="<?php echo e(fjdT('Ex : renfort caisse', 'Bijv.: extra kassa')); ?>">
+                            </div>
+
+                            <button type="submit" class="btn btn-primary"><?php echo e(fjdT('Enregistrer les demandes', 'Aanvragen opslaan')); ?></button>
+                        </form>
+
+                        <p class="helper">
+                            <?php echo e(fjdT('Choisis le département, puis colle tes horaires jour par jour — un horaire par ligne. Deux lignes identiques le même jour = 2 personnes sur ce créneau.', 'Kies de afdeling en plak je uurroosters dag per dag — één per regel. Twee identieke regels op dezelfde dag = 2 personen op dat tijdsblok.')); ?>
+                        </p>
+                    </div><!-- /panel-byday -->
                 </div>
             </section>
 
@@ -1061,6 +1236,14 @@ if (isset($_POST['create_requests']) && $createFailed) {
             });
         });
     });
+
+    window.switchPanel = function (panelId, btn) {
+        document.querySelectorAll('.tab-panel').forEach(function (p) { p.style.display = 'none'; });
+        var panel = document.getElementById(panelId);
+        if (panel) { panel.style.display = 'block'; }
+        document.querySelectorAll('.mode-tab').forEach(function (t) { t.classList.remove('is-active'); });
+        if (btn) { btn.classList.add('is-active'); }
+    };
 
     window.insertBlock = function (id) {
         var b = BLOCKS[id];
