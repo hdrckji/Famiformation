@@ -77,6 +77,24 @@ $db->exec(
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
 );
 
+// Migration : supporter l'affectation de personnes non inscrites sur le site (matching par nom, version A).
+$assignmentColumns = [];
+$assignmentStudentNullable = false;
+foreach ($db->query('SHOW COLUMNS FROM interim_shift_assignments')->fetchAll(PDO::FETCH_ASSOC) as $columnRow) {
+    $field = (string) ($columnRow['Field'] ?? '');
+    $assignmentColumns[$field] = true;
+    if ($field === 'student_id' && strtoupper((string) ($columnRow['Null'] ?? '')) === 'YES') {
+        $assignmentStudentNullable = true;
+    }
+}
+if (!isset($assignmentColumns['external_name'])) {
+    $db->exec("ALTER TABLE interim_shift_assignments ADD COLUMN external_name VARCHAR(255) NULL AFTER student_id");
+}
+if (!$assignmentStudentNullable) {
+    // student_id peut etre NULL pour une personne externe (non inscrite) affectee via son nom.
+    $db->exec('ALTER TABLE interim_shift_assignments MODIFY COLUMN student_id INT NULL');
+}
+
 $agencyName = '';
 if (!$isAdmin) {
     $agencyStmt = $db->prepare('SELECT interim FROM utilisateurs WHERE id = ? LIMIT 1');
@@ -85,6 +103,7 @@ if (!$isAdmin) {
 }
 
 $message = '';
+$pendingConfirm = null; // Confirmation "modale" en attente (mode par nom) : ['message','request_id','student_name']
 
 $today = new DateTimeImmutable('today');
 $startMonday = $today->modify('monday this week');
@@ -152,6 +171,11 @@ if ($selectedDepartmentFilter !== 'all' && !in_array($selectedDepartmentFilter, 
 $selectedVueFilter = trim((string) ($_GET['vue'] ?? 'all'));
 if (!in_array($selectedVueFilter, ['all', 'a_pourvoir', 'attribue'], true)) {
     $selectedVueFilter = 'all';
+}
+
+$matchingMode = trim((string) ($_GET['matching_mode'] ?? $_POST['matching_mode'] ?? 'name'));
+if (!in_array($matchingMode, ['name', 'list'], true)) {
+    $matchingMode = 'name';
 }
 
 if (!function_exists('interimExtractStartMinutes')) {
@@ -348,8 +372,8 @@ if (!function_exists('interimGetRankedCandidatesForRequest')) {
                     'score' => 999999,
                     'manual_eligible' => false,
                     'eligible' => false,
-                    'reason' => 'Deja affecte sur ce creneau',
-                    'manual_reason' => 'Deja affecte sur ce creneau',
+                    'reason' => 'Déjà affecté sur ce créneau',
+                    'manual_reason' => 'Déjà affecté sur ce créneau',
                 ];
                 continue;
             }
@@ -373,8 +397,8 @@ if (!function_exists('interimGetRankedCandidatesForRequest')) {
                     'score' => 999998,
                     'manual_eligible' => false,
                     'eligible' => false,
-                    'reason' => 'Deja affecte ce jour',
-                    'manual_reason' => 'Deja affecte ce jour',
+                    'reason' => 'Déjà affecté ce jour',
+                    'manual_reason' => 'Déjà affecté ce jour',
                 ];
                 continue;
             }
@@ -407,7 +431,7 @@ if (!function_exists('interimGetRankedCandidatesForRequest')) {
                     'score' => 999997,
                     'manual_eligible' => true,
                     'eligible' => false,
-                    'reason' => 'Disponibilite non compatible',
+                    'reason' => 'Disponibilité non compatible',
                     'manual_reason' => '',
                 ];
                 continue;
@@ -427,7 +451,7 @@ if (!function_exists('interimGetRankedCandidatesForRequest')) {
                         'score' => 999996,
                         'manual_eligible' => false,
                         'eligible' => false,
-                        'reason' => 'Limite 45h/semaine atteinte (' . round($totalMinutesThisWeek / 60, 1) . 'h prevu)',
+                        'reason' => 'Limite 45h/semaine atteinte (' . round($totalMinutesThisWeek / 60, 1) . 'h prévu)',
                         'manual_reason' => 'Limite 45h/semaine atteinte',
                     ];
                     continue;
@@ -464,8 +488,8 @@ if (!function_exists('interimGetRankedCandidatesForRequest')) {
                     'score' => 999995,
                     'manual_eligible' => false,
                     'eligible' => false,
-                    'reason' => 'Limite 6 jours consecutifs atteinte',
-                    'manual_reason' => 'Limite 6 jours consecutifs atteinte',
+                    'reason' => 'Limite 6 jours consécutifs atteinte',
+                    'manual_reason' => 'Limite 6 jours consécutifs atteinte',
                 ];
                 continue;
             }
@@ -536,7 +560,7 @@ if (!function_exists('interimAutoAssignRequest')) {
 
             if (empty($availableSeats)) {
                 $db->commit();
-                return ['assigned' => 0, 'reason' => 'Creneau deja complet'];
+                return ['assigned' => 0, 'reason' => 'Créneau déjà complet'];
             }
 
             $rankedCandidates = interimGetRankedCandidatesForRequest($db, $requestRow, $isAdmin, $agencyName);
@@ -589,11 +613,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $requestId = (int) ($_POST['request_id'] ?? 0);
         $result = interimAutoAssignRequest($db, $requestId, $currentUserId, true, $agencyName);
         if ((int) $result['assigned'] > 0) {
-            $message = "<div class='alert success'>Auto-matching termine: " . (int) $result['assigned'] . " place(s) affectee(s) sur ce creneau.</div>";
+            $message = "<div class='alert success'>Auto-matching terminé : " . (int) $result['assigned'] . " place(s) affectée(s) sur ce créneau.</div>";
         } else {
             $reason = trim((string) ($result['reason'] ?? ''));
             $suffix = $reason !== '' ? ' (' . e($reason) . ')' : '';
-            $message = "<div class='alert error'>Auto-matching: aucune affectation realisee{$suffix}.</div>";
+            $message = "<div class='alert error'>Auto-matching : aucune affectation réalisée{$suffix}.</div>";
         }
     }
 
@@ -625,19 +649,214 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($totalAssigned > 0) {
-            $message = "<div class='alert success'>Auto-matching semaine termine: {$totalAssigned} place(s) affectee(s) sur {$processed} creneau(x).</div>";
+            $message = "<div class='alert success'>Auto-matching semaine terminé : {$totalAssigned} place(s) affectée(s) sur {$processed} créneau(x).</div>";
         } else {
-            $message = "<div class='alert error'>Auto-matching semaine: aucune nouvelle affectation.</div>";
+            $message = "<div class='alert error'>Auto-matching semaine : aucune nouvelle affectation.</div>";
         }
     }
 
     if (isset($_POST['assign_student'])) {
         $requestId = (int) ($_POST['request_id'] ?? 0);
-        $studentId = (int) ($_POST['student_id'] ?? 0);
+        $studentId = 0;
+        $externalName = '';
+        $isExternal = false;
+        $ambiguousName = false;
 
-        if ($requestId <= 0 || $studentId <= 0) {
-            $message = "<div class='alert error'>Selection etudiant invalide.</div>";
+        if ($matchingMode === 'name') {
+            $studentName = trim((string) ($_POST['student_name'] ?? ''));
+            if ($studentName !== '') {
+                $studentSearchStmt = $db->prepare(
+                    "SELECT id, nom, prenom, interim
+                     FROM utilisateurs
+                     WHERE role = 'etudiant'
+                       AND (
+                            LOWER(CONCAT(TRIM(prenom), ' ', TRIM(nom))) = LOWER(?)
+                         OR LOWER(CONCAT(TRIM(nom), ' ', TRIM(prenom))) = LOWER(?)
+                         OR LOWER(CONCAT(TRIM(prenom), ' ', TRIM(nom))) LIKE LOWER(?)
+                         OR LOWER(CONCAT(TRIM(nom), ' ', TRIM(prenom))) LIKE LOWER(?)
+                       )
+                     ORDER BY nom ASC, prenom ASC
+                     LIMIT 5"
+                );
+                $likeTerm = $studentName . '%';
+                $studentSearchStmt->execute([$studentName, $studentName, $likeTerm, $likeTerm]);
+                $candidateRows = $studentSearchStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (count($candidateRows) === 1) {
+                    $studentId = (int) $candidateRows[0]['id'];
+                } elseif (count($candidateRows) > 1) {
+                    $exactMatches = array_filter($candidateRows, static function ($row) use ($studentName) {
+                        $full1 = trim((string) $row['prenom'] . ' ' . $row['nom']);
+                        $full2 = trim((string) $row['nom'] . ' ' . $row['prenom']);
+                        return strcasecmp($full1, $studentName) === 0 || strcasecmp($full2, $studentName) === 0;
+                    });
+                    if (count($exactMatches) === 1) {
+                        $studentId = (int) array_values($exactMatches)[0]['id'];
+                    } else {
+                        // Plusieurs inscrits correspondent sans nom complet unique : on demande de preciser.
+                        $ambiguousName = true;
+                    }
+                }
+
+                // Aucun inscrit ne correspond : on affecte la personne en texte libre (version A).
+                if ($studentId <= 0 && !$ambiguousName) {
+                    $isExternal = true;
+                    $externalName = $studentName;
+                }
+            }
         } else {
+            $studentId = (int) ($_POST['student_id'] ?? 0);
+        }
+
+        $confirmAssign = isset($_POST['confirm_assign']);
+
+        // === Avertissements "soft" en mode par nom : on demande confirmation (modale Oui/Non) au lieu de bloquer/affecter ===
+        if ($matchingMode === 'name' && !$ambiguousName && $requestId > 0 && ($studentId > 0 || $isExternal) && !$confirmAssign) {
+            $confInfoStmt = $db->prepare('SELECT shift_date FROM interim_shift_requests WHERE id = ? LIMIT 1');
+            $confInfoStmt->execute([$requestId]);
+            $confShiftDate = (string) $confInfoStmt->fetchColumn();
+            $confReasons = [];
+
+            if ($confShiftDate !== '') {
+                if ($isExternal) {
+                    // Personne non inscrite deja affectee a un autre creneau ce jour-la
+                    $confExtDayStmt = $db->prepare(
+                        "SELECT COUNT(*)
+                         FROM interim_shift_assignments a
+                         INNER JOIN interim_shift_requests r ON r.id = a.request_id
+                         WHERE r.shift_date = ?
+                           AND a.request_id <> ?
+                           AND a.student_id IS NULL
+                           AND LOWER(TRIM(a.external_name)) = LOWER(?)"
+                    );
+                    $confExtDayStmt->execute([$confShiftDate, $requestId, $externalName]);
+                    if ((int) $confExtDayStmt->fetchColumn() > 0) {
+                        $confReasons[] = fjhT(
+                            'Cette personne est déjà affectée à un autre créneau ce jour-là.',
+                            'Deze persoon is die dag al aan een ander tijdsblok toegewezen.'
+                        );
+                    }
+                } else {
+                    // Inscrit : disponibilites non renseignees ?
+                    $confAvailStmt = $db->prepare(
+                        'SELECT availability_status FROM student_availabilities WHERE user_id = ? AND availability_date = ? LIMIT 1'
+                    );
+                    $confAvailStmt->execute([$studentId, $confShiftDate]);
+                    $confAvail = (string) $confAvailStmt->fetchColumn();
+                    if ($confAvail === 'matin') {
+                        $confAvail = 'non_renseigne';
+                    }
+                    if ($confAvail === '' || $confAvail === 'non_renseigne') {
+                        $confReasons[] = fjhT(
+                            "Cette personne n'a pas renseigné ses disponibilités pour ce jour.",
+                            'Deze persoon heeft zijn/haar beschikbaarheid voor deze dag niet doorgegeven.'
+                        );
+                    }
+                    // Inscrit : deja affecte a un autre creneau ce jour-la ?
+                    $confDayStmt = $db->prepare(
+                        "SELECT COUNT(*)
+                         FROM interim_shift_assignments a
+                         INNER JOIN interim_shift_requests r ON r.id = a.request_id
+                         WHERE a.student_id = ?
+                           AND r.shift_date = ?
+                           AND a.request_id <> ?"
+                    );
+                    $confDayStmt->execute([$studentId, $confShiftDate, $requestId]);
+                    if ((int) $confDayStmt->fetchColumn() > 0) {
+                        $confReasons[] = fjhT(
+                            'Cette personne est déjà affectée à un autre créneau ce jour-là.',
+                            'Deze persoon is die dag al aan een ander tijdsblok toegewezen.'
+                        );
+                    }
+                }
+            }
+
+            if (!empty($confReasons)) {
+                $pendingConfirm = [
+                    'message' => implode(' ', $confReasons) . ' ' . fjhT(
+                        "Êtes-vous sûr de vouloir l'affecter quand même ?",
+                        'Weet u zeker dat u deze persoon toch wilt toewijzen?'
+                    ),
+                    'request_id' => $requestId,
+                    'student_name' => $studentName,
+                ];
+            }
+        }
+
+        if ($pendingConfirm !== null) {
+            // Confirmation requise : la modale sera affichee, on n'affecte pas encore.
+        } elseif ($ambiguousName) {
+            $message = "<div class='alert error'>Plusieurs étudiants correspondent à ce nom. Précisez le nom complet ou utilisez l'onglet Matching par liste.</div>";
+        } elseif ($requestId <= 0 || ($studentId <= 0 && !$isExternal)) {
+            $message = "<div class='alert error'>Sélection étudiant invalide.</div>";
+        } elseif ($isExternal) {
+            // === Affectation d'une personne non inscrite sur le site ===
+            try {
+                $db->beginTransaction();
+
+                $requestLockStmt = $db->prepare(
+                    'SELECT id, seats_required FROM interim_shift_requests WHERE id = ? LIMIT 1 FOR UPDATE'
+                );
+                $requestLockStmt->execute([$requestId]);
+                $requestRow = $requestLockStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$requestRow) {
+                    throw new RuntimeException('Demande introuvable.');
+                }
+
+                $assignedSeatsStmt = $db->prepare(
+                    'SELECT seat_number FROM interim_shift_assignments WHERE request_id = ? ORDER BY seat_number ASC FOR UPDATE'
+                );
+                $assignedSeatsStmt->execute([$requestId]);
+                $assignedSeats = array_map('intval', $assignedSeatsStmt->fetchAll(PDO::FETCH_COLUMN));
+
+                $seatsRequired = (int) $requestRow['seats_required'];
+                $nextSeat = null;
+                for ($i = 1; $i <= $seatsRequired; $i++) {
+                    if (!in_array($i, $assignedSeats, true)) {
+                        $nextSeat = $i;
+                        break;
+                    }
+                }
+
+                if ($nextSeat === null) {
+                    throw new RuntimeException('Ce créneau est déjà complet.');
+                }
+
+                // Eviter d'ajouter deux fois la meme personne externe sur ce creneau.
+                $dupExternalStmt = $db->prepare(
+                    "SELECT COUNT(*) FROM interim_shift_assignments
+                     WHERE request_id = ? AND student_id IS NULL AND LOWER(TRIM(external_name)) = LOWER(?)"
+                );
+                $dupExternalStmt->execute([$requestId, $externalName]);
+                if ((int) $dupExternalStmt->fetchColumn() > 0) {
+                    throw new RuntimeException('Cette personne est déjà assignée sur ce créneau.');
+                }
+
+                $insertAssignStmt = $db->prepare(
+                    'INSERT INTO interim_shift_assignments (request_id, seat_number, student_id, external_name, assigned_by_user_id, agency_name) VALUES (?, ?, NULL, ?, ?, ?)'
+                );
+                $insertAssignStmt->execute([
+                    $requestId,
+                    $nextSeat,
+                    $externalName,
+                    $currentUserId,
+                    $isAdmin ? '' : $agencyName,
+                ]);
+
+                $db->commit();
+                $message = "<div class='alert success'>Personne (non inscrite) assignée avec succès.</div>";
+            } catch (Exception $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                $message = "<div class='alert error'>" . e($e->getMessage()) . "</div>";
+            }
+        } else {
+            $rhBlockMessage = fjhT(
+                "Ce n'est pas possible : cette personne n'est pas disponible pour ce creneau et l'ajouter poserait probleme au niveau du planning. Si vous avez vraiment besoin d'elle, merci de voir directement avec les RH.",
+                'Dit is niet mogelijk: deze persoon is niet beschikbaar voor dit tijdsblok en toevoegen zou voor problemen in de planning zorgen. Heeft u deze persoon echt nodig, neem dan rechtstreeks contact op met HR.'
+            );
             try {
                 $db->beginTransaction();
 
@@ -661,7 +880,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $student = $studentStmt->fetch(PDO::FETCH_ASSOC);
 
                 if (!$student) {
-                    throw new RuntimeException('Etudiant invalide.');
+                    throw new RuntimeException('Étudiant invalide.');
                 }
 
                 $studentAvailabilityStmt = $db->prepare(
@@ -677,12 +896,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($studentAvailabilityStatus === 'indisponible') {
-                    throw new RuntimeException('Affectation impossible: etudiant marque indisponible ce jour.');
+                    throw new RuntimeException($rhBlockMessage);
                 }
 
                 $studentInterim = trim((string) ($student['interim'] ?? ''));
                 if (!$isAdmin && ($studentInterim === '' || $studentInterim !== $agencyName)) {
-                    throw new RuntimeException('Cet etudiant ne fait pas partie de votre agence.');
+                    throw new RuntimeException('Cet étudiant ne fait pas partie de votre agence.');
                 }
 
                 $sameDayAssignmentStmt = $db->prepare(
@@ -696,8 +915,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $studentId,
                     (string) ($requestRow['shift_date'] ?? ''),
                 ]);
-                if ((int) $sameDayAssignmentStmt->fetchColumn() > 0) {
-                    throw new RuntimeException('Affectation impossible: etudiant deja affecte ce jour.');
+                // En mode par nom, "deja affecte ce jour" est gere en amont par une confirmation (modale), pas un blocage.
+                if ($matchingMode !== 'name' && (int) $sameDayAssignmentStmt->fetchColumn() > 0) {
+                    throw new RuntimeException($rhBlockMessage);
                 }
 
                 // Vérification 45h/semaine
@@ -724,7 +944,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $manualTotalMinutes += interimParseTimeSlotDuration((string) $slot);
                     }
                     if ($manualTotalMinutes > 45 * 60) {
-                        throw new RuntimeException('Affectation impossible: depassement de la limite de 45h/semaine (' . round($manualTotalMinutes / 60, 1) . 'h prevu).');
+                        throw new RuntimeException($rhBlockMessage);
                     }
                 }
 
@@ -762,7 +982,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 if ($manualMax > 6) {
-                    throw new RuntimeException('Affectation impossible: depassement de la limite de 6 jours consecutifs.');
+                    throw new RuntimeException($rhBlockMessage);
                 }
 
                 $assignedSeatsStmt = $db->prepare(
@@ -781,7 +1001,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($nextSeat === null) {
-                    throw new RuntimeException('Ce creneau est deja complet.');
+                    throw new RuntimeException('Ce créneau est déjà complet.');
                 }
 
                 $alreadyAssignedStmt = $db->prepare(
@@ -789,7 +1009,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $alreadyAssignedStmt->execute([$requestId, $studentId]);
                 if ((int) $alreadyAssignedStmt->fetchColumn() > 0) {
-                    throw new RuntimeException('Cet etudiant est deja assigne sur ce creneau.');
+                    throw new RuntimeException('Cet étudiant est déjà assigné sur ce créneau.');
                 }
 
                 $insertAssignStmt = $db->prepare(
@@ -804,7 +1024,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 $db->commit();
-                $message = "<div class='alert success'>Etudiant assigne avec succes.</div>";
+                $message = "<div class='alert success'>Étudiant assigné avec succès.</div>";
             } catch (Exception $e) {
                 if ($db->inTransaction()) {
                     $db->rollBack();
@@ -818,14 +1038,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
         $requestId = (int) ($_POST['request_id'] ?? 0);
         if ($assignmentId <= 0 || $requestId <= 0) {
-            $message = "<div class='alert error'>Desaffectation invalide.</div>";
+            $message = "<div class='alert error'>Désaffectation invalide.</div>";
         } else {
             try {
                 $db->beginTransaction();
                 $assignmentStmt = $db->prepare(
-                    "SELECT a.id, a.request_id, COALESCE(NULLIF(TRIM(a.agency_name), ''), TRIM(u.interim)) AS owner_agency
+                    "SELECT a.id, a.request_id,
+                            CASE WHEN a.student_id IS NULL
+                                 THEN TRIM(a.agency_name)
+                                 ELSE COALESCE(NULLIF(TRIM(a.agency_name), ''), TRIM(u.interim))
+                            END AS owner_agency
                      FROM interim_shift_assignments a
-                     INNER JOIN utilisateurs u ON u.id = a.student_id
+                     LEFT JOIN utilisateurs u ON u.id = a.student_id
                      WHERE a.id = ? AND a.request_id = ?
                      LIMIT 1
                      FOR UPDATE"
@@ -845,11 +1069,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $deleteStmt = $db->prepare('DELETE FROM interim_shift_assignments WHERE id = ? AND request_id = ?');
                 $deleteStmt->execute([$assignmentId, $requestId]);
                 if ($deleteStmt->rowCount() <= 0) {
-                    throw new RuntimeException('Desaffectation non effectuee.');
+                    throw new RuntimeException('Désaffectation non effectuée.');
                 }
 
                 $db->commit();
-                $message = "<div class='alert success'>Etudiant desaffecte du creneau.</div>";
+                $message = "<div class='alert success'>Étudiant désaffecté du créneau.</div>";
             } catch (Exception $e) {
                 if ($db->inTransaction()) {
                     $db->rollBack();
@@ -881,10 +1105,10 @@ $assignmentsByRequest = [];
 if (!empty($requestIds)) {
     $placeholders = implode(', ', array_fill(0, count($requestIds), '?'));
     $assignmentsStmt = $db->prepare(
-        "SELECT a.id AS assignment_id, a.request_id, a.seat_number, a.agency_name,
+        "SELECT a.id AS assignment_id, a.request_id, a.seat_number, a.agency_name, a.external_name,
                 u.id AS student_id, u.nom, u.prenom, u.interim
          FROM interim_shift_assignments a
-         INNER JOIN utilisateurs u ON u.id = a.student_id
+         LEFT JOIN utilisateurs u ON u.id = a.student_id
          WHERE a.request_id IN ($placeholders)
          ORDER BY a.request_id ASC, a.seat_number ASC"
     );
@@ -955,10 +1179,10 @@ if (!empty($studentOptions)) {
 }
 
 $statusLabels = [
-    'non_renseigne' => 'Non renseigne',
+    'non_renseigne' => 'Non renseigné',
     'indisponible' => 'Indisponible',
-    'apres_midi' => 'Apres-midi',
-    'journee' => 'Journee',
+    'apres_midi' => 'Après-midi',
+    'journee' => 'Journée',
 ];
 
 $requestsByDate = [];
@@ -1044,7 +1268,7 @@ foreach ($weekDays as $weekDay) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo e(fjhT('Horaires Interim', 'Interim uurroosters')); ?></title>
+    <title><?php echo e(fjhT('Horaires Intérim', 'Interim uurroosters')); ?></title>
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1430,6 +1654,69 @@ foreach ($weekDays as $weekDay) {
             color: var(--accent);
         }
 
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tab {
+            text-decoration: none;
+            border-radius: 12px 12px 0 0;
+            padding: 12px 20px;
+            font-weight: 700;
+            font-size: 0.92rem;
+            color: var(--muted);
+            background: #eef3f0;
+            border: 1px solid var(--line);
+            border-bottom: none;
+        }
+
+        .tab.is-active {
+            background: var(--card);
+            color: var(--accent);
+            box-shadow: 0 -3px 0 var(--accent) inset;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(20, 40, 28, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-box {
+            background: var(--card);
+            border-radius: 18px;
+            box-shadow: 0 24px 60px rgba(15, 40, 25, 0.35);
+            max-width: 460px;
+            width: 100%;
+            padding: 24px;
+        }
+
+        .modal-title {
+            font-weight: 800;
+            font-size: 1.05rem;
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+
+        .modal-text {
+            color: var(--text);
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
         @media (max-width: 1200px) {
             .layout {
                 display: block;
@@ -1442,29 +1729,50 @@ foreach ($weekDays as $weekDay) {
         <section class="hero">
             <div class="hero-top">
                 <div>
-                    <div style="text-transform:uppercase;letter-spacing:.08em;font-size:.78rem;opacity:.86;"><?php echo $isAdmin ? e(fjhT('Administration', 'Administratie')) : e(fjhT('Agence interim', 'Interimkantoor')); ?></div>
-                    <h1><?php echo e(fjhT('Horaires a pourvoir', 'In te vullen uurroosters')); ?></h1>
+                    <div style="text-transform:uppercase;letter-spacing:.08em;font-size:.78rem;opacity:.86;"><?php echo $isAdmin ? e(fjhT('Administration', 'Administratie')) : e(fjhT('Agence intérim', 'Interimkantoor')); ?></div>
+                    <h1><?php echo e(fjhT('Horaires à pourvoir', 'In te vullen uurroosters')); ?></h1>
                 </div>
                 <div class="hero-actions">
                     <?php if ($isAdmin): ?>
                         <a href="interim_horaires_demandes.php" class="link-pill"><?php echo e(fjhT('Demandes horaires', 'Uurroosteraanvragen')); ?></a>
                         <a href="validation_demandes_horaires.php" class="link-pill"><?php echo e(fjhT('Validation demandes', 'Aanvragen valideren')); ?></a>
                     <?php endif; ?>
-                    <a href="admin_disponibilites_etudiants.php" class="link-pill"><?php echo e(fjhT('Disponibilites etudiants', 'Beschikbaarheden studenten')); ?></a>
-                    <a href="<?php echo $isAdmin ? 'index.php' : 'logout.php'; ?>" class="link-pill"><?php echo $isAdmin ? e(fjhT('Retour accueil', 'Terug naar start')) : e(fjhT('Se deconnecter', 'Uitloggen')); ?></a>
+                    <a href="admin_disponibilites_etudiants.php" class="link-pill"><?php echo e(fjhT('Disponibilités étudiants', 'Beschikbaarheden studenten')); ?></a>
+                    <a href="<?php echo $isAdmin ? 'index.php' : 'logout.php'; ?>" class="link-pill"><?php echo $isAdmin ? e(fjhT('Retour accueil', 'Terug naar start')) : e(fjhT('Se déconnecter', 'Uitloggen')); ?></a>
                     <?php echo famiRenderLanguageSwitcher(); ?>
                 </div>
             </div>
             <p>
                 <?php if ($isAdmin): ?>
-                    <?php echo e(fjhT('Cree les besoins horaires en quelques lignes. Les agences voient tous les creneaux, mais ne peuvent completer que les places encore libres.', 'Maak uurbehoeften in enkele regels. Kantoren zien alle tijdsblokken, maar kunnen alleen vrije plaatsen invullen.')); ?>
+                    <?php echo e(fjhT('Crée les besoins horaires en quelques lignes. Les agences voient tous les créneaux, mais ne peuvent compléter que les places encore libres.', 'Maak uurbehoeften in enkele regels. Kantoren zien alle tijdsblokken, maar kunnen alleen vrije plaatsen invullen.')); ?>
                 <?php else: ?>
-                    <?php echo e(fjhT('Tous les horaires a pourvoir sont visibles. Une place deja completee par une autre agence est verrouillee, avec anonymisation des etudiants externes a votre agence.', 'Alle in te vullen uurroosters zijn zichtbaar. Een plaats die al werd ingevuld door een ander kantoor is vergrendeld; studenten van andere kantoren worden geanonimiseerd.')); ?>
+                    <?php echo e(fjhT('Tous les horaires à pourvoir sont visibles. Une place déjà complétée par une autre agence est verrouillée, avec anonymisation des étudiants externes à votre agence.', 'Alle in te vullen uurroosters zijn zichtbaar. Een plaats die al werd ingevuld door een ander kantoor is vergrendeld; studenten van andere kantoren worden geanonimiseerd.')); ?>
                 <?php endif; ?>
             </p>
         </section>
 
         <?php echo $message; ?>
+
+        <?php if ($pendingConfirm !== null): ?>
+            <div class="modal-overlay" id="confirmModal">
+                <div class="modal-box">
+                    <div class="modal-title"><?php echo e(fjhT('Confirmation', 'Bevestiging')); ?></div>
+                    <div class="modal-text"><?php echo e($pendingConfirm['message']); ?></div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-soft" onclick="document.getElementById('confirmModal').style.display='none';"><?php echo e(fjhT('Non', 'Nee')); ?></button>
+                        <form method="POST" style="display:inline;">
+                            <?php echo csrfField(); ?>
+                            <input type="hidden" name="assign_student" value="1">
+                            <input type="hidden" name="request_id" value="<?php echo (int) $pendingConfirm['request_id']; ?>">
+                            <input type="hidden" name="matching_mode" value="name">
+                            <input type="hidden" name="student_name" value="<?php echo e($pendingConfirm['student_name']); ?>">
+                            <input type="hidden" name="confirm_assign" value="1">
+                            <button type="submit" class="btn btn-primary"><?php echo e(fjhT('Oui, affecter', 'Ja, toewijzen')); ?></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <section class="toolbar">
             <form method="GET">
@@ -1488,9 +1796,9 @@ foreach ($weekDays as $weekDay) {
                     </select>
                 </div>
                 <div>
-                    <label for="department"><?php echo e(fjhT('Departement', 'Afdeling')); ?></label>
+                    <label for="department"><?php echo e(fjhT('Département', 'Afdeling')); ?></label>
                     <select id="department" name="department">
-                        <option value="all" <?php echo $selectedDepartmentFilter === 'all' ? 'selected' : ''; ?>><?php echo e(fjhT('Tous les departements', 'Alle afdelingen')); ?></option>
+                        <option value="all" <?php echo $selectedDepartmentFilter === 'all' ? 'selected' : ''; ?>><?php echo e(fjhT('Tous les départements', 'Alle afdelingen')); ?></option>
                         <?php foreach ($departmentFilterOptions as $departmentFilterName): ?>
                             <option value="<?php echo e($departmentFilterName); ?>" <?php echo $selectedDepartmentFilter === $departmentFilterName ? 'selected' : ''; ?>>
                                 <?php echo e($departmentFilterName); ?>
@@ -1502,10 +1810,11 @@ foreach ($weekDays as $weekDay) {
                     <label for="vue"><?php echo e(fjhT('Vue', 'Weergave')); ?></label>
                     <select id="vue" name="vue">
                         <option value="all" <?php echo $selectedVueFilter === 'all' ? 'selected' : ''; ?>><?php echo e(fjhT('Tous les horaires', 'Alle uurroosters')); ?></option>
-                        <option value="a_pourvoir" <?php echo $selectedVueFilter === 'a_pourvoir' ? 'selected' : ''; ?>><?php echo e(fjhT('Encore a pourvoir', 'Nog in te vullen')); ?></option>
-                        <option value="attribue" <?php echo $selectedVueFilter === 'attribue' ? 'selected' : ''; ?>><?php echo e(fjhT('Deja attribues', 'Reeds toegewezen')); ?></option>
+                        <option value="a_pourvoir" <?php echo $selectedVueFilter === 'a_pourvoir' ? 'selected' : ''; ?>><?php echo e(fjhT('Encore à pourvoir', 'Nog in te vullen')); ?></option>
+                        <option value="attribue" <?php echo $selectedVueFilter === 'attribue' ? 'selected' : ''; ?>><?php echo e(fjhT('Déjà attribués', 'Reeds toegewezen')); ?></option>
                     </select>
                 </div>
+                <input type="hidden" name="matching_mode" value="<?php echo e($matchingMode); ?>">
                 <button type="submit" class="btn btn-soft"><?php echo e(fjhT('Afficher', 'Tonen')); ?></button>
             </form>
             <?php if ($isAdmin): ?>
@@ -1513,20 +1822,34 @@ foreach ($weekDays as $weekDay) {
                     <?php echo csrfField(); ?>
                     <input type="hidden" name="auto_match_week" value="1">
                     <input type="hidden" name="week" value="<?php echo e($selectedWeekKey); ?>">
+                    <input type="hidden" name="matching_mode" value="<?php echo e($matchingMode); ?>">
                     <button type="submit" class="btn btn-primary"><?php echo e(fjhT('Auto-matching semaine', 'Automatische matching week')); ?></button>
                 </form>
             <?php endif; ?>
             <div style="text-align:right;color:var(--muted);line-height:1.5;">
-                <strong><?php echo e(fjhT('Periode', 'Periode')); ?></strong><br>
+                <strong><?php echo e(fjhT('Période', 'Periode')); ?></strong><br>
                 <?php echo $selectedWeek['start']->format('d/m/Y'); ?> - <?php echo $selectedWeek['end']->format('d/m/Y'); ?>
             </div>
+        </section>
+
+        <section class="tabs">
+            <?php
+                $tabQuery = http_build_query([
+                    'week' => $selectedWeekKey,
+                    'day' => $selectedDayFilter,
+                    'department' => $selectedDepartmentFilter,
+                    'vue' => $selectedVueFilter,
+                ]);
+            ?>
+            <a href="?<?php echo $tabQuery . '&matching_mode=name'; ?>" class="tab <?php echo $matchingMode === 'name' ? 'is-active' : ''; ?>"><?php echo e(fjhT('Matching par nom', 'Matching op naam')); ?></a>
+            <a href="?<?php echo $tabQuery . '&matching_mode=list'; ?>" class="tab <?php echo $matchingMode === 'list' ? 'is-active' : ''; ?>"><?php echo e(fjhT('Matching par liste', 'Matching per lijst')); ?></a>
         </section>
 
         <section class="layout">
             <div>
                 <?php if (!empty($remainingByDayDept)): ?>
                     <section class="card" style="margin-bottom:16px;">
-                        <div class="card-head recap-toggle" onclick="toggleRecap(this)" style="cursor:pointer;user-select:none;"><?php echo e(fjhT('Recap des horaires a pourvoir (reste a couvrir)', 'Overzicht van in te vullen uurroosters (nog te dekken)')); ?> <span class="recap-chevron">&#9660;</span></div>
+                        <div class="card-head recap-toggle" onclick="toggleRecap(this)" style="cursor:pointer;user-select:none;"><?php echo e(fjhT('Récap des horaires à pourvoir (reste à couvrir)', 'Overzicht van in te vullen uurroosters (nog te dekken)')); ?> <span class="recap-chevron">&#9660;</span></div>
                         <div class="card-body recap-body" style="display:none;">
                             <div class="recap-grid">
                                 <?php foreach ($weekDays as $weekDay): ?>
@@ -1551,7 +1874,7 @@ foreach ($weekDays as $weekDay) {
 
                 <?php if (empty($visibleWeekDays)): ?>
                     <section class="day-card">
-                        <div class="empty"><?php echo e(fjhT('Aucun creneau a afficher pour les filtres selectionnes.', 'Geen tijdsblok om te tonen voor de geselecteerde filters.')); ?></div>
+                        <div class="empty"><?php echo e(fjhT('Aucun créneau à afficher pour les filtres sélectionnés.', 'Geen tijdsblok om te tonen voor de geselecteerde filters.')); ?></div>
                     </section>
                 <?php endif; ?>
 
@@ -1570,8 +1893,8 @@ foreach ($weekDays as $weekDay) {
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th><?php echo e(fjhT('Departement / Horaire', 'Afdeling / Uurrooster')); ?></th>
-                                            <th><?php echo e(fjhT('Etat', 'Status')); ?></th>
+                                            <th><?php echo e(fjhT('Département / Horaire', 'Afdeling / Uurrooster')); ?></th>
+                                            <th><?php echo e(fjhT('État', 'Status')); ?></th>
                                             <th><?php echo e(fjhT('Affectations', 'Toewijzingen')); ?></th>
                                             <th><?php echo e(fjhT('Action', 'Actie')); ?></th>
                                         </tr>
@@ -1617,29 +1940,38 @@ foreach ($weekDays as $weekDay) {
                                                 </td>
                                                 <td>
                                                     <?php if (empty($assignments)): ?>
-                                                        <span class="slot-meta">Aucun etudiant assigne</span>
+                                                        <span class="slot-meta">Aucun étudiant assigné</span>
                                                     <?php else: ?>
                                                         <ul class="assigned-list">
                                                             <?php foreach ($assignments as $assignment): ?>
                                                                 <?php
-                                                                $studentName = trim((string) ($assignment['prenom'] ?? '')) . ' ' . trim((string) ($assignment['nom'] ?? ''));
-                                                                $studentAgency = trim((string) ($assignment['interim'] ?? ''));
+                                                                $isExternalAssign = empty($assignment['student_id']);
+                                                                if ($isExternalAssign) {
+                                                                    $studentName = trim((string) ($assignment['external_name'] ?? ''));
+                                                                    $studentAgency = trim((string) ($assignment['agency_name'] ?? ''));
+                                                                } else {
+                                                                    $studentName = trim((string) ($assignment['prenom'] ?? '')) . ' ' . trim((string) ($assignment['nom'] ?? ''));
+                                                                    $studentAgency = trim((string) ($assignment['interim'] ?? ''));
+                                                                }
                                                                 $canSeeIdentity = $isAdmin || ($studentAgency !== '' && $studentAgency === $agencyName);
-                                                                $canUnassign = $isAdmin || ($studentAgency !== '' && $studentAgency === $agencyName);
+                                                                $canUnassign = $canSeeIdentity;
                                                                 ?>
                                                                 <li>
                                                                     <?php if ($canSeeIdentity): ?>
                                                                         <?php echo e($studentName); ?>
+                                                                        <?php if ($isExternalAssign): ?>
+                                                                            <span class="badge badge-open" style="margin-left:4px;"><?php echo e(fjhT('externe', 'extern')); ?></span>
+                                                                        <?php endif; ?>
                                                                         <?php if ($isAdmin): ?>
-                                                                            <span class="slot-meta">(<?php echo e($studentAgency !== '' ? $studentAgency : 'Sans agence'); ?>)</span>
+                                                                            <span class="slot-meta">(<?php echo e($studentAgency !== '' ? $studentAgency : ($isExternalAssign ? 'Non inscrit' : 'Sans agence')); ?>)</span>
                                                                         <?php endif; ?>
                                                                         <?php if ($canUnassign): ?>
-                                                                            <form method="POST" class="unassign-form" onsubmit="return confirm('Retirer cet etudiant de ce creneau ?');">
+                                                                            <form method="POST" class="unassign-form" onsubmit="return confirm('Retirer cet étudiant de ce créneau ?');">
                                                                                 <?php echo csrfField(); ?>
                                                                                 <input type="hidden" name="unassign_student" value="1">
                                                                                 <input type="hidden" name="request_id" value="<?php echo $requestId; ?>">
                                                                                 <input type="hidden" name="assignment_id" value="<?php echo (int) ($assignment['assignment_id'] ?? 0); ?>">
-                                                                                <button type="submit" class="btn-mini">Desaffecter</button>
+                                                                                <button type="submit" class="btn-mini">Désaffecter</button>
                                                                             </form>
                                                                         <?php endif; ?>
                                                                     <?php else: ?>
@@ -1652,6 +1984,7 @@ foreach ($weekDays as $weekDay) {
                                                 </td>
                                                 <td>
                                                     <?php if (!$isFull): ?>
+                                                        <?php if ($matchingMode === 'list'): ?>
                                                         <?php if (!empty($topSuggestions)): ?>
                                                             <ul class="suggestion-list">
                                                                 <?php foreach ($topSuggestions as $suggestion): ?>
@@ -1669,16 +2002,22 @@ foreach ($weekDays as $weekDay) {
                                                                 <?php endforeach; ?>
                                                             </ul>
                                                         <?php else: ?>
-                                                            <div class="slot-meta">Aucun candidat compatible (dispo + departement).</div>
+                                                            <div class="slot-meta">Aucun candidat compatible (dispo + département).</div>
+                                                        <?php endif; ?>
                                                         <?php endif; ?>
 
                                                         <form method="POST" class="fill-form">
                                                             <?php echo csrfField(); ?>
                                                             <input type="hidden" name="assign_student" value="1">
                                                             <input type="hidden" name="request_id" value="<?php echo $requestId; ?>">
-                                                            <select name="student_id" required>
-                                                                <option value=""><?php echo $hasManualEligibleCandidates ? 'Choisir etudiant' : 'Aucun etudiant eligible'; ?></option>
-                                                                <?php foreach ($rankedCandidates as $candidate): ?>
+                                                            <input type="hidden" name="matching_mode" value="<?php echo e($matchingMode); ?>">
+                                                            <?php if ($matchingMode === 'name'): ?>
+                                                                <div style="font-weight:600;margin-bottom:8px;line-height:1.35;"><?php echo e(fjhT('Entrez le nom et prénom de la personne que vous souhaitez pour cette demande', 'Voer de naam en voornaam in van de gewenste persoon voor deze aanvraag')); ?></div>
+                                                                <input type="text" name="student_name" placeholder="<?php echo e(fjhT('Nom et prénom', 'Naam en voornaam')); ?>" autocomplete="off" style="width:100%;padding:22px 18px;font-size:1.35rem;margin-bottom:10px;" required>
+                                                            <?php else: ?>
+                                                                <select name="student_id" required>
+                                                                    <option value=""><?php echo $hasManualEligibleCandidates ? 'Choisir étudiant' : 'Aucun étudiant éligible'; ?></option>
+                                                                    <?php foreach ($rankedCandidates as $candidate): ?>
                                                                     <?php
                                                                     $candidateStatusLabel = $statusLabels[$candidate['availability_status']] ?? $candidate['availability_status'];
                                                                     $candidateReason = trim((string) ($candidate['manual_reason'] ?? ''));
@@ -1696,8 +2035,9 @@ foreach ($weekDays as $weekDay) {
                                                                         <?php echo e($candidateLabel); ?>
                                                                     </option>
                                                                 <?php endforeach; ?>
-                                                            </select>
-                                                            <button type="submit" class="btn btn-primary" <?php echo $hasManualEligibleCandidates ? '' : 'disabled'; ?>>Affecter</button>
+                                                                </select>
+                                                            <?php endif; ?>
+                                                            <button type="submit" class="btn btn-primary" <?php echo ($matchingMode === 'list' && !$hasManualEligibleCandidates) ? 'disabled' : ''; ?>>Affecter</button>
                                                         </form>
 
                                                         <?php if ($isAdmin): ?>
@@ -1705,11 +2045,11 @@ foreach ($weekDays as $weekDay) {
                                                                 <?php echo csrfField(); ?>
                                                                 <input type="hidden" name="auto_match_request" value="1">
                                                                 <input type="hidden" name="request_id" value="<?php echo $requestId; ?>">
-                                                                <button type="submit" class="btn btn-soft" style="width:100%;">Auto-matching creneau</button>
+                                                                <button type="submit" class="btn btn-soft" style="width:100%;">Auto-matching créneau</button>
                                                             </form>
                                                         <?php endif; ?>
                                                     <?php else: ?>
-                                                        <span class="slot-meta">Creneau verrouille (complet)</span>
+                                                        <span class="slot-meta">Créneau verrouillé (complet)</span>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>

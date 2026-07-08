@@ -508,6 +508,18 @@ if (!function_exists('ensureDepartmentsTable')) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
 
+        // Departements ajoutes manuellement (absents de la base planning) : semes ici pour
+        // qu'ils soient disponibles PARTOUT (Demandes, Matching, Disponibilites, Vue horaire...).
+        $manualDepartments = ['Pots extérieur', "Feux d'artifice", 'Info prix'];
+        $seedStmt = $db->prepare(
+            "INSERT INTO departments (department_name, is_active)
+             VALUES (?, 1)
+             ON DUPLICATE KEY UPDATE is_active = 1, updated_at = CURRENT_TIMESTAMP"
+        );
+        foreach ($manualDepartments as $manualDepartment) {
+            $seedStmt->execute([$manualDepartment]);
+        }
+
         $tableReady = true;
         return true;
     }

@@ -11,7 +11,7 @@ if (!function_exists('fjvhT')) {
 }
 
 $role = isset($_SESSION['role']) ? $_SESSION['role'] : '';
-if (!in_array($role, ['admin', 'teamcoach'], true)) {
+if (!in_array($role, ['admin'], true)) {
     header('Location: ../public/index.php');
     exit();
 }
@@ -94,9 +94,9 @@ $requestIds = array_map(static function ($row) {
 if (!empty($requestIds)) {
     $placeholders = implode(', ', array_fill(0, count($requestIds), '?'));
     $assignmentsStmt = $db->prepare(
-        "SELECT a.request_id, a.seat_number, u.nom, u.prenom
+        "SELECT a.request_id, a.seat_number, a.external_name, u.nom, u.prenom
          FROM interim_shift_assignments a
-         INNER JOIN utilisateurs u ON u.id = a.student_id
+         LEFT JOIN utilisateurs u ON u.id = a.student_id
          WHERE a.request_id IN ($placeholders)
          ORDER BY a.request_id ASC, a.seat_number ASC"
     );
@@ -340,7 +340,12 @@ foreach ($timeline as $timeSlot => $requestsAtSlot) {
                                                     </div>
                                                 <?php else: ?>
                                                     <?php foreach ($requestAssignments as $assignment): ?>
-                                                        <?php $studentName = trim((string) ($assignment['prenom'] ?? '')) . ' ' . trim((string) ($assignment['nom'] ?? '')); ?>
+                                                        <?php
+                                                        $studentName = trim((string) ($assignment['prenom'] ?? '')) . ' ' . trim((string) ($assignment['nom'] ?? ''));
+                                                        if (trim($studentName) === '') {
+                                                            $studentName = trim((string) ($assignment['external_name'] ?? ''));
+                                                        }
+                                                        ?>
                                                         <div class="slot-card">
                                                             <strong><?php echo e(trim($studentName) !== '' ? $studentName : '--'); ?></strong>
                                                             <div class="meta"><?php echo e(fjvhT('Horaire :', 'Uurrooster:')); ?> <?php echo e($request['time_slot']); ?></div>

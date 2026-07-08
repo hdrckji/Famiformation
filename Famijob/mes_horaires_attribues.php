@@ -119,7 +119,7 @@ function renderScheduleRows(array $items)
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mes horaires attribues - FamiFormation</title>
+    <title>Mes horaires attribués - FamiFormation</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -286,14 +286,14 @@ function renderScheduleRows(array $items)
     <div class="hero">
         <div>
             <a href="index.php" class="back-link">← FamiFormation</a>
-            <h1>Mes horaires attribues</h1>
-            <p>Vue consultative de tes creneaux passes, du jour et a venir.</p>
+            <h1>Mes horaires attribués</h1>
+            <p>Vue consultative de tes créneaux passés, du jour et à venir.</p>
         </div>
     </div>
 
     <div class="stats">
         <div class="stat">
-            <div class="label">Passes</div>
+            <div class="label">Passés</div>
             <div class="value"><?= count($past) ?></div>
         </div>
         <div class="stat">
@@ -301,7 +301,7 @@ function renderScheduleRows(array $items)
             <div class="value"><?= count($present) ?></div>
         </div>
         <div class="stat">
-            <div class="label">A venir</div>
+            <div class="label">À venir</div>
             <div class="value"><?= count($future) ?></div>
         </div>
         <div class="stat">
@@ -320,8 +320,8 @@ function renderScheduleRows(array $items)
                 <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Creneau</th>
-                    <th>Departement</th>
+                    <th>Créneau</th>
+                    <th>Département</th>
                     <th>Agence</th>
                     <th>Commentaire</th>
                 </tr>
@@ -333,7 +333,7 @@ function renderScheduleRows(array $items)
 
     <section class="section">
         <div class="section-head">
-            <span>A venir</span>
+            <span>À venir</span>
             <span class="badge"><?= count($future) ?></span>
         </div>
         <div class="table-wrap">
@@ -341,8 +341,8 @@ function renderScheduleRows(array $items)
                 <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Creneau</th>
-                    <th>Departement</th>
+                    <th>Créneau</th>
+                    <th>Département</th>
                     <th>Agence</th>
                     <th>Commentaire</th>
                 </tr>
@@ -354,7 +354,7 @@ function renderScheduleRows(array $items)
 
     <section class="section">
         <div class="section-head">
-            <span>Passes</span>
+            <span>Passés</span>
             <span class="badge"><?= count($past) ?></span>
         </div>
         <div class="table-wrap">
@@ -362,8 +362,8 @@ function renderScheduleRows(array $items)
                 <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Creneau</th>
-                    <th>Departement</th>
+                    <th>Créneau</th>
+                    <th>Département</th>
                     <th>Agence</th>
                     <th>Commentaire</th>
                 </tr>

@@ -12,7 +12,7 @@ if (!function_exists('fjaT')) {
 }
 
 $currentRole = getCurrentRole();
-if (!in_array($currentRole, ['admin', 'teamcoach'], true)) {
+if (!in_array($currentRole, ['admin'], true)) {
     header('Location: ../public/index.php');
     exit();
 }
@@ -40,15 +40,15 @@ try {
 $flashMessage = '';
 if (isset($_GET['availability_deleted'])) {
     $flashMessage = ((string) $_GET['availability_deleted'] === '1')
-    ? "<div class='alert success'>✅ " . e(fjaT('Disponibilite supprimee.', 'Beschikbaarheid verwijderd.')) . "</div>"
-    : "<div class='alert error'>⚠️ " . e(fjaT('Aucune disponibilite a supprimer.', 'Geen beschikbaarheid om te verwijderen.')) . "</div>";
+    ? "<div class='alert success'>✅ " . e(fjaT('Disponibilité supprimée.', 'Beschikbaarheid verwijderd.')) . "</div>"
+    : "<div class='alert error'>⚠️ " . e(fjaT('Aucune disponibilité à supprimer.', 'Geen beschikbaarheid om te verwijderen.')) . "</div>";
 }
 
 $statusLabels = [
-    'non_renseigne' => fjaT('Non renseigne', 'Niet ingevuld'),
+    'non_renseigne' => fjaT('Non renseigné', 'Niet ingevuld'),
     'indisponible' => fjaT('Indisponible', 'Niet beschikbaar'),
-    'apres_midi' => fjaT('Apres-midi uniquement (a partir de 13h)', 'Enkel namiddag (vanaf 13u)'),
-    'journee' => fjaT('Journee', 'Hele dag'),
+    'apres_midi' => fjaT('Après-midi uniquement (à partir de 13h)', 'Enkel namiddag (vanaf 13u)'),
+    'journee' => fjaT('Journée', 'Hele dag'),
 ];
 
 $statusClasses = [
@@ -274,7 +274,7 @@ if (isset($studentsBySector['none'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo e(fjaT('Disponibilites etudiants - Admin', 'Beschikbaarheden studenten - Admin')); ?></title>
+    <title><?php echo e(fjaT('Disponibilités étudiants - Admin', 'Beschikbaarheden studenten - Admin')); ?></title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -565,24 +565,24 @@ if (isset($studentsBySector['none'])) {
         <div class="hero">
             <div class="hero-top">
                 <div>
-                    <div style="text-transform:uppercase;letter-spacing:.08em;font-size:.82rem;opacity:.85;"><?php echo $isAgencyInterimViewer ? e(fjaT('Agence interim', 'Interimkantoor')) : e(fjaT('Administration', 'Administratie')); ?></div>
-                    <h1><?php echo e(fjaT('Disponibilites etudiants', 'Beschikbaarheden studenten')); ?></h1>
+                    <div style="text-transform:uppercase;letter-spacing:.08em;font-size:.82rem;opacity:.85;"><?php echo $isAgencyInterimViewer ? e(fjaT('Agence intérim', 'Interimkantoor')) : e(fjaT('Administration', 'Administratie')); ?></div>
+                    <h1><?php echo e(fjaT('Disponibilités étudiants', 'Beschikbaarheden studenten')); ?></h1>
                 </div>
                 <div style="display:flex;gap:10px;align-items:center;">
                     <?php if ($isAgencyInterimViewer): ?>
-                        <a href="logout.php" class="back-link">⬅ <?php echo e(fjaT('Se deconnecter', 'Uitloggen')); ?></a>
+                        <a href="logout.php" class="back-link">⬅ <?php echo e(fjaT('Se déconnecter', 'Uitloggen')); ?></a>
                     <?php else: ?>
-                        <a href="index.php" class="back-link">⬅ <?php echo e(fjaT('Retour a l\'accueil', 'Terug naar start')); ?></a>
+                        <a href="index.php" class="back-link">⬅ <?php echo e(fjaT('Retour à l\'accueil', 'Terug naar start')); ?></a>
                     <?php endif; ?>
                     <?php echo famiRenderLanguageSwitcher(); ?>
                 </div>
             </div>
             <p>
-                <?php echo e(fjaT('Vue hebdomadaire des disponibilites etudiantes, organisee par secteur.', 'Wekelijks overzicht van studentbeschikbaarheden, georganiseerd per sector.')); ?>
+                <?php echo e(fjaT('Vue hebdomadaire des disponibilités étudiantes, organisée par secteur.', 'Wekelijks overzicht van studentbeschikbaarheden, georganiseerd per sector.')); ?>
                 <?php if ($isAgencyInterimViewer): ?>
-                    <?php echo e(fjaT('Affichage limite aux etudiants rattaches a l\'agence :', 'Weergave beperkt tot studenten van kantoor:')); ?> <strong><?php echo htmlspecialchars($agencyInterimName !== '' ? $agencyInterimName : fjaT('non renseignee', 'niet ingevuld')); ?></strong>.
+                    <?php echo e(fjaT('Affichage limité aux étudiants rattachés à l\'agence :', 'Weergave beperkt tot studenten van kantoor:')); ?> <strong><?php echo htmlspecialchars($agencyInterimName !== '' ? $agencyInterimName : fjaT('non renseignée', 'niet ingevuld')); ?></strong>.
                 <?php else: ?>
-                    <?php echo e(fjaT('Cette page permet de savoir rapidement quels etudiants sont disponibles sur la semaine choisie, avec leurs priorites de rattachement.', 'Met deze pagina zie je snel welke studenten beschikbaar zijn in de gekozen week, met hun prioriteiten.')); ?>
+                    <?php echo e(fjaT('Cette page permet de savoir rapidement quels étudiants sont disponibles sur la semaine choisie, avec leurs priorités de rattachement.', 'Met deze pagina zie je snel welke studenten beschikbaar zijn in de gekozen week, met hun prioriteiten.')); ?>
                 <?php endif; ?>
             </p>
         </div>
@@ -610,8 +610,8 @@ if (isset($studentsBySector['none'])) {
                 <button type="submit" class="btn-filter"><?php echo e(fjaT('Appliquer', 'Toepassen')); ?></button>
             </form>
             <div class="toolbar-meta">
-                <strong><?php echo e(fjaT('Periode :', 'Periode:')); ?></strong> <?php echo e(fjaT('du', 'van')); ?> <?php echo $selectedWeek['start']->format('d/m/Y'); ?> <?php echo e(fjaT('au', 'tot')); ?> <?php echo $selectedWeek['end']->format('d/m/Y'); ?><br>
-                <strong><?php echo e(fjaT('Lecture :', 'Legenda:')); ?></strong> <?php echo e(fjaT('journee, apres-midi a partir de 13h, indisponible ou non renseigne', 'hele dag, namiddag vanaf 13u, niet beschikbaar of niet ingevuld')); ?>
+                <strong><?php echo e(fjaT('Période :', 'Periode:')); ?></strong> <?php echo e(fjaT('du', 'van')); ?> <?php echo $selectedWeek['start']->format('d/m/Y'); ?> <?php echo e(fjaT('au', 'tot')); ?> <?php echo $selectedWeek['end']->format('d/m/Y'); ?><br>
+                <strong><?php echo e(fjaT('Lecture :', 'Legenda:')); ?></strong> <?php echo e(fjaT('journée, après-midi à partir de 13h, indisponible ou non renseigné', 'hele dag, namiddag vanaf 13u, niet beschikbaar of niet ingevuld')); ?>
             </div>
         </div>
 
@@ -619,7 +619,7 @@ if (isset($studentsBySector['none'])) {
 
         <?php if (empty($studentsBySector)): ?>
             <div class="sector-card">
-                <div class="empty-state"><?php echo e(fjaT('Aucun etudiant disponible a afficher pour les filtres selectionnes.', 'Geen beschikbare student om te tonen voor de geselecteerde filters.')); ?></div>
+                <div class="empty-state"><?php echo e(fjaT('Aucun étudiant disponible à afficher pour les filtres sélectionnés.', 'Geen beschikbare student om te tonen voor de geselecteerde filters.')); ?></div>
             </div>
         <?php endif; ?>
 
@@ -627,14 +627,14 @@ if (isset($studentsBySector['none'])) {
             <div class="sector-card">
                 <div class="sector-head">
                     <h2 class="sector-title"><?php echo htmlspecialchars($sectorName === 'none' ? fjaT('Sans secteur', 'Zonder sector') : $sectorName); ?></h2>
-                    <span class="sector-badge"><?php echo count($sectorStudents); ?> <?php echo e(fjaT('etudiant', 'student')); ?><?php echo count($sectorStudents) > 1 ? 's' : ''; ?></span>
+                    <span class="sector-badge"><?php echo count($sectorStudents); ?> <?php echo e(fjaT('étudiant', 'student')); ?><?php echo count($sectorStudents) > 1 ? 's' : ''; ?></span>
                 </div>
                 <div class="table-wrap">
                     <table>
                         <thead>
                             <tr>
-                                <th class="sticky-col"><?php echo e(fjaT('Etudiant', 'Student')); ?></th>
-                                <th><?php echo e(fjaT('Priorite', 'Prioriteit')); ?></th>
+                                <th class="sticky-col"><?php echo e(fjaT('Étudiant', 'Student')); ?></th>
+                                <th><?php echo e(fjaT('Priorité', 'Prioriteit')); ?></th>
                                 <?php foreach ($weekDays as $day): ?>
                                     <th><?php echo htmlspecialchars($day['label']); ?><br><?php echo htmlspecialchars($day['date']); ?></th>
                                 <?php endforeach; ?>
@@ -672,14 +672,14 @@ if (isset($studentsBySector['none'])) {
                                             <?php endif; ?>
                                             <?php if ($canDeleteAvailability && !empty($availability['exists'])): ?>
                                                 <div class="cell-actions">
-                                                    <form method="POST" onsubmit="return confirm('<?php echo e(fjaT('Supprimer cette disponibilite ?', 'Deze beschikbaarheid verwijderen?')); ?>');">
+                                                    <form method="POST" onsubmit="return confirm('<?php echo e(fjaT('Supprimer cette disponibilité ?', 'Deze beschikbaarheid verwijderen?')); ?>');">
                                                         <?php echo csrfField(); ?>
                                                         <input type="hidden" name="delete_availability" value="1">
                                                         <input type="hidden" name="user_id" value="<?php echo (int) $student['id']; ?>">
                                                         <input type="hidden" name="availability_date" value="<?php echo htmlspecialchars($day['key']); ?>">
                                                         <input type="hidden" name="week" value="<?php echo htmlspecialchars($selectedWeekKey); ?>">
                                                         <input type="hidden" name="sector" value="<?php echo htmlspecialchars($selectedSector); ?>">
-                                                        <button type="submit" class="btn-delete-availability" title="<?php echo e(fjaT('Supprimer cette disponibilite', 'Deze beschikbaarheid verwijderen')); ?>"><?php echo e(fjaT('Supprimer', 'Verwijderen')); ?></button>
+                                                        <button type="submit" class="btn-delete-availability" title="<?php echo e(fjaT('Supprimer cette disponibilité', 'Deze beschikbaarheid verwijderen')); ?>"><?php echo e(fjaT('Supprimer', 'Verwijderen')); ?></button>
                                                     </form>
                                                 </div>
                                             <?php endif; ?>

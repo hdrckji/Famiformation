@@ -441,7 +441,7 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
                 <div class="tile-desc"><?= e(famiT('tile.interim_fixes.desc')) ?></div>
             </a>
             <?php else: ?>
-            <!-- TeamCoach : accès aux 3 pages aussi -->
+            <!-- TeamCoach : accès limité à 2 modules (Demande d'horaire + Matching intérim) -->
             <a href="interim_horaires_demandes.php" class="tile">
                 <div class="tile-icon">📝</div>
                 <div class="tile-title"><?= e(famiT('tile.demands.title')) ?></div>
@@ -452,30 +452,6 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
                 <div class="tile-icon">🤝</div>
                 <div class="tile-title"><?= e(famiT('tile.matching.title')) ?></div>
                 <div class="tile-desc"><?= e(famiT('tile.matching.desc.teamcoach')) ?></div>
-            </a>
-
-            <a href="validation_demandes_horaires.php" class="tile">
-                <div class="tile-icon">✅</div>
-                <div class="tile-title"><?= e(famiT('tile.validation.title')) ?></div>
-                <div class="tile-desc"><?= e(famiT('tile.validation.desc')) ?></div>
-            </a>
-
-            <a href="vue_horaire.php" class="tile">
-                <div class="tile-icon">📅</div>
-                <div class="tile-title"><?= e(famiT('tile.schedule.title')) ?></div>
-                <div class="tile-desc"><?= e(famiT('tile.schedule.desc')) ?></div>
-            </a>
-
-            <a href="relance_etudiant.php" class="tile">
-                <div class="tile-icon">✉️</div>
-                <div class="tile-title"><?= e(famiT('tile.relaunch.title')) ?></div>
-                <div class="tile-desc"><?= e(famiT('tile.relaunch.desc')) ?></div>
-            </a>
-
-            <a href="admin_disponibilites_etudiants.php" class="tile">
-                <div class="tile-icon">🗓️</div>
-                <div class="tile-title"><?= e(famiT('tile.availability.title')) ?></div>
-                <div class="tile-desc"><?= e(famiT('tile.availability.desc')) ?></div>
             </a>
             <?php endif; ?>
         </div>

@@ -11,7 +11,7 @@ if (!function_exists('fjrT')) {
 }
 
 $role = $_SESSION['role'] ?? '';
-if (!in_array($role, ['admin', 'teamcoach'], true)) {
+if (!in_array($role, ['admin'], true)) {
     header('Location: ../public/index.php');
     exit();
 }

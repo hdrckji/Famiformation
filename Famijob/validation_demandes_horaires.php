@@ -11,7 +11,7 @@ if (!function_exists('fjvT')) {
 }
 
 $role = (string) ($_SESSION['role'] ?? '');
-if (!in_array($role, ['admin', 'teamcoach'], true)) {
+if (!in_array($role, ['admin'], true)) {
     header('Location: ../public/index.php');
     exit();
 }
@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
-        $message = "<div class='alert success'>" . e(fjvT('Validation globale effectuée:', 'Globale validatie uitgevoerd:')) . ' ' . (int) $stmt->rowCount() . ' ' . e(fjvT('demande(s).', 'aanvraag/aanvragen.')) . "</div>";
+        $message = "<div class='alert success'>" . e(fjvT('Validation globale effectuée :', 'Globale validatie uitgevoerd:')) . ' ' . (int) $stmt->rowCount() . ' ' . e(fjvT('demande(s).', 'aanvraag/aanvragen.')) . "</div>";
     } elseif (isset($_POST['approve_department'])) {
         if ($selectedDepartment === 'all') {
             $message = "<div class='alert error'>" . e(fjvT('Sélectionne un département pour la validation par département.', 'Selecteer een afdeling voor validatie per afdeling.')) . "</div>";
