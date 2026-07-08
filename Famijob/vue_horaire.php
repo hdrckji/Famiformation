@@ -111,17 +111,6 @@ if (!empty($requestIds)) {
     }
 }
 
-$timeline = [];
-foreach ($requests as $request) {
-    if ($selectedDepartment !== 'all' && (string) $request['department_name'] !== $selectedDepartment) {
-        continue;
-    }
-
-    $timeline[(string) $request['time_slot']][] = $request;
-}
-
-ksort($timeline, SORT_NATURAL | SORT_FLAG_CASE);
-
 function famijobParseStartMinutesForView($timeSlot)
 {
     $timeSlot = trim((string) $timeSlot);
@@ -154,33 +143,29 @@ function famijobTimeSlotSortView($a, $b)
     return $ma <=> $mb;
 }
 
-uksort($timeline, 'famijobTimeSlotSortView');
-
-$rows = [];
-$allDepartmentsInView = [];
-foreach ($timeline as $timeSlot => $requestsAtSlot) {
-    foreach ($requestsAtSlot as $request) {
-        $allDepartmentsInView[(string) $request['department_name']] = true;
+// Regroupe les demandes par département puis par jour.
+// La plage horaire n'est plus une colonne : elle apparaît dans chaque bulle.
+$byDeptDay = [];
+$departmentsInView = [];
+foreach ($requests as $request) {
+    $departmentName = (string) $request['department_name'];
+    if ($selectedDepartment !== 'all' && $departmentName !== $selectedDepartment) {
+        continue;
     }
+    $departmentsInView[$departmentName] = true;
+    $byDeptDay[$departmentName][(string) $request['shift_date']][] = $request;
 }
-$allDepartmentsInView = array_keys($allDepartmentsInView);
-sort($allDepartmentsInView, SORT_NATURAL | SORT_FLAG_CASE);
+$departmentsInView = array_keys($departmentsInView);
+sort($departmentsInView, SORT_NATURAL | SORT_FLAG_CASE);
 
-foreach ($timeline as $timeSlot => $requestsAtSlot) {
-    $row = [
-        'time_slot' => $timeSlot,
-        'by_day' => [],
-    ];
-
-    foreach ($weekDays as $day) {
-        $row['by_day'][$day['key']] = [];
+// Trie les demandes de chaque cellule (jour) par heure de début.
+foreach ($byDeptDay as $departmentName => $byDay) {
+    foreach ($byDay as $dateKey => $list) {
+        usort($list, static function ($a, $b) {
+            return famijobTimeSlotSortView((string) $a['time_slot'], (string) $b['time_slot']);
+        });
+        $byDeptDay[$departmentName][$dateKey] = $list;
     }
-
-    foreach ($requestsAtSlot as $request) {
-        $row['by_day'][(string) $request['shift_date']][] = $request;
-    }
-
-    $rows[] = $row;
 }
 ?>
 <!DOCTYPE html>
@@ -293,17 +278,16 @@ foreach ($timeline as $timeSlot => $requestsAtSlot) {
             </div>
             <button class="btn btn-primary" type="submit"><?php echo e(fjvhT('Afficher', 'Tonen')); ?></button>
         </form>
-        <div class="legend"><?php echo e(fjvhT('Colonnes = jours de la semaine. Lignes = plages horaires et départements.', 'Kolommen = weekdagen. Rijen = tijdsblokken en afdelingen.')); ?></div>
+        <div class="legend"><?php echo e(fjvhT('Colonnes = jours de la semaine. Lignes = départements. L\'horaire est indiqué dans chaque bulle.', 'Kolommen = weekdagen. Rijen = afdelingen. Het uurrooster staat in elke bubbel.')); ?></div>
     </div>
 
-    <?php if (empty($rows)): ?>
+    <?php if (empty($departmentsInView)): ?>
         <div class="empty-state"><?php echo e(fjvhT('Aucun créneau trouvé pour cette semaine.', 'Geen tijdsblok gevonden voor deze week.')); ?></div>
     <?php else: ?>
         <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th class="corner"><?php echo e(fjvhT('Plage horaire', 'Tijdsblok')); ?></th>
                         <th class="corner"><?php echo e(fjvhT('Département', 'Afdeling')); ?></th>
                         <?php foreach ($weekDays as $day): ?>
                             <th>
@@ -313,54 +297,43 @@ foreach ($timeline as $timeSlot => $requestsAtSlot) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($rows as $row): ?>
-                        <?php foreach ($allDepartmentsInView as $deptIndex => $departmentName): ?>
-                            <tr>
-                                <?php if ($deptIndex === 0): ?>
-                                    <td class="slot-cell" rowspan="<?php echo max(1, count($allDepartmentsInView)); ?>">
-                                        <div class="slot-time"><?php echo e($row['time_slot']); ?></div>
-                                        <div class="legend"><?php echo e(fjvhT('Bloc horaire', 'Tijdsblok')); ?></div>
-                                    </td>
-                                <?php endif; ?>
-                                <td class="slot-cell">
-                                    <div class="slot-dept"><?php echo e($departmentName); ?></div>
-                                </td>
-                                <?php foreach ($weekDays as $day): ?>
-                                    <?php $dayRequests = $row['by_day'][$day['key']] ?? []; ?>
-                                    <td>
-                                        <?php $matched = false; ?>
+                    <?php foreach ($departmentsInView as $departmentName): ?>
+                        <tr>
+                            <td class="slot-cell">
+                                <div class="slot-dept"><?php echo e($departmentName); ?></div>
+                            </td>
+                            <?php foreach ($weekDays as $day): ?>
+                                <?php $dayRequests = $byDeptDay[$departmentName][$day['key']] ?? []; ?>
+                                <td>
+                                    <?php if (empty($dayRequests)): ?>
+                                        <div class="slot-empty">—</div>
+                                    <?php else: ?>
                                         <?php foreach ($dayRequests as $request): ?>
-                                            <?php if ((string) $request['department_name'] === $departmentName): ?>
-                                                <?php $matched = true; ?>
-                                                <?php $requestAssignments = $assignmentsByRequest[(int) $request['id']] ?? []; ?>
-                                                <?php if (empty($requestAssignments)): ?>
-                                                    <div class="slot-card warn">
-                                                        <strong>--</strong>
+                                            <?php $requestAssignments = $assignmentsByRequest[(int) $request['id']] ?? []; ?>
+                                            <?php if (empty($requestAssignments)): ?>
+                                                <div class="slot-card warn">
+                                                    <strong>--</strong>
+                                                    <div class="meta"><?php echo e(fjvhT('Horaire :', 'Uurrooster:')); ?> <?php echo e($request['time_slot']); ?></div>
+                                                </div>
+                                            <?php else: ?>
+                                                <?php foreach ($requestAssignments as $assignment): ?>
+                                                    <?php
+                                                    $studentName = trim((string) ($assignment['prenom'] ?? '')) . ' ' . trim((string) ($assignment['nom'] ?? ''));
+                                                    if (trim($studentName) === '') {
+                                                        $studentName = trim((string) ($assignment['external_name'] ?? ''));
+                                                    }
+                                                    ?>
+                                                    <div class="slot-card">
+                                                        <strong><?php echo e(trim($studentName) !== '' ? $studentName : '--'); ?></strong>
                                                         <div class="meta"><?php echo e(fjvhT('Horaire :', 'Uurrooster:')); ?> <?php echo e($request['time_slot']); ?></div>
                                                     </div>
-                                                <?php else: ?>
-                                                    <?php foreach ($requestAssignments as $assignment): ?>
-                                                        <?php
-                                                        $studentName = trim((string) ($assignment['prenom'] ?? '')) . ' ' . trim((string) ($assignment['nom'] ?? ''));
-                                                        if (trim($studentName) === '') {
-                                                            $studentName = trim((string) ($assignment['external_name'] ?? ''));
-                                                        }
-                                                        ?>
-                                                        <div class="slot-card">
-                                                            <strong><?php echo e(trim($studentName) !== '' ? $studentName : '--'); ?></strong>
-                                                            <div class="meta"><?php echo e(fjvhT('Horaire :', 'Uurrooster:')); ?> <?php echo e($request['time_slot']); ?></div>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                <?php endif; ?>
+                                                <?php endforeach; ?>
                                             <?php endif; ?>
                                         <?php endforeach; ?>
-                                        <?php if (!$matched): ?>
-                                            <div class="slot-empty">—</div>
-                                        <?php endif; ?>
-                                    </td>
-                                <?php endforeach; ?>
-                            </tr>
-                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endforeach; ?>
+                        </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>

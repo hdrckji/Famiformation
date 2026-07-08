@@ -66,9 +66,11 @@ for ($offset = -2; $offset < 8; $offset++) {
     ];
 }
 
-$selectedWeekKey = (string) ($_GET['week'] ?? array_key_first($weekOptions));
+// Par défaut : la semaine en cours (les semaines précédentes restent sélectionnables).
+$currentWeekKey = $startMonday->format('Y-m-d');
+$selectedWeekKey = (string) ($_GET['week'] ?? $currentWeekKey);
 if (!isset($weekOptions[$selectedWeekKey])) {
-    $selectedWeekKey = array_key_first($weekOptions);
+    $selectedWeekKey = $currentWeekKey;
 }
 $selectedWeek = $weekOptions[$selectedWeekKey];
 
@@ -89,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireValidCSRF();
     $selectedWeekKey = (string) ($_POST['week'] ?? $selectedWeekKey);
     if (!isset($weekOptions[$selectedWeekKey])) {
-        $selectedWeekKey = array_key_first($weekOptions);
+        $selectedWeekKey = $currentWeekKey;
     }
     $selectedWeek = $weekOptions[$selectedWeekKey];
 

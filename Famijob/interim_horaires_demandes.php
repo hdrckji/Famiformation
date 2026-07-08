@@ -821,8 +821,11 @@ if (isset($_POST['create_requests']) && $createFailed) {
                                     <tr>
                                         <th style="text-align:left;min-width:170px;"><?php echo e(fjdT('Horaire', 'Uurrooster')); ?></th>
                                         <th style="width:80px;"><?php echo e(fjdT('Nombre', 'Aantal')); ?></th>
-                                        <?php foreach ($weekDays as $weekDay): ?>
-                                            <th><?php echo e($weekDay['label']); ?><span class="th-date"><?php echo e($weekDay['date']); ?></span></th>
+                                        <?php foreach ($weekDays as $dayIndex => $weekDay): ?>
+                                            <th>
+                                                <?php echo e($weekDay['label']); ?><span class="th-date"><?php echo e($weekDay['date']); ?></span>
+                                                <input type="checkbox" class="col-toggle" data-col="<?php echo (int) $dayIndex; ?>" title="<?php echo e(fjdT('Cocher/décocher ce jour pour toutes les lignes', 'Deze dag voor alle regels aan-/uitvinken')); ?>" style="display:block;margin:4px auto 0;">
+                                            </th>
                                         <?php endforeach; ?>
                                         <th></th>
                                     </tr>
@@ -845,6 +848,8 @@ if (isset($_POST['create_requests']) && $createFailed) {
                         <?php echo e(fjdT('Saisis un horaire, le nombre de personnes, puis coche les jours concernés. Un seul envoi crée toutes les demandes.', 'Voer een uurrooster in, het aantal personen, en vink de betrokken dagen aan. Eén verzending maakt alle aanvragen.')); ?>
                         <br>
                         <?php echo e(fjdT('Un bloc enregistre une liste d’horaires réutilisable : clique dessus pour l’insérer, ou sur « + » pour sauvegarder les lignes actuelles.', 'Een blok bewaart een herbruikbare lijst met uurroosters: klik erop om ze in te voegen, of op « + » om de huidige regels op te slaan.')); ?>
+                        <br>
+                        <?php echo e(fjdT('Astuce rapidité : « 7/7 » coche toute la ligne, la case sous un jour coche toute la colonne, ⧉ duplique la ligne, et Entrée ajoute une nouvelle ligne.', 'Snelheidstip: « 7/7 » vinkt de hele regel aan, het vakje onder een dag vinkt de hele kolom aan, ⧉ dupliceert de regel, en Enter voegt een nieuwe regel toe.')); ?>
                     </p>
 
                     <form method="POST" id="saveBlockForm" style="display:none;">
@@ -940,6 +945,9 @@ if (isset($_POST['create_requests']) && $createFailed) {
     var BLOCKS = <?php echo json_encode($blocksForJs); ?>;
     var INITIAL_ROWS = <?php echo json_encode($initialRows); ?>;
     var DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    var T_ALLDAYS = <?php echo json_encode(fjdT('Cocher/décocher tous les jours de la ligne', 'Alle dagen van de regel aan-/uitvinken')); ?>;
+    var T_DUP = <?php echo json_encode(fjdT('Dupliquer la ligne', 'Regel dupliceren')); ?>;
+    var T_REMOVE = <?php echo json_encode(fjdT('Retirer la ligne', 'Regel verwijderen')); ?>;
     var rowIdx = 0;
 
     function esc(s) {
@@ -962,10 +970,57 @@ if (isset($_POST['create_requests']) && $createFailed) {
             '<td class="cell-horaire"><input type="text" name="row_horaire[' + idx + ']" value="' + esc(h || '') + '" placeholder="9h30-12h30" style="width:100%;"></td>' +
             '<td><input type="number" min="1" max="30" name="row_nombre[' + idx + ']" value="' + (parseInt(n, 10) > 0 ? parseInt(n, 10) : 1) + '" style="width:64px;"></td>' +
             dayCellsHtml(idx, days) +
-            '<td><button type="button" class="btn-mini" title="Retirer" onclick="this.closest(\'tr\').remove();">&times;</button></td>';
+            '<td style="white-space:nowrap;">' +
+                '<button type="button" class="btn-mini" title="' + esc(T_ALLDAYS) + '" onclick="toggleRowDays(this)">7/7</button> ' +
+                '<button type="button" class="btn-mini" title="' + esc(T_DUP) + '" onclick="duplicateRow(this)">&#10697;</button> ' +
+                '<button type="button" class="btn-mini" title="' + esc(T_REMOVE) + '" onclick="this.closest(\'tr\').remove();">&times;</button>' +
+            '</td>';
         document.getElementById('gridBody').appendChild(tr);
+        var horaireInput = tr.querySelector('input[name^="row_horaire"]');
+        if (horaireInput) {
+            horaireInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addRow();
+                    var allRows = document.querySelectorAll('#gridBody tr');
+                    var last = allRows[allRows.length - 1];
+                    var inp = last ? last.querySelector('input[name^="row_horaire"]') : null;
+                    if (inp) { inp.focus(); }
+                }
+            });
+        }
+        return tr;
     }
     window.addRow = addRow;
+
+    window.toggleRowDays = function (btn) {
+        var tr = btn.closest('tr');
+        if (!tr) { return; }
+        var boxes = tr.querySelectorAll('input[name^="row_days"]');
+        var allOn = boxes.length > 0 && Array.prototype.every.call(boxes, function (b) { return b.checked; });
+        boxes.forEach(function (b) { b.checked = !allOn; });
+    };
+
+    window.duplicateRow = function (btn) {
+        var tr = btn.closest('tr');
+        if (!tr) { return; }
+        var hi = tr.querySelector('input[name^="row_horaire"]');
+        var ni = tr.querySelector('input[name^="row_nombre"]');
+        var days = [];
+        tr.querySelectorAll('input[name^="row_days"]').forEach(function (b, k) { if (b.checked) { days.push(k); } });
+        addRow(hi ? hi.value : '', ni ? ni.value : 1, days);
+    };
+
+    // En-tête de colonne : coche/décoche ce jour pour toutes les lignes.
+    document.querySelectorAll('.col-toggle').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var col = parseInt(cb.getAttribute('data-col'), 10);
+            document.querySelectorAll('#gridBody tr').forEach(function (tr) {
+                var dayBoxes = tr.querySelectorAll('input[name^="row_days"]');
+                if (dayBoxes[col]) { dayBoxes[col].checked = cb.checked; }
+            });
+        });
+    });
 
     window.insertBlock = function (id) {
         var b = BLOCKS[id];
