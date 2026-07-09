@@ -61,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_prefs'])) {
     requireValidCSRF();
     widgetSet($db, 'birthday_enabled', isset($_POST['birthday_enabled']) ? '1' : '0');
     widgetSet($db, 'themes_enabled', isset($_POST['themes_enabled']) ? '1' : '0');
+    widgetSet($db, 'welcome_enabled', isset($_POST['welcome_enabled']) ? '1' : '0');
     $_SESSION['module_flash'] = "✅ Préférences enregistrées.";
     header('Location: parametres.php#prefs');
     exit();
@@ -693,14 +694,23 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <p class="muted" style="margin:8px 0 10px;">Change automatiquement le visuel du site (modules, boutons, widget + décor) selon la date.
                         <?php if ($activeTheme): ?><br><strong style="color:<?= htmlspecialchars($activeTheme['accent']) ?>;">Thème actif aujourd'hui : <?= htmlspecialchars(is_array($activeTheme['nom']) ? $activeTheme['nom'][0] : $activeTheme['nom']) ?></strong><?php else: ?><br>Aucun thème actif aujourd'hui.<?php endif; ?>
                     </p>
-                    <p class="muted" style="margin:0 0 6px;">Cliquez sur un thème pour l'<strong>aperçu</strong> (accueil). <a href="index.php?theme=off" style="color:#2d5a37;">Revenir au normal</a>.</p>
+                    <p class="muted" style="margin:0 0 6px;">Cliquez sur un thème pour l'<strong>aperçu</strong> (accueil, appliqué à tout le site). <a href="index.php?theme=off" style="color:#2d5a37;">Revenir au normal</a>.</p>
                     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+                        <?php $bdT = birthdayTheme(); ?>
+                        <a href="index.php?theme=anniversaire" title="Aperçu du thème anniversaire" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($bdT['accent']) ?>; color:<?= htmlspecialchars($bdT['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">🎂 Anniversaire</a>
                         <?php foreach (siteThemeCatalog() as $tk => $tv): ?>
                             <a href="index.php?theme=<?= urlencode($tk) ?>" title="Aperçu du thème" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($tv['accent']) ?>; color:<?= htmlspecialchars($tv['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">
                                 <?= htmlspecialchars(is_array($tv['nom']) ? $tv['nom'][0] : $tv['nom']) ?>
                             </a>
                         <?php endforeach; ?>
                     </div>
+
+                    <?php $welcomeOn = (widgetGet($db, 'welcome_enabled', '1') === '1'); ?>
+                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230; border-top:1px solid #eee; padding-top:14px;">
+                        <input type="checkbox" name="welcome_enabled" value="1" <?= $welcomeOn ? 'checked' : '' ?> style="width:20px; height:20px; accent-color:#2d5a37;">
+                        🌿 Message de bienvenue à la première connexion d'un nouveau collaborateur
+                    </label>
+                    <p class="muted" style="margin:8px 0 16px;">Animation d'accueil affichée une seule fois, à la toute première connexion.</p>
 
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </form>

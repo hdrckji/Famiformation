@@ -66,7 +66,8 @@ if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
 
 // --- Message de bienvenue (toute première connexion de l'utilisateur) ---
 $showWelcome = false;
-if (isset($user_data['welcome_seen']) && (int) $user_data['welcome_seen'] === 0) {
+$welcomeEnabled = (function_exists('widgetGet') ? widgetGet($db, 'welcome_enabled', '1') : '1') === '1';
+if ($welcomeEnabled && isset($user_data['welcome_seen']) && (int) $user_data['welcome_seen'] === 0) {
     $showWelcome = true;
     try {
         $db->prepare("UPDATE utilisateurs SET welcome_seen = 1 WHERE id = ?")->execute([$user_id]);
