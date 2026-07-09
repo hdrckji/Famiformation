@@ -294,6 +294,101 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('seed_formation_caisse_children_v1');
             }
+
+            // 11) Arbre profond complet sous « Magasin » (tous les niveaux).
+            //     Chaque nœud : [nom, icône, lien, [enfants]]. Un nœud avec enfants = Conteneur.
+            if (!$hasFlag('seed_deep_tree_v1')) {
+                $deepMagasin = [
+                    ['Déco', '🎨', 'deco.php', [
+                        ['Barbecue', '🔥', 'barbecue_menu.php', [
+                            ["Cook'in Garden et Weber", '🔥', 'barbecue.php', []],
+                            ['Barbecook et Napoleon', '🍖', 'barbecue2.php', []],
+                        ]],
+                        ['Piscine & Spa', '🏊', 'piscine_spa.php', [
+                            ['Piscine', '🏊', 'piscine.php', []],
+                            ['Spa', '🛁', 'spa.php', []],
+                        ]],
+                        ['Changement de saison', '🍂', 'changement_saison.php', []],
+                        ['Présentation équipe mix', '🧑', 'mix.php', [
+                            ['Formation Mix PDF', '📄', 'presentation_mix.php', []],
+                            ['Formation Mix Vidéo', '🎬', 'formation_mix_video.php', []],
+                        ]],
+                        ['Marketing', '📣', 'marketing.php', []],
+                        ['Parrain/Marraine', '🤝', 'parrain.php', []],
+                        ['Fleurs artificielles', '💐', 'fleurs-artificielles-menu.php', [
+                            ['Version vidéo', '🎬', 'fleurs-artificielles.php', []],
+                            ['Version guide PDF', '📄', 'fleurs-artificielles-pdf.php', []],
+                        ]],
+                    ]],
+                    ['Green', '🌿', 'green.php', [
+                        ['Plantes intérieur Hiver', '🪴', 'plantes-interieur-hiver.php', []],
+                        ['Le sapin de Noël', '🎄', 'sapin-noel.php', []],
+                        ['Protection des plantes', '❄️', 'protection-hiver.php', []],
+                        ['Plantes Automne/Hiver', '🍂', 'plantes-automne-hiver.php', []],
+                        ['Les Chrysanthèmes', '🌸', 'chrysanthemes.php', []],
+                        ['Cultiver des légumes', '🥦', 'legumes.php', []],
+                    ]],
+                    ['Animalerie', '🐾', 'animalerie.php', [
+                        ['Bien-être animalier', '🐾', 'animalerie_bienetre.php', []],
+                        ["Process de base de l'animalerie", '📘', 'process_base_animalerie.php', []],
+                        ['Rongeur', '🐭', 'rongeur.php', []],
+                        ['Oiseaux', '🐦', 'oiseaux.php', []],
+                        ['SAV Animalerie', '🛠️', 'sav_animalerie.php', []],
+                    ]],
+                    ['Garden', '🌱', 'garden.php', [
+                        ['Lutter contre les limaces', '🐌', 'lutte-limaces.php', []],
+                        ['Mousse dans le gazon', '🌿', 'mousse-gazon.php', []],
+                        ['Aménager votre pelouse', '🚜', 'amenagement-pelouse.php', []],
+                        ['Travailler de manière ergonomique', '💪', 'ergonomie-jardin.php', []],
+                        ['Faire son compost', '♻️', 'compostage.php', []],
+                    ]],
+                    ['Food', '🍔', 'food.php', [
+                        ['Lollyland', '🍭', 'lollyland_menu.php', [
+                            ['Remplir les bonbons (PDF)', '🍬', 'lollyland.php', []],
+                            ['Méthode de travail', '🛠️', 'lollyland_methode_travail.php', []],
+                        ]],
+                    ]],
+                    ['Stock', '📦', 'stock.php', [
+                        ['Gerbeur', '🏗️', 'gerbeur.php', []],
+                        ['Préparation de commande', '📦', 'preparation_commande.php', []],
+                    ]],
+                    ['Formation ressources humaines', '👥', 'ressources_humaines.php', [
+                        ['Judo verbal', '🥋', 'judo.php', []],
+                        ['Gestion du stress', '🧘', 'stress.php', []],
+                    ]],
+                ];
+
+                $upsertNode = function ($nom, $icon, $link, $parentId, $isContainer) use ($db) {
+                    $sel = $db->prepare("SELECT id FROM modules WHERE nom = ? AND parent_id = ? LIMIT 1");
+                    $sel->execute([$nom, $parentId]);
+                    $id = (int) $sel->fetchColumn();
+                    if ($id <= 0) {
+                        $ins = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES (?, '', ?, ?, ?, '', 1, 0, ?)");
+                        $ins->execute([$nom, $isContainer, $parentId, $icon, $link]);
+                        $id = (int) $db->lastInsertId();
+                    } else {
+                        $db->prepare("UPDATE modules SET is_container = ? WHERE id = ?")->execute([$isContainer, $id]);
+                    }
+                    return $id;
+                };
+                $walk = function ($nodes, $parentId) use (&$walk, $upsertNode) {
+                    foreach ($nodes as $node) {
+                        $children = $node[3];
+                        $isContainer = empty($children) ? 0 : 1;
+                        $id = $upsertNode($node[0], $node[1], $node[2], $parentId, $isContainer);
+                        if (!empty($children)) {
+                            $walk($children, $id);
+                        }
+                    }
+                };
+
+                $magasinId = (int) $db->query("SELECT id FROM modules WHERE nom = 'Magasin' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($magasinId > 0) {
+                    $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?")->execute([$magasinId]);
+                    $walk($deepMagasin, $magasinId);
+                }
+                $setFlag('seed_deep_tree_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
