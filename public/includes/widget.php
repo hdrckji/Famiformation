@@ -114,12 +114,12 @@ if (!function_exists('ensureWidgetTables')) {
             <div class="hw-date"><?= htmlspecialchars(widgetDate()) ?></div>
         </div>
         <style>
-        .home-widget { position: relative; width: 42%; min-width: 320px; max-width: 640px; min-height: 155px; margin: 12px auto 6px; background: rgba(255,255,255,0.95); border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); padding: 16px 18px; box-sizing: border-box; }
-        .hw-weather { position: absolute; top: 14px; left: 16px; font-weight: 700; color: #2d5a37; }
-        .hw-soon { color: #9bb3a3; font-weight: 600; font-size: 0.9rem; }
-        .hw-date { position: absolute; bottom: 12px; right: 16px; font-weight: 600; color: #666; font-size: 0.9rem; }
-        .hw-center { display: flex; align-items: center; justify-content: center; min-height: 155px; text-align: center; color: #2d5a37; font-weight: 700; font-size: 1.1rem; padding: 34px 60px; box-sizing: border-box; }
-        @media (max-width: 900px) { .home-widget { width: 94%; } .hw-center { padding: 40px 14px; } }
+        .home-widget { position: sticky; top: 0; z-index: 200; width: 34%; min-width: 300px; max-width: 500px; min-height: 150px; margin: 6px auto 10px; background: rgba(255,255,255,0.97); border-radius: 16px; box-shadow: 0 8px 22px rgba(0,0,0,0.18); padding: 14px 16px; box-sizing: border-box; }
+        .hw-weather { position: absolute; top: 12px; left: 14px; font-weight: 700; color: #2d5a37; }
+        .hw-soon { color: #9bb3a3; font-weight: 600; font-size: 0.85rem; }
+        .hw-date { position: absolute; bottom: 10px; right: 14px; font-weight: 600; color: #666; font-size: 0.85rem; }
+        .hw-center { display: flex; align-items: center; justify-content: center; min-height: 150px; text-align: center; color: #2d5a37; font-weight: 700; font-size: 1.05rem; padding: 30px 46px; box-sizing: border-box; }
+        @media (max-width: 900px) { .home-widget { width: 94%; max-width: none; } .hw-center { padding: 40px 14px; } }
         </style>
         <?php
         return ob_get_clean();

@@ -225,13 +225,13 @@ if (!empty($_SESSION['module_flash'])) {
         </div>
     </div>
 
-    <div class="header">
-        <img src="logo.png" alt="Famiflora" class="logo-main">
-    </div>
-
     <?php if (userSeesWidget($db, $role)): ?>
         <?= renderWidget($db) ?>
     <?php endif; ?>
+
+    <div class="header">
+        <img src="logo.png" alt="Famiflora" class="logo-main">
+    </div>
 
     <?php if (!empty($moduleFlash)): ?>
         <div class="module-flash"><?= htmlspecialchars($moduleFlash) ?></div>
