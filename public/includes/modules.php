@@ -158,6 +158,31 @@ if (!function_exists('ensureModulesTable')) {
                 $db->prepare("UPDATE modules SET icon = ? WHERE nom = 'Aide' AND parent_id IS NULL")->execute(['🛠️']);
                 $setFlag('aide_icon_tools_v1');
             }
+
+            // 7) Sous-modules « Présentiel » et « En ligne » sous « Formation »
+            //    (pour les voir et les paramétrer dans la gestion des modules ;
+            //     la page Formation garde son fonctionnement actuel)
+            if (!$hasFlag('seed_formation_children_v1')) {
+                $formationId = (int) $db->query("SELECT id FROM modules WHERE nom = 'Formation' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($formationId > 0) {
+                    $formationChildren = [
+                        // [nom, description, icône, lien]
+                        ['Présentiel', 'Formations en présentiel (sessions planifiées).', '📅', 'formation.php?vue=presentiel'],
+                        ['En ligne', 'Formations en ligne (contenus à évaluer).', '💻', 'formation.php?vue=enligne'],
+                    ];
+                    $insFc = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES (?, ?, 0, ?, ?, '', 1, 0, ?)");
+                    $chkFc = $db->prepare("SELECT COUNT(*) FROM modules WHERE nom = ? AND parent_id = ?");
+                    foreach ($formationChildren as $fc) {
+                        $chkFc->execute([$fc[0], $formationId]);
+                        if ((int) $chkFc->fetchColumn() === 0) {
+                            $insFc->execute([$fc[0], $fc[1], $formationId, $fc[2], $fc[3]]);
+                        }
+                    }
+                    // « Formation » devient un conteneur (flèche de dépliage en gestion)
+                    $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?")->execute([$formationId]);
+                }
+                $setFlag('seed_formation_children_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
