@@ -143,9 +143,9 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .btn-light { background: #e9ecef; color: #333; }
         .btn:disabled, .btn[disabled] { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
         select:disabled { opacity: 0.5; cursor: not-allowed; background: #f1f1f1; }
-        .tree-toggle { background:#e8f5e9; border:1px solid #bcdcc6; cursor:pointer; font-size:0.8rem; color:#2d5a37; width:24px; height:24px; border-radius:6px; margin-right:8px; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; transition:background .12s, color .12s; }
+        .tree-toggle { background:#e8f5e9; border:1px solid #bcdcc6; cursor:pointer; font-size:1.05rem; line-height:1; color:#2d5a37; width:28px; height:28px; border-radius:7px; margin-right:8px; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; transition:background .12s, color .12s; }
         .tree-toggle:hover { background:#2d5a37; color:#fff; }
-        .tree-spacer { display:inline-block; width:24px; margin-right:8px; }
+        .tree-spacer { display:inline-block; width:28px; margin-right:8px; }
         .child-count { display:inline-block; margin-left:8px; font-size:0.72rem; font-weight:700; color:#2d5a37; background:#e8f5e9; padding:2px 9px; border-radius:999px; vertical-align:middle; }
         .type-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:0.76rem; font-weight:700; white-space:nowrap; }
         .type-container { background:#e8f5e9; color:#2d5a37; }
@@ -210,11 +210,11 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 </thead>
                 <tbody>
                     <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $childCount = isset($byParent[(int) $m['id']]) ? count($byParent[(int) $m['id']]) : 0; $hasChildren = $childCount > 0; ?>
-                    <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>">
+                    <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>"<?= $depth > 0 ? ' style="display:none;"' : '' ?>>
                         <td><?= moduleIconHtml($m, '1.6rem') ?></td>
                         <td>
                             <div style="padding-left:<?= $depth * 18 ?>px;">
-                                <?php if ($hasChildren): ?><button type="button" class="tree-toggle" data-expanded="1" onclick="toggleModuleChildren(<?= (int) $m['id'] ?>, this)" title="Afficher / masquer les sous-modules">▾</button><?php else: ?><span class="tree-spacer"></span><?php endif; ?><?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong><?php if ($hasChildren): ?><span class="child-count"><?= $childCount ?> sous-module<?= $childCount > 1 ? 's' : '' ?></span><?php endif; ?>
+                                <?php if ($hasChildren): ?><button type="button" class="tree-toggle" data-expanded="0" onclick="toggleModuleChildren(<?= (int) $m['id'] ?>, this)" title="Afficher / masquer les sous-modules">▸</button><?php else: ?><span class="tree-spacer"></span><?php endif; ?><?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong><?php if ($hasChildren): ?><span class="child-count"><?= $childCount ?> sous-module<?= $childCount > 1 ? 's' : '' ?></span><?php endif; ?>
                                 <?php if (!empty($m['is_locked'])): ?> <span title="Verrouillé">🔒</span><?php endif; ?>
                                 <div class="muted" style="font-size:0.82rem;"><?= htmlspecialchars($m['description'] ?? '') ?></div>
                                 <?php if (!empty($m['link'])): ?><div class="muted" style="font-size:0.76rem;">🔗 module de base → <?= htmlspecialchars($m['link']) ?></div><?php endif; ?>
