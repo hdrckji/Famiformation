@@ -224,9 +224,7 @@ if (!empty($_SESSION['module_flash'])) {
 
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
-                <?php if ($isAdmin): ?>
-                <a href="parametres.php" class="btn-param" title="<?= t('Paramètres', 'Instellingen') ?>">⚙️</a>
-                <?php endif; ?>
+                <a href="parametres.php" class="btn-param" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                 <a href="logout.php" class="btn-logout" onclick="return confirm('<?= t('Êtes-vous sûr de vouloir vous déconnecter ?', 'Weet je zeker dat je je wilt afmelden?') ?>');"><?= t('Déconnexion', 'Afmelden') ?></a>
             </div>
             <div class="lang-switch">

@@ -4,9 +4,52 @@ verifierConnexion($db);
 require_once 'includes/modules.php';
 require_once 'includes/widget.php';
 
-// Réservé à l'admin
-if (($_SESSION['role'] ?? '') !== 'admin') {
-    header('Location: index.php');
+// Accessible à tous les utilisateurs connectés. Les non-admins n'ont droit qu'à la
+// catégorie « Paramètres utilisateur » (bénigne) ; les sections de gestion sont admin.
+$isAdmin = (($_SESSION['role'] ?? '') === 'admin');
+
+if (!$isAdmin) {
+    $lang = currentLang();
+    ?>
+    <!DOCTYPE html>
+    <html lang="<?= htmlspecialchars($lang) ?>">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title><?= t('Préférences', 'Voorkeuren') ?> - FamiFormation</title>
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+            body { font-family: 'Open Sans', sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+            .container { max-width: 640px; margin: 0 auto; }
+            .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
+            .topbar a { color: #2d5a37; text-decoration: none; font-weight: bold; }
+            h1 { color: #2d5a37; margin: 0; }
+            .card { background: #fff; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 24px; }
+            .btn { border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
+            .btn-primary { background: #2d5a37; color: #fff; }
+            .btn-light { background: #e9ecef; color: #333; }
+            .muted { color: #7a8a80; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="topbar">
+                <h1><?= t('Préférences', 'Voorkeuren') ?></h1>
+                <a href="index.php">← <?= t('Retour à l\'accueil', 'Terug naar start') ?></a>
+            </div>
+            <div class="card">
+                <h2 style="margin-top:0; color:#2d5a37;"><?= t('Paramètres utilisateur', 'Gebruikersinstellingen') ?></h2>
+                <p class="muted"><?= t('Réglages personnels.', 'Persoonlijke instellingen.') ?></p>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span style="font-weight:700;"><?= t('Langue', 'Taal') ?> :</span>
+                    <a href="?lang=fr" class="btn <?= $lang === 'fr' ? 'btn-primary' : 'btn-light' ?>">🇫🇷 Français</a>
+                    <a href="?lang=nl" class="btn <?= $lang === 'nl' ? 'btn-primary' : 'btn-light' ?>">🇳🇱 Nederlands</a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
     exit();
 }
 
@@ -544,59 +587,31 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <a href="admin_questions.php" class="btn btn-light" style="margin-top:4px;">✏️ Gérer les questions de quiz</a>
         </div>
 
-        <!-- Météo : lieux de travail (sites) -->
+        <!-- Météo des sites (lecture seule) -->
         <?php $wSites = widgetSites($db); ?>
         <div class="card" style="margin-top:20px;">
-            <h2 style="margin-top:0; color:#2d5a37;">Météo — lieux de travail</h2>
-            <p class="muted">Ajoute un site avec sa ville : les coordonnées météo sont trouvées automatiquement (Open-Meteo, gratuit). L'affiliation d'un utilisateur à un site se règle dans sa <strong>fiche</strong> (page Administration → colonne « Lieu de travail »).</p>
-
-            <form method="POST" action="widget_save.php" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="add_site">
-                <input type="hidden" name="return" value="parametres.php#widget">
-                <div style="flex:1; min-width:200px;">
-                    <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Nom du site</label>
-                    <input type="text" name="nom" maxlength="100" placeholder="Ex : Famiflora Mouscron" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
-                </div>
-                <div style="min-width:180px;">
-                    <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Ville</label>
-                    <input type="text" name="ville" required maxlength="100" placeholder="Ex : Mouscron" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
-                </div>
-                <button type="submit" class="btn btn-primary">➕ Ajouter</button>
-            </form>
-
+            <h2 style="margin-top:0; color:#2d5a37;">Météo des sites</h2>
+            <p class="muted">Aperçu de la météo par lieu de travail. La liste des sites se gère dans l'onglet <strong>Préférences</strong> → Paramètres administrateur (pas ici).</p>
             <table>
-                <thead><tr><th>Site</th><th>Ville</th><th>Météo</th><th>Suppr.</th></tr></thead>
+                <thead><tr><th>Site</th><th>Ville</th><th>Météo actuelle</th></tr></thead>
                 <tbody>
                     <?php foreach ($wSites as $s): ?>
-                    <tr>
-                        <td style="font-weight:700; color:#244230;"><?= htmlspecialchars($s['nom']) ?></td>
-                        <td><?= htmlspecialchars((string) $s['ville']) ?></td>
-                        <td>
-                            <?php if ($s['latitude'] !== null): ?>
-                                <span class="pill on">Coordonnées OK</span>
-                            <?php else: ?>
-                                <form method="POST" action="widget_save.php" style="display:inline;">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="action" value="regeocode_site">
-                                    <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
-                                    <input type="hidden" name="return" value="parametres.php#widget">
-                                    <button type="submit" class="btn btn-light" style="padding:5px 10px;" title="Réessayer de trouver les coordonnées">⚠️ Retrouver</button>
-                                </form>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <form method="POST" action="widget_save.php" style="display:inline;" onsubmit="return confirm('Supprimer ce site ? Les utilisateurs affiliés perdront leur lieu de travail.');">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="action" value="delete_site">
-                                <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
-                                <input type="hidden" name="return" value="parametres.php#widget">
-                                <button type="submit" class="btn btn-danger" style="padding:5px 10px;">🗑</button>
-                            </form>
-                        </td>
-                    </tr>
+                        <?php $w = widgetWeather($db, $s); ?>
+                        <tr>
+                            <td style="font-weight:700; color:#244230;"><?= htmlspecialchars($s['nom']) ?></td>
+                            <td><?= htmlspecialchars((string) $s['ville']) ?></td>
+                            <td>
+                                <?php if ($w): ?>
+                                    <span style="font-weight:700;"><?= $w['emoji'] ?> <?= (int) $w['temp'] ?>°C</span>
+                                <?php elseif ($s['latitude'] === null): ?>
+                                    <span class="muted">Ville non géocodée</span>
+                                <?php else: ?>
+                                    <span class="muted">Indisponible</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
                     <?php endforeach; ?>
-                    <?php if (empty($wSites)): ?><tr><td colspan="4" class="muted">Aucun site pour l'instant.</td></tr><?php endif; ?>
+                    <?php if (empty($wSites)): ?><tr><td colspan="3" class="muted">Aucun site. Ajoutez-en dans l'onglet Préférences.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -627,7 +642,95 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         </div>
     </div>
 
-    <div id="tab-prefs" class="tab-content"><div class="card"><div class="soon">Préférences (langue FR/NL, personnalisation) — à venir.</div></div></div>
+    <div id="tab-prefs" class="tab-content">
+        <!-- Catégorie 1 : Paramètres utilisateur (bénins, pour tout le monde) -->
+        <div class="card">
+            <h2 style="margin-top:0; color:#2d5a37;">Paramètres utilisateur</h2>
+            <p class="muted">Réglages personnels, accessibles à tout le monde.</p>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <span style="font-weight:700;">Langue :</span>
+                <a href="?lang=fr#prefs" class="btn <?= currentLang() === 'fr' ? 'btn-primary' : 'btn-light' ?>">🇫🇷 Français</a>
+                <a href="?lang=nl#prefs" class="btn <?= currentLang() === 'nl' ? 'btn-primary' : 'btn-light' ?>">🇳🇱 Nederlands</a>
+            </div>
+        </div>
+
+        <!-- Catégorie 2 : Paramètres administrateur -->
+        <div class="card" style="margin-top:20px;">
+            <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
+            <p class="muted">Réservé aux administrateurs.</p>
+
+            <!-- Souhait d'anniversaire -->
+            <div style="border-top:1px solid #eee; padding-top:14px; margin-top:6px;">
+                <h3 style="margin:0 0 6px; color:#244230;">🎂 Souhait d'anniversaire</h3>
+                <?php $birthdayOn = widgetGet($db, 'birthday_wish_enabled', '1') === '1'; ?>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span>État : <?php if ($birthdayOn): ?><span class="pill on">Activé</span><?php else: ?><span class="pill off">Désactivé</span><?php endif; ?></span>
+                    <form method="POST" action="widget_save.php" style="display:inline;">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="toggle_birthday">
+                        <input type="hidden" name="return" value="parametres.php#prefs">
+                        <button type="submit" class="btn <?= $birthdayOn ? 'btn-danger' : 'btn-primary' ?>"><?= $birthdayOn ? 'Désactiver' : 'Activer' ?></button>
+                    </form>
+                </div>
+                <p class="muted" style="margin-top:6px;">Les dates d'anniversaire se renseignent dans la fiche de chaque collaborateur.</p>
+            </div>
+
+            <!-- Sites Famiflora (source unique : fiche collaborateur + widget) -->
+            <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
+                <h3 style="margin:0 0 6px; color:#244230;">📍 Sites Famiflora</h3>
+                <p class="muted">Cette liste sert à la fois au menu « Lieu de travail » de la fiche collaborateur et à la météo du widget. Ajoute un site avec sa ville (coordonnées météo trouvées automatiquement, Open-Meteo).</p>
+                <?php $wSitesAdmin = widgetSites($db); ?>
+                <form method="POST" action="widget_save.php" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="add_site">
+                    <input type="hidden" name="return" value="parametres.php#prefs">
+                    <div style="flex:1; min-width:200px;">
+                        <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Nom du site</label>
+                        <input type="text" name="nom" maxlength="100" placeholder="Ex : Famiflora Mouscron" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                    </div>
+                    <div style="min-width:180px;">
+                        <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Ville</label>
+                        <input type="text" name="ville" required maxlength="100" placeholder="Ex : Mouscron" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                    </div>
+                    <button type="submit" class="btn btn-primary">➕ Ajouter</button>
+                </form>
+                <table>
+                    <thead><tr><th>Site</th><th>Ville</th><th>Météo</th><th>Suppr.</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($wSitesAdmin as $s): ?>
+                        <tr>
+                            <td style="font-weight:700; color:#244230;"><?= htmlspecialchars($s['nom']) ?></td>
+                            <td><?= htmlspecialchars((string) $s['ville']) ?></td>
+                            <td>
+                                <?php if ($s['latitude'] !== null): ?>
+                                    <span class="pill on">Coordonnées OK</span>
+                                <?php else: ?>
+                                    <form method="POST" action="widget_save.php" style="display:inline;">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="action" value="regeocode_site">
+                                        <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
+                                        <input type="hidden" name="return" value="parametres.php#prefs">
+                                        <button type="submit" class="btn btn-light" style="padding:5px 10px;" title="Réessayer de trouver les coordonnées">⚠️ Retrouver</button>
+                                    </form>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <form method="POST" action="widget_save.php" style="display:inline;" onsubmit="return confirm('Supprimer ce site ? Les utilisateurs affiliés perdront leur lieu de travail.');">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="action" value="delete_site">
+                                    <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
+                                    <input type="hidden" name="return" value="parametres.php#prefs">
+                                    <button type="submit" class="btn btn-danger" style="padding:5px 10px;">🗑</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($wSitesAdmin)): ?><tr><td colspan="4" class="muted">Aucun site pour l'instant.</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modale création -->

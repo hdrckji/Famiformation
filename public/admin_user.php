@@ -6,6 +6,7 @@ error_reporting(E_ALL);
 
 require_once 'config.php';
 verifierConnexion($db);
+require_once 'includes/widget.php';
 if (!function_exists('isAdmin')) {
     echo "<div class='alert error'>Erreur : fonction isAdmin() non définie.</div>";
     exit;
@@ -25,6 +26,7 @@ if (!isset($db) || !$db) {
     exit;
 }
 ensureUserProfileColumns($db);
+ensureWidgetTables($db); // garantit la colonne site_id + la table des sites
 // Infos utilisateur
 try {
     $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE id = ?");
@@ -48,13 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile_info']))
     $ville = trim((string) ($_POST['ville'] ?? ''));
     $dateNaissance = trim((string) ($_POST['date_naissance'] ?? ''));
     $dateVal = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateNaissance) === 1) ? $dateNaissance : null;
+    $siteVal = (($_POST['site_id'] ?? '') === '') ? null : (int) $_POST['site_id'];
     try {
-        $db->prepare("UPDATE utilisateurs SET ville = ?, date_naissance = ? WHERE id = ?")
-           ->execute([$ville !== '' ? $ville : null, $dateVal, $user_id]);
+        $db->prepare("UPDATE utilisateurs SET ville = ?, date_naissance = ?, site_id = ? WHERE id = ?")
+           ->execute([$ville !== '' ? $ville : null, $dateVal, $siteVal, $user_id]);
         $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE id = ?");
         $stmt->execute([$user_id]);
         $user = $stmt->fetch();
-        $pageMessage = "<div class='alert' style='background:#dff3e3;color:#1d6a39;padding:10px 14px;border-radius:8px;font-weight:700;'>Ville et date d'anniversaire enregistrées.</div>";
+        $pageMessage = "<div class='alert' style='background:#dff3e3;color:#1d6a39;padding:10px 14px;border-radius:8px;font-weight:700;'>Ville, date d'anniversaire et lieu de travail enregistrés.</div>";
     } catch (Exception $e) {
         $pageMessage = "<div class='alert error'>Enregistrement impossible : " . htmlspecialchars($e->getMessage()) . "</div>";
     }
@@ -569,6 +572,17 @@ if (($user['role'] ?? '') === 'etudiant') {
             <div>
                 <label style="font-weight:700;color:#1d6f42;display:block;margin-bottom:6px;">Date d'anniversaire 🎂</label>
                 <input type="date" name="date_naissance" value="<?php echo htmlspecialchars($naissanceVal); ?>" class="input-control">
+            </div>
+            <div>
+                <label style="font-weight:700;color:#1d6f42;display:block;margin-bottom:6px;">Lieu de travail 📍</label>
+                <?php $ficheSites = widgetSites($db); $ficheSiteId = (string) ($user['site_id'] ?? ''); ?>
+                <select name="site_id" class="input-control" style="min-width:200px;">
+                    <option value="">— Aucun —</option>
+                    <?php foreach ($ficheSites as $fs): ?>
+                        <option value="<?php echo (int) $fs['id']; ?>" <?php echo ($ficheSiteId === (string) $fs['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($fs['nom']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div style="font-size:0.8em;color:#7a8e82;margin-top:4px;">Détermine la météo affichée dans son widget.</div>
             </div>
             <button type="submit" class="btn-primary">Enregistrer</button>
         </form>

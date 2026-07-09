@@ -101,6 +101,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['module_flash'] = "⚠️ Ville introuvable — vérifiez l'orthographe.";
             }
         }
+    } elseif ($action === 'toggle_birthday') {
+        $new = (widgetGet($db, 'birthday_wish_enabled', '1') === '1') ? '0' : '1';
+        widgetSet($db, 'birthday_wish_enabled', $new);
+        $_SESSION['module_flash'] = ($new === '1') ? "✅ Souhaits d'anniversaire activés." : "✅ Souhaits d'anniversaire désactivés.";
     }
 }
 
