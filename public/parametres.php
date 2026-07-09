@@ -143,8 +143,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .btn-light { background: #e9ecef; color: #333; }
         .btn:disabled, .btn[disabled] { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
         select:disabled { opacity: 0.5; cursor: not-allowed; background: #f1f1f1; }
-        .tree-toggle { background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #2d5a37; padding: 0; margin-right: 6px; width: 16px; display: inline-block; transition: transform .1s ease; }
-        .tree-spacer { display: inline-block; width: 16px; margin-right: 6px; }
+        .tree-toggle { background:#e8f5e9; border:1px solid #bcdcc6; cursor:pointer; font-size:0.8rem; color:#2d5a37; width:24px; height:24px; border-radius:6px; margin-right:8px; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; transition:background .12s, color .12s; }
+        .tree-toggle:hover { background:#2d5a37; color:#fff; }
+        .tree-spacer { display:inline-block; width:24px; margin-right:8px; }
+        .child-count { display:inline-block; margin-left:8px; font-size:0.72rem; font-weight:700; color:#2d5a37; background:#e8f5e9; padding:2px 9px; border-radius:999px; vertical-align:middle; }
+        .type-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:0.76rem; font-weight:700; white-space:nowrap; }
+        .type-container { background:#e8f5e9; color:#2d5a37; }
+        .type-content { background:#eef1f4; color:#54606b; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
         th, td { padding: 10px 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 0.92rem; vertical-align: middle; }
         th { background: #e8f5e9; color: #1d6f42; }
@@ -195,23 +200,27 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <h2 style="margin:0; color:#2d5a37;">Modules</h2>
                 <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer un module</button>
             </div>
+            <div style="display:flex; gap:8px; margin-top:14px;">
+                <button type="button" class="btn btn-light" style="padding:6px 12px; font-size:0.85rem;" onclick="expandAllModules()">▾ Tout déplier</button>
+                <button type="button" class="btn btn-light" style="padding:6px 12px; font-size:0.85rem;" onclick="collapseAllModules()">▸ Tout replier</button>
+            </div>
             <table>
                 <thead>
                     <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $hasChildren = !empty($byParent[(int) $m['id']]); ?>
-                    <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>"<?= $depth > 0 ? ' style="display:none;"' : '' ?>>
+                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $childCount = isset($byParent[(int) $m['id']]) ? count($byParent[(int) $m['id']]) : 0; $hasChildren = $childCount > 0; ?>
+                    <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>">
                         <td><?= moduleIconHtml($m, '1.6rem') ?></td>
                         <td>
                             <div style="padding-left:<?= $depth * 18 ?>px;">
-                                <?php if ($hasChildren): ?><button type="button" class="tree-toggle" data-expanded="0" onclick="toggleModuleChildren(<?= (int) $m['id'] ?>, this)" title="Afficher / masquer les sous-modules">▸</button><?php else: ?><span class="tree-spacer"></span><?php endif; ?><?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong>
+                                <?php if ($hasChildren): ?><button type="button" class="tree-toggle" data-expanded="1" onclick="toggleModuleChildren(<?= (int) $m['id'] ?>, this)" title="Afficher / masquer les sous-modules">▾</button><?php else: ?><span class="tree-spacer"></span><?php endif; ?><?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong><?php if ($hasChildren): ?><span class="child-count"><?= $childCount ?> sous-module<?= $childCount > 1 ? 's' : '' ?></span><?php endif; ?>
                                 <?php if (!empty($m['is_locked'])): ?> <span title="Verrouillé">🔒</span><?php endif; ?>
                                 <div class="muted" style="font-size:0.82rem;"><?= htmlspecialchars($m['description'] ?? '') ?></div>
                                 <?php if (!empty($m['link'])): ?><div class="muted" style="font-size:0.76rem;">🔗 module de base → <?= htmlspecialchars($m['link']) ?></div><?php endif; ?>
                             </div>
                         </td>
-                        <td><?= !empty($m['is_container']) ? 'Conteneur' : 'Contenu' ?></td>
+                        <td><?php if (!empty($m['is_container'])): ?><span class="type-badge type-container">📁 Conteneur</span><?php else: ?><span class="type-badge type-content">📄 Contenu</span><?php endif; ?></td>
                         <td>
                             <form method="POST" action="module_save.php" style="display:flex; gap:4px;">
                                 <?= csrfField() ?>
@@ -494,6 +503,16 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             if (childBtn) { childBtn.setAttribute('data-expanded', '0'); childBtn.textContent = '▸'; }
             collapseModuleDescendants(tr.getAttribute('data-id'));
         });
+    }
+    function expandAllModules() {
+        document.querySelectorAll('tr[data-parent]').forEach(function (tr) { tr.style.display = ''; });
+        document.querySelectorAll('.tree-toggle').forEach(function (b) { b.setAttribute('data-expanded', '1'); b.textContent = '▾'; });
+    }
+    function collapseAllModules() {
+        document.querySelectorAll('tr[data-parent]').forEach(function (tr) {
+            if (tr.getAttribute('data-parent') !== '0') { tr.style.display = 'none'; }
+        });
+        document.querySelectorAll('.tree-toggle').forEach(function (b) { b.setAttribute('data-expanded', '0'); b.textContent = '▸'; });
     }
     function showTab(name, btn) {
         document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
