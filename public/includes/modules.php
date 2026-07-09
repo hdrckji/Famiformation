@@ -437,6 +437,46 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('set_root_sort_order_v1');
             }
+
+            // 14) Regroupe « Support PDF » + « Vidéo Tutoriel » dans un sous-module
+            //     « Formation caisse » (sous "Formation Caisse" racine et "Caisses" de Magasin).
+            if (!$hasFlag('group_caisse_pdf_video_v1')) {
+                $caisseParents = [];
+                $r = (int) $db->query("SELECT id FROM modules WHERE nom = 'Formation Caisse' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($r > 0) {
+                    $caisseParents[] = $r;
+                }
+                $magasinId = (int) $db->query("SELECT id FROM modules WHERE nom = 'Magasin' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($magasinId > 0) {
+                    $selC = $db->prepare("SELECT id FROM modules WHERE nom = 'Caisses' AND parent_id = ? ORDER BY id ASC LIMIT 1");
+                    $selC->execute([$magasinId]);
+                    $cid = (int) $selC->fetchColumn();
+                    if ($cid > 0) {
+                        $caisseParents[] = $cid;
+                    }
+                }
+
+                $findChild = $db->prepare("SELECT id FROM modules WHERE nom = ? AND parent_id = ? ORDER BY id ASC LIMIT 1");
+                $insGroup = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES ('Formation caisse', '', 1, ?, '💳', '', 1, 0, NULL)");
+                $moveChild = $db->prepare("UPDATE modules SET parent_id = ? WHERE id = ?");
+
+                foreach ($caisseParents as $parentId) {
+                    $findChild->execute(['Formation caisse', $parentId]);
+                    $groupId = (int) $findChild->fetchColumn();
+                    if ($groupId <= 0) {
+                        $insGroup->execute([$parentId]);
+                        $groupId = (int) $db->lastInsertId();
+                    }
+                    foreach (['Support PDF', 'Vidéo Tutoriel'] as $childNom) {
+                        $findChild->execute([$childNom, $parentId]);
+                        $childId = (int) $findChild->fetchColumn();
+                        if ($childId > 0) {
+                            $moveChild->execute([$groupId, $childId]);
+                        }
+                    }
+                }
+                $setFlag('group_caisse_pdf_video_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
