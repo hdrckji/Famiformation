@@ -391,6 +391,80 @@ BLAGUES
     }
 
     /**
+     * Horaires attribués de l'utilisateur (issus de Famijob, base partagée).
+     * Renvoie ['today' => [lignes du jour], 'next' => prochaine ligne future|null].
+     * Lecture EN DIRECT des tables interim_shift_assignments / interim_shift_requests.
+     */
+    function widgetSchedule(PDO $db, $userId)
+    {
+        $out = ['today' => [], 'next' => null];
+        if (!$userId) {
+            return $out;
+        }
+        try {
+            $chk = $db->query("SHOW TABLES LIKE 'interim_shift_assignments'");
+            if (!$chk || !$chk->fetch()) {
+                return $out;
+            }
+            $today = date('Y-m-d');
+            $st = $db->prepare(
+                "SELECT r.shift_date, r.department_name, r.time_slot, r.comment, a.agency_name
+                 FROM interim_shift_assignments a
+                 INNER JOIN interim_shift_requests r ON r.id = a.request_id
+                 WHERE a.student_id = ? AND r.shift_date >= ?
+                 ORDER BY r.shift_date ASC, r.time_slot ASC"
+            );
+            $st->execute([(int) $userId, $today]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if ((string) $row['shift_date'] === $today) {
+                    $out['today'][] = $row;
+                } elseif ($out['next'] === null) {
+                    $out['next'] = $row;
+                }
+            }
+            return $out;
+        } catch (Exception $e) {
+            return $out;
+        }
+    }
+
+    /**
+     * Libellé d'un créneau pour le défilement du widget.
+     * $mode = 'today' (créneau du jour) ou 'next' (prochain créneau, avec la date).
+     */
+    function widgetShiftLabel(array $row, $mode)
+    {
+        $tt = function ($fr, $nl) {
+            return function_exists('t') ? t($fr, $nl) : $fr;
+        };
+        $slot = trim((string) ($row['time_slot'] ?? ''));
+        $dept = trim((string) ($row['department_name'] ?? ''));
+        $parts = [];
+        if ($mode === 'today') {
+            $parts[] = '🕒 ' . $tt("Aujourd'hui", 'Vandaag');
+        } else {
+            $joursFr = ['Monday' => 'Lun', 'Tuesday' => 'Mar', 'Wednesday' => 'Mer', 'Thursday' => 'Jeu', 'Friday' => 'Ven', 'Saturday' => 'Sam', 'Sunday' => 'Dim'];
+            $joursNl = ['Monday' => 'Ma', 'Tuesday' => 'Di', 'Wednesday' => 'Wo', 'Thursday' => 'Do', 'Friday' => 'Vr', 'Saturday' => 'Za', 'Sunday' => 'Zo'];
+            $dt = DateTimeImmutable::createFromFormat('Y-m-d', (string) ($row['shift_date'] ?? ''));
+            if ($dt) {
+                $en = $dt->format('l');
+                $jour = (function_exists('currentLang') && currentLang() === 'nl') ? ($joursNl[$en] ?? $en) : ($joursFr[$en] ?? $en);
+                $dateStr = $jour . ' ' . $dt->format('d/m');
+            } else {
+                $dateStr = (string) ($row['shift_date'] ?? '');
+            }
+            $parts[] = '📅 ' . $tt('Prochain', 'Volgende') . ' : ' . $dateStr;
+        }
+        if ($slot !== '') {
+            $parts[] = $slot;
+        }
+        if ($dept !== '') {
+            $parts[] = $dept;
+        }
+        return implode(' · ', $parts);
+    }
+
+    /**
      * Phrases du widget. $onlyActive = true -> uniquement celles affichées.
      */
     function widgetPhrases(PDO $db, $onlyActive = true)
@@ -500,17 +574,49 @@ BLAGUES
             shuffle($quizItems);
         }
         // On alterne phrase / question / phrase / question…
-        $items = [];
+        $pool = [];
         $np = count($phrases);
         $nq = count($quizItems);
         for ($i = 0, $max = max($np, $nq); $i < $max; $i++) {
             if ($i < $np) {
-                $items[] = $phrases[$i];
+                $pool[] = $phrases[$i];
             }
             if ($i < $nq) {
-                $items[] = $quizItems[$i];
+                $pool[] = $quizItems[$i];
             }
         }
+
+        // Horaires attribués (Famijob, base partagée) — lus EN DIRECT
+        $schedule = widgetSchedule($db, $_SESSION['user_id'] ?? null);
+        $scheduleItems = [];
+        if (!empty($schedule['today'])) {
+            foreach ($schedule['today'] as $s) {
+                $scheduleItems[] = widgetShiftLabel($s, 'today');
+            }
+        } elseif ($schedule['next']) {
+            $scheduleItems[] = widgetShiftLabel($schedule['next'], 'next');
+        }
+
+        if (!empty($scheduleItems) && !empty($schedule['today'])) {
+            // Travaille aujourd'hui : l'horaire du jour d'abord, puis le reste défile
+            $items = array_merge($scheduleItems, $pool);
+        } elseif (!empty($scheduleItems)) {
+            // Horaire à venir mais pas aujourd'hui : on alterne horaire / phrase / horaire / phrase…
+            $items = [];
+            $k = 0;
+            foreach ($pool as $p) {
+                $items[] = $scheduleItems[$k % count($scheduleItems)];
+                $items[] = $p;
+                $k++;
+            }
+            if (empty($pool)) {
+                $items = $scheduleItems;
+            }
+        } else {
+            // Pas d'horaire : phrases + quiz uniquement
+            $items = $pool;
+        }
+
         if (empty($items)) {
             $items = [$tt('Bienvenue chez Famiflora 🌿', 'Welkom bij Famiflora 🌿')];
         }
