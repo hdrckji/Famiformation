@@ -143,6 +143,8 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .btn-light { background: #e9ecef; color: #333; }
         .btn:disabled, .btn[disabled] { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
         select:disabled { opacity: 0.5; cursor: not-allowed; background: #f1f1f1; }
+        .tree-toggle { background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #2d5a37; padding: 0; margin-right: 6px; width: 16px; display: inline-block; transition: transform .1s ease; }
+        .tree-spacer { display: inline-block; width: 16px; margin-right: 6px; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
         th, td { padding: 10px 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 0.92rem; vertical-align: middle; }
         th { background: #e8f5e9; color: #1d6f42; }
@@ -198,12 +200,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); ?>
-                    <tr>
+                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $hasChildren = !empty($byParent[(int) $m['id']]); ?>
+                    <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>"<?= $depth > 0 ? ' style="display:none;"' : '' ?>>
                         <td><?= moduleIconHtml($m, '1.6rem') ?></td>
                         <td>
                             <div style="padding-left:<?= $depth * 18 ?>px;">
-                                <?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong>
+                                <?php if ($hasChildren): ?><button type="button" class="tree-toggle" data-expanded="0" onclick="toggleModuleChildren(<?= (int) $m['id'] ?>, this)" title="Afficher / masquer les sous-modules">▸</button><?php else: ?><span class="tree-spacer"></span><?php endif; ?><?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong>
                                 <?php if (!empty($m['is_locked'])): ?> <span title="Verrouillé">🔒</span><?php endif; ?>
                                 <div class="muted" style="font-size:0.82rem;"><?= htmlspecialchars($m['description'] ?? '') ?></div>
                                 <?php if (!empty($m['link'])): ?><div class="muted" style="font-size:0.76rem;">🔗 module de base → <?= htmlspecialchars($m['link']) ?></div><?php endif; ?>
@@ -472,6 +474,26 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         document.getElementById('pwdTitle').textContent = titles[action] || 'Confirmation';
         document.getElementById('pwdInput').value = '';
         openModal('pwdModal');
+    }
+    function toggleModuleChildren(id, btn) {
+        var expanded = btn.getAttribute('data-expanded') === '1';
+        if (expanded) {
+            collapseModuleDescendants(id);
+            btn.setAttribute('data-expanded', '0');
+            btn.textContent = '▸';
+        } else {
+            document.querySelectorAll('tr[data-parent="' + id + '"]').forEach(function (tr) { tr.style.display = ''; });
+            btn.setAttribute('data-expanded', '1');
+            btn.textContent = '▾';
+        }
+    }
+    function collapseModuleDescendants(id) {
+        document.querySelectorAll('tr[data-parent="' + id + '"]').forEach(function (tr) {
+            tr.style.display = 'none';
+            var childBtn = tr.querySelector('.tree-toggle');
+            if (childBtn) { childBtn.setAttribute('data-expanded', '0'); childBtn.textContent = '▸'; }
+            collapseModuleDescendants(tr.getAttribute('data-id'));
+        });
     }
     function showTab(name, btn) {
         document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
