@@ -55,6 +55,15 @@ if (!$isAdmin) {
 
 ensureModulesTable($db);
 
+// Enregistrement des préférences (ex : souhait d'anniversaire)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_prefs'])) {
+    requireValidCSRF();
+    widgetSet($db, 'birthday_enabled', isset($_POST['birthday_enabled']) ? '1' : '0');
+    $_SESSION['module_flash'] = "✅ Préférences enregistrées.";
+    header('Location: parametres.php#prefs');
+    exit();
+}
+
 $flash = '';
 if (!empty($_SESSION['module_flash'])) {
     $flash = $_SESSION['module_flash'];
@@ -346,11 +355,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <h2 style="margin:0; color:#2d5a37;">Utilisateurs (<?= count($usersList) ?>)</h2>
                 <a href="admin.php" class="btn btn-primary">Gérer dans RH</a>
             </div>
+            <input type="text" id="userSearch" onkeyup="filterUsers()" placeholder="🔍 Rechercher par nom, identifiant ou agence..." style="width:100%; box-sizing:border-box; margin:14px 0; padding:10px 12px; border:1px solid #cfdad3; border-radius:10px; font-size:0.95rem;">
             <table>
                 <thead><tr><th>Nom</th><th>Identifiant</th><th>Profil</th><th>Agence</th><th>Statut</th><th>Fiche</th></tr></thead>
-                <tbody>
+                <tbody id="usersTbody">
                     <?php foreach ($usersList as $u): ?>
-                    <tr>
+                    <tr data-search="<?= htmlspecialchars(strtolower(trim($u['nom'] . ' ' . $u['prenom'] . ' ' . $u['identifiant'] . ' ' . ($u['interim'] ?? '')))) ?>">
                         <td><?= htmlspecialchars(trim($u['nom'] . ' ' . $u['prenom'])) ?></td>
                         <td class="muted"><?= htmlspecialchars($u['identifiant']) ?></td>
                         <td><?= htmlspecialchars($profiles[$u['role']] ?? $u['role']) ?></td>
@@ -458,11 +468,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <h2 style="margin:0; color:#2d5a37;">Agences intérim (<?= count($agencesList) ?>)</h2>
                 <a href="admin_agences_interim.php" class="btn btn-primary">Gérer les agences</a>
             </div>
+            <input type="text" id="agenceSearch" onkeyup="filterAgences()" placeholder="🔍 Rechercher une agence..." style="width:100%; box-sizing:border-box; margin:14px 0; padding:10px 12px; border:1px solid #cfdad3; border-radius:10px; font-size:0.95rem;">
             <table>
                 <thead><tr><th>Agence</th><th>Collaborateurs rattachés</th></tr></thead>
-                <tbody>
+                <tbody id="agencesTbody">
                     <?php foreach ($agencesList as $ag): ?>
-                    <tr><td><?= htmlspecialchars($ag) ?></td><td><?= (int) ($agenceCounts[$ag] ?? 0) ?></td></tr>
+                    <tr data-search="<?= htmlspecialchars(strtolower((string) $ag)) ?>"><td><?= htmlspecialchars($ag) ?></td><td><?= (int) ($agenceCounts[$ag] ?? 0) ?></td></tr>
                     <?php endforeach; ?>
                     <?php if (empty($agencesList)): ?><tr><td colspan="2" class="muted">Aucune agence pour l'instant.</td></tr><?php endif; ?>
                 </tbody>
@@ -659,20 +670,20 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
             <p class="muted">Réservé aux administrateurs.</p>
 
-            <!-- Souhait d'anniversaire -->
+            <!-- Souhait d'anniversaire (clé birthday_enabled, branchée dans index.php) -->
             <div style="border-top:1px solid #eee; padding-top:14px; margin-top:6px;">
                 <h3 style="margin:0 0 6px; color:#244230;">🎂 Souhait d'anniversaire</h3>
-                <?php $birthdayOn = widgetGet($db, 'birthday_wish_enabled', '1') === '1'; ?>
-                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                    <span>État : <?php if ($birthdayOn): ?><span class="pill on">Activé</span><?php else: ?><span class="pill off">Désactivé</span><?php endif; ?></span>
-                    <form method="POST" action="widget_save.php" style="display:inline;">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="action" value="toggle_birthday">
-                        <input type="hidden" name="return" value="parametres.php#prefs">
-                        <button type="submit" class="btn <?= $birthdayOn ? 'btn-danger' : 'btn-primary' ?>"><?= $birthdayOn ? 'Désactiver' : 'Activer' ?></button>
-                    </form>
-                </div>
-                <p class="muted" style="margin-top:6px;">Les dates d'anniversaire se renseignent dans la fiche de chaque collaborateur.</p>
+                <?php $birthdayOn = (widgetGet($db, 'birthday_enabled', '1') === '1'); ?>
+                <form method="POST" action="parametres.php">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="save_prefs" value="1">
+                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
+                        <input type="checkbox" name="birthday_enabled" value="1" <?= $birthdayOn ? 'checked' : '' ?> style="width:20px; height:20px; accent-color:#2d5a37;">
+                        Souhaiter l'anniversaire aux collaborateurs (animation à leur première ouverture du jour)
+                    </label>
+                    <p class="muted" style="margin:8px 0 12px;">Basé sur la date d'anniversaire renseignée dans la fiche de chaque collaborateur.</p>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </form>
             </div>
 
             <!-- Sites Famiflora (source unique : fiche collaborateur + widget) -->
@@ -833,6 +844,20 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             if (tr.getAttribute('data-parent') !== '0') { tr.style.display = 'none'; }
         });
         document.querySelectorAll('.tree-toggle').forEach(function (b) { b.setAttribute('data-expanded', '0'); b.textContent = '▸'; });
+    }
+    function filterUsers() {
+        var q = (document.getElementById('userSearch').value || '').toLowerCase().trim();
+        document.querySelectorAll('#usersTbody tr').forEach(function (tr) {
+            var s = tr.getAttribute('data-search') || '';
+            tr.style.display = (q === '' || s.indexOf(q) !== -1) ? '' : 'none';
+        });
+    }
+    function filterAgences() {
+        var q = (document.getElementById('agenceSearch').value || '').toLowerCase().trim();
+        document.querySelectorAll('#agencesTbody tr').forEach(function (tr) {
+            var s = tr.getAttribute('data-search') || '';
+            tr.style.display = (q === '' || s.indexOf(q) !== -1) ? '' : 'none';
+        });
     }
     function togglePt(id, btn) {
         var el = document.getElementById(id);
