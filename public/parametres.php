@@ -312,11 +312,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <h2 style="margin:0; color:#2d5a37;">Utilisateurs (<?= count($usersList) ?>)</h2>
                 <a href="admin.php" class="btn btn-primary">Gérer dans RH</a>
             </div>
+            <input type="text" id="userSearch" onkeyup="filterUsers()" placeholder="🔍 Rechercher par nom, identifiant ou agence..." style="width:100%; box-sizing:border-box; margin:14px 0; padding:10px 12px; border:1px solid #cfdad3; border-radius:10px; font-size:0.95rem;">
             <table>
                 <thead><tr><th>Nom</th><th>Identifiant</th><th>Profil</th><th>Agence</th><th>Statut</th><th>Fiche</th></tr></thead>
-                <tbody>
+                <tbody id="usersTbody">
                     <?php foreach ($usersList as $u): ?>
-                    <tr>
+                    <tr data-search="<?= htmlspecialchars(strtolower(trim($u['nom'] . ' ' . $u['prenom'] . ' ' . $u['identifiant'] . ' ' . ($u['interim'] ?? '')))) ?>">
                         <td><?= htmlspecialchars(trim($u['nom'] . ' ' . $u['prenom'])) ?></td>
                         <td class="muted"><?= htmlspecialchars($u['identifiant']) ?></td>
                         <td><?= htmlspecialchars($profiles[$u['role']] ?? $u['role']) ?></td>
@@ -424,11 +425,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <h2 style="margin:0; color:#2d5a37;">Agences intérim (<?= count($agencesList) ?>)</h2>
                 <a href="admin_agences_interim.php" class="btn btn-primary">Gérer les agences</a>
             </div>
+            <input type="text" id="agenceSearch" onkeyup="filterAgences()" placeholder="🔍 Rechercher une agence..." style="width:100%; box-sizing:border-box; margin:14px 0; padding:10px 12px; border:1px solid #cfdad3; border-radius:10px; font-size:0.95rem;">
             <table>
                 <thead><tr><th>Agence</th><th>Collaborateurs rattachés</th></tr></thead>
-                <tbody>
+                <tbody id="agencesTbody">
                     <?php foreach ($agencesList as $ag): ?>
-                    <tr><td><?= htmlspecialchars($ag) ?></td><td><?= (int) ($agenceCounts[$ag] ?? 0) ?></td></tr>
+                    <tr data-search="<?= htmlspecialchars(strtolower((string) $ag)) ?>"><td><?= htmlspecialchars($ag) ?></td><td><?= (int) ($agenceCounts[$ag] ?? 0) ?></td></tr>
                     <?php endforeach; ?>
                     <?php if (empty($agencesList)): ?><tr><td colspan="2" class="muted">Aucune agence pour l'instant.</td></tr><?php endif; ?>
                 </tbody>
@@ -754,6 +756,20 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             if (tr.getAttribute('data-parent') !== '0') { tr.style.display = 'none'; }
         });
         document.querySelectorAll('.tree-toggle').forEach(function (b) { b.setAttribute('data-expanded', '0'); b.textContent = '▸'; });
+    }
+    function filterUsers() {
+        var q = (document.getElementById('userSearch').value || '').toLowerCase().trim();
+        document.querySelectorAll('#usersTbody tr').forEach(function (tr) {
+            var s = tr.getAttribute('data-search') || '';
+            tr.style.display = (q === '' || s.indexOf(q) !== -1) ? '' : 'none';
+        });
+    }
+    function filterAgences() {
+        var q = (document.getElementById('agenceSearch').value || '').toLowerCase().trim();
+        document.querySelectorAll('#agencesTbody tr').forEach(function (tr) {
+            var s = tr.getAttribute('data-search') || '';
+            tr.style.display = (q === '' || s.indexOf(q) !== -1) ? '' : 'none';
+        });
     }
     function togglePt(id, btn) {
         var el = document.getElementById(id);
