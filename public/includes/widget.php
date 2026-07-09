@@ -114,12 +114,13 @@ if (!function_exists('ensureWidgetTables')) {
             <div class="hw-date"><?= htmlspecialchars(widgetDate()) ?></div>
         </div>
         <style>
-        .home-widget { position: sticky; top: 0; z-index: 200; width: 34%; min-width: 300px; max-width: 500px; min-height: 150px; margin: 6px auto 10px; background: rgba(255,255,255,0.97); border-radius: 16px; box-shadow: 0 8px 22px rgba(0,0,0,0.18); padding: 14px 16px; box-sizing: border-box; }
-        .hw-weather { position: absolute; top: 12px; left: 14px; font-weight: 700; color: #2d5a37; }
-        .hw-soon { color: #9bb3a3; font-weight: 600; font-size: 0.85rem; }
-        .hw-date { position: absolute; bottom: 10px; right: 14px; font-weight: 600; color: #666; font-size: 0.85rem; }
-        .hw-center { display: flex; align-items: center; justify-content: center; min-height: 150px; text-align: center; color: #2d5a37; font-weight: 700; font-size: 1.05rem; padding: 30px 46px; box-sizing: border-box; }
-        @media (max-width: 900px) { .home-widget { width: 94%; max-width: none; } .hw-center { padding: 40px 14px; } }
+        /* Bande horizontale intégrée dans le ruban du haut (météo à gauche, date à droite, infos au centre) */
+        .home-widget { flex: 1 1 auto; min-width: 0; max-width: 860px; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 52px; background: rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); padding: 6px 16px; box-sizing: border-box; }
+        .hw-weather { font-weight: 700; color: #2d5a37; white-space: nowrap; flex-shrink: 0; }
+        .hw-soon { color: #9bb3a3; font-weight: 600; font-size: 0.82rem; }
+        .hw-center { flex: 1 1 auto; min-width: 0; text-align: center; color: #2d5a37; font-weight: 700; font-size: 1rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .hw-date { font-weight: 600; color: #666; font-size: 0.82rem; white-space: nowrap; flex-shrink: 0; }
+        @media (max-width: 780px) { .home-widget { display: none; } }
         </style>
         <?php
         return ob_get_clean();

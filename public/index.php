@@ -71,13 +71,19 @@ if (!empty($_SESSION['module_flash'])) {
         body { font-family: 'Open Sans', sans-serif; background: url('background.jpg') no-repeat center center fixed; background-size: cover; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
         /* AJUSTEMENT DE LA POSITION DU BOUTON DÉCONNEXION */
-        .top-nav { 
-            width: 100%; 
-            display: flex; 
+        .top-nav {
+            width: 100%;
+            display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 16px 0 16px; 
-            box-sizing: border-box; 
+            gap: 14px;
+            padding: 8px 16px;
+            box-sizing: border-box;
+            position: sticky;
+            top: 0;
+            z-index: 300;
+            background: rgba(255,255,255,0.72);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.10);
         }
         .user-info {
             display: flex;
@@ -211,6 +217,11 @@ if (!empty($_SESSION['module_flash'])) {
             <?php endif; ?>
             <span><?= htmlspecialchars($userNom ?: ($_SESSION['username'] ?? '')) ?></span>
         </a>
+
+        <?php if (userSeesWidget($db, $role)): ?>
+            <?= renderWidget($db) ?>
+        <?php endif; ?>
+
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
                 <?php if ($isAdmin): ?>
@@ -224,10 +235,6 @@ if (!empty($_SESSION['module_flash'])) {
             </div>
         </div>
     </div>
-
-    <?php if (userSeesWidget($db, $role)): ?>
-        <?= renderWidget($db) ?>
-    <?php endif; ?>
 
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main">
