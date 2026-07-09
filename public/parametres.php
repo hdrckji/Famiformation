@@ -32,9 +32,19 @@ try {
 
 // Tous les modules, organisés en arbre (parents puis enfants indentés)
 $allModules = getAllModules($db);
+$moduleIds = [];
+foreach ($allModules as $m) {
+    $moduleIds[(int) $m['id']] = true;
+}
 $byParent = [];
 foreach ($allModules as $m) {
-    $byParent[(int) ($m['parent_id'] ?? 0)][] = $m;
+    $pid = (int) ($m['parent_id'] ?? 0);
+    // Parent inexistant (module parent supprimé) : on rattache le module à la racine
+    // pour qu'il reste TOUJOURS visible dans la gestion (sinon il devient invisible).
+    if ($pid !== 0 && !isset($moduleIds[$pid])) {
+        $pid = 0;
+    }
+    $byParent[$pid][] = $m;
 }
 function flattenModules(array $byParent, $parentId, $depth, array &$out)
 {
@@ -220,7 +230,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                                 <?php if (!empty($m['link'])): ?><div class="muted" style="font-size:0.76rem;">🔗 module de base → <?= htmlspecialchars($m['link']) ?></div><?php endif; ?>
                             </div>
                         </td>
-                        <td><?php if (!empty($m['is_container'])): ?><span class="type-badge type-container">📁 Conteneur</span><?php else: ?><span class="type-badge type-content">📄 Contenu</span><?php endif; ?></td>
+                        <td><?php if (!empty($m['is_container']) || $hasChildren): ?><span class="type-badge type-container">📁 Conteneur</span><?php else: ?><span class="type-badge type-content">📄 Élément</span><?php endif; ?></td>
                         <td>
                             <form method="POST" action="module_save.php" style="display:flex; gap:4px;">
                                 <?= csrfField() ?>
