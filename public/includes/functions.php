@@ -122,6 +122,11 @@ if (!function_exists('ensureUserProfileColumns')) {
             if (!isset($cols['last_birthday_wish'])) {
                 $db->exec("ALTER TABLE utilisateurs ADD COLUMN last_birthday_wish DATE NULL");
             }
+            if (!isset($cols['welcome_seen'])) {
+                $db->exec("ALTER TABLE utilisateurs ADD COLUMN welcome_seen TINYINT(1) NOT NULL DEFAULT 0");
+                // Les comptes déjà existants ne sont pas de « nouveaux » : on les marque comme accueillis.
+                $db->exec("UPDATE utilisateurs SET welcome_seen = 1");
+            }
         } catch (Exception $e) {
             // migration non critique
         }

@@ -201,3 +201,47 @@ if (isset($connectionException)) {
 if (isset($_SESSION['user_id'])) {
     // ...fin du bloc PHP, suppression du script HTML injecté...
 }
+
+// 8. THÈME (événement / anniversaire) : fond appliqué sur TOUTES les pages HTML.
+if (isset($db) && isset($_SESSION['user_id'])) {
+    require_once __DIR__ . '/includes/widget.php';
+    require_once __DIR__ . '/includes/theme.php';
+
+    // Vérifie l'anniversaire une seule fois par jour et par session (léger).
+    $__todayD = date('Y-m-d');
+    if (($_SESSION['bday_cache_date'] ?? '') !== $__todayD) {
+        $_SESSION['bday_cache_date'] = $__todayD;
+        $_SESSION['is_birthday_today'] = '0';
+        try {
+            if (function_exists('ensureUserProfileColumns')) {
+                ensureUserProfileColumns($db);
+            }
+            $__bstmt = $db->prepare("SELECT date_naissance FROM utilisateurs WHERE id = ? LIMIT 1");
+            $__bstmt->execute([(int) $_SESSION['user_id']]);
+            $__dn = (string) $__bstmt->fetchColumn();
+            if ($__dn !== '' && $__dn !== '0000-00-00' && substr($__dn, 5, 5) === date('m-d')) {
+                $_SESSION['is_birthday_today'] = '1';
+            }
+        } catch (Exception $e) {
+            // pas critique
+        }
+    }
+
+    // Aperçu admin persistant : ?theme=noel (ou ?theme=off pour revenir au normal).
+    if (isset($_GET['theme']) && (($_SESSION['role'] ?? '') === 'admin')) {
+        $__tp = (string) $_GET['theme'];
+        if ($__tp === 'off' || $__tp === '') {
+            unset($_SESSION['theme_preview']);
+        } else {
+            $_SESSION['theme_preview'] = $__tp;
+        }
+    }
+
+    if (function_exists('activePageTheme')) {
+        $__pageTheme = activePageTheme($db);
+        if (!empty($__pageTheme)) {
+            $GLOBALS['__fami_page_theme'] = $__pageTheme;
+            ob_start('famiInjectPageTheme');
+        }
+    }
+}
