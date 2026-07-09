@@ -12,6 +12,15 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
 
 ensureModulesTable($db);
 
+// Enregistrement des préférences (ex : souhait d'anniversaire)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_prefs'])) {
+    requireValidCSRF();
+    widgetSet($db, 'birthday_enabled', isset($_POST['birthday_enabled']) ? '1' : '0');
+    $_SESSION['module_flash'] = "✅ Préférences enregistrées.";
+    header('Location: parametres.php#prefs');
+    exit();
+}
+
 $flash = '';
 if (!empty($_SESSION['module_flash'])) {
     $flash = $_SESSION['module_flash'];
@@ -627,7 +636,22 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         </div>
     </div>
 
-    <div id="tab-prefs" class="tab-content"><div class="card"><div class="soon">Préférences (langue FR/NL, personnalisation) — à venir.</div></div></div>
+    <div id="tab-prefs" class="tab-content">
+        <div class="card">
+            <h2 style="margin-top:0; color:#2d5a37;">Préférences</h2>
+            <?php $birthdayOn = (widgetGet($db, 'birthday_enabled', '1') === '1'); ?>
+            <form method="POST" action="parametres.php">
+                <?= csrfField() ?>
+                <input type="hidden" name="save_prefs" value="1">
+                <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
+                    <input type="checkbox" name="birthday_enabled" value="1" <?= $birthdayOn ? 'checked' : '' ?> style="width:20px; height:20px; accent-color:#2d5a37;">
+                    🎂 Souhaiter l'anniversaire aux collaborateurs (animation à leur première ouverture du jour)
+                </label>
+                <p class="muted" style="margin:8px 0 16px;">Basé sur la date d'anniversaire renseignée dans la fiche de chaque collaborateur.</p>
+                <button type="submit" class="btn btn-primary">Enregistrer les préférences</button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Modale création -->

@@ -16,10 +16,11 @@ if ($role === 'evaluateur') {
 }
 
 $user_id = $_SESSION['user_id'];
+ensureUserProfileColumns($db);
 // --- LOGIQUE DE NOTIFICATION NEW ---
 $nouvelles_formations = 0;
 try {
-    $stmt = $db->prepare("SELECT derniere_visite, nom, prenom, photo_profil FROM utilisateurs WHERE id = ?");
+    $stmt = $db->prepare("SELECT derniere_visite, nom, prenom, photo_profil, date_naissance, last_birthday_wish FROM utilisateurs WHERE id = ?");
     $stmt->execute([$user_id]);
     $user_data = $stmt->fetch();
     $derniere_visite = ($user_data && $user_data['derniere_visite']) ? $user_data['derniere_visite'] : '2000-01-01 00:00:00';
@@ -38,6 +39,28 @@ try {
     $stmtUpdate->execute([$user_id]);
 } catch (Exception $e) {
     $nouvelles_formations = 0;
+}
+
+// --- Anniversaire ---
+$birthdayEnabled = (function_exists('widgetGet') ? widgetGet($db, 'birthday_enabled', '1') : '1') === '1';
+$isBirthday = false;
+$birthdayFirstOpen = false;
+$birthdayName = '';
+if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
+    $dob = (string) $user_data['date_naissance'];
+    if ($dob !== '0000-00-00' && substr($dob, 5, 5) === date('m-d')) {
+        $isBirthday = true;
+        $birthdayName = ucfirst(strtolower((string) ($user_data['prenom'] ?? '')));
+        $todayStr = date('Y-m-d');
+        if ((string) ($user_data['last_birthday_wish'] ?? '') !== $todayStr) {
+            $birthdayFirstOpen = true;
+            try {
+                $db->prepare("UPDATE utilisateurs SET last_birthday_wish = ? WHERE id = ?")->execute([$todayStr, $user_id]);
+            } catch (Exception $e) {
+                // pas critique
+            }
+        }
+    }
 }
 
 $caisse_valid = false;
@@ -201,7 +224,58 @@ if (!empty($_SESSION['module_flash'])) {
         .role-chk { font-weight: 600; display: flex; align-items: center; gap: 6px; }
     </style>
 </head>
-<body>
+<body class="<?php echo $isBirthday ? 'birthday-mode' : ''; ?>">
+<?php if ($isBirthday): ?>
+<style>
+body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0; height:5px; z-index:9999; background:linear-gradient(90deg,#b8860b,#d4af37,#fff6cf,#d4af37,#b8860b); background-size:200% auto; animation:bdGold 3s linear infinite; pointer-events:none; }
+@keyframes bdGold { to { background-position:200% center; } }
+</style>
+<?php endif; ?>
+<?php if ($birthdayFirstOpen): ?>
+<div id="bdOverlay" class="bd-overlay" onclick="this.classList.add('bd-hide')">
+    <div class="bd-confetti"></div>
+    <div class="bd-card">
+        <div class="bd-emoji">🎂</div>
+        <div class="bd-title"><?php echo t('Joyeux anniversaire', 'Gelukkige verjaardag'); ?></div>
+        <div class="bd-name"><?php echo htmlspecialchars($birthdayName); ?> !</div>
+        <div class="bd-sub"><?php echo t('Toute l\'équipe Famiflora te souhaite une magnifique journée', 'Het hele Famiflora-team wenst je een prachtige dag'); ?> 🎉</div>
+        <div class="bd-close"><?php echo t('Clique pour continuer', 'Klik om verder te gaan'); ?></div>
+    </div>
+</div>
+<style>
+.bd-overlay { position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 38%, #161616, #000 70%); overflow:hidden; cursor:pointer; transition:opacity .8s ease; }
+.bd-overlay.bd-hide { opacity:0; pointer-events:none; }
+.bd-card { position:relative; z-index:2; text-align:center; padding:20px; animation:bdIn .9s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes bdIn { from { opacity:0; transform:scale(.85) translateY(20px); } to { opacity:1; transform:none; } }
+.bd-emoji { font-size:4.5rem; margin-bottom:8px; animation:bdPop 1.2s ease infinite alternate; }
+@keyframes bdPop { to { transform:scale(1.12) rotate(-5deg); } }
+.bd-title { font-size:2.7rem; font-weight:800; letter-spacing:1px; background:linear-gradient(90deg,#b8860b,#d4af37,#fff6cf,#d4af37,#b8860b); background-size:200% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; animation:bdGold 3s linear infinite; }
+@keyframes bdGold { to { background-position:200% center; } }
+.bd-name { font-size:2.1rem; font-weight:800; color:#fff6cf; margin-top:2px; text-shadow:0 0 22px rgba(212,175,55,.6); }
+.bd-sub { color:#cdb96a; margin-top:16px; font-size:1.02rem; max-width:520px; margin-left:auto; margin-right:auto; line-height:1.5; }
+.bd-close { margin-top:28px; color:#8a7b45; font-size:.8rem; letter-spacing:1.5px; text-transform:uppercase; }
+.bd-piece { position:absolute; top:-24px; width:10px; height:15px; border-radius:2px; opacity:.9; animation-name:bdFall; animation-timing-function:linear; animation-iteration-count:infinite; }
+@keyframes bdFall { to { transform:translateY(108vh) rotate(720deg); } }
+</style>
+<script>
+(function () {
+    var ov = document.getElementById('bdOverlay');
+    if (!ov) { return; }
+    var c = ov.querySelector('.bd-confetti');
+    var colors = ['#d4af37', '#fff6cf', '#b8860b', '#ffffff'];
+    for (var i = 0; i < 44; i++) {
+        var p = document.createElement('span');
+        p.className = 'bd-piece';
+        p.style.left = (Math.random() * 100) + '%';
+        p.style.background = colors[i % colors.length];
+        p.style.animationDelay = (Math.random() * 3) + 's';
+        p.style.animationDuration = (2.5 + Math.random() * 2.5) + 's';
+        c.appendChild(p);
+    }
+    setTimeout(function () { ov.classList.add('bd-hide'); }, 7000);
+})();
+</script>
+<?php endif; ?>
     <?= apercuBanner($db) ?>
 
     <div class="top-nav">
@@ -219,7 +293,7 @@ if (!empty($_SESSION['module_flash'])) {
         </a>
 
         <?php if (userSeesWidget($db, $role)): ?>
-            <?= renderWidget($db) ?>
+            <?= renderWidget($db, $isBirthday ? $birthdayName : null) ?>
         <?php endif; ?>
 
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">

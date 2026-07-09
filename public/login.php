@@ -85,6 +85,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['prenom'] = $user['prenom'];
         $_SESSION['photo_profil'] = $user['photo_profil'] ?? null;
 
+        // Langue par défaut selon la ville de résidence (modifiable ensuite via le sélecteur)
+        if (function_exists('villeLangueDefaut')) {
+            $_SESSION['lang'] = villeLangueDefaut($user['ville'] ?? '');
+        }
+
         // Renouvelle le token CSRF après connexion
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 

@@ -556,7 +556,7 @@ BLAGUES
      * Étape 1 : cadre + date (bas-droite) + emplacements météo (haut-gauche) et centre.
      * La météo, les horaires et les phrases qui défilent viendront aux étapes suivantes.
      */
-    function renderWidget(PDO $db)
+    function renderWidget(PDO $db, $birthdayName = null)
     {
         $tt = function ($fr, $nl) {
             return function_exists('t') ? t($fr, $nl) : $fr;
@@ -627,6 +627,18 @@ BLAGUES
         $weather = $site ? widgetWeather($db, $site) : null;
         $siteLabel = $site ? ((string) ($site['ville'] ?: $site['nom'])) : '';
         ob_start();
+        $bdName = is_string($birthdayName) ? trim($birthdayName) : '';
+        if ($bdName !== '') {
+            ?>
+            <div class="home-widget hw-birthday"><div class="hw-bd-text">🎉 <?= htmlspecialchars($tt('Joyeux anniversaire', 'Gelukkige verjaardag')) ?> <?= htmlspecialchars($bdName) ?> ! 🎂</div></div>
+            <style>
+            .home-widget.hw-birthday { background: linear-gradient(120deg,#0b0b0b,#1c1c1c,#0b0b0b); border:1px solid #d4af37; box-shadow:0 4px 20px rgba(212,175,55,0.45); justify-content:center; overflow:hidden; }
+            .hw-bd-text { font-weight:800; font-size:1rem; letter-spacing:.4px; white-space:nowrap; background:linear-gradient(90deg,#b8860b,#d4af37,#fff6cf,#d4af37,#b8860b); background-size:200% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; animation:hwGold 3s linear infinite; }
+            @keyframes hwGold { to { background-position:200% center; } }
+            </style>
+            <?php
+            return ob_get_clean();
+        }
         ?>
         <div class="home-widget">
             <div class="hw-weather">
