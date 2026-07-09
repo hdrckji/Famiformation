@@ -437,7 +437,75 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 </form>
             </div>
 
-            <p class="muted" style="margin-top:18px;">Prochaines étapes : la liste des phrases qui défilent, la météo, les horaires, et la composition des sous-widgets.</p>
+            <p class="muted" style="margin-top:18px;">Prochaines étapes : la météo, les horaires, et la composition des sous-widgets.</p>
+        </div>
+
+        <!-- Phrases qui défilent -->
+        <?php $wPhrases = widgetPhrases($db, false); ?>
+        <div class="card" style="margin-top:20px;">
+            <h2 style="margin-top:0; color:#2d5a37;">Phrases qui défilent</h2>
+            <p class="muted">Blagues et infos jardinerie affichées au centre du widget (défilement infini). Elles seront rejointes plus tard par les questions de quiz déjà faites.</p>
+
+            <form method="POST" action="widget_save.php" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="add_phrase">
+                <input type="hidden" name="return" value="parametres.php#widget">
+                <div style="flex:1; min-width:260px;">
+                    <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Nouvelle phrase</label>
+                    <input type="text" name="texte" required maxlength="500" placeholder="Ex : Le paillage garde l'humidité du sol…" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                </div>
+                <div>
+                    <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Type</label>
+                    <select name="categorie" style="padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                        <option value="info">🌱 Info jardinerie</option>
+                        <option value="blague">😄 Blague</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">➕ Ajouter</button>
+            </form>
+
+            <table>
+                <thead><tr><th>Phrase (modifiable)</th><th>Affichée</th><th>Suppr.</th></tr></thead>
+                <tbody>
+                    <?php foreach ($wPhrases as $ph): ?>
+                    <tr>
+                        <td>
+                            <form method="POST" action="widget_save.php" style="display:flex; gap:8px; align-items:center;">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="edit_phrase">
+                                <input type="hidden" name="id" value="<?= (int) $ph['id'] ?>">
+                                <input type="hidden" name="return" value="parametres.php#widget">
+                                <input type="text" name="texte" value="<?= htmlspecialchars($ph['texte']) ?>" maxlength="500" style="flex:1; min-width:220px; padding:6px 8px; border:1px solid #ccc; border-radius:6px;">
+                                <select name="categorie" style="padding:6px; border:1px solid #ccc; border-radius:6px;">
+                                    <option value="info" <?= $ph['categorie'] !== 'blague' ? 'selected' : '' ?>>Info</option>
+                                    <option value="blague" <?= $ph['categorie'] === 'blague' ? 'selected' : '' ?>>Blague</option>
+                                </select>
+                                <button type="submit" class="btn btn-light" style="padding:5px 9px;" title="Enregistrer">💾</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="POST" action="widget_save.php" style="display:inline;">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="toggle_phrase">
+                                <input type="hidden" name="id" value="<?= (int) $ph['id'] ?>">
+                                <input type="hidden" name="return" value="parametres.php#widget">
+                                <button type="submit" class="btn <?= !empty($ph['actif']) ? 'btn-light' : 'btn-danger' ?>" style="padding:5px 10px;"><?= !empty($ph['actif']) ? '👁 Oui' : '🚫 Non' ?></button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="POST" action="widget_save.php" style="display:inline;" onsubmit="return confirm('Supprimer cette phrase ?');">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="delete_phrase">
+                                <input type="hidden" name="id" value="<?= (int) $ph['id'] ?>">
+                                <input type="hidden" name="return" value="parametres.php#widget">
+                                <button type="submit" class="btn btn-danger" style="padding:5px 10px;">🗑</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($wPhrases)): ?><tr><td colspan="3" class="muted">Aucune phrase pour l'instant.</td></tr><?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 

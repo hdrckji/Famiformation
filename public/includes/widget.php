@@ -22,8 +22,51 @@ if (!function_exists('ensureWidgetTables')) {
                 $ins->execute(['enabled', '1']);
                 $ins->execute(['roles', 'admin']);
             }
+
+            // Phrases qui défilent (blagues / infos jardinerie)
+            $db->exec(
+                "CREATE TABLE IF NOT EXISTS widget_phrases (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    texte VARCHAR(500) NOT NULL,
+                    categorie VARCHAR(30) NOT NULL DEFAULT 'info',
+                    actif TINYINT(1) NOT NULL DEFAULT 1,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+            );
+            $cph = (int) $db->query("SELECT COUNT(*) FROM widget_phrases")->fetchColumn();
+            if ($cph === 0) {
+                $seed = [
+                    ["Arrosez vos plantes tôt le matin ou en soirée pour limiter l'évaporation.", 'info'],
+                    ['Le paillage garde l\'humidité du sol et limite les mauvaises herbes.', 'info'],
+                    ['Un sol vivant = un jardin en bonne santé : préservez les vers de terre ! 🪱', 'info'],
+                    ['Pourquoi les jardiniers sont-ils si zen ? Ils savent cultiver la patience. 🌱', 'blague'],
+                    ['Que dit une fleur à une abeille ? « Butine-moi tant que je suis en fleur ! » 🐝', 'blague'],
+                ];
+                $insP = $db->prepare("INSERT INTO widget_phrases (texte, categorie) VALUES (?, ?)");
+                foreach ($seed as $s) {
+                    $insP->execute($s);
+                }
+            }
         } catch (Exception $e) {
             // base indisponible : on ignore
+        }
+    }
+
+    /**
+     * Phrases du widget. $onlyActive = true -> uniquement celles affichées.
+     */
+    function widgetPhrases(PDO $db, $onlyActive = true)
+    {
+        try {
+            ensureWidgetTables($db);
+            $sql = "SELECT id, texte, categorie, actif FROM widget_phrases";
+            if ($onlyActive) {
+                $sql .= " WHERE actif = 1";
+            }
+            $sql .= " ORDER BY id ASC";
+            return $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return [];
         }
     }
 
@@ -106,11 +149,19 @@ if (!function_exists('ensureWidgetTables')) {
         $tt = function ($fr, $nl) {
             return function_exists('t') ? t($fr, $nl) : $fr;
         };
+        // Phrases à faire défiler au centre (lues EN DIRECT depuis la base)
+        $phrases = array_values(array_filter(array_map(function ($p) {
+            return trim((string) $p['texte']);
+        }, widgetPhrases($db, true))));
+        if (empty($phrases)) {
+            $phrases = [$tt('Bienvenue chez Famiflora 🌿', 'Welkom bij Famiflora 🌿')];
+        }
+        $phrasesAttr = htmlspecialchars(json_encode($phrases, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
         ob_start();
         ?>
         <div class="home-widget">
             <div class="hw-weather">🌤️ <span class="hw-soon"><?= htmlspecialchars($tt('Météo à venir', 'Weer binnenkort')) ?></span></div>
-            <div class="hw-center"><?= htmlspecialchars($tt('Bientôt : horaires & infos qui défilent', 'Binnenkort: uren & info')) ?></div>
+            <div class="hw-center" id="hwCenter" data-phrases="<?= $phrasesAttr ?>"><span class="hw-phrase"><?= htmlspecialchars($phrases[0]) ?></span></div>
             <div class="hw-date"><?= htmlspecialchars(widgetDate()) ?></div>
         </div>
         <style>
@@ -118,10 +169,31 @@ if (!function_exists('ensureWidgetTables')) {
         .home-widget { flex: 1 1 auto; min-width: 0; max-width: 860px; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 52px; background: rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); padding: 6px 16px; box-sizing: border-box; }
         .hw-weather { font-weight: 700; color: #2d5a37; white-space: nowrap; flex-shrink: 0; }
         .hw-soon { color: #9bb3a3; font-weight: 600; font-size: 0.82rem; }
-        .hw-center { flex: 1 1 auto; min-width: 0; text-align: center; color: #2d5a37; font-weight: 700; font-size: 1rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .hw-center { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; text-align: center; }
+        .hw-phrase { color: #2d5a37; font-weight: 700; font-size: 0.95rem; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: opacity 0.35s ease; }
         .hw-date { font-weight: 600; color: #666; font-size: 0.82rem; white-space: nowrap; flex-shrink: 0; }
         @media (max-width: 780px) { .home-widget { display: none; } }
         </style>
+        <script>
+        (function () {
+            var box = document.getElementById('hwCenter');
+            if (!box) { return; }
+            var list;
+            try { list = JSON.parse(box.getAttribute('data-phrases') || '[]'); } catch (e) { list = []; }
+            if (list.length < 2) { return; }
+            var span = box.querySelector('.hw-phrase');
+            var i = 0;
+            setInterval(function () {
+                i = (i + 1) % list.length;
+                if (!span) { return; }
+                span.style.opacity = '0';
+                setTimeout(function () {
+                    span.textContent = list[i];
+                    span.style.opacity = '1';
+                }, 350);
+            }, 7000);
+        })();
+        </script>
         <?php
         return ob_get_clean();
     }

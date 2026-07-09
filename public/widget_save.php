@@ -32,6 +32,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $roles = array_values(array_intersect($valid, $submitted));
         widgetSet($db, 'roles', implode(',', $roles));
         $_SESSION['module_flash'] = "✅ Accès au widget mis à jour.";
+    } elseif ($action === 'add_phrase') {
+        $texte = trim((string) ($_POST['texte'] ?? ''));
+        $cat = (($_POST['categorie'] ?? 'info') === 'blague') ? 'blague' : 'info';
+        if ($texte !== '') {
+            $db->prepare("INSERT INTO widget_phrases (texte, categorie) VALUES (?, ?)")->execute([mb_substr($texte, 0, 500), $cat]);
+            $_SESSION['module_flash'] = "✅ Phrase ajoutée.";
+        } else {
+            $_SESSION['module_flash'] = "❌ La phrase ne peut pas être vide.";
+        }
+    } elseif ($action === 'edit_phrase') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $texte = trim((string) ($_POST['texte'] ?? ''));
+        $cat = (($_POST['categorie'] ?? 'info') === 'blague') ? 'blague' : 'info';
+        if ($id > 0 && $texte !== '') {
+            $db->prepare("UPDATE widget_phrases SET texte = ?, categorie = ? WHERE id = ?")->execute([mb_substr($texte, 0, 500), $cat, $id]);
+            $_SESSION['module_flash'] = "✅ Phrase modifiée.";
+        }
+    } elseif ($action === 'delete_phrase') {
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $db->prepare("DELETE FROM widget_phrases WHERE id = ?")->execute([$id]);
+            $_SESSION['module_flash'] = "✅ Phrase supprimée.";
+        }
+    } elseif ($action === 'toggle_phrase') {
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $db->prepare("UPDATE widget_phrases SET actif = 1 - actif WHERE id = ?")->execute([$id]);
+            $_SESSION['module_flash'] = "✅ Affichage de la phrase mis à jour.";
+        }
     }
 }
 
