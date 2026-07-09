@@ -24,6 +24,7 @@ if (!isset($db) || !$db) {
     echo "<div class='alert error'>Erreur de connexion à la base de données.</div>";
     exit;
 }
+ensureUserProfileColumns($db);
 // Infos utilisateur
 try {
     $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE id = ?");
@@ -40,6 +41,24 @@ if (!$user) {
 
 $pageMessage = '';
 $departmentSyncNote = '';
+
+// Enregistrement ville + date d'anniversaire (tous rôles)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile_info'])) {
+    requireValidCSRF();
+    $ville = trim((string) ($_POST['ville'] ?? ''));
+    $dateNaissance = trim((string) ($_POST['date_naissance'] ?? ''));
+    $dateVal = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateNaissance) === 1) ? $dateNaissance : null;
+    try {
+        $db->prepare("UPDATE utilisateurs SET ville = ?, date_naissance = ? WHERE id = ?")
+           ->execute([$ville !== '' ? $ville : null, $dateVal, $user_id]);
+        $stmt = $db->prepare("SELECT * FROM utilisateurs WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $user = $stmt->fetch();
+        $pageMessage = "<div class='alert' style='background:#dff3e3;color:#1d6a39;padding:10px 14px;border-radius:8px;font-weight:700;'>Ville et date d'anniversaire enregistrées.</div>";
+    } catch (Exception $e) {
+        $pageMessage = "<div class='alert error'>Enregistrement impossible : " . htmlspecialchars($e->getMessage()) . "</div>";
+    }
+}
 
 if (($user['role'] ?? '') === 'etudiant') {
     ensureDepartmentsTable($db);
@@ -532,6 +551,27 @@ if (($user['role'] ?? '') === 'etudiant') {
         <?php endif; ?>
         <br>
         <strong>Onboarding débloqué :</strong> <?php echo !empty($user['onboarding_unlocked'] ?? 0) ? 'Oui' : 'Non'; ?><br>
+
+        <hr style="border:none;border-top:1px solid #e3ece5;margin:16px 0;">
+        <?php
+            $villeVal = (string) ($user['ville'] ?? '');
+            $naissanceVal = (string) ($user['date_naissance'] ?? '');
+            $langDefaut = function_exists('villeLangueDefaut') ? villeLangueDefaut($villeVal) : 'fr';
+        ?>
+        <form method="POST" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;">
+            <?php echo csrfField(); ?>
+            <input type="hidden" name="save_profile_info" value="1">
+            <div>
+                <label style="font-weight:700;color:#1d6f42;display:block;margin-bottom:6px;">Ville de résidence</label>
+                <input type="text" name="ville" value="<?php echo htmlspecialchars($villeVal); ?>" placeholder="Ex : Anvers, Bruxelles, Gand..." class="input-control" style="min-width:230px;">
+                <div style="font-size:0.8em;color:#7a8e82;margin-top:4px;">Langue par défaut du site : <strong><?php echo $langDefaut === 'nl' ? 'Néerlandais 🇳🇱' : 'Français 🇫🇷'; ?></strong></div>
+            </div>
+            <div>
+                <label style="font-weight:700;color:#1d6f42;display:block;margin-bottom:6px;">Date d'anniversaire 🎂</label>
+                <input type="date" name="date_naissance" value="<?php echo htmlspecialchars($naissanceVal); ?>" class="input-control">
+            </div>
+            <button type="submit" class="btn-primary">Enregistrer</button>
+        </form>
     </div>
     <?php if (($user['role'] ?? '') === 'etudiant'):
         $caisseOk   = ($progressionScores['quiz_caisse'] ?? 0) >= 8;
