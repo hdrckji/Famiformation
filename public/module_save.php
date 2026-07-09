@@ -145,8 +145,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0 && $nom !== '') {
             $existing = getModuleById($db, $id);
-            if ($existing && !empty($existing['is_locked']) && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
-                $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage requis, modification annulée.";
+            if ($existing && !empty($existing['is_locked'])) {
+                $_SESSION['module_flash'] = "❌ Module verrouillé : déverrouillez-le d'abord pour le modifier.";
             } else {
                 $iconImage = $existing['icon_image'] ?? null;
                 if (!empty($_POST['remove_icon_image'])) { $iconImage = null; }
@@ -176,8 +176,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'toggle') {
         $id = (int) ($_POST['id'] ?? 0);
         if ($id > 0) {
-            $db->prepare("UPDATE modules SET is_active = 1 - is_active WHERE id = ?")->execute([$id]);
-            $_SESSION['module_flash'] = "✅ Statut du module mis à jour.";
+            $module = getModuleById($db, $id);
+            if ($module && !empty($module['is_locked'])) {
+                $_SESSION['module_flash'] = "❌ Module verrouillé : déverrouillez-le d'abord pour changer son statut.";
+            } else {
+                $db->prepare("UPDATE modules SET is_active = 1 - is_active WHERE id = ?")->execute([$id]);
+                $_SESSION['module_flash'] = "✅ Statut du module mis à jour.";
+            }
         }
     } elseif ($action === 'content') {
         $id = (int) ($_POST['id'] ?? 0);
@@ -223,9 +228,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id > 0) {
             $module = getModuleById($db, $id);
             if ($module) {
-                $locked = !empty($module['is_locked']);
-                if ($locked && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
-                    $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage incorrect, suppression annulée.";
+                if (!empty($module['is_locked'])) {
+                    $_SESSION['module_flash'] = "❌ Module verrouillé : déverrouillez-le d'abord pour le supprimer.";
                 } else {
                     // Supprime aussi les éventuels sous-modules
                     $db->prepare("DELETE FROM modules WHERE id = ? OR parent_id = ?")->execute([$id, $id]);
@@ -336,7 +340,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $raw = $_POST['new_parent'] ?? '';
         $newParent = ($raw === '' || $raw === '0') ? null : (int) $raw;
         $m = $id > 0 ? getModuleById($db, $id) : null;
-        if ($m && $newParent !== $id) {
+        if ($m && !empty($m['is_locked'])) {
+            $_SESSION['module_flash'] = "❌ Module verrouillé : déverrouillez-le d'abord pour le déplacer.";
+        } elseif ($m && $newParent !== $id) {
             // Empêche les cycles : le nouveau parent ne doit pas être un descendant de $id
             $ok = true;
             if ($newParent !== null) {

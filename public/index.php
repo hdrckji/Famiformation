@@ -328,7 +328,7 @@ if (!empty($_SESSION['module_flash'])) {
         <?php endif; ?>
 
         <?php if ($role === 'admin' || $role === 'teamcoach'): ?>
-        <a href="https://student.famiformation.com" target="_blank" rel="noopener" class="tile tile-admin">
+        <a href="famijob/index.php" class="tile tile-admin">
             <div class="tile-media"><span class="tile-icon">💼</span></div>
             <div class="tile-title">Famijob</div>
             <div class="tile-desc"><?= t('Accéder à la plateforme Famijob (gestion des jobs étudiants).', 'Toegang tot het Famijob-platform (beheer van studentenjobs).') ?></div>

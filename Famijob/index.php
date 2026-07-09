@@ -5,7 +5,7 @@ verifierConnexion($db);
 // Contrôle d'accès : uniquement admin et teamcoach
 $role = isset($_SESSION['role']) ? $_SESSION['role'] : '';
 if (!in_array($role, ['admin', 'teamcoach'], true)) {
-    header('Location: ../public/index.php');
+    header('Location: ../index.php');
     exit();
 }
 

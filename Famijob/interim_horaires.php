@@ -12,7 +12,7 @@ if (!function_exists('fjhT')) {
 
 $role = getCurrentRole();
 if (!in_array($role, ['admin', 'teamcoach'], true)) {
-    header('Location: ../public/index.php');
+    header('Location: ../index.php');
     exit();
 }
 
@@ -103,7 +103,7 @@ if (!$isAdmin) {
 }
 
 $message = '';
-$pendingConfirm = null; // Confirmation "modale" en attente (mode par nom) : ['message','request_id','student_name']
+$pendingConfirm = null; // Confirmation "modale" en attente (par nom ET par liste) : ['message','request_id','student_name','student_id','matching_mode']
 
 $today = new DateTimeImmutable('today');
 $startMonday = $today->modify('monday this week');
@@ -710,8 +710,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $confirmAssign = isset($_POST['confirm_assign']);
 
-        // === Avertissements "soft" en mode par nom : on demande confirmation (modale Oui/Non) au lieu de bloquer/affecter ===
-        if ($matchingMode === 'name' && !$ambiguousName && $requestId > 0 && ($studentId > 0 || $isExternal) && !$confirmAssign) {
+        // === Avertissements "soft" (par nom ET par liste) : on demande confirmation (modale Oui/Non) au lieu de bloquer/affecter ===
+        if (!$ambiguousName && $requestId > 0 && ($studentId > 0 || $isExternal) && !$confirmAssign) {
             $confInfoStmt = $db->prepare('SELECT shift_date FROM interim_shift_requests WHERE id = ? LIMIT 1');
             $confInfoStmt->execute([$requestId]);
             $confShiftDate = (string) $confInfoStmt->fetchColumn();
@@ -779,6 +779,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ),
                     'request_id' => $requestId,
                     'student_name' => $studentName,
+                    'student_id' => $studentId,
+                    'matching_mode' => $matchingMode,
                 ];
             }
         }
@@ -915,8 +917,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $studentId,
                     (string) ($requestRow['shift_date'] ?? ''),
                 ]);
-                // En mode par nom, "deja affecte ce jour" est gere en amont par une confirmation (modale), pas un blocage.
-                if ($matchingMode !== 'name' && (int) $sameDayAssignmentStmt->fetchColumn() > 0) {
+                // "Deja affecte ce jour" est gere en amont par une confirmation (modale) dans les deux modes ;
+                // une fois confirme, on autorise l'affectation.
+                if (!$confirmAssign && (int) $sameDayAssignmentStmt->fetchColumn() > 0) {
                     throw new RuntimeException($rhBlockMessage);
                 }
 
@@ -1762,10 +1765,15 @@ foreach ($weekDays as $weekDay) {
                         <button type="button" class="btn btn-soft" onclick="document.getElementById('confirmModal').style.display='none';"><?php echo e(fjhT('Non', 'Nee')); ?></button>
                         <form method="POST" style="display:inline;">
                             <?php echo csrfField(); ?>
+                            <?php $confirmMode = (string) ($pendingConfirm['matching_mode'] ?? 'name'); ?>
                             <input type="hidden" name="assign_student" value="1">
                             <input type="hidden" name="request_id" value="<?php echo (int) $pendingConfirm['request_id']; ?>">
-                            <input type="hidden" name="matching_mode" value="name">
-                            <input type="hidden" name="student_name" value="<?php echo e($pendingConfirm['student_name']); ?>">
+                            <input type="hidden" name="matching_mode" value="<?php echo e($confirmMode); ?>">
+                            <?php if ($confirmMode === 'list'): ?>
+                                <input type="hidden" name="student_id" value="<?php echo (int) ($pendingConfirm['student_id'] ?? 0); ?>">
+                            <?php else: ?>
+                                <input type="hidden" name="student_name" value="<?php echo e($pendingConfirm['student_name']); ?>">
+                            <?php endif; ?>
                             <input type="hidden" name="confirm_assign" value="1">
                             <button type="submit" class="btn btn-primary"><?php echo e(fjhT('Oui, affecter', 'Ja, toewijzen')); ?></button>
                         </form>

@@ -9,6 +9,9 @@ RUN printf "upload_max_filesize=300M\npost_max_size=320M\nmemory_limit=512M\nmax
 # Copie le contenu de public/ dans la racine servie par FrankenPHP
 COPY public/ /app/public/
 
+# Copie l'app FamiJob comme sous-dossier de la racine web (accessible via /famijob/)
+COPY Famijob/ /app/public/famijob/
+
 # Configuration du serveur : port dynamique Railway + blocage des fichiers sensibles
 COPY Caddyfile /etc/frankenphp/Caddyfile
 
