@@ -386,8 +386,16 @@ if (!function_exists('ensureModulesTable')) {
             $profs = moduleProfiles($db);
             $label = $profs[$key] ?? $key;
         }
-        return '<div style="position:sticky; top:0; z-index:5000; background:#2d5a37; color:#fff; padding:10px 16px; text-align:center; font-weight:700; box-shadow:0 2px 10px rgba(0,0,0,0.3);">'
-            . '👁 Aperçu du profil : ' . htmlspecialchars($label) . ' — vous voyez le site comme cet utilisateur (navigation seule).'
+        $flash = '';
+        if (!empty($_SESSION['apercu_flash'])) {
+            $flash = '<div style="position:sticky; top:0; z-index:5001; background:#a13e35; color:#fff; padding:8px 16px; text-align:center; font-weight:700;">'
+                . htmlspecialchars((string) $_SESSION['apercu_flash'])
+                . '</div>';
+            unset($_SESSION['apercu_flash']);
+        }
+        return $flash
+            . '<div style="position:sticky; top:0; z-index:5000; background:#2d5a37; color:#fff; padding:10px 16px; text-align:center; font-weight:700; box-shadow:0 2px 10px rgba(0,0,0,0.3);">'
+            . '👁 Aperçu du profil : ' . htmlspecialchars($label) . ' — vous voyez le site comme cet utilisateur (lecture seule, aucune action n\'est enregistrée).'
             . ' <a href="apercu.php?exit=1" style="color:#fff; text-decoration:underline; margin-left:12px;">Quitter l\'aperçu</a>'
             . '</div>';
     }

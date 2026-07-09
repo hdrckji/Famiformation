@@ -45,6 +45,20 @@ if (!function_exists('validateCSRF')) {
 if (!function_exists('requireValidCSRF')) {
     function requireValidCSRF()
     {
+        // Mode aperçu (admin prévisualisant un profil) : lecture seule.
+        // Aucune écriture n'est autorisée tant que l'aperçu est actif.
+        if (!empty($_SESSION['apercu_role']) && (($_SESSION['role'] ?? '') === 'admin')) {
+            $_SESSION['apercu_flash'] = "Action ignorée : vous êtes en mode aperçu (lecture seule). Rien n'a été enregistré.";
+            $back = 'index.php';
+            $ref = $_SERVER['HTTP_REFERER'] ?? '';
+            $host = $_SERVER['HTTP_HOST'] ?? '';
+            if ($ref !== '' && $host !== '' && parse_url($ref, PHP_URL_HOST) === $host) {
+                $back = $ref;
+            }
+            header('Location: ' . $back);
+            exit;
+        }
+
         if (!validateCSRF()) {
             http_response_code(403);
             exit('Jeton CSRF invalide.');
