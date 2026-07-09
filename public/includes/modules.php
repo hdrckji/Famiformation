@@ -389,6 +389,35 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('seed_deep_tree_v1');
             }
+
+            // 12) « Caisses » (sous Magasin) : même structure que Formation Caisse
+            //     (conteneur + 4 éléments).
+            if (!$hasFlag('seed_caisses_children_v1')) {
+                $magasinId = (int) $db->query("SELECT id FROM modules WHERE nom = 'Magasin' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($magasinId > 0) {
+                    $selCaisses = $db->prepare("SELECT id FROM modules WHERE nom = 'Caisses' AND parent_id = ? ORDER BY id ASC LIMIT 1");
+                    $selCaisses->execute([$magasinId]);
+                    $caissesId = (int) $selCaisses->fetchColumn();
+                    if ($caissesId > 0) {
+                        $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?")->execute([$caissesId]);
+                        $caissesChildren = [
+                            ['Support PDF', '📄', 'view-pdf.php'],
+                            ['Vidéo Tutoriel', '🎥', 'caisse.php'],
+                            ['Module technique', '🔧', 'module-technique.php'],
+                            ['Mes 2 premières semaines en caisse', '🗓️', 'mes-2-premieres-semaines-caisse.php'],
+                        ];
+                        $chkCc = $db->prepare("SELECT COUNT(*) FROM modules WHERE nom = ? AND parent_id = ?");
+                        $insCc = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES (?, '', 0, ?, ?, '', 1, 0, ?)");
+                        foreach ($caissesChildren as $c) {
+                            $chkCc->execute([$c[0], $caissesId]);
+                            if ((int) $chkCc->fetchColumn() === 0) {
+                                $insCc->execute([$c[0], $caissesId, $c[1], $c[2]]);
+                            }
+                        }
+                    }
+                }
+                $setFlag('seed_caisses_children_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
