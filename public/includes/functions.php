@@ -96,6 +96,71 @@ if (!function_exists('verifierConnexion')) {
     }
 }
 
+if (!function_exists('ensureUserProfileColumns')) {
+    /**
+     * Ajoute (une fois) les colonnes de profil : ville, date de naissance,
+     * date du dernier souhait d'anniversaire (pour ne souhaiter qu'une fois par an).
+     */
+    function ensureUserProfileColumns(PDO $db)
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        try {
+            $cols = [];
+            foreach ($db->query("SHOW COLUMNS FROM utilisateurs")->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                $cols[(string) ($c['Field'] ?? '')] = true;
+            }
+            if (!isset($cols['ville'])) {
+                $db->exec("ALTER TABLE utilisateurs ADD COLUMN ville VARCHAR(120) NULL");
+            }
+            if (!isset($cols['date_naissance'])) {
+                $db->exec("ALTER TABLE utilisateurs ADD COLUMN date_naissance DATE NULL");
+            }
+            if (!isset($cols['last_birthday_wish'])) {
+                $db->exec("ALTER TABLE utilisateurs ADD COLUMN last_birthday_wish DATE NULL");
+            }
+        } catch (Exception $e) {
+            // migration non critique
+        }
+    }
+}
+
+if (!function_exists('villeLangueDefaut')) {
+    /**
+     * Déduit la langue par défaut ('nl' ou 'fr') à partir de la ville de résidence.
+     * Villes flamandes connues -> néerlandais, sinon français.
+     */
+    function villeLangueDefaut($ville)
+    {
+        $ville = strtolower(trim((string) $ville));
+        if ($ville === '') {
+            return 'fr';
+        }
+        // Normalise (retire accents/espaces multiples)
+        $ville = preg_replace('/\s+/', ' ', $ville);
+        $flamandes = [
+            'anvers', 'antwerpen', 'gand', 'gent', 'bruges', 'brugge', 'louvain', 'leuven',
+            'malines', 'mechelen', 'hasselt', 'courtrai', 'kortrijk', 'ostende', 'oostende',
+            'alost', 'aalst', 'genk', 'roulers', 'roeselare', 'termonde', 'dendermonde',
+            'saint-nicolas', 'sint-niklaas', 'turnhout', 'ypres', 'ieper', 'furnes', 'veurne',
+            'tirlemont', 'tienen', 'lokeren', 'geel', 'mol', 'vilvorde', 'vilvoorde',
+            'hal', 'halle', 'grammont', 'geraardsbergen', 'audenarde', 'oudenaarde',
+            'diest', 'lierre', 'lier', 'beringen', 'dilbeek', 'brasschaat', 'schoten',
+            'knokke', 'knokke-heist', 'waregem', 'menin', 'menen', 'deinze', 'evergem',
+            'lommel', 'maaseik', 'tongres', 'tongeren', 'zele', 'wevelgem',
+        ];
+        foreach ($flamandes as $f) {
+            if ($ville === $f || strpos($ville, $f) !== false) {
+                return 'nl';
+            }
+        }
+        return 'fr';
+    }
+}
+
 if (!function_exists('isAdmin')) {
     function isAdmin()
     {
