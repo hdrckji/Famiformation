@@ -265,6 +265,35 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('seed_full_tree_v1');
             }
+
+            // 10) Niveau 3 : sous-modules de « Formation Caisse » (page = conteneur propre).
+            //     PDF et vidéo restent 2 éléments distincts pour l'instant (règle PDF/vidéo à venir).
+            if (!$hasFlag('seed_formation_caisse_children_v1')) {
+                $fcParents = $db->query("SELECT id FROM modules WHERE nom = 'Formation Caisse'")->fetchAll(PDO::FETCH_COLUMN);
+                $fcChildren = [
+                    ['Support PDF', '📄', 'view-pdf.php'],
+                    ['Vidéo Tutoriel', '🎥', 'caisse.php'],
+                    ['Module technique', '🔧', 'module-technique.php'],
+                    ['Mes 2 premières semaines en caisse', '🗓️', 'mes-2-premieres-semaines-caisse.php'],
+                ];
+                $chkFcc = $db->prepare("SELECT COUNT(*) FROM modules WHERE nom = ? AND parent_id = ?");
+                $insFcc = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES (?, '', 0, ?, ?, '', 1, 0, ?)");
+                $setFccContainer = $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?");
+                foreach ($fcParents as $fcParentId) {
+                    $fcParentId = (int) $fcParentId;
+                    if ($fcParentId <= 0) {
+                        continue;
+                    }
+                    $setFccContainer->execute([$fcParentId]);
+                    foreach ($fcChildren as $c) {
+                        $chkFcc->execute([$c[0], $fcParentId]);
+                        if ((int) $chkFcc->fetchColumn() === 0) {
+                            $insFcc->execute([$c[0], $fcParentId, $c[1], $c[2]]);
+                        }
+                    }
+                }
+                $setFlag('seed_formation_caisse_children_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
