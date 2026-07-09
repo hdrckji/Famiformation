@@ -183,6 +183,17 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('seed_formation_children_v1');
             }
+
+            // 8) Suppression du module « Aide » (inutile). Ses éventuels sous-modules
+            //    (ex : Magasin) sont remontés à la racine pour ne pas les perdre.
+            if (!$hasFlag('remove_aide_v1')) {
+                $aideId = (int) $db->query("SELECT id FROM modules WHERE nom = 'Aide' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($aideId > 0) {
+                    $db->prepare("UPDATE modules SET parent_id = NULL WHERE parent_id = ?")->execute([$aideId]);
+                    $db->prepare("DELETE FROM modules WHERE id = ?")->execute([$aideId]);
+                }
+                $setFlag('remove_aide_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }

@@ -210,10 +210,6 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <h2 style="margin:0; color:#2d5a37;">Modules</h2>
                 <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer un module</button>
             </div>
-            <div style="display:flex; gap:8px; margin-top:14px;">
-                <button type="button" class="btn btn-light" style="padding:6px 12px; font-size:0.85rem;" onclick="expandAllModules()">▾ Tout déplier</button>
-                <button type="button" class="btn btn-light" style="padding:6px 12px; font-size:0.85rem;" onclick="collapseAllModules()">▸ Tout replier</button>
-            </div>
             <table>
                 <thead>
                     <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
