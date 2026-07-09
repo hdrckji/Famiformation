@@ -376,9 +376,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e3ece5; padding-bottom:6px;">
                             <span style="font-weight:800; color:#2d5a37;"><?= htmlspecialchars($lbl) ?></span>
                             <span style="display:flex; gap:5px;">
-                                <?php if (!in_array($key, ['admin', 'evaluateur', 'agence_interim'], true)): ?>
-                                    <a href="apercu.php?role=<?= urlencode($key) ?>&back=<?= urlencode('parametres.php#histprofil') ?>" title="Voir le site comme ce profil" style="text-decoration:none; font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; color:#2d5a37;">👁</a>
-                                <?php endif; ?>
+                                <a href="apercu.php?role=<?= urlencode($key) ?>&back=<?= urlencode('parametres.php#histprofil') ?>" title="Voir ce que ce profil voit en se connectant" style="text-decoration:none; font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; color:#2d5a37;">👁</a>
                                 <?php if (!$reorderUnlocked): ?>
                                     <button type="button" title="Modifier l'ordre" onclick="askPassword('unlock_reorder', 0)" style="font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; background:#fff; cursor:pointer;">🖐</button>
                                 <?php endif; ?>

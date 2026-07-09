@@ -33,9 +33,10 @@ if (isset($_GET['exit'])) {
 
 $role = trim((string) ($_GET['role'] ?? ''));
 $valides = array_keys(moduleProfiles($db));
-// On ne prévisualise pas les rôles à redirection spéciale (agence intérim, évaluateur)
-$exclus = ['agence_interim', 'evaluateur', 'admin'];
-if ($role !== '' && in_array($role, $valides, true) && !in_array($role, $exclus, true)) {
+// Tous les profils sont prévisualisables. Les rôles à page d'arrivée spéciale
+// (évaluateur → evaluation.php, agence intérim → interim_horaires.php) affichent
+// aussi la bannière d'aperçu pour pouvoir en sortir.
+if ($role !== '' && in_array($role, $valides, true)) {
     $_SESSION['apercu_role'] = $role;
     // Mémorise la page de lancement pour y revenir en quittant l'aperçu.
     $back = $_GET['back'] ?? ($_SERVER['HTTP_REFERER'] ?? '');

@@ -1231,6 +1231,7 @@ foreach ($weekDays as $weekDay) {
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/modules.php'; echo apercuBanner($db ?? null); ?>
     <div class="page">
         <section class="hero">
             <div class="hero-top">
