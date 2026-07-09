@@ -177,7 +177,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </div>
             <table>
                 <thead>
-                    <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Verrou</th><th>Actions</th></tr>
+                    <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); ?>
@@ -193,28 +193,24 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         </td>
                         <td><?= !empty($m['is_container']) ? 'Conteneur' : 'Contenu' ?></td>
                         <td>
-                            <form method="POST" action="module_save.php" style="display:inline-block;">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="action" value="module_move">
-                                <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
-                                <input type="hidden" name="return" value="parametres.php">
-                                <button type="submit" name="dir" value="up" class="btn btn-light" style="padding:3px 8px;" title="Monter">↑</button>
-                                <button type="submit" name="dir" value="down" class="btn btn-light" style="padding:3px 8px;" title="Descendre">↓</button>
-                            </form>
-                            <form method="POST" action="module_save.php" style="display:flex; gap:4px; margin-top:5px;">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="action" value="module_reparent">
-                                <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
-                                <input type="hidden" name="return" value="parametres.php">
-                                <select name="new_parent" style="max-width:150px; padding:5px; border:1px solid #ccc; border-radius:6px; font-size:0.82rem;">
-                                    <option value="0" <?= empty($m['parent_id']) ? 'selected' : '' ?>>— Racine —</option>
-                                    <?php foreach ($orderedModules as $cand): ?>
-                                        <?php if ((int) $cand['id'] === (int) $m['id']) { continue; } ?>
-                                        <option value="<?= (int) $cand['id'] ?>" <?= ((int) ($m['parent_id'] ?? 0) === (int) $cand['id']) ? 'selected' : '' ?>><?= str_repeat('— ', (int) ($cand['_depth'] ?? 0)) . htmlspecialchars($cand['nom']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <button type="submit" class="btn btn-light" style="padding:3px 8px;" title="Déplacer dans ce module">→</button>
-                            </form>
+                            <?php if (!empty($m['is_locked'])): ?>
+                                <span class="muted">—</span>
+                            <?php else: ?>
+                                <form method="POST" action="module_save.php" style="display:flex; gap:4px;">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="action" value="module_reparent">
+                                    <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
+                                    <input type="hidden" name="return" value="parametres.php">
+                                    <select name="new_parent" style="max-width:150px; padding:5px; border:1px solid #ccc; border-radius:6px; font-size:0.82rem;">
+                                        <option value="0" <?= empty($m['parent_id']) ? 'selected' : '' ?>>— Racine —</option>
+                                        <?php foreach ($orderedModules as $cand): ?>
+                                            <?php if ((int) $cand['id'] === (int) $m['id']) { continue; } ?>
+                                            <option value="<?= (int) $cand['id'] ?>" <?= ((int) ($m['parent_id'] ?? 0) === (int) $cand['id']) ? 'selected' : '' ?>><?= str_repeat('— ', (int) ($cand['_depth'] ?? 0)) . htmlspecialchars($cand['nom']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <button type="submit" class="btn btn-light" style="padding:3px 10px;" title="Valider le déplacement">➜</button>
+                                </form>
+                            <?php endif; ?>
                         </td>
                         <td><?= htmlspecialchars(rolesLabel($m, $profiles)) ?></td>
                         <td>
@@ -222,24 +218,17 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         </td>
                         <td>
                             <?php if (!empty($m['is_locked'])): ?>
-                                <button type="button" class="btn" style="background:#fde8c8; color:#8a5a00;" title="Verrouillé — cliquer pour déverrouiller (mot de passe requis)" onclick="askPassword('toggle_lock', <?= (int) $m['id'] ?>)">🔒 Verrouillé</button>
+                                <span class="muted" title="Module verrouillé : déverrouillez-le pour agir">—</span>
                             <?php else: ?>
-                                <button type="button" class="btn btn-light" title="Déverrouillé — cliquer pour verrouiller (mot de passe requis)" onclick="askPassword('toggle_lock', <?= (int) $m['id'] ?>)">🔓 Déverrouillé</button>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <div class="row-actions">
-                                <button type="button" class="btn btn-light" onclick="openModal('editModal_<?= (int) $m['id'] ?>')">✏️</button>
-                                <form method="POST" action="module_save.php" style="display:inline;">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="action" value="toggle">
-                                    <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
-                                    <input type="hidden" name="return" value="parametres.php">
-                                    <button type="submit" class="btn btn-light" title="Activer / Désactiver"><?= (int) $m['is_active'] === 1 ? '⏸' : '▶' ?></button>
-                                </form>
-                                <?php if (!empty($m['is_locked'])): ?>
-                                    <button type="button" class="btn btn-danger" onclick="askPassword('delete', <?= (int) $m['id'] ?>)" title="Supprimer (verrouillé)">🗑</button>
-                                <?php else: ?>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-light" onclick="openModal('editModal_<?= (int) $m['id'] ?>')" title="Modifier">✏️</button>
+                                    <form method="POST" action="module_save.php" style="display:inline;">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="action" value="toggle">
+                                        <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
+                                        <input type="hidden" name="return" value="parametres.php">
+                                        <button type="submit" class="btn btn-light" title="Activer / Désactiver"><?= (int) $m['is_active'] === 1 ? '⏸' : '▶' ?></button>
+                                    </form>
                                     <form method="POST" action="module_save.php" style="display:inline;" onsubmit="return confirm('Supprimer définitivement ce module (et ses sous-modules) ?');">
                                         <?= csrfField() ?>
                                         <input type="hidden" name="action" value="delete">
@@ -247,8 +236,15 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                                         <input type="hidden" name="return" value="parametres.php">
                                         <button type="submit" class="btn btn-danger" title="Supprimer">🗑</button>
                                     </form>
-                                <?php endif; ?>
-                            </div>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+                        <td style="text-align:right;">
+                            <?php if (!empty($m['is_locked'])): ?>
+                                <button type="button" class="btn" style="background:#fde8c8; color:#8a5a00; padding:6px 10px;" title="Verrouillé — cliquer pour déverrouiller (mot de passe requis)" onclick="askPassword('toggle_lock', <?= (int) $m['id'] ?>)">🔒</button>
+                            <?php else: ?>
+                                <button type="button" class="btn btn-light" style="padding:6px 10px;" title="Déverrouillé — cliquer pour verrouiller (mot de passe requis)" onclick="askPassword('toggle_lock', <?= (int) $m['id'] ?>)">🔓</button>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
