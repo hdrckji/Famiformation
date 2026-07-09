@@ -53,7 +53,7 @@ function flattenModules(array $byParent, $parentId, $depth, array &$out)
  * - À la racine : on filtre par accès ($checkVisibility).
  * - Dans les sous-modules : tout est hérité (comme sur le site), donc pas de re-filtre.
  */
-function renderProfileModuleTree(array $byParent, $parentId, $profileKey, $depth, $checkVisibility)
+function renderProfileModuleTree(array $byParent, $parentId, $profileKey, $depth, $checkVisibility, $reorderUnlocked = false)
 {
     if (empty($byParent[$parentId])) {
         return '';
@@ -68,12 +68,28 @@ function renderProfileModuleTree(array $byParent, $parentId, $profileKey, $depth
         }
         $pad = 6 + $depth * 20;
         $icon = function_exists('moduleIcon') ? moduleIcon($mod) : '📄';
+
+        // Flèches de réorganisation (uniquement à la racine, quand le mode est déverrouillé)
+        $reorderBtns = '';
+        if ($reorderUnlocked && $depth === 0) {
+            $btn = 'border:1px solid #cdd8d0; background:#fff; border-radius:5px; cursor:pointer; padding:0 6px; font-size:0.8rem;';
+            $reorderBtns = '<form method="POST" action="module_save.php" style="display:inline-block; margin-right:6px;">'
+                . csrfField()
+                . '<input type="hidden" name="action" value="module_move">'
+                . '<input type="hidden" name="id" value="' . (int) $mod['id'] . '">'
+                . '<input type="hidden" name="return" value="parametres.php#histprofil">'
+                . '<button type="submit" name="dir" value="up" title="Monter" style="' . $btn . '">↑</button>'
+                . '<button type="submit" name="dir" value="down" title="Descendre" style="' . $btn . '">↓</button>'
+                . '</form>';
+        }
+
         $html .= '<div style="padding:3px 0 3px ' . $pad . 'px;">'
+            . $reorderBtns
             . ($depth > 0 ? '<span style="color:#9bb3a3;">↳ </span>' : '')
             . '<span>' . $icon . '</span> '
             . '<span style="font-weight:' . ($depth === 0 ? '700' : '600') . '; color:#244230;">' . htmlspecialchars($mod['nom']) . '</span>'
             . '</div>';
-        $html .= renderProfileModuleTree($byParent, (int) $mod['id'], $profileKey, $depth + 1, false);
+        $html .= renderProfileModuleTree($byParent, (int) $mod['id'], $profileKey, $depth + 1, false, $reorderUnlocked);
     }
     return $html;
 }
@@ -339,14 +355,34 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </table>
         </div>
 
+        <?php $reorderUnlocked = !empty($_SESSION['reorder_unlocked']); ?>
         <div class="card" style="margin-top:20px;">
-            <h2 style="margin-top:0; color:#2d5a37;">Accès aux modules par profil</h2>
-            <p class="muted">Aperçu (lecture seule) de l'arborescence des modules vue par chaque profil, pour vérifier. Pour modifier un accès, ouvrez le module dans « Gestion des modules ». Admin et Teamcoach voient tous les modules.</p>
-            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0; color:#2d5a37;">Accès aux modules par profil</h2>
+                <?php if ($reorderUnlocked): ?>
+                    <form method="POST" action="module_save.php" style="display:inline;">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="lock_reorder">
+                        <button type="submit" class="btn btn-primary">✅ Terminer la réorganisation</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+            <p class="muted">Arborescence des modules vue par chaque profil. <strong>👁</strong> = voir le site comme ce profil. <strong>🖐</strong> = modifier l'ordre (mot de passe). Admin et Teamcoach voient tous les modules.</p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
                 <?php foreach ($profiles as $key => $lbl): ?>
-                    <?php $tree = renderProfileModuleTree($byParent, 0, $key, 0, true); ?>
+                    <?php $tree = renderProfileModuleTree($byParent, 0, $key, 0, true, $reorderUnlocked); ?>
                     <div style="border:1px solid #e3ece5; border-radius:12px; padding:14px; background:#fafcfb;">
-                        <div style="font-weight:800; color:#2d5a37; margin-bottom:8px; border-bottom:1px solid #e3ece5; padding-bottom:6px;"><?= htmlspecialchars($lbl) ?></div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e3ece5; padding-bottom:6px;">
+                            <span style="font-weight:800; color:#2d5a37;"><?= htmlspecialchars($lbl) ?></span>
+                            <span style="display:flex; gap:5px;">
+                                <?php if (!in_array($key, ['admin', 'evaluateur', 'agence_interim'], true)): ?>
+                                    <a href="apercu.php?role=<?= urlencode($key) ?>" title="Voir le site comme ce profil" style="text-decoration:none; font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; color:#2d5a37;">👁</a>
+                                <?php endif; ?>
+                                <?php if (!$reorderUnlocked): ?>
+                                    <button type="button" title="Modifier l'ordre" onclick="askPassword('unlock_reorder', 0)" style="font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; background:#fff; cursor:pointer;">🖐</button>
+                                <?php endif; ?>
+                            </span>
+                        </div>
                         <?= $tree !== '' ? $tree : '<div class="muted">Aucun module.</div>' ?>
                     </div>
                 <?php endforeach; ?>
@@ -440,7 +476,8 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             'delete': 'Supprimer ce module verrouillé',
             'toggle_lock': 'Verrouiller / déverrouiller le module',
             'delete_profile': 'Supprimer ce profil verrouillé',
-            'toggle_lock_profile': 'Verrouiller / déverrouiller le profil'
+            'toggle_lock_profile': 'Verrouiller / déverrouiller le profil',
+            'unlock_reorder': "Modifier l'ordre des modules"
         };
         document.getElementById('pwdTitle').textContent = titles[action] || 'Confirmation';
         document.getElementById('pwdInput').value = '';
@@ -460,6 +497,17 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         if (wrap) { wrap.querySelectorAll('.icon-opt').forEach(function (b) { b.classList.remove('sel'); }); }
         btn.classList.add('sel');
     }
+    // Rouvre l'onglet indiqué par le hash (#histprofil) après un rechargement (réorganisation)
+    document.addEventListener('DOMContentLoaded', function () {
+        var name = (location.hash || '').replace('#', '');
+        if (!name) { return; }
+        var target = null;
+        document.querySelectorAll('.tab-btn').forEach(function (b) {
+            var oc = b.getAttribute('onclick') || '';
+            if (oc.indexOf("'" + name + "'") !== -1) { target = b; }
+        });
+        if (target) { showTab(name, target); }
+    });
 </script>
 </body>
 </html>

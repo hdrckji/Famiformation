@@ -329,7 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['module_flash'] = "✅ Ordre mis à jour.";
             }
         }
-        $redirectTo = 'parametres.php';
+        $redirectTo = safeReturn($_POST['return'] ?? '', 'parametres.php');
     } elseif ($action === 'module_reparent') {
         // Déplace un module dans un autre (ou à la racine)
         $id = (int) ($_POST['id'] ?? 0);
@@ -361,6 +361,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $redirectTo = 'parametres.php';
+    } elseif ($action === 'unlock_reorder') {
+        // Déverrouille le mode réorganisation (flèches) avec le mot de passe unique
+        if (adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+            $_SESSION['reorder_unlocked'] = 1;
+            $_SESSION['module_flash'] = "🖐 Mode réorganisation activé — utilisez les flèches, puis « Terminer ».";
+        } else {
+            $_SESSION['module_flash'] = "❌ Mot de passe de verrouillage incorrect.";
+        }
+        $redirectTo = 'parametres.php#histprofil';
+    } elseif ($action === 'lock_reorder') {
+        unset($_SESSION['reorder_unlocked']);
+        $_SESSION['module_flash'] = "✅ Réorganisation terminée.";
+        $redirectTo = 'parametres.php#histprofil';
     }
 }
 

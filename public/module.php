@@ -3,7 +3,8 @@ require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
 
-$isAdmin = (($_SESSION['role'] ?? '') === 'admin');
+// En mode aperçu, l'admin voit la page comme l'utilisateur (boutons admin masqués)
+$isAdmin = ((($_SESSION['role'] ?? '') === 'admin') && !isApercuActif());
 
 $moduleId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $module = $moduleId > 0 ? getModuleById($db, $moduleId) : null;
@@ -81,6 +82,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
     </style>
 </head>
 <body>
+    <?= apercuBanner($db) ?>
     <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main"><br>

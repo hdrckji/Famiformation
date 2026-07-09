@@ -353,6 +353,46 @@ if (!function_exists('ensureModulesTable')) {
     }
 
     /**
+     * Un aperçu de profil est-il actif ? (réservé à un admin qui prévisualise un autre profil)
+     */
+    function isApercuActif()
+    {
+        return !empty($_SESSION['apercu_role']) && (($_SESSION['role'] ?? '') === 'admin');
+    }
+
+    /**
+     * Rôle à utiliser pour l'AFFICHAGE uniquement (tuiles, visibilité des modules).
+     * Ne modifie JAMAIS le rôle réel utilisé pour le contrôle d'accès.
+     */
+    function currentDisplayRole()
+    {
+        if (isApercuActif()) {
+            return $_SESSION['apercu_role'];
+        }
+        return $_SESSION['role'] ?? 'etudiant';
+    }
+
+    /**
+     * Bannière d'aperçu (sticky) affichée en haut des pages quand l'aperçu est actif.
+     */
+    function apercuBanner(PDO $db = null)
+    {
+        if (!isApercuActif()) {
+            return '';
+        }
+        $key = (string) $_SESSION['apercu_role'];
+        $label = $key;
+        if ($db instanceof PDO) {
+            $profs = moduleProfiles($db);
+            $label = $profs[$key] ?? $key;
+        }
+        return '<div style="position:sticky; top:0; z-index:5000; background:#2d5a37; color:#fff; padding:10px 16px; text-align:center; font-weight:700; box-shadow:0 2px 10px rgba(0,0,0,0.3);">'
+            . '👁 Aperçu du profil : ' . htmlspecialchars($label) . ' — vous voyez le site comme cet utilisateur (navigation seule).'
+            . ' <a href="apercu.php?exit=1" style="color:#fff; text-decoration:underline; margin-left:12px;">Quitter l\'aperçu</a>'
+            . '</div>';
+    }
+
+    /**
      * Récupère les modules d'un niveau donné (NULL = niveau racine).
      */
     function getModules(PDO $db, $parentId = null, $onlyActive = true)

@@ -4,7 +4,7 @@ verifierConnexion($db);
 require_once 'includes/quizz_status.php';
 require_once 'includes/modules.php';
 
-$role = isset($_SESSION['role']) ? $_SESSION['role'] : 'etudiant';
+$role = currentDisplayRole(); // rôle d'AFFICHAGE (tient compte de l'aperçu admin), pas le rôle réel
 if ($role === 'agence_interim') {
     header('Location: interim_horaires.php');
     exit();
@@ -195,6 +195,7 @@ if (!empty($_SESSION['module_flash'])) {
     </style>
 </head>
 <body>
+    <?= apercuBanner($db) ?>
 
     <div class="top-nav">
         <?php
