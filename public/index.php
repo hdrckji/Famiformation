@@ -21,7 +21,7 @@ ensureUserProfileColumns($db);
 // --- LOGIQUE DE NOTIFICATION NEW ---
 $nouvelles_formations = 0;
 try {
-    $stmt = $db->prepare("SELECT derniere_visite, nom, prenom, photo_profil, date_naissance, last_birthday_wish FROM utilisateurs WHERE id = ?");
+    $stmt = $db->prepare("SELECT derniere_visite, nom, prenom, photo_profil, date_naissance, last_birthday_wish, welcome_seen FROM utilisateurs WHERE id = ?");
     $stmt->execute([$user_id]);
     $user_data = $stmt->fetch();
     $derniere_visite = ($user_data && $user_data['derniere_visite']) ? $user_data['derniere_visite'] : '2000-01-01 00:00:00';
@@ -64,17 +64,26 @@ if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
     }
 }
 
-// --- Thème événementiel (Noël, Pâques, Halloween, 11 novembre...) ---
-$siteTheme = activeSiteTheme($db);
-// Aperçu admin : index.php?theme=noel (ou ?theme=off pour désactiver)
-if (($_SESSION['role'] ?? '') === 'admin' && isset($_GET['theme'])) {
-    $themeCatalog = siteThemeCatalog();
-    $themeKey = (string) $_GET['theme'];
-    if (isset($themeCatalog[$themeKey])) {
-        $siteTheme = ['key' => $themeKey] + $themeCatalog[$themeKey];
-    } elseif ($themeKey === 'off') {
-        $siteTheme = null;
+// --- Message de bienvenue (toute première connexion de l'utilisateur) ---
+$showWelcome = false;
+if (isset($user_data['welcome_seen']) && (int) $user_data['welcome_seen'] === 0) {
+    $showWelcome = true;
+    try {
+        $db->prepare("UPDATE utilisateurs SET welcome_seen = 1 WHERE id = ?")->execute([$user_id]);
+    } catch (Exception $e) {
+        // pas critique
     }
+}
+$welcomeName = ucfirst(strtolower((string) ($user_data['prenom'] ?? '')));
+
+// --- Thème (calculé globalement dans config.php : événement / anniversaire / aperçu admin) ---
+$siteTheme = $GLOBALS['__fami_page_theme'] ?? null;
+// Message de fête pour le widget (alterne avec les phrases) — sauf anniversaire (bandeau dédié).
+$festiveMsg = null;
+if (!$isBirthday && $siteTheme && !empty($siteTheme['nom'])) {
+    $festiveMsg = is_array($siteTheme['nom'])
+        ? (currentLang() === 'nl' ? ($siteTheme['nom'][1] ?? $siteTheme['nom'][0]) : $siteTheme['nom'][0])
+        : (string) $siteTheme['nom'];
 }
 
 $caisse_valid = false;
@@ -246,7 +255,42 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 @keyframes bdGold { to { background-position:200% center; } }
 </style>
 <?php endif; ?>
-<?php if ($birthdayFirstOpen): ?>
+<?php if ($showWelcome): ?>
+<div id="wcOverlay" class="wc-overlay" onclick="this.classList.add('wc-hide')">
+    <div class="wc-fx"></div>
+    <div class="wc-card">
+        <div class="wc-logo">🌿</div>
+        <div class="wc-hi"><?php echo t('Bienvenue', 'Welkom'); ?></div>
+        <div class="wc-name"><?php echo htmlspecialchars($welcomeName); ?></div>
+        <div class="wc-sub"><?php echo t('Ravis de t\'accueillir chez Famiflora. Prends le temps de découvrir ton espace 🌱', 'Fijn dat je er bent bij Famiflora. Ontdek rustig jouw ruimte 🌱'); ?></div>
+        <div class="wc-cta"><?php echo t('Clique pour commencer', 'Klik om te beginnen'); ?></div>
+    </div>
+</div>
+<style>
+.wc-overlay { position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 30%, #2d5a37, #123020 75%); overflow:hidden; cursor:pointer; transition:opacity .8s ease; }
+.wc-overlay.wc-hide { opacity:0; pointer-events:none; }
+.wc-card { position:relative; z-index:2; text-align:center; color:#fff; padding:24px; animation:wcIn 1s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes wcIn { from { opacity:0; transform:scale(.9) translateY(24px); } to { opacity:1; transform:none; } }
+.wc-logo { font-size:4.6rem; margin-bottom:6px; animation:wcFloat 2.4s ease-in-out infinite; }
+@keyframes wcFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-12px); } }
+.wc-hi { font-size:1.5rem; letter-spacing:3px; text-transform:uppercase; color:#bfe6cc; font-weight:700; }
+.wc-name { font-size:3rem; font-weight:800; margin-top:2px; text-shadow:0 4px 24px rgba(0,0,0,.4); }
+.wc-sub { margin-top:16px; font-size:1.05rem; color:#dcefe2; max-width:540px; margin-left:auto; margin-right:auto; line-height:1.55; }
+.wc-cta { margin-top:30px; font-size:.8rem; letter-spacing:2px; text-transform:uppercase; color:#9ccbac; }
+.wc-fx { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.wc-leaf { position:absolute; top:-30px; opacity:.85; animation:wcFall linear infinite; }
+@keyframes wcFall { to { transform:translateY(112vh) rotate(360deg); } }
+</style>
+<script>
+(function(){
+  var ov=document.getElementById('wcOverlay'); if(!ov){return;}
+  var fx=ov.querySelector('.wc-fx'); var leaves=['🌿','🍃','🌱','✨'];
+  for(var i=0;i<26;i++){var s=document.createElement('span');s.className='wc-leaf';s.textContent=leaves[i%leaves.length];s.style.left=(Math.random()*100)+'%';s.style.fontSize=(0.9+Math.random()*1.3)+'rem';s.style.animationDuration=(6+Math.random()*6)+'s';s.style.animationDelay=(Math.random()*7)+'s';fx.appendChild(s);}
+  setTimeout(function(){ov.classList.add('wc-hide');},7500);
+})();
+</script>
+<?php endif; ?>
+<?php if ($birthdayFirstOpen && !$showWelcome): ?>
 <div id="bdOverlay" class="bd-overlay" onclick="this.classList.add('bd-hide')">
     <div class="bd-confetti"></div>
     <div class="bd-card">
@@ -308,7 +352,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         </a>
 
         <?php if (userSeesWidget($db, $role)): ?>
-            <?= renderWidget($db, $isBirthday ? $birthdayName : null) ?>
+            <?= renderWidget($db, $isBirthday ? $birthdayName : null, $festiveMsg) ?>
         <?php endif; ?>
 
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">

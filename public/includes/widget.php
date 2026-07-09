@@ -556,7 +556,7 @@ BLAGUES
      * Étape 1 : cadre + date (bas-droite) + emplacements météo (haut-gauche) et centre.
      * La météo, les horaires et les phrases qui défilent viendront aux étapes suivantes.
      */
-    function renderWidget(PDO $db, $birthdayName = null)
+    function renderWidget(PDO $db, $birthdayName = null, $festiveMessage = null)
     {
         $tt = function ($fr, $nl) {
             return function_exists('t') ? t($fr, $nl) : $fr;
@@ -621,6 +621,10 @@ BLAGUES
             $items = [$tt('Bienvenue chez Famiflora 🌿', 'Welkom bij Famiflora 🌿')];
         }
         $phrases = $items;
+        // Message de fête (thème événementiel) : alterne avec les phrases habituelles.
+        if (is_string($festiveMessage) && trim($festiveMessage) !== '') {
+            array_unshift($phrases, '🎉 ' . trim($festiveMessage));
+        }
         $phrasesAttr = htmlspecialchars(json_encode($phrases, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
         // Météo du site (lieu de travail) de l'utilisateur — Open-Meteo, mise en cache
         $site = userSite($db, $_SESSION['user_id'] ?? null);
