@@ -194,6 +194,77 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('remove_aide_v1');
             }
+
+            // 9) Reconstruit l'arborescence complète du site dans la gestion :
+            //    chaque conteneur de base reçoit ses sous-modules (tuiles codées en dur
+            //    des pages). Purement pour la gestion — n'affecte pas la navigation réelle.
+            if (!$hasFlag('seed_full_tree_v1')) {
+                // Répare d'abord les orphelins (parent supprimé) -> racine, pour retrouver les conteneurs.
+                $db->exec("UPDATE modules m LEFT JOIN modules p ON p.id = m.parent_id SET m.parent_id = NULL WHERE m.parent_id IS NOT NULL AND p.id IS NULL");
+
+                $tree = [
+                    'Onboarding' => [
+                        ["Livret d'accueil", '📖', 'view-pdf-onboarding.php'],
+                        ['Vidéo', '🎥', 'video-onboarding.php'],
+                    ],
+                    'Magasin' => [
+                        ['Caisses', '🛒', 'formation-caisse.php'],
+                        ['Formation ressources humaines', '👥', 'ressources_humaines.php'],
+                        ['Déco', '🛋️', 'deco.php'],
+                        ['Green', '🌿', 'green.php'],
+                        ['Animalerie', '🐾', 'animalerie.php'],
+                        ['Garden', '🏡', 'garden.php'],
+                        ['Food', '🍫', 'food.php'],
+                        ['Stock', '📦', 'stock.php'],
+                    ],
+                    'Management' => [
+                        ['Donner du feedback', '💬', 'feedback.php'],
+                        ['Formation Parrain/Marraine', '🤝', 'mentor.php'],
+                        ['Leadership', '🦸', 'leadership.php'],
+                        ['Gestion de la présence', '🗓️', 'presence_view.php'],
+                        ['Entretiens de collaboration', '🗣️', 'entretien.php'],
+                        ['Judo verbal', '🥋', 'judo.php'],
+                    ],
+                    'Becosoft' => [
+                        ['Recherche Article', '🔍', 'becosoft.php'],
+                        ['Commande Gazon', '🌱', 'beco_gazon.php'],
+                        ['Bon de Commande', '📜', 'beco_bon.php'],
+                        ['Vente Flash', '⚡', 'beco_flash.php'],
+                    ],
+                    'Logistique' => [
+                        ['Chariots Danois', '🪴', 'logistique_chariots.php'],
+                        ['Réception', '🚚', 'logistique-reception.php'],
+                        ['Transfert', '🔄', 'logistique-transfert.php'],
+                        ['Gerbeur', '🏗️', 'gerbeur.php'],
+                        ['Empileuse', '📚', 'logistique_empileuse.php'],
+                    ],
+                    'Sécurité au travail' => [
+                        ['Chaussure de sécurité', '👟', 'chaussure_securite_pdf.php'],
+                        ['Formation secourisme', '⛑️', 'formation_secourisme_pdf.php'],
+                    ],
+                ];
+
+                $findParent = $db->prepare("SELECT id FROM modules WHERE nom = ? AND parent_id IS NULL ORDER BY id ASC LIMIT 1");
+                $chkChild = $db->prepare("SELECT COUNT(*) FROM modules WHERE nom = ? AND parent_id = ?");
+                $insChild = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES (?, '', 0, ?, ?, '', 1, 0, ?)");
+                $setContainer = $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?");
+
+                foreach ($tree as $parentName => $children) {
+                    $findParent->execute([$parentName]);
+                    $parentId = (int) $findParent->fetchColumn();
+                    if ($parentId <= 0) {
+                        continue;
+                    }
+                    $setContainer->execute([$parentId]);
+                    foreach ($children as $c) {
+                        $chkChild->execute([$c[0], $parentId]);
+                        if ((int) $chkChild->fetchColumn() === 0) {
+                            $insChild->execute([$c[0], $parentId, $c[1], $c[2]]);
+                        }
+                    }
+                }
+                $setFlag('seed_full_tree_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
