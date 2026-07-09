@@ -4,13 +4,17 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 require_once 'config.php';
 verifierConnexion($db);
+require_once 'includes/widget.php';
 
 ensureUserAccountAccessColumns($db);
+ensureWidgetTables($db); // garantit la colonne utilisateurs.site_id + la table des sites
 
 if (!isAdminOrTeamcoach()) {
     header('Location: index.php');
     exit();
 }
+
+$widgetSitesList = widgetSites($db); // lieux de travail (météo)
 
 $hasInterimColumn = false;
 try {
@@ -247,6 +251,15 @@ if (isset($_POST['update_email']) && isset($_POST['user_id'])) {
     $stmt = $db->prepare("UPDATE utilisateurs SET email = ? WHERE id = ?");
     $stmt->execute([$nouveau_email, $uid]);
     adminRedirect("<div class='alert success'>✅ Email modifié.</div>");
+}
+
+if (isset($_POST['update_site']) && isset($_POST['user_id'])) {
+    requireValidCSRF();
+    $uid = (int) $_POST['user_id'];
+    $siteVal = (($_POST['nouveau_site'] ?? '') === '') ? null : (int) $_POST['nouveau_site'];
+    $stmt = $db->prepare("UPDATE utilisateurs SET site_id = ? WHERE id = ?");
+    $stmt->execute([$siteVal, $uid]);
+    adminRedirect("<div class='alert success'>✅ Lieu de travail modifié.</div>");
 }
 
 if (isset($_POST['set_inactif']) && isset($_POST['user_id'])) {
@@ -491,6 +504,7 @@ $users = $db->query($query_str)->fetchAll();
                         <th class="col-login">Identifiant</th>
                         <th class="col-email">Email</th>
                         <th class="col-interim">Intérim</th>
+                        <th class="col-site">Lieu de travail</th>
                         <th class="col-quiz">Quiz</th>
                         <th class="col-role">Profil</th>
                         <th class="col-status">Statut</th>
@@ -528,6 +542,19 @@ $users = $db->query($query_str)->fetchAll();
                                 </select>
                                 <input type="hidden" name="nouveau_role" value="<?php echo htmlspecialchars($u['role']); ?>">
                                 <button type="submit" name="update_user" class="btn-save" style="padding:2px 8px; font-size:0.9em;">🏢</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="POST" class="stack-form" onsubmit="return confirm('Modifier le lieu de travail de ce collaborateur ?');">
+                                <?php echo csrfField(); ?>
+                                <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
+                                <select name="nouveau_site" class="input-mini" style="width:160px;">
+                                    <option value="" <?php if (empty($u['site_id'])) echo 'selected'; ?>>— Aucun —</option>
+                                    <?php foreach ($widgetSitesList as $wSite): ?>
+                                        <option value="<?php echo (int) $wSite['id']; ?>" <?php if ((string) ($u['site_id'] ?? '') === (string) $wSite['id']) echo 'selected'; ?>><?php echo htmlspecialchars($wSite['nom']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="submit" name="update_site" class="btn-save" style="padding:2px 8px; font-size:0.9em;">📍</button>
                             </form>
                         </td>
                         <td class="col-quiz">

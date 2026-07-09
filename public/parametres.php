@@ -507,6 +507,88 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 </tbody>
             </table>
         </div>
+
+        <!-- Révision quiz : synchronisation en direct -->
+        <?php $qStats = widgetQuizStats($db, $_SESSION['user_id'] ?? null); ?>
+        <div class="card" style="margin-top:20px;">
+            <h2 style="margin-top:0; color:#2d5a37;">Révision des quiz</h2>
+            <p class="muted">Le widget affiche des questions du module Quiz (avec la bonne réponse), uniquement parmi les quiz que la personne a déjà réalisés. Les questions sont lues <strong>en direct</strong> : ajouter ou supprimer une question dans le module Quiz met le widget à jour automatiquement.</p>
+
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:6px;">
+                <?php if ($qStats['ok']): ?>
+                    <span class="pill on">🔄 Synchronisé en direct</span>
+                <?php else: ?>
+                    <span class="pill off">⚠️ Module Quiz introuvable</span>
+                <?php endif; ?>
+                <span style="font-weight:700; color:#244230;"><?= (int) $qStats['total'] ?> question<?= $qStats['total'] > 1 ? 's' : '' ?></span>
+                <span class="muted">dans <?= (int) $qStats['themes'] ?> quiz</span>
+            </div>
+
+            <p class="muted" style="margin-top:10px;">
+                Aperçu pour <strong>votre compte</strong> : <strong><?= (int) $qStats['user'] ?></strong> question<?= $qStats['user'] > 1 ? 's' : '' ?> seraient affichée<?= $qStats['user'] > 1 ? 's' : '' ?> dans votre widget
+                <?php if ($qStats['user'] === 0): ?>
+                    <br><span style="color:#b26a00;">→ 0 pour l'instant : vous n'avez pas encore passé de quiz (ou aucune question n'existe pour ces quiz). Réalisez un quiz pour voir ses questions apparaître.</span>
+                <?php endif; ?>
+            </p>
+            <a href="admin_questions.php" class="btn btn-light" style="margin-top:4px;">✏️ Gérer les questions de quiz</a>
+        </div>
+
+        <!-- Météo : lieux de travail (sites) -->
+        <?php $wSites = widgetSites($db); ?>
+        <div class="card" style="margin-top:20px;">
+            <h2 style="margin-top:0; color:#2d5a37;">Météo — lieux de travail</h2>
+            <p class="muted">Ajoute un site avec sa ville : les coordonnées météo sont trouvées automatiquement (Open-Meteo, gratuit). L'affiliation d'un utilisateur à un site se règle dans sa <strong>fiche</strong> (page Administration → colonne « Lieu de travail »).</p>
+
+            <form method="POST" action="widget_save.php" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="add_site">
+                <input type="hidden" name="return" value="parametres.php#widget">
+                <div style="flex:1; min-width:200px;">
+                    <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Nom du site</label>
+                    <input type="text" name="nom" maxlength="100" placeholder="Ex : Famiflora Mouscron" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                </div>
+                <div style="min-width:180px;">
+                    <label style="display:block; font-weight:700; color:#244230; font-size:0.85rem;">Ville</label>
+                    <input type="text" name="ville" required maxlength="100" placeholder="Ex : Mouscron" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #ccc; border-radius:8px;">
+                </div>
+                <button type="submit" class="btn btn-primary">➕ Ajouter</button>
+            </form>
+
+            <table>
+                <thead><tr><th>Site</th><th>Ville</th><th>Météo</th><th>Suppr.</th></tr></thead>
+                <tbody>
+                    <?php foreach ($wSites as $s): ?>
+                    <tr>
+                        <td style="font-weight:700; color:#244230;"><?= htmlspecialchars($s['nom']) ?></td>
+                        <td><?= htmlspecialchars((string) $s['ville']) ?></td>
+                        <td>
+                            <?php if ($s['latitude'] !== null): ?>
+                                <span class="pill on">Coordonnées OK</span>
+                            <?php else: ?>
+                                <form method="POST" action="widget_save.php" style="display:inline;">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="action" value="regeocode_site">
+                                    <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
+                                    <input type="hidden" name="return" value="parametres.php#widget">
+                                    <button type="submit" class="btn btn-light" style="padding:5px 10px;" title="Réessayer de trouver les coordonnées">⚠️ Retrouver</button>
+                                </form>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <form method="POST" action="widget_save.php" style="display:inline;" onsubmit="return confirm('Supprimer ce site ? Les utilisateurs affiliés perdront leur lieu de travail.');">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="delete_site">
+                                <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
+                                <input type="hidden" name="return" value="parametres.php#widget">
+                                <button type="submit" class="btn btn-danger" style="padding:5px 10px;">🗑</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($wSites)): ?><tr><td colspan="4" class="muted">Aucun site pour l'instant.</td></tr><?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Modale : accès au widget -->

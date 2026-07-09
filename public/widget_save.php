@@ -61,6 +61,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db->prepare("UPDATE widget_phrases SET actif = 1 - actif WHERE id = ?")->execute([$id]);
             $_SESSION['module_flash'] = "✅ Affichage de la phrase mis à jour.";
         }
+    } elseif ($action === 'add_site') {
+        $nom = trim((string) ($_POST['nom'] ?? ''));
+        $ville = trim((string) ($_POST['ville'] ?? ''));
+        if ($nom === '') {
+            $nom = $ville;
+        }
+        if ($ville === '') {
+            $_SESSION['module_flash'] = "❌ La ville est obligatoire (elle sert à trouver la météo).";
+        } else {
+            $geo = widgetGeocode($ville);
+            $lat = $geo['lat'] ?? null;
+            $lon = $geo['lon'] ?? null;
+            $db->prepare("INSERT INTO widget_sites (nom, ville, latitude, longitude) VALUES (?, ?, ?, ?)")
+               ->execute([mb_substr($nom, 0, 100), mb_substr($ville, 0, 100), $lat, $lon]);
+            $_SESSION['module_flash'] = ($lat !== null)
+                ? "✅ Site ajouté (coordonnées météo trouvées)."
+                : "⚠️ Site ajouté, mais ville introuvable pour la météo — vérifiez l'orthographe.";
+        }
+    } elseif ($action === 'delete_site') {
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $db->prepare("DELETE FROM widget_sites WHERE id = ?")->execute([$id]);
+            $db->prepare("UPDATE utilisateurs SET site_id = NULL WHERE site_id = ?")->execute([$id]);
+            $_SESSION['module_flash'] = "✅ Site supprimé.";
+        }
+    } elseif ($action === 'regeocode_site') {
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $row = $db->prepare("SELECT ville FROM widget_sites WHERE id = ?");
+            $row->execute([$id]);
+            $ville = (string) $row->fetchColumn();
+            $geo = widgetGeocode($ville);
+            if (!empty($geo['lat'])) {
+                $db->prepare("UPDATE widget_sites SET latitude = ?, longitude = ?, weather_at = NULL WHERE id = ?")
+                   ->execute([$geo['lat'], $geo['lon'], $id]);
+                $_SESSION['module_flash'] = "✅ Coordonnées mises à jour.";
+            } else {
+                $_SESSION['module_flash'] = "⚠️ Ville introuvable — vérifiez l'orthographe.";
+            }
+        }
     }
 }
 

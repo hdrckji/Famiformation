@@ -47,9 +47,347 @@ if (!function_exists('ensureWidgetTables')) {
                     $insP->execute($s);
                 }
             }
+
+            // Sites (lieux de travail) pour la météo
+            $db->exec(
+                "CREATE TABLE IF NOT EXISTS widget_sites (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    nom VARCHAR(100) NOT NULL,
+                    ville VARCHAR(100) NULL,
+                    latitude DECIMAL(9,5) NULL,
+                    longitude DECIMAL(9,5) NULL,
+                    weather_json TEXT NULL,
+                    weather_at DATETIME NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+            );
+            $cs = (int) $db->query("SELECT COUNT(*) FROM widget_sites")->fetchColumn();
+            if ($cs === 0) {
+                $insS = $db->prepare("INSERT INTO widget_sites (nom, ville, latitude, longitude) VALUES (?, ?, ?, ?)");
+                $insS->execute(['Famiflora Mouscron', 'Mouscron', 50.73330, 3.21670]);
+                $insS->execute(['Famiflora La Panne', 'La Panne', 51.09750, 2.59360]);
+            }
+
+            // Colonne site_id sur les utilisateurs (lieu de travail affilié)
+            $chkSite = $db->query("SHOW COLUMNS FROM utilisateurs LIKE 'site_id'");
+            if ($chkSite && !$chkSite->fetch()) {
+                $db->exec("ALTER TABLE utilisateurs ADD COLUMN site_id INT NULL");
+            }
+
+            // Pack de 50 infos jardinerie + 50 blagues (une seule fois)
+            $flag = $db->query("SELECT sval FROM widget_settings WHERE skey = 'phrases_pack_v1'")->fetchColumn();
+            if ($flag !== '1') {
+                $infos = array_filter(array_map('trim', explode("\n", <<<'INFOS'
+Le paillage garde l'humidité du sol et limite les mauvaises herbes.
+Arrosez tôt le matin ou le soir pour limiter l'évaporation.
+Les tomates aiment le soleil : au moins 6 heures par jour.
+Ne jetez pas le marc de café : il enrichit le compost.
+Les coccinelles dévorent les pucerons : ce sont vos alliées.
+Taillez les rosiers en fin d'hiver, avant le redémarrage de la végétation.
+Un sol bien drainé évite le pourrissement des racines.
+Beaucoup de plantes aromatiques éloignent naturellement certains insectes.
+Le basilic protège les tomates et parfume vos plats.
+Récoltez les courgettes jeunes : elles sont plus tendres.
+Les feuilles mortes font un excellent paillis gratuit.
+Arrosez au pied des plantes, pas sur le feuillage, pour éviter les maladies.
+La lavande attire les abeilles et repousse les moustiques.
+Tournez votre compost régulièrement pour bien l'aérer.
+Plantez les bulbes de printemps à l'automne.
+Retirez les fleurs fanées des géraniums pour relancer la floraison.
+Les orties font un purin riche en azote pour vos légumes.
+Le voile d'hivernage protège les plantes fragiles du gel.
+Les capucines attirent les pucerons loin de vos légumes.
+Rempotez vos plantes au printemps, quand elles reprennent leur croissance.
+Une plante qui jaunit manque souvent d'azote ou d'eau.
+Les semis d'intérieur démarrent dès février sur un rebord lumineux.
+Espacez bien vos plants pour une bonne circulation de l'air.
+Le buis se taille deux fois par an, au printemps et en été.
+Récupérez l'eau de pluie : gratuite et sans calcaire pour vos plantes.
+Les œillets d'Inde protègent le potager des nématodes.
+Un rosier aime le soleil et un sol riche et frais.
+Pincez les gourmands des tomates pour concentrer la sève sur les fruits.
+La menthe est envahissante : cultivez-la de préférence en pot.
+Griffez la terre après l'arrosage pour éviter la croûte de surface.
+Les fraisiers se multiplient facilement grâce à leurs stolons.
+Nettoyez vos outils après usage pour éviter de propager les maladies.
+Un hôtel à insectes favorise la biodiversité au jardin.
+Les hortensias bleuissent en sol acide et rosissent en sol calcaire.
+À la Sainte-Catherine, tout bois prend racine : plantez à l'automne.
+Arrosez moins souvent mais abondamment pour des racines profondes.
+Le compost mûr sent la bonne terre de forêt, pas la pourriture.
+Les limaces détestent le marc de café et les coquilles d'œufs.
+Coupez les fleurs fanées des vivaces pour prolonger la floraison.
+Le purin de consoude booste la floraison et la fructification.
+Aérez votre serre les jours de beau temps pour éviter l'excès d'humidité.
+Rentrez les agrumes à l'abri dès les premières gelées.
+Les haies libres offrent gîte et nourriture aux oiseaux.
+Pratiquez la rotation des cultures : ne replantez pas la même famille au même endroit.
+Les graines de tournesol régalent les oiseaux en hiver.
+Un sol couvert est un sol protégé : évitez de laisser la terre nue.
+La cendre de bois apporte de la potasse, mais à utiliser avec modération.
+Ne tondez pas trop court : une pelouse un peu haute résiste mieux à la sécheresse.
+Un bon terreau, c'est la moitié du travail pour une plante en pot.
+Observez votre jardin : la meilleure façon d'apprendre, c'est de regarder.
+INFOS
+                )));
+
+                $blagues = array_filter(array_map('trim', explode("\n", <<<'BLAGUES'
+Pourquoi les jardiniers sont-ils zen ? Parce qu'ils savent que tout finit par pousser.
+Que dit une fraise à une autre ? « C'est de ta faute si on est dans la confiture ! »
+Quel est le comble pour un jardinier ? Ne pas savoir planter un clou.
+Pourquoi les plantes détestent les maths ? Ça leur donne des racines carrées.
+Que fait une tomate qui a peur ? Elle rougit.
+Pourquoi l'arbre est-il allé à la banque ? Pour ouvrir un compte en tronc.
+Comment un jardinier dit-il au revoir ? « À la salade prochaine ! »
+Pourquoi les carottes sont-elles bonnes pour les yeux ? Avez-vous déjà vu un lapin avec des lunettes ?
+Que dit un jardinier à ses plantes le matin ? « Alors, on pousse un peu ? »
+Quel arbre trouve-t-on dans les mains ? Le palmier.
+Pourquoi l'oignon est-il si triste ? Parce que tout le monde le fait pleurer.
+Que dit une graine à un jardinier impatient ? « Laisse-moi le temps de pousser ! »
+Quel est le comble pour un arrosoir ? D'avoir le cœur sec.
+Comment fait un jardinier pour ranger ses idées ? Il les met en pot.
+Que dit une pelle à un râteau ? « Toi, tu me ratisses toujours large ! »
+Pourquoi les fleurs vont-elles à l'école ? Pour cultiver leur savoir.
+Pourquoi le ver de terre est-il champion de yoga ? Parce qu'il est très souple.
+Comment appelle-t-on un jardinier très calme ? Un philosophe du potager.
+Que dit un cactus à un autre ? « Pique pas ma place ! »
+Pourquoi le maïs a-t-il des oreilles ? Pour écouter pousser le blé.
+Pourquoi le jardinier a-t-il mis un réveil dans le potager ? Pour que ses légumes soient à l'heure.
+Pourquoi le tournesol est-il si sympa ? Il a toujours la tête tournée vers les autres.
+Que dit une rose à une épine ? « Arrête de me piquer mes compliments ! »
+Quel est le fruit le plus paresseux ? La poire, toujours avachie dans le compotier.
+Pourquoi les haricots ne se disputent jamais ? Parce qu'ils restent dans les rangs.
+Pourquoi la courgette est-elle modeste ? Elle ne se prend pas pour un potiron.
+Que dit le jardinier épuisé ? « Je suis complètement à plat… -bande. »
+Pourquoi le gazon est-il de bonne humeur ? Parce qu'il voit la vie en vert.
+Comment appelle-t-on un chat tombé dans un massif ? Un chat-mite… de jardin.
+Pourquoi la salade reste-t-elle calme ? Elle garde son sang-froid dans le frigo.
+Que se disent deux escargots pressés ? Rien, ils sont à la traîne.
+Pourquoi le champignon est-il invité partout ? Parce que c'est un mec sympa.
+Pourquoi le radis rougit-il ? Parce qu'il a vu la salade se déshabiller.
+Comment un poireau reste-t-il discret ? Il ne fait jamais de plat.
+Pourquoi la betterave a-t-elle toujours bonne mine ? Parce qu'elle est rouge de santé.
+Quel légume est le plus poli ? Le chou : il dit toujours « à tes souhaits ».
+Pourquoi le persil pousse-t-il lentement ? Il prend son persil… son temps.
+Que fait une abeille coiffée ? Un brushing-bzzz.
+Pourquoi les pommes de terre ont-elles des yeux ? Pour surveiller la cave.
+Comment appelle-t-on une vieille théière ? Une antiquithé.
+Pourquoi le concombre a-t-il appelé le médecin ? Il était dans le vinaigre.
+Pourquoi le potiron est-il un bon copain ? Parce qu'il est toujours bien rond.
+Que dit un mur à un autre mur au jardin ? « On se retrouve au coin. »
+Pourquoi les abeilles bourdonnent-elles ? Parce qu'elles ne connaissent pas les paroles.
+Quel est le sport préféré du cresson ? Le cross… -cresson.
+Pourquoi la citrouille ne ment jamais ? Parce qu'elle a le cœur sur la main… -tenant.
+Comment un chou fait-il du sport ? Il devient un chou-fleur… de forme.
+Que dit le jardinier optimiste sous la pluie ? « Au moins, je n'arrose pas ! »
+Pourquoi le sapin est-il toujours à la mode ? Parce qu'il garde toujours ses aiguilles.
+Pourquoi le jardinier parle-t-il à ses plantes ? Parce qu'elles ne le contredisent jamais.
+BLAGUES
+                )));
+
+                $insPack = $db->prepare("INSERT INTO widget_phrases (texte, categorie) VALUES (?, ?)");
+                foreach ($infos as $t) {
+                    $insPack->execute([mb_substr($t, 0, 500), 'info']);
+                }
+                foreach ($blagues as $t) {
+                    $insPack->execute([mb_substr($t, 0, 500), 'blague']);
+                }
+                $db->prepare("INSERT INTO widget_settings (skey, sval) VALUES ('phrases_pack_v1', '1') ON DUPLICATE KEY UPDATE sval = '1'")->execute();
+            }
         } catch (Exception $e) {
             // base indisponible : on ignore
         }
+    }
+
+    /**
+     * Liste des sites (lieux de travail).
+     */
+    function widgetSites(PDO $db)
+    {
+        try {
+            ensureWidgetTables($db);
+            return $db->query("SELECT * FROM widget_sites ORDER BY nom ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Géocodage gratuit (Open-Meteo) : ville -> ['lat','lon'] ou null.
+     */
+    function widgetGeocode($ville)
+    {
+        $ville = trim((string) $ville);
+        if ($ville === '' || !function_exists('curl_init')) {
+            return null;
+        }
+        $url = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=fr&format=json&name=' . rawurlencode($ville);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_USERAGENT => 'Famiformation/1.0']);
+        $resp = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($resp === false || $code < 200 || $code >= 300) {
+            return null;
+        }
+        $d = json_decode($resp, true);
+        if (empty($d['results'][0]['latitude'])) {
+            return null;
+        }
+        return ['lat' => $d['results'][0]['latitude'], 'lon' => $d['results'][0]['longitude']];
+    }
+
+    /**
+     * Émoji météo depuis un code WMO (Open-Meteo).
+     */
+    function weatherEmoji($code)
+    {
+        $code = (int) $code;
+        if ($code === 0) { return '☀️'; }
+        if ($code === 1 || $code === 2) { return '🌤️'; }
+        if ($code === 3) { return '☁️'; }
+        if ($code === 45 || $code === 48) { return '🌫️'; }
+        if ($code >= 51 && $code <= 67) { return '🌦️'; }
+        if ($code >= 71 && $code <= 77) { return '❄️'; }
+        if ($code >= 80 && $code <= 82) { return '🌧️'; }
+        if ($code >= 85 && $code <= 86) { return '🌨️'; }
+        if ($code >= 95) { return '⛈️'; }
+        return '🌡️';
+    }
+
+    /**
+     * Météo actuelle d'un site via Open-Meteo, mise en cache 30 min dans widget_sites.
+     * Renvoie ['emoji','temp'] ou null.
+     */
+    function widgetWeather(PDO $db, array $site)
+    {
+        $lat = $site['latitude'] ?? null;
+        $lon = $site['longitude'] ?? null;
+        if ($lat === null || $lon === null) {
+            return null;
+        }
+        // Cache 30 min
+        $at = $site['weather_at'] ?? null;
+        if ($at && (time() - strtotime((string) $at)) < 1800 && !empty($site['weather_json'])) {
+            $cached = json_decode((string) $site['weather_json'], true);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        }
+        if (!function_exists('curl_init')) {
+            return null;
+        }
+        $url = 'https://api.open-meteo.com/v1/forecast?latitude=' . rawurlencode((string) $lat)
+            . '&longitude=' . rawurlencode((string) $lon)
+            . '&current=temperature_2m,weather_code&timezone=Europe%2FBrussels';
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_USERAGENT => 'Famiformation/1.0']);
+        $resp = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($resp === false || $code < 200 || $code >= 300) {
+            // Échec : on renvoie le cache périmé s'il existe
+            $stale = json_decode((string) ($site['weather_json'] ?? ''), true);
+            return is_array($stale) ? $stale : null;
+        }
+        $data = json_decode($resp, true);
+        $temp = $data['current']['temperature_2m'] ?? null;
+        if ($temp === null) {
+            return null;
+        }
+        $result = ['emoji' => weatherEmoji($data['current']['weather_code'] ?? 0), 'temp' => (int) round((float) $temp)];
+        try {
+            $db->prepare("UPDATE widget_sites SET weather_json = ?, weather_at = NOW() WHERE id = ?")
+               ->execute([json_encode($result), (int) $site['id']]);
+        } catch (Exception $e) {
+        }
+        return $result;
+    }
+
+    /**
+     * Site (lieu de travail) d'un utilisateur, sinon le premier site en secours.
+     */
+    function userSite(PDO $db, $userId)
+    {
+        try {
+            ensureWidgetTables($db);
+            if ($userId) {
+                $st = $db->prepare("SELECT site_id FROM utilisateurs WHERE id = ? LIMIT 1");
+                $st->execute([(int) $userId]);
+                $sid = $st->fetchColumn();
+                if ($sid) {
+                    $s = $db->prepare("SELECT * FROM widget_sites WHERE id = ? LIMIT 1");
+                    $s->execute([(int) $sid]);
+                    $row = $s->fetch(PDO::FETCH_ASSOC);
+                    if ($row) {
+                        return $row;
+                    }
+                }
+            }
+            $row = $db->query("SELECT * FROM widget_sites ORDER BY id ASC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Questions de quiz (avec la bonne réponse) à afficher dans le widget.
+     * Lues EN DIRECT depuis quiz_questions, uniquement pour les quiz que la
+     * personne a déjà réalisés (statistiques.nom_page = quiz_questions.theme).
+     * Renvoie un tableau de chaînes "❓ question   ✅ réponse".
+     */
+    function widgetQuizItems(PDO $db, $userId, $limit = 40)
+    {
+        if (!$userId) {
+            return [];
+        }
+        try {
+            $stThemes = $db->prepare("SELECT DISTINCT nom_page FROM statistiques WHERE utilisateur_id = ? AND score IS NOT NULL");
+            $stThemes->execute([(int) $userId]);
+            $themes = array_filter($stThemes->fetchAll(PDO::FETCH_COLUMN));
+            if (empty($themes)) {
+                return [];
+            }
+            $placeholders = implode(',', array_fill(0, count($themes), '?'));
+            $q = $db->prepare(
+                "SELECT question_text, option_a, option_b, option_c, reponse_correcte
+                 FROM quiz_questions WHERE theme IN ($placeholders) ORDER BY RAND() LIMIT " . (int) $limit
+            );
+            $q->execute(array_values($themes));
+            $items = [];
+            foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $map = ['A' => $row['option_a'] ?? '', 'B' => $row['option_b'] ?? '', 'C' => $row['option_c'] ?? ''];
+                $rep = $map[strtoupper(trim((string) ($row['reponse_correcte'] ?? 'A')))] ?? ($row['option_a'] ?? '');
+                $qt = trim((string) $row['question_text']);
+                $rep = trim((string) $rep);
+                if ($qt === '' || $rep === '') {
+                    continue;
+                }
+                $items[] = '❓ ' . $qt . '   ✅ ' . $rep;
+            }
+            return $items;
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Statistiques de synchronisation widget <-> module Quiz (pour l'onglet Widget).
+     * Renvoie ['total' => questions en base, 'themes' => nb thèmes, 'user' => questions
+     * visibles pour cet utilisateur selon ses quiz réalisés, 'ok' => quiz_questions accessible].
+     */
+    function widgetQuizStats(PDO $db, $userId)
+    {
+        $out = ['total' => 0, 'themes' => 0, 'user' => 0, 'ok' => false];
+        try {
+            $out['total'] = (int) $db->query("SELECT COUNT(*) FROM quiz_questions")->fetchColumn();
+            $out['themes'] = (int) $db->query("SELECT COUNT(DISTINCT theme) FROM quiz_questions")->fetchColumn();
+            $out['ok'] = true;
+            $out['user'] = count(widgetQuizItems($db, $userId, 1000));
+        } catch (Exception $e) {
+            $out['ok'] = false;
+        }
+        return $out;
     }
 
     /**
@@ -153,14 +491,46 @@ if (!function_exists('ensureWidgetTables')) {
         $phrases = array_values(array_filter(array_map(function ($p) {
             return trim((string) $p['texte']);
         }, widgetPhrases($db, true))));
-        if (empty($phrases)) {
-            $phrases = [$tt('Bienvenue chez Famiflora 🌿', 'Welkom bij Famiflora 🌿')];
+        // Questions de quiz déjà réalisées (lues EN DIRECT depuis quiz_questions)
+        $quizItems = widgetQuizItems($db, $_SESSION['user_id'] ?? null, 40);
+        if (!empty($phrases)) {
+            shuffle($phrases);
         }
+        if (!empty($quizItems)) {
+            shuffle($quizItems);
+        }
+        // On alterne phrase / question / phrase / question…
+        $items = [];
+        $np = count($phrases);
+        $nq = count($quizItems);
+        for ($i = 0, $max = max($np, $nq); $i < $max; $i++) {
+            if ($i < $np) {
+                $items[] = $phrases[$i];
+            }
+            if ($i < $nq) {
+                $items[] = $quizItems[$i];
+            }
+        }
+        if (empty($items)) {
+            $items = [$tt('Bienvenue chez Famiflora 🌿', 'Welkom bij Famiflora 🌿')];
+        }
+        $phrases = $items;
         $phrasesAttr = htmlspecialchars(json_encode($phrases, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+        // Météo du site (lieu de travail) de l'utilisateur — Open-Meteo, mise en cache
+        $site = userSite($db, $_SESSION['user_id'] ?? null);
+        $weather = $site ? widgetWeather($db, $site) : null;
+        $siteLabel = $site ? ((string) ($site['ville'] ?: $site['nom'])) : '';
         ob_start();
         ?>
         <div class="home-widget">
-            <div class="hw-weather">🌤️ <span class="hw-soon"><?= htmlspecialchars($tt('Météo à venir', 'Weer binnenkort')) ?></span></div>
+            <div class="hw-weather">
+                <?php if ($weather): ?>
+                    <?= $weather['emoji'] ?> <?= (int) $weather['temp'] ?>°C
+                    <?php if ($siteLabel !== ''): ?><span class="hw-soon"><?= htmlspecialchars($siteLabel) ?></span><?php endif; ?>
+                <?php else: ?>
+                    🌤️ <span class="hw-soon"><?= htmlspecialchars($tt('Météo indisponible', 'Weer onbeschikbaar')) ?></span>
+                <?php endif; ?>
+            </div>
             <div class="hw-center" id="hwCenter" data-phrases="<?= $phrasesAttr ?>"><span class="hw-phrase"><?= htmlspecialchars($phrases[0]) ?></span></div>
             <div class="hw-date"><?= htmlspecialchars(widgetDate()) ?></div>
         </div>
