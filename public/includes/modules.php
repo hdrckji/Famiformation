@@ -418,6 +418,25 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('seed_caisses_children_v1');
             }
+
+            // 13) Ordre des modules racine = ordre réel de l'accueil (pour l'aperçu par profil
+            //     et la gestion). N'affecte pas la page d'accueil (codée en dur).
+            if (!$hasFlag('set_root_sort_order_v1')) {
+                $rootOrder = [
+                    'Onboarding', 'Formation', 'Magasin', 'Management', 'Becosoft',
+                    'Formation Caisse', 'Mes disponibilités', 'Mes horaires attribués',
+                    'Logistique', 'Classement', 'Sécurité au travail', 'Famijob',
+                    'Demandes Horaires Intérim', 'Matching Intérim', 'Validation demandes horaires',
+                    'RH', 'Dispos Etudiants', 'Gestion Questions',
+                ];
+                // Tous les modules racine à la fin par défaut, puis on positionne ceux de la liste.
+                $db->exec("UPDATE modules SET sort_order = 900 WHERE parent_id IS NULL");
+                $updSort = $db->prepare("UPDATE modules SET sort_order = ? WHERE nom = ? AND parent_id IS NULL");
+                foreach ($rootOrder as $i => $nom) {
+                    $updSort->execute([$i + 1, $nom]);
+                }
+                $setFlag('set_root_sort_order_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
