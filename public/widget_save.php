@@ -36,8 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $texte = trim((string) ($_POST['texte'] ?? ''));
         $cat = (($_POST['categorie'] ?? 'info') === 'blague') ? 'blague' : 'info';
         if ($texte !== '') {
-            $db->prepare("INSERT INTO widget_phrases (texte, categorie) VALUES (?, ?)")->execute([mb_substr($texte, 0, 500), $cat]);
-            $_SESSION['module_flash'] = "✅ Phrase ajoutée.";
+            $texte = mb_substr($texte, 0, 500);
+            $nl = function_exists('mymemoryTranslateFrToNl') ? mymemoryTranslateFrToNl($texte) : '';
+            $db->prepare("INSERT INTO widget_phrases (texte, texte_nl, categorie) VALUES (?, ?, ?)")
+               ->execute([$texte, $nl !== '' ? mb_substr($nl, 0, 500) : null, $cat]);
+            $_SESSION['module_flash'] = $nl !== '' ? "✅ Phrase ajoutée (traduite en NL)." : "✅ Phrase ajoutée (NL à traduire).";
         } else {
             $_SESSION['module_flash'] = "❌ La phrase ne peut pas être vide.";
         }
@@ -46,8 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $texte = trim((string) ($_POST['texte'] ?? ''));
         $cat = (($_POST['categorie'] ?? 'info') === 'blague') ? 'blague' : 'info';
         if ($id > 0 && $texte !== '') {
-            $db->prepare("UPDATE widget_phrases SET texte = ?, categorie = ? WHERE id = ?")->execute([mb_substr($texte, 0, 500), $cat, $id]);
-            $_SESSION['module_flash'] = "✅ Phrase modifiée.";
+            $texte = mb_substr($texte, 0, 500);
+            $nl = function_exists('mymemoryTranslateFrToNl') ? mymemoryTranslateFrToNl($texte) : '';
+            $db->prepare("UPDATE widget_phrases SET texte = ?, texte_nl = ?, categorie = ? WHERE id = ?")
+               ->execute([$texte, $nl !== '' ? mb_substr($nl, 0, 500) : null, $cat, $id]);
+            $_SESSION['module_flash'] = $nl !== '' ? "✅ Phrase modifiée (traduite en NL)." : "✅ Phrase modifiée (NL à traduire).";
         }
     } elseif ($action === 'delete_phrase') {
         $id = (int) ($_POST['id'] ?? 0);
@@ -100,6 +106,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $_SESSION['module_flash'] = "⚠️ Ville introuvable — vérifiez l'orthographe.";
             }
+        }
+    } elseif ($action === 'translate_phrases_batch') {
+        $rows = $db->query("SELECT id, texte FROM widget_phrases WHERE texte_nl IS NULL OR texte_nl = '' LIMIT 20")->fetchAll(PDO::FETCH_ASSOC);
+        $done = 0;
+        foreach ($rows as $r) {
+            $nl = function_exists('mymemoryTranslateFrToNl') ? mymemoryTranslateFrToNl((string) $r['texte']) : '';
+            if ($nl !== '') {
+                $db->prepare("UPDATE widget_phrases SET texte_nl = ? WHERE id = ?")->execute([mb_substr($nl, 0, 500), (int) $r['id']]);
+                $done++;
+            }
+        }
+        $rest = (int) $db->query("SELECT COUNT(*) FROM widget_phrases WHERE texte_nl IS NULL OR texte_nl = ''")->fetchColumn();
+        $_SESSION['module_flash'] = "✅ {$done} phrase(s) traduite(s) en NL. Restant à traduire : {$rest}.";
+    } elseif ($action === 'translate_quiz_batch') {
+        try {
+            $rows = $db->query("SELECT id, question_text, option_a, option_b, option_c FROM quiz_questions WHERE question_text_nl IS NULL OR question_text_nl = '' LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);
+            $done = 0;
+            foreach ($rows as $r) {
+                $qn = function_exists('mymemoryTranslateFrToNl') ? mymemoryTranslateFrToNl((string) $r['question_text']) : '';
+                $an = mymemoryTranslateFrToNl((string) $r['option_a']);
+                $bn = ((string) $r['option_b'] !== '') ? mymemoryTranslateFrToNl((string) $r['option_b']) : '';
+                $cn = ((string) $r['option_c'] !== '') ? mymemoryTranslateFrToNl((string) $r['option_c']) : '';
+                if ($qn !== '') {
+                    $db->prepare("UPDATE quiz_questions SET question_text_nl = ?, option_a_nl = ?, option_b_nl = ?, option_c_nl = ? WHERE id = ?")
+                       ->execute([mb_substr($qn, 0, 500), $an !== '' ? mb_substr($an, 0, 500) : null, $bn !== '' ? mb_substr($bn, 0, 500) : null, $cn !== '' ? mb_substr($cn, 0, 500) : null, (int) $r['id']]);
+                    $done++;
+                }
+            }
+            $rest = (int) $db->query("SELECT COUNT(*) FROM quiz_questions WHERE question_text_nl IS NULL OR question_text_nl = ''")->fetchColumn();
+            $_SESSION['module_flash'] = "✅ {$done} question(s) traduite(s) en NL. Restant : {$rest}.";
+        } catch (Exception $e) {
+            $_SESSION['module_flash'] = "⚠️ Traduction des quiz impossible (module Quiz absent ?).";
         }
     }
 }

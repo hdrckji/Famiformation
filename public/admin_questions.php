@@ -5,9 +5,12 @@ error_reporting(E_ALL);
 
 // 2. Inclusion de la configuration
 require_once 'config.php';
+require_once 'includes/modules.php'; // mymemoryTranslateFrToNl()
+require_once 'includes/widget.php';  // ensureWidgetTables() -> colonnes NL
 
 // 3. Vérification de la session Admin
 requireAdminOrTeamcoach();
+ensureWidgetTables($db); // garantit les colonnes *_nl sur quiz_questions
 
 $message = "";
 
@@ -48,14 +51,26 @@ $all_possible_themes = [
 if (isset($_POST['add_question'])) {
     requireValidCSRF();
     try {
-        $stmt = $db->prepare("INSERT INTO quiz_questions (theme, question_text, option_a, option_b, option_c, reponse_correcte) VALUES (?, ?, ?, ?, ?, ?)");
+        $qText = trim($_POST['question_text'] ?? '');
+        $rA = trim($_POST['r1'] ?? '');
+        $rB = trim($_POST['r2'] ?? '');
+        $rC = trim($_POST['r3'] ?? '');
+        $qNl = $qText !== '' ? mymemoryTranslateFrToNl($qText) : '';
+        $aNl = $rA !== '' ? mymemoryTranslateFrToNl($rA) : '';
+        $bNl = $rB !== '' ? mymemoryTranslateFrToNl($rB) : '';
+        $cNl = $rC !== '' ? mymemoryTranslateFrToNl($rC) : '';
+        $stmt = $db->prepare("INSERT INTO quiz_questions (theme, question_text, option_a, option_b, option_c, reponse_correcte, question_text_nl, option_a_nl, option_b_nl, option_c_nl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['theme'] ?? '',
-            trim($_POST['question_text'] ?? ''),
-            trim($_POST['r1'] ?? ''),
-            trim($_POST['r2'] ?? ''),
-            trim($_POST['r3'] ?? ''),
-            $_POST['correct_answer'] ?? ''
+            $qText,
+            $rA,
+            $rB,
+            $rC,
+            $_POST['correct_answer'] ?? '',
+            $qNl !== '' ? $qNl : null,
+            $aNl !== '' ? $aNl : null,
+            $bNl !== '' ? $bNl : null,
+            $cNl !== '' ? $cNl : null,
         ]);
         $message = "<div class='alert success'>✅ Question enregistrée avec succès !</div>";
     } catch (Exception $e) {
@@ -67,14 +82,26 @@ if (isset($_POST['add_question'])) {
 if (isset($_POST['update_question'])) {
     requireValidCSRF();
     try {
-        $stmt = $db->prepare("UPDATE quiz_questions SET theme = ?, question_text = ?, option_a = ?, option_b = ?, option_c = ?, reponse_correcte = ? WHERE id = ?");
+        $qText = trim($_POST['edit_question_text'] ?? '');
+        $rA = trim($_POST['edit_r1'] ?? '');
+        $rB = trim($_POST['edit_r2'] ?? '');
+        $rC = trim($_POST['edit_r3'] ?? '');
+        $qNl = $qText !== '' ? mymemoryTranslateFrToNl($qText) : '';
+        $aNl = $rA !== '' ? mymemoryTranslateFrToNl($rA) : '';
+        $bNl = $rB !== '' ? mymemoryTranslateFrToNl($rB) : '';
+        $cNl = $rC !== '' ? mymemoryTranslateFrToNl($rC) : '';
+        $stmt = $db->prepare("UPDATE quiz_questions SET theme = ?, question_text = ?, option_a = ?, option_b = ?, option_c = ?, reponse_correcte = ?, question_text_nl = ?, option_a_nl = ?, option_b_nl = ?, option_c_nl = ? WHERE id = ?");
         $stmt->execute([
             trim($_POST['edit_theme'] ?? ''),
-            trim($_POST['edit_question_text'] ?? ''),
-            trim($_POST['edit_r1'] ?? ''),
-            trim($_POST['edit_r2'] ?? ''),
-            trim($_POST['edit_r3'] ?? ''),
+            $qText,
+            $rA,
+            $rB,
+            $rC,
             trim($_POST['edit_correct_answer'] ?? 'A'),
+            $qNl !== '' ? $qNl : null,
+            $aNl !== '' ? $aNl : null,
+            $bNl !== '' ? $bNl : null,
+            $cNl !== '' ? $cNl : null,
             $_POST['question_id'] ?? ''
         ]);
         $message = "<div class='alert success'>✅ Question mise à jour !</div>";

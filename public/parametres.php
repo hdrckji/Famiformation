@@ -740,6 +740,34 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     </tbody>
                 </table>
             </div>
+
+            <!-- Traduction néerlandaise (rattrapage de l'existant) -->
+            <?php
+            $phrasesToTranslate = (int) $db->query("SELECT COUNT(*) FROM widget_phrases WHERE texte_nl IS NULL OR texte_nl = ''")->fetchColumn();
+            $quizToTranslate = 0;
+            try {
+                $quizToTranslate = (int) $db->query("SELECT COUNT(*) FROM quiz_questions WHERE question_text_nl IS NULL OR question_text_nl = ''")->fetchColumn();
+            } catch (Exception $e) {
+            }
+            ?>
+            <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
+                <h3 style="margin:0 0 6px; color:#244230;">🌍 Traduction néerlandaise</h3>
+                <p class="muted">Les nouvelles phrases et questions sont traduites automatiquement à l'enregistrement. Utilise ces boutons pour traduire l'<strong>existant</strong> (par lots, pour respecter les limites du service gratuit). Clique plusieurs fois jusqu'à « Restant : 0 ».</p>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <form method="POST" action="widget_save.php" style="display:inline;">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="translate_phrases_batch">
+                        <input type="hidden" name="return" value="parametres.php#prefs">
+                        <button type="submit" class="btn btn-primary">🌍 Traduire les phrases (reste : <?= $phrasesToTranslate ?>)</button>
+                    </form>
+                    <form method="POST" action="widget_save.php" style="display:inline;">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="translate_quiz_batch">
+                        <input type="hidden" name="return" value="parametres.php#prefs">
+                        <button type="submit" class="btn btn-primary">🌍 Traduire les quiz (reste : <?= $quizToTranslate ?>)</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -73,6 +73,23 @@ if (!function_exists('ensureWidgetTables')) {
                 $db->exec("ALTER TABLE utilisateurs ADD COLUMN site_id INT NULL");
             }
 
+            // Traduction NL : colonne texte_nl sur les phrases
+            $chkPnl = $db->query("SHOW COLUMNS FROM widget_phrases LIKE 'texte_nl'");
+            if ($chkPnl && !$chkPnl->fetch()) {
+                $db->exec("ALTER TABLE widget_phrases ADD COLUMN texte_nl VARCHAR(500) NULL");
+            }
+
+            // Traduction NL : colonnes sur quiz_questions (si la table existe)
+            $chkQt = $db->query("SHOW TABLES LIKE 'quiz_questions'");
+            if ($chkQt && $chkQt->fetch()) {
+                foreach (['question_text_nl', 'option_a_nl', 'option_b_nl', 'option_c_nl'] as $col) {
+                    $cc = $db->query("SHOW COLUMNS FROM quiz_questions LIKE '" . $col . "'");
+                    if ($cc && !$cc->fetch()) {
+                        $db->exec("ALTER TABLE quiz_questions ADD COLUMN " . $col . " VARCHAR(500) NULL");
+                    }
+                }
+            }
+
             // Pack de 50 infos jardinerie + 50 blagues (une seule fois)
             $flag = $db->query("SELECT sval FROM widget_settings WHERE skey = 'phrases_pack_v1'")->fetchColumn();
             if ($flag !== '1') {
@@ -350,16 +367,24 @@ BLAGUES
             }
             $placeholders = implode(',', array_fill(0, count($themes), '?'));
             $q = $db->prepare(
-                "SELECT question_text, option_a, option_b, option_c, reponse_correcte
+                "SELECT question_text, question_text_nl, option_a, option_b, option_c,
+                        option_a_nl, option_b_nl, option_c_nl, reponse_correcte
                  FROM quiz_questions WHERE theme IN ($placeholders) ORDER BY RAND() LIMIT " . (int) $limit
             );
             $q->execute(array_values($themes));
+            $isNl = (function_exists('currentLang') && currentLang() === 'nl');
+            $pick = function ($fr, $nl) use ($isNl) {
+                $fr = trim((string) $fr);
+                $nl = trim((string) $nl);
+                return ($isNl && $nl !== '') ? $nl : $fr;
+            };
             $items = [];
             foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $map = ['A' => $row['option_a'] ?? '', 'B' => $row['option_b'] ?? '', 'C' => $row['option_c'] ?? ''];
-                $rep = $map[strtoupper(trim((string) ($row['reponse_correcte'] ?? 'A')))] ?? ($row['option_a'] ?? '');
-                $qt = trim((string) $row['question_text']);
-                $rep = trim((string) $rep);
+                $letter = strtoupper(trim((string) ($row['reponse_correcte'] ?? 'A')));
+                $mapFr = ['A' => $row['option_a'] ?? '', 'B' => $row['option_b'] ?? '', 'C' => $row['option_c'] ?? ''];
+                $mapNl = ['A' => $row['option_a_nl'] ?? '', 'B' => $row['option_b_nl'] ?? '', 'C' => $row['option_c_nl'] ?? ''];
+                $qt = $pick($row['question_text'] ?? '', $row['question_text_nl'] ?? '');
+                $rep = $pick($mapFr[$letter] ?? ($row['option_a'] ?? ''), $mapNl[$letter] ?? '');
                 if ($qt === '' || $rep === '') {
                     continue;
                 }
@@ -471,7 +496,7 @@ BLAGUES
     {
         try {
             ensureWidgetTables($db);
-            $sql = "SELECT id, texte, categorie, actif FROM widget_phrases";
+            $sql = "SELECT id, texte, texte_nl, categorie, actif FROM widget_phrases";
             if ($onlyActive) {
                 $sql .= " WHERE actif = 1";
             }
@@ -561,28 +586,39 @@ BLAGUES
         $tt = function ($fr, $nl) {
             return function_exists('t') ? t($fr, $nl) : $fr;
         };
-        // Phrases à faire défiler au centre (lues EN DIRECT depuis la base)
-        $phrases = array_values(array_filter(array_map(function ($p) {
-            return trim((string) $p['texte']);
-        }, widgetPhrases($db, true))));
-        // Questions de quiz déjà réalisées (lues EN DIRECT depuis quiz_questions)
-        $quizItems = widgetQuizItems($db, $_SESSION['user_id'] ?? null, 40);
-        if (!empty($phrases)) {
-            shuffle($phrases);
-        }
-        if (!empty($quizItems)) {
-            shuffle($quizItems);
-        }
-        // On alterne phrase / question / phrase / question…
-        $pool = [];
-        $np = count($phrases);
-        $nq = count($quizItems);
-        for ($i = 0, $max = max($np, $nq); $i < $max; $i++) {
-            if ($i < $np) {
-                $pool[] = $phrases[$i];
+        // Contenu du centre, lu EN DIRECT et affiché selon la langue (FR/NL)
+        $isNl = (function_exists('currentLang') && currentLang() === 'nl');
+        $infoList = [];
+        $blagueList = [];
+        foreach (widgetPhrases($db, true) as $p) {
+            $txt = ($isNl && !empty($p['texte_nl'])) ? $p['texte_nl'] : $p['texte'];
+            $txt = trim((string) $txt);
+            if ($txt === '') {
+                continue;
             }
-            if ($i < $nq) {
-                $pool[] = $quizItems[$i];
+            if (($p['categorie'] ?? 'info') === 'blague') {
+                $blagueList[] = $txt;
+            } else {
+                $infoList[] = $txt;
+            }
+        }
+        // Questions de quiz déjà réalisées (déjà traduites en NL si disponible)
+        $quizItems = widgetQuizItems($db, $_SESSION['user_id'] ?? null, 40);
+        shuffle($infoList);
+        shuffle($blagueList);
+        shuffle($quizItems);
+        // Défilement dans l'ordre : info / blague / quiz / info / blague / quiz…
+        $pool = [];
+        $rounds = min(30, max(count($infoList), count($blagueList), count($quizItems)));
+        for ($i = 0; $i < $rounds; $i++) {
+            if (!empty($infoList)) {
+                $pool[] = $infoList[$i % count($infoList)];
+            }
+            if (!empty($blagueList)) {
+                $pool[] = $blagueList[$i % count($blagueList)];
+            }
+            if (!empty($quizItems)) {
+                $pool[] = $quizItems[$i % count($quizItems)];
             }
         }
 
