@@ -158,6 +158,113 @@ if (!function_exists('ensureModulesTable')) {
                 $db->prepare("UPDATE modules SET icon = ? WHERE nom = 'Aide' AND parent_id IS NULL")->execute(['🛠️']);
                 $setFlag('aide_icon_tools_v1');
             }
+
+            // 7) Sous-modules « Présentiel » et « En ligne » sous « Formation »
+            //    (pour les voir et les paramétrer dans la gestion des modules ;
+            //     la page Formation garde son fonctionnement actuel)
+            if (!$hasFlag('seed_formation_children_v1')) {
+                $formationId = (int) $db->query("SELECT id FROM modules WHERE nom = 'Formation' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($formationId > 0) {
+                    $formationChildren = [
+                        // [nom, description, icône, lien]
+                        ['Présentiel', 'Formations en présentiel (sessions planifiées).', '📅', 'formation.php?vue=presentiel'],
+                        ['En ligne', 'Formations en ligne (contenus à évaluer).', '💻', 'formation.php?vue=enligne'],
+                    ];
+                    $insFc = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES (?, ?, 0, ?, ?, '', 1, 0, ?)");
+                    $chkFc = $db->prepare("SELECT COUNT(*) FROM modules WHERE nom = ? AND parent_id = ?");
+                    foreach ($formationChildren as $fc) {
+                        $chkFc->execute([$fc[0], $formationId]);
+                        if ((int) $chkFc->fetchColumn() === 0) {
+                            $insFc->execute([$fc[0], $fc[1], $formationId, $fc[2], $fc[3]]);
+                        }
+                    }
+                    // « Formation » devient un conteneur (flèche de dépliage en gestion)
+                    $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?")->execute([$formationId]);
+                }
+                $setFlag('seed_formation_children_v1');
+            }
+
+            // 8) Suppression du module « Aide » (inutile). Ses éventuels sous-modules
+            //    (ex : Magasin) sont remontés à la racine pour ne pas les perdre.
+            if (!$hasFlag('remove_aide_v1')) {
+                $aideId = (int) $db->query("SELECT id FROM modules WHERE nom = 'Aide' AND parent_id IS NULL ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($aideId > 0) {
+                    $db->prepare("UPDATE modules SET parent_id = NULL WHERE parent_id = ?")->execute([$aideId]);
+                    $db->prepare("DELETE FROM modules WHERE id = ?")->execute([$aideId]);
+                }
+                $setFlag('remove_aide_v1');
+            }
+
+            // 9) Reconstruit l'arborescence complète du site dans la gestion :
+            //    chaque conteneur de base reçoit ses sous-modules (tuiles codées en dur
+            //    des pages). Purement pour la gestion — n'affecte pas la navigation réelle.
+            if (!$hasFlag('seed_full_tree_v1')) {
+                // Répare d'abord les orphelins (parent supprimé) -> racine, pour retrouver les conteneurs.
+                $db->exec("UPDATE modules m LEFT JOIN modules p ON p.id = m.parent_id SET m.parent_id = NULL WHERE m.parent_id IS NOT NULL AND p.id IS NULL");
+
+                $tree = [
+                    'Onboarding' => [
+                        ["Livret d'accueil", '📖', 'view-pdf-onboarding.php'],
+                        ['Vidéo', '🎥', 'video-onboarding.php'],
+                    ],
+                    'Magasin' => [
+                        ['Caisses', '🛒', 'formation-caisse.php'],
+                        ['Formation ressources humaines', '👥', 'ressources_humaines.php'],
+                        ['Déco', '🛋️', 'deco.php'],
+                        ['Green', '🌿', 'green.php'],
+                        ['Animalerie', '🐾', 'animalerie.php'],
+                        ['Garden', '🏡', 'garden.php'],
+                        ['Food', '🍫', 'food.php'],
+                        ['Stock', '📦', 'stock.php'],
+                    ],
+                    'Management' => [
+                        ['Donner du feedback', '💬', 'feedback.php'],
+                        ['Formation Parrain/Marraine', '🤝', 'mentor.php'],
+                        ['Leadership', '🦸', 'leadership.php'],
+                        ['Gestion de la présence', '🗓️', 'presence_view.php'],
+                        ['Entretiens de collaboration', '🗣️', 'entretien.php'],
+                        ['Judo verbal', '🥋', 'judo.php'],
+                    ],
+                    'Becosoft' => [
+                        ['Recherche Article', '🔍', 'becosoft.php'],
+                        ['Commande Gazon', '🌱', 'beco_gazon.php'],
+                        ['Bon de Commande', '📜', 'beco_bon.php'],
+                        ['Vente Flash', '⚡', 'beco_flash.php'],
+                    ],
+                    'Logistique' => [
+                        ['Chariots Danois', '🪴', 'logistique_chariots.php'],
+                        ['Réception', '🚚', 'logistique-reception.php'],
+                        ['Transfert', '🔄', 'logistique-transfert.php'],
+                        ['Gerbeur', '🏗️', 'gerbeur.php'],
+                        ['Empileuse', '📚', 'logistique_empileuse.php'],
+                    ],
+                    'Sécurité au travail' => [
+                        ['Chaussure de sécurité', '👟', 'chaussure_securite_pdf.php'],
+                        ['Formation secourisme', '⛑️', 'formation_secourisme_pdf.php'],
+                    ],
+                ];
+
+                $findParent = $db->prepare("SELECT id FROM modules WHERE nom = ? AND parent_id IS NULL ORDER BY id ASC LIMIT 1");
+                $chkChild = $db->prepare("SELECT COUNT(*) FROM modules WHERE nom = ? AND parent_id = ?");
+                $insChild = $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES (?, '', 0, ?, ?, '', 1, 0, ?)");
+                $setContainer = $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?");
+
+                foreach ($tree as $parentName => $children) {
+                    $findParent->execute([$parentName]);
+                    $parentId = (int) $findParent->fetchColumn();
+                    if ($parentId <= 0) {
+                        continue;
+                    }
+                    $setContainer->execute([$parentId]);
+                    foreach ($children as $c) {
+                        $chkChild->execute([$c[0], $parentId]);
+                        if ((int) $chkChild->fetchColumn() === 0) {
+                            $insChild->execute([$c[0], $parentId, $c[1], $c[2]]);
+                        }
+                    }
+                }
+                $setFlag('seed_full_tree_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
@@ -386,8 +493,16 @@ if (!function_exists('ensureModulesTable')) {
             $profs = moduleProfiles($db);
             $label = $profs[$key] ?? $key;
         }
-        return '<div style="position:sticky; top:0; z-index:5000; background:#2d5a37; color:#fff; padding:10px 16px; text-align:center; font-weight:700; box-shadow:0 2px 10px rgba(0,0,0,0.3);">'
-            . '👁 Aperçu du profil : ' . htmlspecialchars($label) . ' — vous voyez le site comme cet utilisateur (navigation seule).'
+        $flash = '';
+        if (!empty($_SESSION['apercu_flash'])) {
+            $flash = '<div style="position:sticky; top:0; z-index:5001; background:#a13e35; color:#fff; padding:8px 16px; text-align:center; font-weight:700;">'
+                . htmlspecialchars((string) $_SESSION['apercu_flash'])
+                . '</div>';
+            unset($_SESSION['apercu_flash']);
+        }
+        return $flash
+            . '<div style="position:sticky; top:0; z-index:5000; background:#2d5a37; color:#fff; padding:10px 16px; text-align:center; font-weight:700; box-shadow:0 2px 10px rgba(0,0,0,0.3);">'
+            . '👁 Aperçu du profil : ' . htmlspecialchars($label) . ' — vous voyez le site comme cet utilisateur (lecture seule, aucune action n\'est enregistrée).'
             . ' <a href="apercu.php?exit=1" style="color:#fff; text-decoration:underline; margin-left:12px;">Quitter l\'aperçu</a>'
             . '</div>';
     }

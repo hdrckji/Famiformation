@@ -33,9 +33,19 @@ try {
 
 // Tous les modules, organisés en arbre (parents puis enfants indentés)
 $allModules = getAllModules($db);
+$moduleIds = [];
+foreach ($allModules as $m) {
+    $moduleIds[(int) $m['id']] = true;
+}
 $byParent = [];
 foreach ($allModules as $m) {
-    $byParent[(int) ($m['parent_id'] ?? 0)][] = $m;
+    $pid = (int) ($m['parent_id'] ?? 0);
+    // Parent inexistant (module parent supprimé) : on rattache le module à la racine
+    // pour qu'il reste TOUJOURS visible dans la gestion (sinon il devient invisible).
+    if ($pid !== 0 && !isset($moduleIds[$pid])) {
+        $pid = 0;
+    }
+    $byParent[$pid][] = $m;
 }
 function flattenModules(array $byParent, $parentId, $depth, array &$out)
 {
@@ -144,6 +154,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .btn-light { background: #e9ecef; color: #333; }
         .btn:disabled, .btn[disabled] { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
         select:disabled { opacity: 0.5; cursor: not-allowed; background: #f1f1f1; }
+        .tree-toggle { background:#e8f5e9; border:1px solid #bcdcc6; cursor:pointer; font-size:1.05rem; line-height:1; color:#2d5a37; width:28px; height:28px; border-radius:7px; margin-right:8px; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; transition:background .12s, color .12s; }
+        .tree-toggle:hover { background:#2d5a37; color:#fff; }
+        .tree-spacer { display:inline-block; width:28px; margin-right:8px; }
+        .child-count { display:inline-block; margin-left:8px; font-size:0.72rem; font-weight:700; color:#2d5a37; background:#e8f5e9; padding:2px 9px; border-radius:999px; vertical-align:middle; }
+        .type-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:0.76rem; font-weight:700; white-space:nowrap; }
+        .type-container { background:#e8f5e9; color:#2d5a37; }
+        .type-content { background:#eef1f4; color:#54606b; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
         th, td { padding: 10px 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 0.92rem; vertical-align: middle; }
         th { background: #e8f5e9; color: #1d6f42; }
@@ -200,18 +217,18 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); ?>
-                    <tr>
+                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $childCount = isset($byParent[(int) $m['id']]) ? count($byParent[(int) $m['id']]) : 0; $hasChildren = $childCount > 0; ?>
+                    <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>"<?= $depth > 0 ? ' style="display:none;"' : '' ?>>
                         <td><?= moduleIconHtml($m, '1.6rem') ?></td>
                         <td>
                             <div style="padding-left:<?= $depth * 18 ?>px;">
-                                <?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong>
+                                <?php if ($hasChildren): ?><button type="button" class="tree-toggle" data-expanded="0" onclick="toggleModuleChildren(<?= (int) $m['id'] ?>, this)" title="Afficher / masquer les sous-modules">▸</button><?php else: ?><span class="tree-spacer"></span><?php endif; ?><?= $depth > 0 ? '↳ ' : '' ?><strong><?= htmlspecialchars($m['nom']) ?></strong><?php if ($hasChildren): ?><span class="child-count"><?= $childCount ?> sous-module<?= $childCount > 1 ? 's' : '' ?></span><?php endif; ?>
                                 <?php if (!empty($m['is_locked'])): ?> <span title="Verrouillé">🔒</span><?php endif; ?>
                                 <div class="muted" style="font-size:0.82rem;"><?= htmlspecialchars($m['description'] ?? '') ?></div>
                                 <?php if (!empty($m['link'])): ?><div class="muted" style="font-size:0.76rem;">🔗 module de base → <?= htmlspecialchars($m['link']) ?></div><?php endif; ?>
                             </div>
                         </td>
-                        <td><?= !empty($m['is_container']) ? 'Conteneur' : 'Contenu' ?></td>
+                        <td><?php if (!empty($m['is_container']) || $hasChildren): ?><span class="type-badge type-container">📁 Conteneur</span><?php else: ?><span class="type-badge type-content">📄 Élément</span><?php endif; ?></td>
                         <td>
                             <form method="POST" action="module_save.php" style="display:flex; gap:4px;">
                                 <?= csrfField() ?>
@@ -367,9 +384,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e3ece5; padding-bottom:6px;">
                             <span style="font-weight:800; color:#2d5a37;"><?= htmlspecialchars($lbl) ?></span>
                             <span style="display:flex; gap:5px;">
-                                <?php if (!in_array($key, ['admin', 'evaluateur', 'agence_interim'], true)): ?>
-                                    <a href="apercu.php?role=<?= urlencode($key) ?>" title="Voir le site comme ce profil" style="text-decoration:none; font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; color:#2d5a37;">👁</a>
-                                <?php endif; ?>
+                                <a href="apercu.php?role=<?= urlencode($key) ?>&back=<?= urlencode('parametres.php#histprofil') ?>" title="Voir ce que ce profil voit en se connectant" style="text-decoration:none; font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; color:#2d5a37;">👁</a>
                                 <?php if (!$reorderUnlocked): ?>
                                     <button type="button" title="Modifier l'ordre" onclick="askPassword('unlock_reorder', 0)" style="font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; background:#fff; cursor:pointer;">🖐</button>
                                 <?php endif; ?>
@@ -524,6 +539,36 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         document.getElementById('pwdTitle').textContent = titles[action] || 'Confirmation';
         document.getElementById('pwdInput').value = '';
         openModal('pwdModal');
+    }
+    function toggleModuleChildren(id, btn) {
+        var expanded = btn.getAttribute('data-expanded') === '1';
+        if (expanded) {
+            collapseModuleDescendants(id);
+            btn.setAttribute('data-expanded', '0');
+            btn.textContent = '▸';
+        } else {
+            document.querySelectorAll('tr[data-parent="' + id + '"]').forEach(function (tr) { tr.style.display = ''; });
+            btn.setAttribute('data-expanded', '1');
+            btn.textContent = '▾';
+        }
+    }
+    function collapseModuleDescendants(id) {
+        document.querySelectorAll('tr[data-parent="' + id + '"]').forEach(function (tr) {
+            tr.style.display = 'none';
+            var childBtn = tr.querySelector('.tree-toggle');
+            if (childBtn) { childBtn.setAttribute('data-expanded', '0'); childBtn.textContent = '▸'; }
+            collapseModuleDescendants(tr.getAttribute('data-id'));
+        });
+    }
+    function expandAllModules() {
+        document.querySelectorAll('tr[data-parent]').forEach(function (tr) { tr.style.display = ''; });
+        document.querySelectorAll('.tree-toggle').forEach(function (b) { b.setAttribute('data-expanded', '1'); b.textContent = '▾'; });
+    }
+    function collapseAllModules() {
+        document.querySelectorAll('tr[data-parent]').forEach(function (tr) {
+            if (tr.getAttribute('data-parent') !== '0') { tr.style.display = 'none'; }
+        });
+        document.querySelectorAll('.tree-toggle').forEach(function (b) { b.setAttribute('data-expanded', '0'); b.textContent = '▸'; });
     }
     function showTab(name, btn) {
         document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });

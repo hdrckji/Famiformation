@@ -269,6 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/modules.php'; echo apercuBanner($db ?? null); ?>
     <div class="container" style="max-width:1100px;">
         <h1>Nouvelle évaluation</h1>
         <?php echo $message; ?>
