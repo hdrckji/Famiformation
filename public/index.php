@@ -3,6 +3,7 @@ require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/quizz_status.php';
 require_once 'includes/modules.php';
+require_once 'includes/widget.php';
 
 $role = currentDisplayRole(); // rôle d'AFFICHAGE (tient compte de l'aperçu admin), pas le rôle réel
 if ($role === 'agence_interim') {
@@ -227,6 +228,10 @@ if (!empty($_SESSION['module_flash'])) {
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main">
     </div>
+
+    <?php if (userSeesWidget($db, $role)): ?>
+        <?= renderWidget($db) ?>
+    <?php endif; ?>
 
     <?php if (!empty($moduleFlash)): ?>
         <div class="module-flash"><?= htmlspecialchars($moduleFlash) ?></div>

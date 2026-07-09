@@ -2,6 +2,7 @@
 require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
+require_once 'includes/widget.php';
 
 // Réservé à l'admin
 if (($_SESSION['role'] ?? '') !== 'admin') {
@@ -183,6 +184,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <button class="tab-btn" onclick="showTab('histuser', this)">Gestion des utilisateurs</button>
         <button class="tab-btn" onclick="showTab('histprofil', this)">Gestion des profils</button>
         <button class="tab-btn" onclick="showTab('histagence', this)">Gestion des agences</button>
+        <button class="tab-btn" onclick="showTab('widget', this)">Widget</button>
         <button class="tab-btn" onclick="showTab('prefs', this)">Préférences</button>
     </div>
 
@@ -396,6 +398,56 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <?php if (empty($agencesList)): ?><tr><td colspan="2" class="muted">Aucune agence pour l'instant.</td></tr><?php endif; ?>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- ONGLET : Widget d'accueil -->
+    <div id="tab-widget" class="tab-content">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0; color:#2d5a37;">Widget d'accueil</h2>
+                <button type="button" class="btn btn-light" onclick="openModal('widgetAccessModal')">👁 Qui a accès ?</button>
+            </div>
+            <p class="muted">Le bloc affiché en haut de l'accueil (météo, date, horaires, infos qui défilent). En construction — pour l'instant visible uniquement par l'admin.</p>
+
+            <div style="display:flex; align-items:center; gap:14px; margin-top:10px;">
+                <span style="font-weight:700;">État :
+                    <?php if (widgetEnabled($db)): ?><span class="pill on">Activé</span><?php else: ?><span class="pill off">Désactivé</span><?php endif; ?>
+                </span>
+                <form method="POST" action="widget_save.php" style="display:inline;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="toggle_enabled">
+                    <input type="hidden" name="return" value="parametres.php#widget">
+                    <button type="submit" class="btn <?= widgetEnabled($db) ? 'btn-danger' : 'btn-primary' ?>"><?= widgetEnabled($db) ? 'Désactiver' : 'Activer' ?></button>
+                </form>
+            </div>
+
+            <p class="muted" style="margin-top:18px;">Prochaines étapes : la liste des phrases qui défilent, la météo, les horaires, et la composition des sous-widgets.</p>
+        </div>
+    </div>
+
+    <!-- Modale : accès au widget -->
+    <div id="widgetAccessModal" class="modal-backdrop">
+        <div class="modal-card">
+            <h3>Qui a accès au widget ?</h3>
+            <p class="muted">Profils qui verront le widget sur l'accueil. (Rien de coché = tout le monde.)</p>
+            <form method="POST" action="widget_save.php">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="set_access">
+                <input type="hidden" name="return" value="parametres.php#widget">
+                <?php $wroles = widgetRoles($db); ?>
+                <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:6px;">
+                    <?php foreach ($profiles as $key => $lbl): ?>
+                        <label style="display:flex; align-items:center; gap:6px; font-weight:600;">
+                            <input type="checkbox" name="roles[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $wroles, true) ? 'checked' : '' ?>> <?= htmlspecialchars($lbl) ?>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-light" onclick="closeModal('widgetAccessModal')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
         </div>
     </div>
 
