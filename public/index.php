@@ -4,6 +4,7 @@ verifierConnexion($db);
 require_once 'includes/quizz_status.php';
 require_once 'includes/modules.php';
 require_once 'includes/widget.php';
+require_once 'includes/theme.php';
 
 $role = currentDisplayRole(); // rôle d'AFFICHAGE (tient compte de l'aperçu admin), pas le rôle réel
 if ($role === 'agence_interim') {
@@ -60,6 +61,19 @@ if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
                 // pas critique
             }
         }
+    }
+}
+
+// --- Thème événementiel (Noël, Pâques, Halloween, 11 novembre...) ---
+$siteTheme = activeSiteTheme($db);
+// Aperçu admin : index.php?theme=noel (ou ?theme=off pour désactiver)
+if (($_SESSION['role'] ?? '') === 'admin' && isset($_GET['theme'])) {
+    $themeCatalog = siteThemeCatalog();
+    $themeKey = (string) $_GET['theme'];
+    if (isset($themeCatalog[$themeKey])) {
+        $siteTheme = ['key' => $themeKey] + $themeCatalog[$themeKey];
+    } elseif ($themeKey === 'off') {
+        $siteTheme = null;
     }
 }
 
@@ -224,7 +238,8 @@ if (!empty($_SESSION['module_flash'])) {
         .role-chk { font-weight: 600; display: flex; align-items: center; gap: 6px; }
     </style>
 </head>
-<body class="<?php echo $isBirthday ? 'birthday-mode' : ''; ?>">
+<body class="<?php echo trim(($isBirthday ? 'birthday-mode ' : '') . ($siteTheme ? 'site-theme' : '')); ?>">
+<?php if ($siteTheme) { echo renderSiteTheme($siteTheme); } ?>
 <?php if ($isBirthday): ?>
 <style>
 body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0; height:5px; z-index:9999; background:linear-gradient(90deg,#b8860b,#d4af37,#fff6cf,#d4af37,#b8860b); background-size:200% auto; animation:bdGold 3s linear infinite; pointer-events:none; }
