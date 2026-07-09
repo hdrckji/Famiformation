@@ -377,7 +377,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                             <span style="font-weight:800; color:#2d5a37;"><?= htmlspecialchars($lbl) ?></span>
                             <span style="display:flex; gap:5px;">
                                 <?php if (!in_array($key, ['admin', 'evaluateur', 'agence_interim'], true)): ?>
-                                    <a href="apercu.php?role=<?= urlencode($key) ?>" title="Voir le site comme ce profil" style="text-decoration:none; font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; color:#2d5a37;">👁</a>
+                                    <a href="apercu.php?role=<?= urlencode($key) ?>&back=<?= urlencode('parametres.php#histprofil') ?>" title="Voir le site comme ce profil" style="text-decoration:none; font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; color:#2d5a37;">👁</a>
                                 <?php endif; ?>
                                 <?php if (!$reorderUnlocked): ?>
                                     <button type="button" title="Modifier l'ordre" onclick="askPassword('unlock_reorder', 0)" style="font-size:0.9rem; border:1px solid #cdd8d0; border-radius:6px; padding:1px 7px; background:#fff; cursor:pointer;">🖐</button>

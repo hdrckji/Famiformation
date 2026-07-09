@@ -10,9 +10,24 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     exit();
 }
 
+// Cible de retour sûre (uniquement des pages internes connues, pas d'open redirect)
+function apercuSafeReturn($value, $default = 'index.php')
+{
+    $value = (string) $value;
+    foreach (['parametres.php', 'index.php', 'module.php', 'formation.php'] as $allowed) {
+        if (strpos($value, $allowed) === 0) {
+            return $value;
+        }
+    }
+    return $default;
+}
+
 if (isset($_GET['exit'])) {
     unset($_SESSION['apercu_role']);
-    header('Location: index.php');
+    // Revient là où l'aperçu a été lancé (ex : Paramètres > Accès aux modules par profil).
+    $back = isset($_SESSION['apercu_return']) ? (string) $_SESSION['apercu_return'] : 'index.php';
+    unset($_SESSION['apercu_return']);
+    header('Location: ' . apercuSafeReturn($back));
     exit();
 }
 
@@ -22,6 +37,9 @@ $valides = array_keys(moduleProfiles($db));
 $exclus = ['agence_interim', 'evaluateur', 'admin'];
 if ($role !== '' && in_array($role, $valides, true) && !in_array($role, $exclus, true)) {
     $_SESSION['apercu_role'] = $role;
+    // Mémorise la page de lancement pour y revenir en quittant l'aperçu.
+    $back = $_GET['back'] ?? ($_SERVER['HTTP_REFERER'] ?? '');
+    $_SESSION['apercu_return'] = apercuSafeReturn($back, 'parametres.php#histprofil');
 }
 
 header('Location: index.php');
