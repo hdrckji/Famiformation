@@ -94,13 +94,24 @@ function renderProfileModuleTree(array $byParent, $parentId, $profileKey, $depth
                 . '</form>';
         }
 
+        // Enfants rendus d'abord (pour savoir s'il y en a), repliés par défaut.
+        $childrenHtml = renderProfileModuleTree($byParent, (int) $mod['id'], $profileKey, $depth + 1, false, $reorderUnlocked);
+        $hasChildren = ($childrenHtml !== '');
+        $wrapId = 'pt_' . preg_replace('/[^a-zA-Z0-9_]/', '', (string) $profileKey) . '_' . (int) $mod['id'];
+        $toggle = $hasChildren
+            ? '<button type="button" onclick="togglePt(\'' . $wrapId . '\', this)" title="Développer / réduire" style="border:1px solid #cdd8d0; background:#eef5ef; color:#2d5a37; border-radius:5px; cursor:pointer; padding:0 6px; margin-right:5px; font-size:0.78rem;">▸</button>'
+            : '';
+
         $html .= '<div style="padding:3px 0 3px ' . $pad . 'px;">'
             . $reorderBtns
+            . $toggle
             . ($depth > 0 ? '<span style="color:#9bb3a3;">↳ </span>' : '')
             . '<span>' . $icon . '</span> '
             . '<span style="font-weight:' . ($depth === 0 ? '700' : '600') . '; color:#244230;">' . htmlspecialchars($mod['nom']) . '</span>'
             . '</div>';
-        $html .= renderProfileModuleTree($byParent, (int) $mod['id'], $profileKey, $depth + 1, false, $reorderUnlocked);
+        if ($hasChildren) {
+            $html .= '<div id="' . $wrapId . '" style="display:none;">' . $childrenHtml . '</div>';
+        }
     }
     return $html;
 }
@@ -719,6 +730,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             if (tr.getAttribute('data-parent') !== '0') { tr.style.display = 'none'; }
         });
         document.querySelectorAll('.tree-toggle').forEach(function (b) { b.setAttribute('data-expanded', '0'); b.textContent = '▸'; });
+    }
+    function togglePt(id, btn) {
+        var el = document.getElementById(id);
+        if (!el) { return; }
+        if (el.style.display === 'none') { el.style.display = 'block'; btn.textContent = '▾'; }
+        else { el.style.display = 'none'; btn.textContent = '▸'; }
     }
     function showTab(name, btn) {
         document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
