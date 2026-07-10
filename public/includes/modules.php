@@ -497,6 +497,14 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('sync_submodule_order_v2');
             }
+
+            // 16) Site piloté par la base : les modules CONTENEUR ne pointent plus vers une
+            //     page codée en dur — ils passent par le moteur générique module.php?id
+            //     qui affiche leurs sous-modules depuis la base. Les feuilles gardent leur lien.
+            if (!$hasFlag('containers_dbdriven_v1')) {
+                $db->exec("UPDATE modules SET link = NULL WHERE is_container = 1");
+                $setFlag('containers_dbdriven_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }

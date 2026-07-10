@@ -100,6 +100,11 @@ if ($role === 'etudiant') {
 $isAdmin = ($role === 'admin');
 ensureModulesTable($db);
 $dynamicModules = getModules($db, null, !$isAdmin); // l'admin voit aussi les modules inactifs
+// Carte nom -> id des modules racine (pour router les tuiles conteneur vers le moteur module.php)
+$rootModuleIds = [];
+foreach (getModules($db, null, false) as $rm) {
+    $rootModuleIds[(string) $rm['nom']] = (int) $rm['id'];
+}
 $moduleFlash = '';
 if (!empty($_SESSION['module_flash'])) {
     $moduleFlash = $_SESSION['module_flash'];
@@ -397,7 +402,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         </a>
 
         <?php if ($role === 'admin' || $role === 'teamcoach' || $role === 'mentor' || $role === 'employe_magasin'): ?>
-        <a href="magasin.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Magasin'] ?? 0) ?>" class="tile">
             <div class="tile-media"><span class="tile-icon">🛒</span></div>
             <div class="tile-title"><?= t('Magasin', 'Winkel') ?></div>
             <div class="tile-desc"><?= t('Procédures de vente et caisses.', 'Verkoop- en kassaprocedures.') ?></div>
@@ -512,7 +517,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         <?php endif; ?>
 
         <?php foreach ($dynamicModules as $mod): ?>
-        <?php if (!empty($mod['link'])) { continue; } // modules de base : déjà affichés par les tuiles ci-dessus ?>
+        <?php if (!empty($mod['link']) || !empty($mod['is_locked'])) { continue; } // modules de base (verrouillés) : déjà affichés par les tuiles ci-dessus ?>
         <?php if (!$isAdmin && !userCanSeeModule($mod, $role)) { continue; } ?>
         <a href="module.php?id=<?= (int) $mod['id'] ?>" class="tile<?= ((int) $mod['is_active'] !== 1) ? ' tile-inactive' : '' ?>">
             <div class="tile-media"><?= moduleIconHtml($mod) ?></div>

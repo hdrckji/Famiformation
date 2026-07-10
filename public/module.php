@@ -100,6 +100,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
     <?php if ($isContainer): ?>
         <div class="tiles-container">
             <?php foreach ($children as $child): ?>
+                <?php if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($child, currentDisplayRole())) { continue; } ?>
                 <?php
                     $childLink = trim((string) ($child['link'] ?? ''));
                     $childHref = $childLink !== '' ? $childLink : 'module.php?id=' . (int) $child['id'];
