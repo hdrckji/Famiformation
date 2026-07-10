@@ -1100,5 +1100,67 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         if (target) { showTab(name, target); }
     });
 </script>
+<?php
+// --- Apercu de theme EN PLACE (sans quitter la page) — ajout non destructif ---
+$__famiThemes = [];
+$__bd = function_exists('birthdayTheme') ? birthdayTheme() : [];
+$__famiThemes['anniversaire'] = [
+    'nom'       => is_array($__bd['nom'] ?? null) ? $__bd['nom'][0] : ($__bd['nom'] ?? '🎂 Anniversaire'),
+    'accent'    => $__bd['accent'] ?? '#e0245e',
+    'particles' => $__bd['particles'] ?? ['🎈', '🎉', '🎂'],
+];
+foreach (siteThemeCatalog() as $__k => $__t) {
+    $__famiThemes[$__k] = [
+        'nom'       => is_array($__t['nom']) ? $__t['nom'][0] : $__t['nom'],
+        'accent'    => $__t['accent'] ?? '#2d5a37',
+        'particles' => $__t['particles'] ?? ['✨'],
+    ];
+}
+?>
+<style>
+@keyframes famiFall { to { transform: translateY(115vh) rotate(360deg); } }
+@keyframes famiPop  { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+</style>
+<script>
+window.FAMI_THEMES = <?= json_encode($__famiThemes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+(function () {
+    function preview(key) {
+        var t = window.FAMI_THEMES[key];
+        if (!t) { return; }
+        var old = document.getElementById('famiThemePreview');
+        if (old) { old.remove(); }
+        var ov = document.createElement('div');
+        ov.id = 'famiThemePreview';
+        ov.style.cssText = 'position:fixed; inset:0; top:0; left:0; right:0; bottom:0; z-index:99999; pointer-events:none; overflow:hidden;';
+        document.body.appendChild(ov);
+        var parts = (t.particles && t.particles.length) ? t.particles : ['✨'];
+        for (var i = 0; i < 36; i++) {
+            var s = document.createElement('span');
+            s.textContent = parts[i % parts.length];
+            var dur = 2.6 + Math.random() * 2.6;
+            s.style.cssText = 'position:absolute; top:-10%; left:' + (Math.random() * 100) + '%; font-size:' + (18 + Math.random() * 22) + 'px; opacity:.95; animation:famiFall ' + dur + 's linear ' + (Math.random() * 1.4) + 's forwards;';
+            ov.appendChild(s);
+        }
+        var b = document.createElement('div');
+        b.textContent = t.nom || '';
+        b.style.cssText = 'position:absolute; top:15%; left:50%; transform:translateX(-50%); background:' + (t.accent || '#2d5a37') + '; color:#fff; padding:10px 22px; border-radius:999px; font-weight:800; font-size:1.1rem; box-shadow:0 10px 30px rgba(0,0,0,.25); animation:famiPop .5s ease;';
+        ov.appendChild(b);
+        setTimeout(function () {
+            ov.style.transition = 'opacity .6s';
+            ov.style.opacity = '0';
+            setTimeout(function () { if (ov && ov.parentNode) { ov.remove(); } }, 650);
+        }, 4200);
+    }
+    window.famiPreviewTheme = preview;
+    document.querySelectorAll('.theme-chip').forEach(function (chip) {
+        chip.addEventListener('click', function (e) {
+            if (chip._sup) { return; }
+            e.preventDefault();
+            preview(chip.getAttribute('data-key'));
+        });
+    });
+})();
+</script>
+
 </body>
 </html>

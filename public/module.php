@@ -167,7 +167,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             <?php if ($isContainer): ?>
                 <button type="button" class="btn btn-create" onclick="document.getElementById('createModal').style.display='flex';">➕ Ajouter un sous-module</button>
             <?php elseif (empty($module['is_booking'])): ?>
-                <button type="button" class="btn btn-create" onclick="document.getElementById('contentModal').style.display='flex';">📎 Gérer le contenu</button>
+                <button type="button" class="btn btn-create" onclick="document.getElementById('contentModal').style.display='flex';">📎 Ajouter du contenu</button>
             <?php endif; ?>
         </div>
         <div style="color:#fff; background:rgba(0,0,0,0.3); padding:8px 14px; border-radius:10px; font-size:0.85rem; margin-top:8px;">ℹ️ La suppression se fait dans ⚙️ Paramètres → Gestion des modules.</div>
