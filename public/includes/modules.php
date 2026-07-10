@@ -516,6 +516,15 @@ if (!function_exists('ensureModulesTable')) {
                 $db->exec("UPDATE modules SET is_booking = 1, is_container = 0, link = NULL, is_active = 0 WHERE nom = 'En ligne'");
                 $setFlag('seed_rdv_modules_v1');
             }
+
+            // 18) CORRECTIF : ne PAS remplacer les anciennes formations. On remet
+            //     « Présentiel » et « En ligne » sur leur affichage d'origine (formation.php).
+            //     Le système de rendez-vous restera pour un module dédié séparé.
+            if (!$hasFlag('revert_rdv_to_formation_v1')) {
+                $db->exec("UPDATE modules SET is_booking = 0, link = 'formation.php?vue=presentiel', is_active = 1 WHERE nom = 'Présentiel'");
+                $db->exec("UPDATE modules SET is_booking = 0, link = 'formation.php?vue=enligne' WHERE nom = 'En ligne'");
+                $setFlag('revert_rdv_to_formation_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
