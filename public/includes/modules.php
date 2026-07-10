@@ -477,6 +477,26 @@ if (!function_exists('ensureModulesTable')) {
                 }
                 $setFlag('group_caisse_pdf_video_v1');
             }
+
+            // 15) Ordre des SOUS-modules = ordre réel du site.
+            //     Les sous-modules ont été créés dans l'ordre d'affichage : on classe donc
+            //     les enfants de chaque parent par id croissant (= ordre de création = ordre réel).
+            //     Exception : le groupe « Formation caisse » (PDF+vidéo) passe en premier.
+            if (!$hasFlag('sync_submodule_order_v2')) {
+                $parents = $db->query("SELECT DISTINCT parent_id FROM modules WHERE parent_id IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
+                $kidsStmt = $db->prepare("SELECT id, nom FROM modules WHERE parent_id = ? ORDER BY id ASC");
+                $updK = $db->prepare("UPDATE modules SET sort_order = ? WHERE id = ?");
+                foreach ($parents as $pid) {
+                    $kidsStmt->execute([(int) $pid]);
+                    $rank = 0;
+                    foreach ($kidsStmt->fetchAll(PDO::FETCH_ASSOC) as $k) {
+                        $so = (strcasecmp((string) $k['nom'], 'Formation caisse') === 0) ? -1 : $rank;
+                        $updK->execute([$so, (int) $k['id']]);
+                        $rank++;
+                    }
+                }
+                $setFlag('sync_submodule_order_v2');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
