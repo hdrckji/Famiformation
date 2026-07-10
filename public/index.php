@@ -519,11 +519,19 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         <?php foreach ($dynamicModules as $mod): ?>
         <?php if (!empty($mod['link']) || !empty($mod['is_locked'])) { continue; } // modules de base (verrouillés) : déjà affichés par les tuiles ci-dessus ?>
         <?php if (!$isAdmin && !userCanSeeModule($mod, $role)) { continue; } ?>
-        <a href="module.php?id=<?= (int) $mod['id'] ?>" class="tile<?= ((int) $mod['is_active'] !== 1) ? ' tile-inactive' : '' ?>">
+        <?php if ((int) $mod['is_active'] === 1): ?>
+        <a href="module.php?id=<?= (int) $mod['id'] ?>" class="tile">
             <div class="tile-media"><?= moduleIconHtml($mod) ?></div>
             <div class="tile-title"><?= htmlspecialchars(moduleNom($mod)) ?></div>
             <div class="tile-desc"><?= htmlspecialchars(moduleDesc($mod)) ?></div>
         </a>
+        <?php else: ?>
+        <div class="tile tile-inactive" title="Module inactif — réactive-le dans Gestion des modules" style="cursor:not-allowed;">
+            <div class="tile-media"><?= moduleIconHtml($mod) ?></div>
+            <div class="tile-title"><?= htmlspecialchars(moduleNom($mod)) ?></div>
+            <div class="tile-desc"><?= htmlspecialchars(moduleDesc($mod)) ?></div>
+        </div>
+        <?php endif; ?>
         <?php endforeach; ?>
     </div>
 

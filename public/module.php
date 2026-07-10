@@ -110,16 +110,26 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             <?php foreach ($children as $child): ?>
                 <?php if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($child, currentDisplayRole())) { continue; } ?>
                 <?php
+                    $childActive = ((int) $child['is_active'] === 1);
                     $childLink = trim((string) ($child['link'] ?? ''));
                     $childHref = $childLink !== '' ? $childLink : 'module.php?id=' . (int) $child['id'];
                     $childExternal = (stripos($childLink, 'http') === 0);
                 ?>
-                <a href="<?= htmlspecialchars($childHref) ?>" class="tile <?= ((int) $child['is_active'] !== 1) ? 'inactive' : '' ?>"<?= $childExternal ? ' target="_blank" rel="noopener"' : '' ?>>
+                <?php if ($childActive): ?>
+                <a href="<?= htmlspecialchars($childHref) ?>" class="tile"<?= $childExternal ? ' target="_blank" rel="noopener"' : '' ?>>
                     <?php if (!empty($child['a_evaluer'])): ?><span class="badge-eval">📝</span><?php endif; ?>
                     <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
                     <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
                     <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
                 </a>
+                <?php else: ?>
+                <div class="tile inactive" title="Module inactif — réactive-le dans Gestion des modules" style="cursor:not-allowed;">
+                    <span class="badge-eval" style="background:#999;">Inactif</span>
+                    <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
+                    <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
+                    <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
+                </div>
+                <?php endif; ?>
             <?php endforeach; ?>
             <?php if (empty($children)): ?>
                 <div class="content-card" style="text-align:center;">Aucun sous-module pour l'instant.</div>
