@@ -266,7 +266,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
     <div class="wc-fx"></div>
     <div class="wc-card">
         <div class="wc-logo">🌿</div>
-        <div class="wc-hi"><?php echo t('Bienvenue', 'Welkom'); ?></div>
+        <div class="wc-hi"><?php echo t('Bienvenue sur Famiformation', 'Welkom op Famiformation'); ?></div>
         <div class="wc-name"><?php echo htmlspecialchars($welcomeName); ?></div>
         <div class="wc-sub"><?php echo t('Ravis de t\'accueillir chez Famiflora. Prends le temps de découvrir ton espace 🌱', 'Fijn dat je er bent bij Famiflora. Ontdek rustig jouw ruimte 🌱'); ?></div>
         <div class="wc-cta"><?php echo t('Clique pour commencer', 'Klik om te beginnen'); ?></div>
@@ -279,7 +279,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 @keyframes wcIn { from { opacity:0; transform:scale(.9) translateY(24px); } to { opacity:1; transform:none; } }
 .wc-logo { font-size:4.6rem; margin-bottom:6px; animation:wcFloat 2.4s ease-in-out infinite; }
 @keyframes wcFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-12px); } }
-.wc-hi { font-size:1.5rem; letter-spacing:3px; text-transform:uppercase; color:#bfe6cc; font-weight:700; }
+.wc-hi { font-size:1.2rem; letter-spacing:1.5px; text-transform:uppercase; color:#bfe6cc; font-weight:700; }
 .wc-name { font-size:3rem; font-weight:800; margin-top:2px; text-shadow:0 4px 24px rgba(0,0,0,.4); }
 .wc-sub { margin-top:16px; font-size:1.05rem; color:#dcefe2; max-width:540px; margin-left:auto; margin-right:auto; line-height:1.55; }
 .wc-cta { margin-top:30px; font-size:.8rem; letter-spacing:2px; text-transform:uppercase; color:#9ccbac; }
