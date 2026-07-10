@@ -103,10 +103,30 @@ if (!function_exists('siteThemeCatalog')) {
     }
 }
 
+if (!function_exists('persoMasterOn')) {
+    /** Interrupteur MAÎTRE « Personnalisation » : coupe toutes les options fun d'un seul clic. */
+    function persoMasterOn(PDO $db)
+    {
+        return function_exists('widgetGet') ? (widgetGet($db, 'perso_enabled', '1') === '1') : true;
+    }
+}
+
+if (!function_exists('persoFeatureOn')) {
+    /** Une option fun (animation, thème, effets...) est active seulement si le MAÎTRE
+     *  ET son interrupteur individuel sont tous les deux activés. */
+    function persoFeatureOn(PDO $db, $key, $default = '1')
+    {
+        if (!persoMasterOn($db)) {
+            return false;
+        }
+        return function_exists('widgetGet') ? (widgetGet($db, $key, $default) === '1') : true;
+    }
+}
+
 if (!function_exists('themesEnabled')) {
     function themesEnabled(PDO $db)
     {
-        return function_exists('widgetGet') ? (widgetGet($db, 'themes_enabled', '1') === '1') : true;
+        return persoFeatureOn($db, 'themes_enabled');
     }
 }
 
@@ -180,7 +200,7 @@ if (!function_exists('activePageTheme')) {
             }
         }
         if (($_SESSION['is_birthday_today'] ?? '') === '1'
-            && (!function_exists('widgetGet') || widgetGet($db, 'birthday_enabled', '1') === '1')) {
+            && persoFeatureOn($db, 'birthday_enabled')) {
             return birthdayTheme();
         }
         return activeSiteTheme($db, $pays);
@@ -253,8 +273,9 @@ if (!function_exists('famiInjectPageTheme')) {
 }
 
 if (!function_exists('renderSiteTheme')) {
-    /** CSS + décor (bannière + particules) à injecter juste après <body> sur l'accueil. */
-    function renderSiteTheme(array $theme)
+    /** CSS + décor (bannière + particules) à injecter juste après <body> sur l'accueil.
+     *  $withEffects=false : garde le fond/couleurs du thème mais SANS les particules animées. */
+    function renderSiteTheme(array $theme, $withEffects = true)
     {
         $accent = $theme['accent'];
         $accent2 = $theme['accent2'] ?? $accent;
@@ -266,7 +287,9 @@ if (!function_exists('renderSiteTheme')) {
         ob_start();
         ?>
         <div class="site-theme-ribbon"><?php echo htmlspecialchars($banner); ?></div>
+        <?php if ($withEffects): ?>
         <div class="site-theme-fx" data-particles="<?php echo $particlesJson; ?>" data-count="<?php echo (int) $count; ?>"></div>
+        <?php endif; ?>
         <style>
         .site-theme-ribbon { width:100%; box-sizing:border-box; text-align:center; font-weight:800; letter-spacing:.4px; color:#fff; padding:6px 12px; font-size:.9rem; background:linear-gradient(90deg, <?php echo $accent; ?>, <?php echo $accent2; ?>); box-shadow:0 2px 12px rgba(0,0,0,.18); position:relative; z-index:20; }
         body.site-theme .tile-title { color: <?php echo $accent; ?> !important; }

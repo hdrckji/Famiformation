@@ -43,7 +43,7 @@ try {
 }
 
 // --- Anniversaire ---
-$birthdayEnabled = (function_exists('widgetGet') ? widgetGet($db, 'birthday_enabled', '1') : '1') === '1';
+$birthdayEnabled = function_exists('persoFeatureOn') ? persoFeatureOn($db, 'birthday_enabled') : true;
 $isBirthday = false;
 $birthdayFirstOpen = false;
 $birthdayName = '';
@@ -66,8 +66,12 @@ if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
 
 // --- Message de bienvenue (toute première connexion de l'utilisateur) ---
 $showWelcome = false;
-$welcomeEnabled = (function_exists('widgetGet') ? widgetGet($db, 'welcome_enabled', '1') : '1') === '1';
-if ($welcomeEnabled && isset($user_data['welcome_seen']) && (int) $user_data['welcome_seen'] === 0) {
+$welcomeEnabled = function_exists('persoFeatureOn') ? persoFeatureOn($db, 'welcome_enabled') : true;
+// Aperçu admin : ?welcome=preview rejoue l'animation sans toucher au statut de l'utilisateur.
+$welcomePreview = (($_SESSION['role'] ?? '') === 'admin') && (($_GET['welcome'] ?? '') === 'preview');
+if ($welcomePreview) {
+    $showWelcome = true;
+} elseif ($welcomeEnabled && isset($user_data['welcome_seen']) && (int) $user_data['welcome_seen'] === 0) {
     $showWelcome = true;
     try {
         $db->prepare("UPDATE utilisateurs SET welcome_seen = 1 WHERE id = ?")->execute([$user_id]);
@@ -254,7 +258,7 @@ if (!empty($_SESSION['module_flash'])) {
     </style>
 </head>
 <body class="<?php echo trim(($isBirthday ? 'birthday-mode ' : '') . ($siteTheme ? 'site-theme' : '')); ?>">
-<?php if ($siteTheme) { echo renderSiteTheme($siteTheme); } ?>
+<?php if ($siteTheme) { echo renderSiteTheme($siteTheme, function_exists('persoFeatureOn') ? persoFeatureOn($db, 'effects_enabled') : true); } ?>
 <?php if ($isBirthday): ?>
 <style>
 body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0; height:5px; z-index:9999; background:linear-gradient(90deg,#b8860b,#d4af37,#fff6cf,#d4af37,#b8860b); background-size:200% auto; animation:bdGold 3s linear infinite; pointer-events:none; }

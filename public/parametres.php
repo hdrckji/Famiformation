@@ -59,9 +59,12 @@ ensureModulesTable($db);
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_prefs'])) {
     requireValidCSRF();
-    widgetSet($db, 'birthday_enabled', isset($_POST['birthday_enabled']) ? '1' : '0');
-    widgetSet($db, 'themes_enabled', isset($_POST['themes_enabled']) ? '1' : '0');
+    // Personnalisation : interrupteur maître + options par catégorie (un seul formulaire).
+    widgetSet($db, 'perso_enabled', isset($_POST['perso_enabled']) ? '1' : '0');
     widgetSet($db, 'welcome_enabled', isset($_POST['welcome_enabled']) ? '1' : '0');
+    widgetSet($db, 'themes_enabled', isset($_POST['themes_enabled']) ? '1' : '0');
+    widgetSet($db, 'effects_enabled', isset($_POST['effects_enabled']) ? '1' : '0');
+    widgetSet($db, 'birthday_enabled', isset($_POST['birthday_enabled']) ? '1' : '0');
     $_SESSION['module_flash'] = "✅ Préférences enregistrées.";
     header('Location: parametres.php#prefs');
     exit();
@@ -676,47 +679,91 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
             <p class="muted">Réservé aux administrateurs.</p>
 
-            <!-- Souhait d'anniversaire (clé birthday_enabled, branchée dans index.php) -->
+            <!-- 🎨 PERSONNALISATION : options « fun » regroupées, avec interrupteur maître.
+                 Un seul formulaire (toutes les cases partent ensemble → aucun écrasement). -->
             <div style="border-top:1px solid #eee; padding-top:14px; margin-top:6px;">
-                <h3 style="margin:0 0 6px; color:#244230;">🎂 Souhait d'anniversaire</h3>
-                <?php $birthdayOn = (widgetGet($db, 'birthday_enabled', '1') === '1'); ?>
+                <h3 style="margin:0 0 4px; color:#244230;">🎨 Personnalisation</h3>
+                <p class="muted" style="margin:0 0 14px;">Options qui rendent le site plus attractif. L'interrupteur maître permet de <strong>tout couper d'un clic</strong> (mode sobre) ; chaque catégorie reste réglable individuellement.</p>
+
+                <?php
+                    $persoOn    = (widgetGet($db, 'perso_enabled', '1') === '1');
+                    $welcomeOn  = (widgetGet($db, 'welcome_enabled', '1') === '1');
+                    $themesOn   = (widgetGet($db, 'themes_enabled', '1') === '1');
+                    $effectsOn  = (widgetGet($db, 'effects_enabled', '1') === '1');
+                    $birthdayOn = (widgetGet($db, 'birthday_enabled', '1') === '1');
+                    $activeTheme = activeSiteTheme($db);
+                    $bdT = birthdayTheme();
+                    $ckStyle = 'width:20px; height:20px; accent-color:#2d5a37; flex:0 0 auto;';
+                ?>
                 <form method="POST" action="parametres.php">
                     <?= csrfField() ?>
                     <input type="hidden" name="save_prefs" value="1">
-                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
-                        <input type="checkbox" name="birthday_enabled" value="1" <?= $birthdayOn ? 'checked' : '' ?> style="width:20px; height:20px; accent-color:#2d5a37;">
-                        Souhaiter l'anniversaire aux collaborateurs (animation à leur première ouverture du jour)
-                    </label>
-                    <p class="muted" style="margin:8px 0 14px;">Basé sur la date d'anniversaire renseignée dans la fiche de chaque collaborateur.</p>
 
-                    <?php $themesOn = (widgetGet($db, 'themes_enabled', '1') === '1'); $activeTheme = activeSiteTheme($db); ?>
-                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
-                        <input type="checkbox" name="themes_enabled" value="1" <?= $themesOn ? 'checked' : '' ?> style="width:20px; height:20px; accent-color:#2d5a37;">
-                        🎨 Thèmes événementiels (Noël, Pâques, Halloween, 11 novembre, fête nationale...)
+                    <!-- Interrupteur MAÎTRE -->
+                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:800; color:#244230; background:#f3f8f4; border:1px solid #d9e8dd; border-radius:10px; padding:12px 14px;">
+                        <input type="checkbox" id="persoMaster" name="perso_enabled" value="1" <?= $persoOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
+                        Activer la personnalisation du site
                     </label>
-                    <p class="muted" style="margin:8px 0 10px;">Change automatiquement le visuel du site (modules, boutons, widget + décor) selon la date.
-                        <?php if ($activeTheme): ?><br><strong style="color:<?= htmlspecialchars($activeTheme['accent']) ?>;">Thème actif aujourd'hui : <?= htmlspecialchars(is_array($activeTheme['nom']) ? $activeTheme['nom'][0] : $activeTheme['nom']) ?></strong><?php else: ?><br>Aucun thème actif aujourd'hui.<?php endif; ?>
-                    </p>
-                    <p class="muted" style="margin:0 0 6px;">Cliquez sur un thème pour l'<strong>aperçu</strong> (accueil, appliqué à tout le site). <a href="index.php?theme=off" style="color:#2d5a37;">Revenir au normal</a>.</p>
-                    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
-                        <?php $bdT = birthdayTheme(); ?>
-                        <a href="index.php?theme=anniversaire" title="Aperçu du thème anniversaire" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($bdT['accent']) ?>; color:<?= htmlspecialchars($bdT['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">🎂 Anniversaire</a>
-                        <?php foreach (siteThemeCatalog() as $tk => $tv): ?>
-                            <a href="index.php?theme=<?= urlencode($tk) ?>" title="Aperçu du thème" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($tv['accent']) ?>; color:<?= htmlspecialchars($tv['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">
-                                <?= htmlspecialchars(is_array($tv['nom']) ? $tv['nom'][0] : $tv['nom']) ?>
-                            </a>
-                        <?php endforeach; ?>
+                    <p class="muted" style="margin:8px 0 14px;">Décochez pour un site <strong>sobre / sérieux</strong> : toutes les options ci-dessous sont désactivées d'un coup (elles restent mémorisées).</p>
+
+                    <!-- Bloc des sous-catégories (grisé visuellement si le maître est coupé) -->
+                    <div id="persoSubs" style="border-left:3px solid #d9e8dd; padding-left:16px; margin-left:4px; transition:opacity .2s;<?= $persoOn ? '' : ' opacity:.45;' ?>">
+
+                        <!-- 🎬 ANIMATIONS -->
+                        <h4 style="margin:2px 0 8px; color:#2d5a37;">🎬 Animations</h4>
+                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
+                            <input type="checkbox" name="welcome_enabled" value="1" <?= $welcomeOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
+                            🌿 Animation de bienvenue
+                        </label>
+                        <p class="muted" style="margin:6px 0 8px;">Apparition affichée <strong>à la toute première connexion</strong> d'un nouveau collaborateur.</p>
+                        <p style="margin:0 0 18px;"><a href="index.php?welcome=preview" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; border:1.5px solid #2d5a37; color:#2d5a37; background:#fff; border-radius:10px; padding:8px 14px; font-weight:700;">▶ Prévisualiser l'animation</a></p>
+
+                        <!-- 🎨 THÈMES -->
+                        <h4 style="margin:2px 0 8px; color:#2d5a37; border-top:1px solid #eee; padding-top:14px;">🎨 Thèmes</h4>
+                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
+                            <input type="checkbox" name="themes_enabled" value="1" <?= $themesOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
+                            🎉 Thèmes événementiels (Noël, Pâques, Halloween, 11 novembre, fête nationale...)
+                        </label>
+                        <p class="muted" style="margin:6px 0 10px;">Change automatiquement le visuel du site (modules, boutons, widget + fond) selon la date.
+                            <?php if ($activeTheme): ?><br><strong style="color:<?= htmlspecialchars($activeTheme['accent']) ?>;">Thème actif aujourd'hui : <?= htmlspecialchars(is_array($activeTheme['nom']) ? $activeTheme['nom'][0] : $activeTheme['nom']) ?></strong><?php else: ?><br>Aucun thème actif aujourd'hui.<?php endif; ?>
+                        </p>
+
+                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
+                            <input type="checkbox" name="effects_enabled" value="1" <?= $effectsOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
+                            ✨ Effets / particules animés
+                        </label>
+                        <p class="muted" style="margin:6px 0 10px;">Flocons, feuilles, confettis... sur l'accueil. Décochez pour garder <strong>le fond du thème sans animation</strong>.</p>
+
+                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
+                            <input type="checkbox" name="birthday_enabled" value="1" <?= $birthdayOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
+                            🎂 Thème anniversaire
+                        </label>
+                        <p class="muted" style="margin:6px 0 10px;">Souhaite l'anniversaire au collaborateur (fond festif à sa première ouverture du jour), d'après sa date de naissance en fiche.</p>
+
+                        <p class="muted" style="margin:0 0 6px;">Cliquez sur un thème pour l'<strong>aperçu</strong> (appliqué à tout le site). <a href="index.php?theme=off" style="color:#2d5a37;">Revenir au normal</a>.</p>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
+                            <a href="index.php?theme=anniversaire" title="Aperçu du thème anniversaire" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($bdT['accent']) ?>; color:<?= htmlspecialchars($bdT['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">🎂 Anniversaire</a>
+                            <?php foreach (siteThemeCatalog() as $tk => $tv): ?>
+                                <a href="index.php?theme=<?= urlencode($tk) ?>" title="Aperçu du thème" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($tv['accent']) ?>; color:<?= htmlspecialchars($tv['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">
+                                    <?= htmlspecialchars(is_array($tv['nom']) ? $tv['nom'][0] : $tv['nom']) ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <!-- À VENIR : autres catégories de personnalisation -->
+                        <h4 style="margin:2px 0 8px; color:#9aa6a0; border-top:1px solid #eee; padding-top:14px;">🏅 Badges <span style="font-size:.75rem; font-weight:700; background:#eef1ef; color:#8a968f; border-radius:999px; padding:2px 8px;">à venir</span></h4>
+                        <h4 style="margin:2px 0 12px; color:#9aa6a0;">🥚 Easter eggs <span style="font-size:.75rem; font-weight:700; background:#eef1ef; color:#8a968f; border-radius:999px; padding:2px 8px;">à venir</span></h4>
                     </div>
-
-                    <?php $welcomeOn = (widgetGet($db, 'welcome_enabled', '1') === '1'); ?>
-                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230; border-top:1px solid #eee; padding-top:14px;">
-                        <input type="checkbox" name="welcome_enabled" value="1" <?= $welcomeOn ? 'checked' : '' ?> style="width:20px; height:20px; accent-color:#2d5a37;">
-                        🌿 Message de bienvenue à la première connexion d'un nouveau collaborateur
-                    </label>
-                    <p class="muted" style="margin:8px 0 16px;">Animation d'accueil affichée une seule fois, à la toute première connexion.</p>
 
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </form>
+                <script>
+                (function () {
+                    var m = document.getElementById('persoMaster'), subs = document.getElementById('persoSubs');
+                    if (!m || !subs) { return; }
+                    m.addEventListener('change', function () { subs.style.opacity = m.checked ? '1' : '.45'; });
+                })();
+                </script>
             </div>
 
             <!-- Sites Famiflora (source unique : fiche collaborateur + widget) -->
