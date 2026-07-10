@@ -38,6 +38,7 @@ if (!function_exists('ensureModulesTable')) {
                 'nom_nl'         => "ALTER TABLE modules ADD COLUMN nom_nl VARCHAR(150) NULL",
                 'description_nl' => "ALTER TABLE modules ADD COLUMN description_nl VARCHAR(500) NULL",
                 'link'           => "ALTER TABLE modules ADD COLUMN link VARCHAR(255) NULL",
+                'is_booking'     => "ALTER TABLE modules ADD COLUMN is_booking TINYINT(1) NOT NULL DEFAULT 0",
             ];
             foreach ($extraColumns as $col => $ddl) {
                 $check = $db->query("SHOW COLUMNS FROM modules LIKE " . $db->quote($col));
@@ -504,6 +505,16 @@ if (!function_exists('ensureModulesTable')) {
             if (!$hasFlag('containers_dbdriven_v1')) {
                 $db->exec("UPDATE modules SET link = NULL WHERE is_container = 1");
                 $setFlag('containers_dbdriven_v1');
+            }
+
+            // 17) Modules « Rendez-vous » : Présentiel (actif) et En ligne (inactif).
+            //     Ils affichent l'interface de réservation au lieu d'un contenu.
+            if (!$hasFlag('seed_rdv_modules_v1')) {
+                // Présentiel : module de rendez-vous, actif, sans lien.
+                $db->exec("UPDATE modules SET is_booking = 1, is_container = 0, link = NULL, is_active = 1 WHERE nom = 'Présentiel'");
+                // En ligne : module de rendez-vous, INACTIF pour l'instant.
+                $db->exec("UPDATE modules SET is_booking = 1, is_container = 0, link = NULL, is_active = 0 WHERE nom = 'En ligne'");
+                $setFlag('seed_rdv_modules_v1');
             }
         } catch (Exception $e) {
             // migration non critique : on ignore

@@ -2,6 +2,7 @@
 require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
+require_once 'includes/rendezvous.php';
 
 // En mode aperçu, l'admin voit la page comme l'utilisateur (boutons admin masqués)
 $isAdmin = ((($_SESSION['role'] ?? '') === 'admin') && !isApercuActif());
@@ -102,7 +103,9 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
 
     <?php if ($flash): ?><div class="flash"><?= $flash ?></div><?php endif; ?>
 
-    <?php if ($isContainer): ?>
+    <?php if (!empty($module['is_booking'])): ?>
+        <?= renderRendezvousModule($db, $module, $isAdmin, currentDisplayRole(), $_SESSION['user_id'] ?? 0) ?>
+    <?php elseif ($isContainer): ?>
         <div class="tiles-container">
             <?php foreach ($children as $child): ?>
                 <?php if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($child, currentDisplayRole())) { continue; } ?>
@@ -153,7 +156,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             <button type="button" class="btn btn-create" onclick="document.getElementById('editModal').style.display='flex';">✏️ Modifier ce module</button>
             <?php if ($isContainer): ?>
                 <button type="button" class="btn btn-create" onclick="document.getElementById('createModal').style.display='flex';">➕ Ajouter un sous-module</button>
-            <?php else: ?>
+            <?php elseif (empty($module['is_booking'])): ?>
                 <button type="button" class="btn btn-create" onclick="document.getElementById('contentModal').style.display='flex';">📎 Gérer le contenu</button>
             <?php endif; ?>
         </div>
@@ -197,7 +200,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         </div>
         <?php endif; ?>
 
-        <?php if (!$isContainer): ?>
+        <?php if (!$isContainer && empty($module['is_booking'])): ?>
         <!-- Modale : gérer le contenu (PDF / vidéo) -->
         <div id="contentModal" class="modal-backdrop">
             <div class="modal-card" style="max-width:620px;">
