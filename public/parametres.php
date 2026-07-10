@@ -57,15 +57,24 @@ if (!$isAdmin) {
 ensureModulesTable($db);
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_prefs'])) {
+// Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
+// Toutes les options passent par ce même point → cohérent et sûr (liste blanche de clés).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_perso'])) {
     requireValidCSRF();
-    // Personnalisation : interrupteur maître + options par catégorie (un seul formulaire).
-    widgetSet($db, 'perso_enabled', isset($_POST['perso_enabled']) ? '1' : '0');
-    widgetSet($db, 'welcome_enabled', isset($_POST['welcome_enabled']) ? '1' : '0');
-    widgetSet($db, 'themes_enabled', isset($_POST['themes_enabled']) ? '1' : '0');
-    widgetSet($db, 'effects_enabled', isset($_POST['effects_enabled']) ? '1' : '0');
-    widgetSet($db, 'birthday_enabled', isset($_POST['birthday_enabled']) ? '1' : '0');
-    $_SESSION['module_flash'] = "✅ Préférences enregistrées.";
+    $key = (string) ($_POST['perso_key'] ?? '');
+    $allowed = ['perso_enabled', 'anim_enabled', 'themes_enabled', 'welcome_enabled'];
+    if (function_exists('siteThemeCatalog')) {
+        foreach (array_keys(siteThemeCatalog()) as $tk) {
+            $allowed[] = 'theme_' . $tk . '_on';
+            $allowed[] = 'theme_' . $tk . '_anim';
+        }
+    }
+    $allowed[] = 'theme_anniversaire_on';
+    $allowed[] = 'theme_anniversaire_anim';
+    if (in_array($key, $allowed, true)) {
+        $cur = widgetGet($db, $key, '1');
+        widgetSet($db, $key, $cur === '1' ? '0' : '1');
+    }
     header('Location: parametres.php#prefs');
     exit();
 }
@@ -679,89 +688,149 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
             <p class="muted">Réservé aux administrateurs.</p>
 
-            <!-- 🎨 PERSONNALISATION : options « fun » regroupées, avec interrupteur maître.
-                 Un seul formulaire (toutes les cases partent ensemble → aucun écrasement). -->
+            <!-- 🎨 PERSONNALISATION : options « fun » regroupées, chaque bascule via un bouton
+                 (confirmation à la désactivation) ou, pour les thèmes, un clic droit. -->
+            <?php
+                $persoOn   = (widgetGet($db, 'perso_enabled', '1') === '1');
+                $animOn    = (widgetGet($db, 'anim_enabled', '1') === '1');
+                $themesOn  = (widgetGet($db, 'themes_enabled', '1') === '1');
+                $welcomeOn = (widgetGet($db, 'welcome_enabled', '1') === '1');
+                $activeTheme = activeSiteTheme($db);
+                $bdT = birthdayTheme();
+
+                // Bouton de bascule ON/OFF (formulaire autonome). Confirmation à la désactivation.
+                $btnToggle = function ($key, $isOn, $confirmOnDisable = '') {
+                    $label = $isOn ? '✔ Activé — cliquer pour désactiver' : '✖ Désactivé — cliquer pour activer';
+                    $bg = $isOn ? '#2d5a37' : '#9aa6a0';
+                    $onsub = ($isOn && $confirmOnDisable !== '')
+                        ? ' onsubmit="return confirm(' . htmlspecialchars(json_encode($confirmOnDisable, JSON_UNESCAPED_UNICODE), ENT_QUOTES) . ')"'
+                        : '';
+                    echo '<form method="POST" action="parametres.php" style="display:inline-block; margin:0;"' . $onsub . '>'
+                        . csrfField()
+                        . '<input type="hidden" name="toggle_perso" value="1">'
+                        . '<input type="hidden" name="perso_key" value="' . htmlspecialchars($key) . '">'
+                        . '<button type="submit" style="border:none; border-radius:8px; padding:8px 14px; font-weight:700; color:#fff; cursor:pointer; background:' . $bg . ';">' . $label . '</button>'
+                        . '</form>';
+                };
+
+                // Liste des thèmes (anniversaire + catalogue) avec leur état on/anim.
+                $themeChips = ['anniversaire' => ['nom' => '🎂 Anniversaire', 'accent' => $bdT['accent']]];
+                foreach (siteThemeCatalog() as $tk => $tv) {
+                    $themeChips[$tk] = ['nom' => (is_array($tv['nom']) ? $tv['nom'][0] : $tv['nom']), 'accent' => $tv['accent']];
+                }
+            ?>
             <div style="border-top:1px solid #eee; padding-top:14px; margin-top:6px;">
-                <h3 style="margin:0 0 4px; color:#244230;">🎨 Personnalisation</h3>
-                <p class="muted" style="margin:0 0 14px;">Options qui rendent le site plus attractif. L'interrupteur maître permet de <strong>tout couper d'un clic</strong> (mode sobre) ; chaque catégorie reste réglable individuellement.</p>
+                <h3 style="margin:0 0 4px; color:#244230; font-size:1.35rem;">🎨 Personnalisation</h3>
+                <p class="muted" style="margin:0 0 14px;">Options qui rendent le site attractif. Chaque bascule se fait par un <strong>bouton</strong> (confirmation à la désactivation). Une catégorie coupée est grisée.</p>
 
-                <?php
-                    $persoOn    = (widgetGet($db, 'perso_enabled', '1') === '1');
-                    $welcomeOn  = (widgetGet($db, 'welcome_enabled', '1') === '1');
-                    $themesOn   = (widgetGet($db, 'themes_enabled', '1') === '1');
-                    $effectsOn  = (widgetGet($db, 'effects_enabled', '1') === '1');
-                    $birthdayOn = (widgetGet($db, 'birthday_enabled', '1') === '1');
-                    $activeTheme = activeSiteTheme($db);
-                    $bdT = birthdayTheme();
-                    $ckStyle = 'width:20px; height:20px; accent-color:#2d5a37; flex:0 0 auto;';
-                ?>
-                <form method="POST" action="parametres.php">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="save_prefs" value="1">
+                <!-- INTERRUPTEUR MAÎTRE -->
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; background:#f3f8f4; border:1px solid #d9e8dd; border-radius:12px; padding:14px 16px;">
+                    <div>
+                        <div style="font-weight:800; color:#244230; font-size:1.05rem;">Personnalisation du site</div>
+                        <div class="muted" style="font-size:.86rem;">Coupez tout d'un clic pour un site <strong>sobre / sérieux</strong>. Les réglages restent mémorisés.</div>
+                    </div>
+                    <?php $btnToggle('perso_enabled', $persoOn, 'Désactiver TOUTE la personnalisation ? Le site deviendra sobre (ni animations, ni thèmes).'); ?>
+                </div>
 
-                    <!-- Interrupteur MAÎTRE -->
-                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:800; color:#244230; background:#f3f8f4; border:1px solid #d9e8dd; border-radius:10px; padding:12px 14px;">
-                        <input type="checkbox" id="persoMaster" name="perso_enabled" value="1" <?= $persoOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
-                        Activer la personnalisation du site
-                    </label>
-                    <p class="muted" style="margin:8px 0 14px;">Décochez pour un site <strong>sobre / sérieux</strong> : toutes les options ci-dessous sont désactivées d'un coup (elles restent mémorisées).</p>
+                <!-- Sous-catégories (grisées si le maître est coupé) -->
+                <div style="<?= $persoOn ? '' : 'opacity:.45; pointer-events:none;' ?> transition:opacity .2s; margin-top:6px;">
 
-                    <!-- Bloc des sous-catégories (grisé visuellement si le maître est coupé) -->
-                    <div id="persoSubs" style="border-left:3px solid #d9e8dd; padding-left:16px; margin-left:4px; transition:opacity .2s;<?= $persoOn ? '' : ' opacity:.45;' ?>">
+                    <!-- 🎬 ANIMATIONS -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-top:1px solid #eee; padding-top:16px; margin-top:14px;">
+                        <h3 style="margin:0; color:#2d5a37; font-size:1.2rem;">🎬 Animations</h3>
+                        <?php $btnToggle('anim_enabled', $animOn, 'Désactiver toute la catégorie Animations ?'); ?>
+                    </div>
+                    <div style="<?= $animOn ? '' : 'opacity:.5; pointer-events:none;' ?> border-left:3px solid #e3ece5; padding-left:14px; margin:12px 0 6px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                            <div>
+                                <div style="font-weight:700; color:#244230;">🌿 Animation de bienvenue</div>
+                                <div class="muted" style="font-size:.85rem;">Apparition affichée <strong>à la toute première connexion</strong> d'un collaborateur.</div>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <a href="index.php?welcome=preview" target="_blank" rel="noopener" style="text-decoration:none; border:1.5px solid #2d5a37; color:#2d5a37; background:#fff; border-radius:8px; padding:7px 12px; font-weight:700;">▶ Prévisualiser</a>
+                                <?php $btnToggle('welcome_enabled', $welcomeOn); ?>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- 🎬 ANIMATIONS -->
-                        <h4 style="margin:2px 0 8px; color:#2d5a37;">🎬 Animations</h4>
-                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
-                            <input type="checkbox" name="welcome_enabled" value="1" <?= $welcomeOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
-                            🌿 Animation de bienvenue
-                        </label>
-                        <p class="muted" style="margin:6px 0 8px;">Apparition affichée <strong>à la toute première connexion</strong> d'un nouveau collaborateur.</p>
-                        <p style="margin:0 0 18px;"><a href="index.php?welcome=preview" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; border:1.5px solid #2d5a37; color:#2d5a37; background:#fff; border-radius:10px; padding:8px 14px; font-weight:700;">▶ Prévisualiser l'animation</a></p>
-
-                        <!-- 🎨 THÈMES -->
-                        <h4 style="margin:2px 0 8px; color:#2d5a37; border-top:1px solid #eee; padding-top:14px;">🎨 Thèmes</h4>
-                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
-                            <input type="checkbox" name="themes_enabled" value="1" <?= $themesOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
-                            🎉 Thèmes événementiels (Noël, Pâques, Halloween, 11 novembre, fête nationale...)
-                        </label>
-                        <p class="muted" style="margin:6px 0 10px;">Change automatiquement le visuel du site (modules, boutons, widget + fond) selon la date.
+                    <!-- 🎨 THÈMES -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-top:1px solid #eee; padding-top:16px; margin-top:16px;">
+                        <h3 style="margin:0; color:#2d5a37; font-size:1.2rem;">🎨 Thèmes</h3>
+                        <?php $btnToggle('themes_enabled', $themesOn, 'Désactiver toute la catégorie Thèmes ?'); ?>
+                    </div>
+                    <div style="<?= $themesOn ? '' : 'opacity:.5; pointer-events:none;' ?> border-left:3px solid #e3ece5; padding-left:14px; margin:12px 0 6px;">
+                        <p class="muted" style="margin:0 0 4px;">Le visuel du site change automatiquement selon la date.
                             <?php if ($activeTheme): ?><br><strong style="color:<?= htmlspecialchars($activeTheme['accent']) ?>;">Thème actif aujourd'hui : <?= htmlspecialchars(is_array($activeTheme['nom']) ? $activeTheme['nom'][0] : $activeTheme['nom']) ?></strong><?php else: ?><br>Aucun thème actif aujourd'hui.<?php endif; ?>
                         </p>
-
-                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
-                            <input type="checkbox" name="effects_enabled" value="1" <?= $effectsOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
-                            ✨ Effets / particules animés
-                        </label>
-                        <p class="muted" style="margin:6px 0 10px;">Flocons, feuilles, confettis... sur l'accueil. Décochez pour garder <strong>le fond du thème sans animation</strong>.</p>
-
-                        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; color:#244230;">
-                            <input type="checkbox" name="birthday_enabled" value="1" <?= $birthdayOn ? 'checked' : '' ?> style="<?= $ckStyle ?>">
-                            🎂 Thème anniversaire
-                        </label>
-                        <p class="muted" style="margin:6px 0 10px;">Souhaite l'anniversaire au collaborateur (fond festif à sa première ouverture du jour), d'après sa date de naissance en fiche.</p>
-
-                        <p class="muted" style="margin:0 0 6px;">Cliquez sur un thème pour l'<strong>aperçu</strong> (appliqué à tout le site). <a href="index.php?theme=off" style="color:#2d5a37;">Revenir au normal</a>.</p>
+                        <p class="muted" style="margin:6px 0 10px; font-size:.85rem;">
+                            <strong>Clic gauche</strong> = aperçu · <strong>Clic droit</strong> (ou appui long sur mobile) = activer/désactiver le thème et son animation.
+                            Un thème désactivé est grisé · ✨ = animation active.
+                            <a href="index.php?theme=off" style="color:#2d5a37;">Revenir au normal</a>.
+                        </p>
                         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
-                            <a href="index.php?theme=anniversaire" title="Aperçu du thème anniversaire" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($bdT['accent']) ?>; color:<?= htmlspecialchars($bdT['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">🎂 Anniversaire</a>
-                            <?php foreach (siteThemeCatalog() as $tk => $tv): ?>
-                                <a href="index.php?theme=<?= urlencode($tk) ?>" title="Aperçu du thème" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1px solid <?= htmlspecialchars($tv['accent']) ?>; color:<?= htmlspecialchars($tv['accent']) ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;">
-                                    <?= htmlspecialchars(is_array($tv['nom']) ? $tv['nom'][0] : $tv['nom']) ?>
+                            <?php foreach ($themeChips as $tk => $tc):
+                                $tOn = (widgetGet($db, 'theme_' . $tk . '_on', '1') === '1');
+                                $aOn = (widgetGet($db, 'theme_' . $tk . '_anim', '1') === '1');
+                                $col = $tOn ? htmlspecialchars($tc['accent']) : '#9aa6a0';
+                            ?>
+                                <a class="theme-chip" href="index.php?theme=<?= urlencode($tk) ?>"
+                                   data-key="<?= htmlspecialchars($tk) ?>" data-on="<?= $tOn ? '1' : '0' ?>" data-anim="<?= $aOn ? '1' : '0' ?>"
+                                   title="Clic = aperçu · Clic droit = options"
+                                   style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1.5px solid <?= $col ?>; color:<?= $col ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;<?= $tOn ? '' : ' opacity:.5; text-decoration:line-through;' ?>">
+                                    <?= htmlspecialchars($tc['nom']) ?><?php if ($tOn && $aOn): ?> <span style="font-size:.72rem;">✨</span><?php endif; ?>
                                 </a>
                             <?php endforeach; ?>
                         </div>
-
-                        <!-- À VENIR : autres catégories de personnalisation -->
-                        <h4 style="margin:2px 0 8px; color:#9aa6a0; border-top:1px solid #eee; padding-top:14px;">🏅 Badges <span style="font-size:.75rem; font-weight:700; background:#eef1ef; color:#8a968f; border-radius:999px; padding:2px 8px;">à venir</span></h4>
-                        <h4 style="margin:2px 0 12px; color:#9aa6a0;">🥚 Easter eggs <span style="font-size:.75rem; font-weight:700; background:#eef1ef; color:#8a968f; border-radius:999px; padding:2px 8px;">à venir</span></h4>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    <!-- À VENIR -->
+                    <div style="border-top:1px solid #eee; padding-top:14px; margin-top:10px;">
+                        <h3 style="margin:2px 0 4px; color:#9aa6a0; font-size:1.05rem;">🏅 Badges <span style="font-size:.72rem; font-weight:700; background:#eef1ef; color:#8a968f; border-radius:999px; padding:2px 8px;">à venir</span></h3>
+                        <h3 style="margin:6px 0 2px; color:#9aa6a0; font-size:1.05rem;">🥚 Easter eggs <span style="font-size:.72rem; font-weight:700; background:#eef1ef; color:#8a968f; border-radius:999px; padding:2px 8px;">à venir</span></h3>
+                    </div>
+                </div>
+
+                <!-- Menu contextuel (clic droit) des thèmes + formulaire de bascule partagé -->
+                <div id="themeCtx" style="position:fixed; z-index:100000; display:none; background:#fff; border:1px solid #d0d7d2; border-radius:10px; box-shadow:0 10px 34px rgba(0,0,0,.2); padding:6px; min-width:220px;">
+                    <button type="button" data-act="preview" style="display:block; width:100%; text-align:left; border:none; background:none; padding:9px 12px; border-radius:7px; cursor:pointer; font-weight:600; color:#244230;">👁 Aperçu du thème</button>
+                    <button type="button" data-act="toggleOn" style="display:block; width:100%; text-align:left; border:none; background:none; padding:9px 12px; border-radius:7px; cursor:pointer; font-weight:600; color:#244230;"></button>
+                    <button type="button" data-act="toggleAnim" style="display:block; width:100%; text-align:left; border:none; background:none; padding:9px 12px; border-radius:7px; cursor:pointer; font-weight:600; color:#244230;"></button>
+                </div>
+                <form id="persoToggleForm" method="POST" action="parametres.php" style="display:none;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="toggle_perso" value="1">
+                    <input type="hidden" name="perso_key" id="persoToggleKey" value="">
                 </form>
                 <script>
                 (function () {
-                    var m = document.getElementById('persoMaster'), subs = document.getElementById('persoSubs');
-                    if (!m || !subs) { return; }
-                    m.addEventListener('change', function () { subs.style.opacity = m.checked ? '1' : '.45'; });
+                    var menu = document.getElementById('themeCtx');
+                    var form = document.getElementById('persoToggleForm');
+                    var keyInput = document.getElementById('persoToggleKey');
+                    if (!menu || !form) { return; }
+                    var cur = null;
+                    function show(chip, x, y) {
+                        cur = chip;
+                        var on = chip.getAttribute('data-on') === '1', anim = chip.getAttribute('data-anim') === '1';
+                        menu.querySelector('[data-act=toggleOn]').textContent = on ? '⬜ Désactiver le thème' : '✅ Activer le thème';
+                        menu.querySelector('[data-act=toggleAnim]').textContent = anim ? '🚫 Couper l’animation' : '✨ Activer l’animation';
+                        menu.style.left = Math.min(x, window.innerWidth - 236) + 'px';
+                        menu.style.top = Math.min(y, window.innerHeight - 150) + 'px';
+                        menu.style.display = 'block';
+                    }
+                    function hide() { menu.style.display = 'none'; cur = null; }
+                    document.querySelectorAll('.theme-chip').forEach(function (chip) {
+                        chip.addEventListener('contextmenu', function (e) { e.preventDefault(); show(chip, e.clientX, e.clientY); });
+                        var t;
+                        chip.addEventListener('touchstart', function () { t = setTimeout(function () { chip._sup = true; var r = chip.getBoundingClientRect(); show(chip, r.left, r.bottom); }, 500); }, { passive: true });
+                        chip.addEventListener('touchend', function () { clearTimeout(t); });
+                        chip.addEventListener('touchmove', function () { clearTimeout(t); });
+                        chip.addEventListener('click', function (e) { if (chip._sup) { e.preventDefault(); chip._sup = false; } });
+                    });
+                    menu.querySelector('[data-act=preview]').addEventListener('click', function () { if (cur) { window.location = cur.getAttribute('href'); } });
+                    menu.querySelector('[data-act=toggleOn]').addEventListener('click', function () { if (cur) { keyInput.value = 'theme_' + cur.getAttribute('data-key') + '_on'; form.submit(); } });
+                    menu.querySelector('[data-act=toggleAnim]').addEventListener('click', function () { if (cur) { keyInput.value = 'theme_' + cur.getAttribute('data-key') + '_anim'; form.submit(); } });
+                    document.addEventListener('click', function (e) { if (menu.style.display === 'block' && !menu.contains(e.target)) { hide(); } });
+                    window.addEventListener('scroll', hide, true);
                 })();
                 </script>
             </div>

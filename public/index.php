@@ -43,7 +43,12 @@ try {
 }
 
 // --- Anniversaire ---
-$birthdayEnabled = function_exists('persoFeatureOn') ? persoFeatureOn($db, 'birthday_enabled') : true;
+// Anniversaire = thème événementiel : soumis au maître + catégorie Thèmes + son
+// interrupteur individuel. Son animation (overlay festif + particules) a sa propre clé.
+$birthdayEnabled = function_exists('themesEnabled')
+    ? (themesEnabled($db) && (!function_exists('widgetGet') || widgetGet($db, 'theme_anniversaire_on', '1') === '1'))
+    : true;
+$birthdayAnim = !function_exists('widgetGet') || widgetGet($db, 'theme_anniversaire_anim', '1') === '1';
 $isBirthday = false;
 $birthdayFirstOpen = false;
 $birthdayName = '';
@@ -66,7 +71,9 @@ if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
 
 // --- Message de bienvenue (toute première connexion de l'utilisateur) ---
 $showWelcome = false;
-$welcomeEnabled = function_exists('persoFeatureOn') ? persoFeatureOn($db, 'welcome_enabled') : true;
+$welcomeEnabled = function_exists('persoFeatureOn')
+    ? (persoFeatureOn($db, 'anim_enabled') && widgetGet($db, 'welcome_enabled', '1') === '1')
+    : true;
 // Aperçu admin : ?welcome=preview rejoue l'animation sans toucher au statut de l'utilisateur.
 $welcomePreview = (($_SESSION['role'] ?? '') === 'admin') && (($_GET['welcome'] ?? '') === 'preview');
 if ($welcomePreview) {
@@ -258,7 +265,14 @@ if (!empty($_SESSION['module_flash'])) {
     </style>
 </head>
 <body class="<?php echo trim(($isBirthday ? 'birthday-mode ' : '') . ($siteTheme ? 'site-theme' : '')); ?>">
-<?php if ($siteTheme) { echo renderSiteTheme($siteTheme, function_exists('persoFeatureOn') ? persoFeatureOn($db, 'effects_enabled') : true); } ?>
+<?php
+if ($siteTheme) {
+    // Animation (particules) propre au thème actif : clé theme_<clé>_anim.
+    $fxKey = is_array($siteTheme) ? ($siteTheme['key'] ?? '') : '';
+    $withFx = $fxKey !== '' && (!function_exists('widgetGet') || widgetGet($db, 'theme_' . $fxKey . '_anim', '1') === '1');
+    echo renderSiteTheme($siteTheme, $withFx);
+}
+?>
 <?php if ($isBirthday): ?>
 <style>
 body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0; height:5px; z-index:9999; background:linear-gradient(90deg,#b8860b,#d4af37,#fff6cf,#d4af37,#b8860b); background-size:200% auto; animation:bdGold 3s linear infinite; pointer-events:none; }
@@ -300,7 +314,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 })();
 </script>
 <?php endif; ?>
-<?php if ($birthdayFirstOpen && !$showWelcome): ?>
+<?php if ($birthdayFirstOpen && !$showWelcome && $birthdayAnim): ?>
 <div id="bdOverlay" class="bd-overlay" onclick="this.classList.add('bd-hide')">
     <div class="bd-confetti"></div>
     <div class="bd-card">

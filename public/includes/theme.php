@@ -161,6 +161,10 @@ if (!function_exists('activeSiteTheme')) {
                 continue;
             }
             if (themeMatchesToday($t, $today, $md, $easter)) {
+                // Thème désactivé individuellement (clé theme_<clé>_on) : on l'ignore.
+                if (function_exists('widgetGet') && widgetGet($db, 'theme_' . $key . '_on', '1') !== '1') {
+                    continue;
+                }
                 return ['key' => $key] + $t;
             }
         }
@@ -199,8 +203,11 @@ if (!function_exists('activePageTheme')) {
                 return ['key' => $pv] + $catalog[$pv];
             }
         }
+        // L'anniversaire est un thème événementiel comme les autres : soumis au maître,
+        // à la catégorie Thèmes, et à son interrupteur individuel theme_anniversaire_on.
         if (($_SESSION['is_birthday_today'] ?? '') === '1'
-            && persoFeatureOn($db, 'birthday_enabled')) {
+            && themesEnabled($db)
+            && (!function_exists('widgetGet') || widgetGet($db, 'theme_anniversaire_on', '1') === '1')) {
             return birthdayTheme();
         }
         return activeSiteTheme($db, $pays);
