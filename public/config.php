@@ -241,7 +241,11 @@ if (isset($db) && isset($_SESSION['user_id'])) {
         $__pageTheme = activePageTheme($db);
         if (!empty($__pageTheme)) {
             $GLOBALS['__fami_page_theme'] = $__pageTheme;
-            ob_start('famiInjectPageTheme');
         }
+    }
+    // Bufferise la sortie pour injecter (toujours) la restauration du scroll,
+    // et le fond du thème si un thème est actif. Ne touche jamais aux réponses non-HTML.
+    if (function_exists('famiInjectPageTheme')) {
+        ob_start('famiInjectPageTheme');
     }
 }

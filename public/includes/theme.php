@@ -200,13 +200,32 @@ if (!function_exists('renderPageThemeBackground')) {
     }
 }
 
+if (!function_exists('famiScrollRestoreScript')) {
+    /**
+     * Script global : mémorise la position de scroll avant un envoi de formulaire /
+     * une navigation, et la restaure après le rechargement de la MÊME page (PRG).
+     * Évite de « remonter en haut » après un clic (verrouiller, traduire, etc.).
+     */
+    function famiScrollRestoreScript()
+    {
+        return '<script>(function(){try{'
+            . 'var k="fscroll:"+location.pathname+location.search;'
+            . 'var s=sessionStorage.getItem(k);'
+            . 'if(s){sessionStorage.removeItem(k);var d=null;try{d=JSON.parse(s);}catch(e){}'
+            . 'if(d&&(Date.now()-d.t)<20000&&d.y>0){var y=d.y;var go=function(){window.scrollTo(0,y);};'
+            . 'go();document.addEventListener("DOMContentLoaded",go);window.addEventListener("load",go);'
+            . 'setTimeout(go,120);setTimeout(go,400);}}'
+            . 'function save(){try{sessionStorage.setItem(k,JSON.stringify({y:window.scrollY||window.pageYOffset||0,t:Date.now()}));}catch(e){}}'
+            . 'document.addEventListener("submit",save,true);'
+            . 'window.addEventListener("beforeunload",save);'
+            . '}catch(e){}})();</script>';
+    }
+}
+
 if (!function_exists('famiInjectPageTheme')) {
-    /** Callback ob_start : injecte le fond du thème après <body>, uniquement en HTML. */
+    /** Callback ob_start : injecte (toujours) la restauration du scroll + le fond du thème si actif. Uniquement en HTML. */
     function famiInjectPageTheme($buffer)
     {
-        if (empty($GLOBALS['__fami_page_theme']) || !is_array($GLOBALS['__fami_page_theme'])) {
-            return $buffer;
-        }
         foreach (headers_list() as $h) {
             if (stripos($h, 'content-type:') === 0 && stripos($h, 'text/html') === false) {
                 return $buffer; // réponse non-HTML (PDF, xlsx, JSON...) : on ne touche pas
@@ -220,7 +239,12 @@ if (!function_exists('famiInjectPageTheme')) {
         if ($tagEnd === false) {
             return $buffer;
         }
-        $inject = renderPageThemeBackground($GLOBALS['__fami_page_theme']);
+        // Toujours : restauration de la position de scroll.
+        $inject = famiScrollRestoreScript();
+        // + fond du thème si un thème est actif.
+        if (!empty($GLOBALS['__fami_page_theme']) && is_array($GLOBALS['__fami_page_theme'])) {
+            $inject .= renderPageThemeBackground($GLOBALS['__fami_page_theme']);
+        }
         if ($inject === '') {
             return $buffer;
         }
