@@ -205,13 +205,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ], 300 * 1024 * 1024, 'video');
             if ($newVideo !== null) { $videoPath = $newVideo; }
 
-            $uniformized = (($_POST['uniformize'] ?? '0') === '1') ? 1 : 0;
-            $aEvaluer = !empty($_POST['a_evaluer']) ? 1 : 0;
+            // Règle : un contenu doit porter sur au moins 1 fichier (PDF ou vidéo).
+            if (($pdfPath === null || $pdfPath === '') && ($videoPath === null || $videoPath === '')) {
+                $_SESSION['module_flash'] = "❌ Il faut au moins 1 fichier (PDF ou vidéo) : contenu inchangé.";
+                $redirectTo = 'module.php?id=' . $id;
+            } else {
+                $uniformized = (($_POST['uniformize'] ?? '0') === '1') ? 1 : 0;
+                $aEvaluer = !empty($_POST['a_evaluer']) ? 1 : 0;
 
-            $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ? WHERE id = ?")
-               ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $id]);
-            $_SESSION['module_flash'] = "✅ Contenu du module mis à jour.";
-            $redirectTo = 'module.php?id=' . $id;
+                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ? WHERE id = ?")
+                   ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $id]);
+                $_SESSION['module_flash'] = "✅ Contenu du module mis à jour.";
+                $redirectTo = 'module.php?id=' . $id;
+            }
         }
     } elseif ($action === 'toggle_lock') {
         $id = (int) ($_POST['id'] ?? 0);

@@ -196,7 +196,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <div id="contentModal" class="modal-backdrop">
             <div class="modal-card" style="max-width:620px;">
                 <h3>Contenu du module</h3>
-                <form id="contentForm" method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return validateContent();">
+                <form id="contentForm" method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return validateContent(event);">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="content">
                     <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
@@ -252,6 +252,38 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                 </form>
             </div>
         </div>
+        <!-- Modale : aucun fichier -->
+        <div id="fileErrorModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">📎</div>
+                <div class="fc-modal-title">Fichier manquant</div>
+                <div class="fc-modal-text">Il faut au moins <strong>1 fichier</strong> (PDF ou vidéo) pour enregistrer du contenu.</div>
+                <div class="fc-modal-actions">
+                    <button type="button" class="btn btn-create" onclick="document.getElementById('fileErrorModal').style.display='none';">J'ai compris</button>
+                </div>
+            </div>
+        </div>
+        <!-- Modale : un seul fichier sur deux -->
+        <div id="fileWarnModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">⚠️</div>
+                <div class="fc-modal-title">Un seul fichier sur deux</div>
+                <div class="fc-modal-text">Vous n'avez ajouté qu'<strong>un seul fichier sur les deux</strong>. Votre contenu ne portera que sur celui-ci.<br>Voulez-vous continuer ?</div>
+                <div class="fc-modal-actions">
+                    <button type="button" class="btn" style="background:#e9ecef; color:#333;" onclick="document.getElementById('fileWarnModal').style.display='none';">Annuler</button>
+                    <button type="button" class="btn btn-create" onclick="fcConfirmContent();">Oui, continuer</button>
+                </div>
+            </div>
+        </div>
+        <style>
+        .fc-modal { position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:20px; }
+        .fc-modal-box { background:#fff; border-radius:16px; padding:28px; max-width:440px; width:100%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.35); animation:fcIn .25s ease; }
+        @keyframes fcIn { from { opacity:0; transform:scale(.92) translateY(10px); } to { opacity:1; transform:none; } }
+        .fc-modal-icon { font-size:3rem; margin-bottom:8px; }
+        .fc-modal-title { font-size:1.35rem; font-weight:800; color:#2d5a37; margin-bottom:8px; }
+        .fc-modal-text { color:#555; line-height:1.55; margin-bottom:22px; }
+        .fc-modal-actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+        </style>
         <script>
         (function () {
             var zones = document.querySelectorAll('#contentForm .drop-zone');
@@ -289,16 +321,31 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             }
             return false;
         }
-        function validateContent() {
+        var fcPendingUniformize = '0';
+        function validateContent(e) {
             var n = (dzPresent('dz_pdf') ? 1 : 0) + (dzPresent('dz_video') ? 1 : 0);
+            if (e && e.submitter && e.submitter.name === 'uniformize') {
+                fcPendingUniformize = e.submitter.value;
+            }
             if (n === 0) {
-                alert("Aucun fichier : ajoutez au moins un PDF ou une vidéo pour enregistrer du contenu.");
+                document.getElementById('fileErrorModal').style.display = 'flex';
                 return false;
             }
             if (n === 1) {
-                return confirm("Un seul des deux fichiers est renseigné (PDF ou vidéo). Voulez-vous continuer quand même ?");
+                document.getElementById('fileWarnModal').style.display = 'flex';
+                return false;
             }
-            return confirm("Enregistrer le contenu de ce module ?");
+            return true; // 2 fichiers : enregistrement direct
+        }
+        function fcConfirmContent() {
+            document.getElementById('fileWarnModal').style.display = 'none';
+            var f = document.getElementById('contentForm');
+            var h = document.createElement('input');
+            h.type = 'hidden';
+            h.name = 'uniformize';
+            h.value = fcPendingUniformize;
+            f.appendChild(h);
+            f.submit();
         }
         </script>
         <?php endif; ?>
