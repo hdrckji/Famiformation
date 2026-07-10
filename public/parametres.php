@@ -56,6 +56,9 @@ if (!$isAdmin) {
 
 ensureModulesTable($db);
 
+require_once __DIR__ . '/includes/ia_settings.php';
+iaSettingsHandlePost($db);
+
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 // Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
 // Toutes les options passent par ce même point → cohérent et sûr (liste blanche de clés).
@@ -699,6 +702,8 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <span class="muted">Aucun volume détecté. Attache un volume Railway au service pour ne pas perdre les fichiers à chaque redéploiement.</span>
                 <?php endif; ?>
             </div>
+
+            <?php iaSettingsCard($db); ?>
 
             <!-- 🎨 PERSONNALISATION : options « fun » regroupées, chaque bascule via un bouton
                  (confirmation à la désactivation) ou, pour les thèmes, un clic droit. -->
