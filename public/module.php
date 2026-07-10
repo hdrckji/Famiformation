@@ -140,19 +140,19 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php if (!empty($module['video_path'])): ?>
             <div class="content-card">
                 <video controls controlsList="nodownload" style="width:100%; border-radius:12px; background:#000;">
-                    <source src="<?= htmlspecialchars($module['video_path']) ?>">
+                    <source src="<?= htmlspecialchars(moduleFileUrl($module['video_path'])) ?>">
                     <?= t('Votre navigateur ne peut pas lire cette vidéo.', 'Uw browser kan deze video niet afspelen.') ?>
                 </video>
             </div>
         <?php endif; ?>
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni): ?>
-                <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars($module['pdf_path']) ?>">
+                <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>
                 </div>
             <?php else: ?>
                 <div class="content-card" style="padding:0; overflow:hidden;">
-                    <iframe src="<?= htmlspecialchars($module['pdf_path']) ?>" style="width:100%; height:80vh; border:none; border-radius:18px;"></iframe>
+                    <iframe src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>" style="width:100%; height:80vh; border:none; border-radius:18px;"></iframe>
                 </div>
             <?php endif; ?>
         <?php endif; ?>
@@ -237,7 +237,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                     </div>
                     <?php if (!empty($module['pdf_path'])): ?>
                         <div class="dz-existing">
-                            <a href="<?= htmlspecialchars($module['pdf_path']) ?>" download>⬇ Télécharger le PDF actuel</a>
+                            <a href="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>" download>⬇ Télécharger le PDF actuel</a>
                             <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_pdf" value="1"> Supprimer</label>
                         </div>
                     <?php endif; ?>
@@ -252,7 +252,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                     </div>
                     <?php if (!empty($module['video_path'])): ?>
                         <div class="dz-existing">
-                            <a href="<?= htmlspecialchars($module['video_path']) ?>" download>⬇ Télécharger la vidéo actuelle</a>
+                            <a href="<?= htmlspecialchars(moduleFileUrl($module['video_path'])) ?>" download>⬇ Télécharger la vidéo actuelle</a>
                             <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_video" value="1"> Supprimer</label>
                         </div>
                     <?php endif; ?>

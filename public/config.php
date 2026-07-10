@@ -8,6 +8,40 @@ require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once __DIR__ . '/includes/lang.php';
 
+// 1bis. STOCKAGE DES FICHIERS (uploads : PDF, vidéos...).
+// Sur Railway, un volume persistant est monté et exposé via RAILWAY_VOLUME_MOUNT_PATH.
+// En local (ou si pas de volume), on retombe sur public/uploads.
+if (!defined('FAMI_STORAGE_BASE')) {
+    $__vol = getenv('RAILWAY_VOLUME_MOUNT_PATH');
+    if (!$__vol && isset($_SERVER['RAILWAY_VOLUME_MOUNT_PATH'])) {
+        $__vol = $_SERVER['RAILWAY_VOLUME_MOUNT_PATH'];
+    }
+    if ($__vol && @is_dir($__vol)) {
+        define('FAMI_STORAGE_BASE', rtrim($__vol, "/\\"));
+    } else {
+        define('FAMI_STORAGE_BASE', __DIR__ . '/uploads');
+    }
+}
+
+if (!function_exists('moduleFileUrl')) {
+    /**
+     * URL d'affichage d'un fichier de module.
+     * - anciens fichiers (déjà sous public/uploads/...) : URL directe (compat).
+     * - nouveaux fichiers (clé « modules/... » sur le volume) : script sécurisé media.php.
+     */
+    function moduleFileUrl($path)
+    {
+        $path = (string) $path;
+        if ($path === '') {
+            return '';
+        }
+        if (strpos($path, 'uploads/') === 0 || preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+        return 'media.php?f=' . rawurlencode($path);
+    }
+}
+
 // Fallback défensif: évite le crash si le serveur charge une version incomplète de includes/functions.php
 if (!function_exists('loadEnv')) {
     function loadEnv($filePath)

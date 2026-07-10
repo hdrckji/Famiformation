@@ -87,13 +87,16 @@ function handleModuleFileUpload($field, array $allowedMap, $maxSize, $subdir)
             return null;
         }
     }
-    $dir = __DIR__ . '/uploads/modules/' . $subdir;
+    // Stockage sur le volume persistant (Railway) via FAMI_STORAGE_BASE ; fallback local.
+    $storeBase = defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads');
+    $dir = $storeBase . '/modules/' . $subdir;
     if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
     $name = $subdir . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
     if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
         return null;
     }
-    return 'uploads/modules/' . $subdir . '/' . $name;
+    // Clé relative (servie par media.php) — plus de préfixe « uploads/ ».
+    return 'modules/' . $subdir . '/' . $name;
 }
 
 $redirectTo = safeReturn($_POST['return'] ?? '', 'index.php');
