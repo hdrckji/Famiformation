@@ -688,6 +688,18 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
             <p class="muted">Réservé aux administrateurs.</p>
 
+            <?php $onVolume = (defined('FAMI_STORAGE_BASE') && FAMI_STORAGE_BASE !== (__DIR__ . '/uploads')); ?>
+            <div style="border:1px solid <?= $onVolume ? '#cfe6d5' : '#f0d9a8' ?>; background:<?= $onVolume ? '#f2f9f4' : '#fdf6e6' ?>; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:.9rem;">
+                🗄️ <strong>Stockage des fichiers :</strong>
+                <?php if ($onVolume): ?>
+                    <span style="color:#256b39; font-weight:700;">Volume persistant ✓</span>
+                    <span class="muted">(<?= htmlspecialchars(FAMI_STORAGE_BASE) ?>)</span> — les PDF/vidéos survivent aux redéploiements.
+                <?php else: ?>
+                    <span style="color:#8a6d1a; font-weight:700;">Local — non persistant ⚠</span>
+                    <span class="muted">Aucun volume détecté. Attache un volume Railway au service pour ne pas perdre les fichiers à chaque redéploiement.</span>
+                <?php endif; ?>
+            </div>
+
             <!-- 🎨 PERSONNALISATION : options « fun » regroupées, chaque bascule via un bouton
                  (confirmation à la désactivation) ou, pour les thèmes, un clic droit. -->
             <?php
