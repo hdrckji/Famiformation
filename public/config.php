@@ -202,6 +202,47 @@ if (isset($_SESSION['user_id'])) {
     // ...fin du bloc PHP, suppression du script HTML injecté...
 }
 
+// 7bis. NAVIGATION 100% PILOTÉE PAR LA BASE :
+// Les anciennes pages « conteneur » codées en dur (pur menu de tuiles) redirigent
+// automatiquement vers leur équivalent piloté par la base (module.php?id=...).
+// Ainsi, où que l'on arrive (lien, bouton « Retour », URL directe), on voit TOUJOURS
+// la version base de données, cohérente. Les pages FONCTION/CONTENU ne sont PAS ici
+// (formation.php, onboarding.php, green.php, garden.php, quiz, PDF/vidéo, etc.).
+if (isset($db) && isset($_SESSION['user_id'])) {
+    $__retiredContainers = [
+        'magasin.php'                   => 'Magasin',
+        'management.php'                => 'Management',
+        'logistique.php'                => 'Logistique',
+        'formation_becosoft.php'        => 'Becosoft',
+        'securite_travail.php'          => 'Sécurité au travail',
+        'formation-caisse.php'          => 'Formation Caisse',
+        'deco.php'                      => 'Déco',
+        'animalerie.php'                => 'Animalerie',
+        'food.php'                      => 'Food',
+        'stock.php'                     => 'Stock',
+        'ressources_humaines.php'       => 'Formation ressources humaines',
+        'barbecue_menu.php'             => 'Barbecue',
+        'piscine_spa.php'               => 'Piscine & Spa',
+        'mix.php'                       => 'Présentation équipe mix',
+        'fleurs-artificielles-menu.php' => 'Fleurs artificielles',
+        'lollyland_menu.php'            => 'Lollyland',
+    ];
+    $__curScript = basename((string) parse_url((string) ($_SERVER['SCRIPT_NAME'] ?? ''), PHP_URL_PATH));
+    if (isset($__retiredContainers[$__curScript])) {
+        try {
+            $__rs = $db->prepare("SELECT id FROM modules WHERE nom = ? ORDER BY id ASC LIMIT 1");
+            $__rs->execute([$__retiredContainers[$__curScript]]);
+            $__rid = (int) $__rs->fetchColumn();
+            if ($__rid > 0) {
+                header('Location: module.php?id=' . $__rid);
+                exit();
+            }
+        } catch (Exception $__e) {
+            // en cas d'anomalie, on laisse l'ancienne page s'afficher (pas de blocage)
+        }
+    }
+}
+
 // 8. THÈME (événement / anniversaire) : fond appliqué sur TOUTES les pages HTML.
 if (isset($db) && isset($_SESSION['user_id'])) {
     require_once __DIR__ . '/includes/widget.php';

@@ -383,7 +383,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 
     <div class="tiles-container">
         <?php if ($role !== 'etudiant' || $onboarding_unlocked): ?>
-        <a href="module.php?id=<?= (int) ($rootModuleIds['Onboarding'] ?? 0) ?>" class="tile">
+        <a href="onboarding.php" class="tile">
             <div class="tile-media"><span class="tile-icon">🚀</span></div>
             <div class="tile-title"><?= t('Onboarding', 'Onboarding') ?>
             </div>
@@ -392,7 +392,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         <?php endif; ?>
 
         <!-- planning des formations : désormais visible pour tous les rôles -->
-        <a href="module.php?id=<?= (int) ($rootModuleIds['Formation'] ?? 0) ?>" class="tile">
+        <a href="formation.php" class="tile">
             <?php if ($nouvelles_formations > 0): ?>
                 <span class="badge-new"><?= t('NOUVEAU', 'NIEUW') ?></span>
             <?php endif; ?>

@@ -525,6 +525,19 @@ if (!function_exists('ensureModulesTable')) {
                 $db->exec("UPDATE modules SET is_booking = 0, link = 'formation.php?vue=enligne' WHERE nom = 'En ligne'");
                 $setFlag('revert_rdv_to_formation_v1');
             }
+
+            // 19) COHÉRENCE : certaines pages portent une VRAIE fonction métier / un quiz
+            //     (inscriptions, gate étudiant, progression + quiz final). Elles NE passent
+            //     PAS par le moteur générique : on rétablit leur lien direct vers leur page
+            //     dédiée pour préserver l'existant. Elles sont exclues de la redirection
+            //     centralisée (config.php). Voir aussi le rétablissement des tuiles d'accueil.
+            if (!$hasFlag('restore_functional_links_v1')) {
+                $db->exec("UPDATE modules SET link = 'formation.php'   WHERE nom = 'Formation'");
+                $db->exec("UPDATE modules SET link = 'onboarding.php'  WHERE nom = 'Onboarding'");
+                $db->exec("UPDATE modules SET link = 'green.php'       WHERE nom = 'Green'");
+                $db->exec("UPDATE modules SET link = 'garden.php'      WHERE nom = 'Garden'");
+                $setFlag('restore_functional_links_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
