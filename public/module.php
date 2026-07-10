@@ -13,6 +13,11 @@ if (!$module || (!$isAdmin && (int) $module['is_active'] !== 1)) {
     header('Location: index.php');
     exit();
 }
+// Contrôle d'accès par profil (le module et ses parents restreignent la visibilité).
+if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($module, currentDisplayRole())) {
+    header('Location: index.php');
+    exit();
+}
 
 $flash = '';
 if (!empty($_SESSION['module_flash'])) {

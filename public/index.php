@@ -383,7 +383,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 
     <div class="tiles-container">
         <?php if ($role !== 'etudiant' || $onboarding_unlocked): ?>
-        <a href="onboarding.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Onboarding'] ?? 0) ?>" class="tile">
             <div class="tile-media"><span class="tile-icon">🚀</span></div>
             <div class="tile-title"><?= t('Onboarding', 'Onboarding') ?>
             </div>
@@ -392,7 +392,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         <?php endif; ?>
 
         <!-- planning des formations : désormais visible pour tous les rôles -->
-        <a href="formation.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Formation'] ?? 0) ?>" class="tile">
             <?php if ($nouvelles_formations > 0): ?>
                 <span class="badge-new"><?= t('NOUVEAU', 'NIEUW') ?></span>
             <?php endif; ?>
@@ -408,7 +408,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
             <div class="tile-desc"><?= t('Procédures de vente et caisses.', 'Verkoop- en kassaprocedures.') ?></div>
         </a>
         <?php if ($role !== 'employe_magasin'): ?>
-        <a href="management.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Management'] ?? 0) ?>" class="tile">
             <div class="tile-media"><span class="tile-icon">🧑‍💼</span></div>
             <div class="tile-title"><?= t('Management', 'Management') ?></div>
             <div class="tile-desc"><?= t('Outils et formations pour managers et mentors.', 'Tools en opleidingen voor managers en mentoren.') ?></div>
@@ -417,7 +417,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         <?php endif; ?>
 
         <?php if ($role !== 'etudiant'): ?>
-        <a href="formation_becosoft.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Becosoft'] ?? 0) ?>" class="tile">
             <div class="tile-media-beco"><img src="beco.png" alt="Becosoft" class="logo-beco-tile"></div>
             <div class="tile-title">Becosoft</div>
             <div class="tile-desc"><?= t('Logiciel de gestion de stock.', 'Software voor voorraadbeheer.') ?></div>
@@ -426,7 +426,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 
         <!-- tuile caisse réservée aux étudiants -->
         <?php if ($role === 'etudiant'): ?>
-        <a href="formation-caisse.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Formation Caisse'] ?? 0) ?>" class="tile">
             <div class="tile-media"><span class="tile-icon">💳</span></div>
             <div class="tile-title tile-title-stack">
                 <span><?= t('Formation Caisse', 'Kassaopleiding') ?></span>
@@ -456,7 +456,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
         <?php endif; ?>
 
         <?php if ($role === 'admin' || $role === 'employe_logistique' || $role === 'teamcoach' || $role === 'mentor'): ?>
-        <a href="logistique.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Logistique'] ?? 0) ?>" class="tile">
             <div class="tile-media"><span class="tile-icon">📦</span></div>
             <div class="tile-title"><?= t('Logistique', 'Logistiek') ?></div>
             <div class="tile-desc"><?= t('Gestion des flux et des stocks.', 'Beheer van stromen en voorraden.') ?></div>
@@ -469,7 +469,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
             <div class="tile-title"><?= t('Classement', 'Klassement') ?></div>
             <div class="tile-desc"><?= t('Tableau des scores et points.', 'Scorebord en punten.') ?></div>
         </a>
-        <a href="securite_travail.php" class="tile">
+        <a href="module.php?id=<?= (int) ($rootModuleIds['Sécurité au travail'] ?? 0) ?>" class="tile">
             <div class="tile-media"><span class="tile-icon">🦺</span></div>
             <div class="tile-title"><?= t('Sécurité au travail', 'Veiligheid op het werk') ?></div>
             <div class="tile-desc"><?= t('Chaussure de sécurité & secourisme', 'Veiligheidsschoenen & EHBO') ?></div>
