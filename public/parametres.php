@@ -72,6 +72,9 @@ if (!empty($_SESSION['module_flash'])) {
     $flash = $_SESSION['module_flash'];
     unset($_SESSION['module_flash']);
 }
+// Progression de la traduction par lots (pour l'enchaînement automatique)
+$xlate = $_SESSION['xlate'] ?? null;
+unset($_SESSION['xlate']);
 
 $profiles = moduleProfiles($db);
 $icons    = moduleIconChoices();
@@ -782,21 +785,36 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             ?>
             <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
                 <h3 style="margin:0 0 6px; color:#244230;">🌍 Traduction néerlandaise</h3>
-                <p class="muted">Les nouvelles phrases et questions sont traduites automatiquement à l'enregistrement. Utilise ces boutons pour traduire l'<strong>existant</strong> (par lots, pour respecter les limites du service gratuit). Clique plusieurs fois jusqu'à « Restant : 0 ».</p>
+                <?php $mmEmail = getenv('MYMEMORY_EMAIL'); $mmHasEmail = ($mmEmail !== false && trim((string) $mmEmail) !== ''); ?>
+                <p class="muted">Les nouvelles phrases et questions sont traduites automatiquement à l'enregistrement. Ces boutons traduisent l'<strong>existant</strong> en <strong>enchaînant les lots tout seuls</strong> jusqu'au bout (ou jusqu'à la limite quotidienne gratuite). Un seul clic suffit.</p>
+                <p class="muted" style="margin:0 0 12px;">Mode : <strong style="color:#2d5a37;"><?= $mmHasEmail ? 'quota étendu — email détecté (~50 000 mots/jour)' : 'quota standard — sans email (~5 000 mots/jour)' ?></strong>.<?= $mmHasEmail ? '' : ' Ajoute la variable MYMEMORY_EMAIL sur Railway pour ×10 (toujours gratuit).' ?></p>
                 <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                    <form method="POST" action="widget_save.php" style="display:inline;">
+                    <form id="xlatePhrasesForm" method="POST" action="widget_save.php" style="display:inline;">
                         <?= csrfField() ?>
                         <input type="hidden" name="action" value="translate_phrases_batch">
                         <input type="hidden" name="return" value="parametres.php#prefs">
                         <button type="submit" class="btn btn-primary">🌍 Traduire les phrases (reste : <?= $phrasesToTranslate ?>)</button>
                     </form>
-                    <form method="POST" action="widget_save.php" style="display:inline;">
+                    <form id="xlateQuizForm" method="POST" action="widget_save.php" style="display:inline;">
                         <?= csrfField() ?>
                         <input type="hidden" name="action" value="translate_quiz_batch">
                         <input type="hidden" name="return" value="parametres.php#prefs">
                         <button type="submit" class="btn btn-primary">🌍 Traduire les quiz (reste : <?= $quizToTranslate ?>)</button>
                     </form>
+                    <span id="xlateStatus" style="font-weight:700; color:#2d5a37; display:none;">⏳ Traduction en cours…</span>
                 </div>
+                <?php if ($xlate && (int) $xlate['rest'] > 0 && (int) $xlate['done'] > 0): ?>
+                <script>
+                (function () {
+                    var s = document.getElementById('xlateStatus');
+                    if (s) { s.style.display = 'inline'; s.textContent = '⏳ Traduction en cours… (restant : <?= (int) $xlate['rest'] ?>)'; }
+                    var formId = <?= json_encode($xlate['type'] === 'quiz' ? 'xlateQuizForm' : 'xlatePhrasesForm') ?>;
+                    setTimeout(function () { var f = document.getElementById(formId); if (f) { f.submit(); } }, 1200);
+                })();
+                </script>
+                <?php elseif ($xlate && (int) $xlate['rest'] > 0 && (int) $xlate['done'] === 0): ?>
+                <div class="muted" style="margin-top:10px; color:#a13e35; font-weight:700;">⚠️ Traduction arrêtée (limite quotidienne gratuite atteinte, ou service momentanément indisponible). Restant : <?= (int) $xlate['rest'] ?>. Réessaie plus tard<?= $mmHasEmail ? '' : ', ou configure MYMEMORY_EMAIL' ?>.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

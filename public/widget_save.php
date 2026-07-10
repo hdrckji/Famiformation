@@ -119,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $rest = (int) $db->query("SELECT COUNT(*) FROM widget_phrases WHERE texte_nl IS NULL OR texte_nl = ''")->fetchColumn();
         $_SESSION['module_flash'] = "✅ {$done} phrase(s) traduite(s) en NL. Restant à traduire : {$rest}.";
+        $_SESSION['xlate'] = ['type' => 'phrases', 'done' => $done, 'rest' => $rest];
     } elseif ($action === 'translate_quiz_batch') {
         try {
             $rows = $db->query("SELECT id, question_text, option_a, option_b, option_c FROM quiz_questions WHERE question_text_nl IS NULL OR question_text_nl = '' LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);
@@ -136,6 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $rest = (int) $db->query("SELECT COUNT(*) FROM quiz_questions WHERE question_text_nl IS NULL OR question_text_nl = ''")->fetchColumn();
             $_SESSION['module_flash'] = "✅ {$done} question(s) traduite(s) en NL. Restant : {$rest}.";
+            $_SESSION['xlate'] = ['type' => 'quiz', 'done' => $done, 'rest' => $rest];
         } catch (Exception $e) {
             $_SESSION['module_flash'] = "⚠️ Traduction des quiz impossible (module Quiz absent ?).";
         }
