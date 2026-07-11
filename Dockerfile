@@ -3,8 +3,12 @@ FROM dunglas/frankenphp:1-php8.3
 # Extensions PHP requises par le site (gd pour phpspreadsheet, zip, MySQL)
 RUN install-php-extensions gd zip pdo_mysql mysqli
 
-# Limites d'upload relevées (upload de PDF / vidéos dans les modules)
-RUN printf "upload_max_filesize=300M\npost_max_size=320M\nmemory_limit=512M\nmax_execution_time=600\n" > "$PHP_INI_DIR/conf.d/zz-uploads.ini"
+# ffmpeg : compression / ré-encodage automatique des vidéos déposées (720p faststart)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+
+# Limites d'upload relevées (on accepte une vidéo brute confortable ~500 Mo ; elle est
+# ensuite compressée côté serveur). upload_max_filesize < post_max_size (PDF + vidéo possibles).
+RUN printf "upload_max_filesize=512M\npost_max_size=540M\nmemory_limit=512M\nmax_execution_time=600\n" > "$PHP_INI_DIR/conf.d/zz-uploads.ini"
 
 # Copie le contenu de public/ dans la racine servie par FrankenPHP
 COPY public/ /app/public/

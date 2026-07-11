@@ -39,6 +39,10 @@ if (!function_exists('ensureModulesTable')) {
                 'description_nl' => "ALTER TABLE modules ADD COLUMN description_nl VARCHAR(500) NULL",
                 'link'           => "ALTER TABLE modules ADD COLUMN link VARCHAR(255) NULL",
                 'is_booking'     => "ALTER TABLE modules ADD COLUMN is_booking TINYINT(1) NOT NULL DEFAULT 0",
+                // Vidéo : état de la compression automatique (ffmpeg) et chemin de la source brute.
+                // video_status : '' | 'processing' | 'ready' | 'failed'.
+                'video_status'   => "ALTER TABLE modules ADD COLUMN video_status VARCHAR(16) NULL",
+                'video_src_path' => "ALTER TABLE modules ADD COLUMN video_src_path VARCHAR(255) NULL",
             ];
             foreach ($extraColumns as $col => $ddl) {
                 $check = $db->query("SHOW COLUMNS FROM modules LIKE " . $db->quote($col));

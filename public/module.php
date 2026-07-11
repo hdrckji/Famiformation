@@ -159,7 +159,20 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         </div>
     <?php else: ?>
         <?php $isUni = !empty($module['uniformized']); ?>
-        <?php if (!empty($module['video_path'])): ?>
+        <?php $vStatus = (string) ($module['video_status'] ?? ''); ?>
+        <?php if ($vStatus === 'processing'): ?>
+            <div class="content-card" style="text-align:center;">
+                <div style="font-size:2.4rem;">🎬</div>
+                <div style="font-weight:800; color:#2d5a37; font-size:1.15rem; margin-top:6px;"><?= t('Vidéo en cours de préparation…', 'Video wordt voorbereid…') ?></div>
+                <div style="color:#666; margin-top:6px;"><?= t('Compression automatique en 720p pour une lecture fluide. La vidéo apparaîtra ici toute seule.', 'Automatische compressie naar 720p voor vlot afspelen. De video verschijnt hier vanzelf.') ?></div>
+            </div>
+            <script>setTimeout(function () { location.reload(); }, 15000);</script>
+        <?php elseif ($vStatus === 'failed'): ?>
+            <div class="content-card" style="text-align:center; color:#b3261e;">
+                ⚠ <?= t('La préparation de la vidéo a échoué.', 'De voorbereiding van de video is mislukt.') ?>
+                <?php if ($isAdmin): ?><br><small><?= t('Réessaie en redéposant la vidéo via « Ajouter du contenu ».', 'Probeer opnieuw door de video opnieuw toe te voegen.') ?></small><?php endif; ?>
+            </div>
+        <?php elseif (!empty($module['video_path'])): ?>
             <div class="content-card">
                 <video controls controlsList="nodownload" style="width:100%; border-radius:12px; background:#000;">
                     <source src="<?= htmlspecialchars(moduleFileUrl($module['video_path'])) ?>">
@@ -181,7 +194,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                 </div>
             <?php endif; ?>
         <?php endif; ?>
-        <?php if (empty($module['video_path']) && empty($module['pdf_path'])): ?>
+        <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === ''): ?>
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
         <?php endif; ?>
     <?php endif; ?>
@@ -272,7 +285,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                         <input type="file" name="video_file" accept="video/*" class="dz-input">
                         <div class="dz-icon">🎬</div>
                         <div class="dz-title">Vidéo</div>
-                        <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir</div>
+                        <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">N'importe quel format · jusqu'à 500 Mo · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
                         <div class="dz-file" hidden></div>
                     </div>
                     <?php if (!empty($module['video_path'])): ?>
