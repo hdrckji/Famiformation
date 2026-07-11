@@ -25,10 +25,10 @@ if (!function_exists('aiUniformisePdf')) {
      * @return array ['ok'=>bool, 'text'=>string, 'error'=>string, 'model'=>string,
      *                'in'=>int, 'out'=>int, 'cost_eur'=>float]
      */
-    function aiUniformisePdf($db, $pdfPath)
+    function aiUniformisePdf($db, $pdfPath, $pdfRelForImages = '')
     {
         $fail = function ($msg) {
-            return ['ok' => false, 'text' => '', 'error' => $msg, 'model' => '', 'in' => 0, 'out' => 0, 'cost_eur' => 0.0];
+            return ['ok' => false, 'text' => '', 'error' => $msg, 'model' => '', 'in' => 0, 'out' => 0, 'cost_eur' => 0.0, 'images' => []];
         };
 
         $apiKey = getenv('ANTHROPIC_API_KEY');
@@ -52,26 +52,42 @@ if (!function_exists('aiUniformisePdf')) {
         // Modèle choisi dans les réglages IA (défaut : Sonnet 5).
         $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
 
-        $system = "Tu reçois un document de formation interne (PDF). Ta tâche : en extraire fidèlement le contenu "
-            . "et le réécrire dans un format UNIFORME, clair et lisible, en français.\n"
-            . "Règles :\n"
-            . "- N'ajoute AUCUNE information qui n'est pas dans le document.\n"
-            . "- Structure en Markdown : titres avec ##, sous-titres avec ###, paragraphes courts, listes à puces (-).\n"
-            . "- Garde toutes les informations utiles (procédures, chiffres, consignes), enlève le superflu (numéros de page, en-têtes répétés).\n"
-            . "- Là où le document contient une image, photo, schéma ou capture d'écran importante, insère un marqueur [IMAGE] seul sur sa ligne, à l'endroit correspondant, dans l'ordre d'apparition. N'invente pas d'images : un marqueur = une image réellement présente.\n"
-            . "- Aucun préambule ni conclusion de ta part (pas de « Voici… »). Donne DIRECTEMENT le contenu formaté.";
+        // 1) Extraire d'abord les images du PDF pour les fournir NUMÉROTÉES à l'IA (elle les place au bon endroit).
+        $relForImg = ($pdfRelForImages !== '') ? $pdfRelForImages : $pdfPath;
+        $images = function_exists('aiExtractPdfImages') ? aiExtractPdfImages($pdfPath, $relForImg) : [];
+        $images = array_slice($images, 0, 12); // borne coût / taille de requête
+
+        $system = "Tu es un rédacteur pédagogique. À partir d'un document de formation (PDF), tu produis une FICHE claire, agréable et bien organisée, en français.\n"
+            . "EXIGENCES :\n"
+            . "- Fidélité TOTALE : n'ajoute aucune information absente du document, n'invente rien.\n"
+            . "- Réorganise proprement : commence par un titre (# Titre) suivi d'une phrase d'introduction, puis des sections logiques (## Titre de section) avec du VRAI contenu sous chaque titre (jamais un titre seul sans texte).\n"
+            . "- Rédige des phrases complètes et lisibles ; utilise des listes à puces (- ) pour les étapes/consignes ; mets en gras (**mot**) uniquement les termes clés, avec parcimonie.\n"
+            . "- N'écris JAMAIS de symboles bruts parasites ni de « : ** » : le gras s'écrit strictement **texte**, rien d'autre.\n"
+            . "- Supprime le superflu (numéros de page, en-têtes/pieds répétés).\n"
+            . "- IMAGES : les images extraites du document te sont fournies, numérotées (Image 1, Image 2, …). Place chaque image PERTINENTE à l'endroit du texte où elle a du sens, seule sur sa ligne, avec le marqueur [[IMG n]] (n = son numéro). Ignore les images purement décoratives (logos, fonds). N'utilise pas deux fois la même image.\n"
+            . "- Aucun préambule ni méta-commentaire (pas de « Voici… ») : donne DIRECTEMENT la fiche en Markdown.";
+
+        $userContent = [
+            ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($bytes)]],
+        ];
+        foreach ($images as $ix => $imgRel) {
+            $imgAbs = rtrim((defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads')), '/') . '/' . $imgRel;
+            $imgBytes = @file_get_contents($imgAbs);
+            if ($imgBytes === false || $imgBytes === '') { continue; }
+            $ext = strtolower(pathinfo($imgAbs, PATHINFO_EXTENSION));
+            $mt = ($ext === 'png') ? 'image/png' : (($ext === 'gif') ? 'image/gif' : (($ext === 'webp') ? 'image/webp' : 'image/jpeg'));
+            $userContent[] = ['type' => 'text', 'text' => 'Image ' . ($ix + 1) . ' :'];
+            $userContent[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mt, 'data' => base64_encode($imgBytes)]];
+        }
+        $userContent[] = ['type' => 'text', 'text' => count($images) > 0
+            ? ('Produis la fiche. Place les images pertinentes parmi les ' . count($images) . ' fournies avec [[IMG n]] au bon endroit.')
+            : 'Produis la fiche.'];
 
         $payload = [
             'model'      => $model,
-            'max_tokens' => 8000,
+            'max_tokens' => 12000,
             'system'     => $system,
-            'messages'   => [[
-                'role'    => 'user',
-                'content' => [
-                    ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($bytes)]],
-                    ['type' => 'text', 'text' => 'Uniformise le contenu de ce document.'],
-                ],
-            ]],
+            'messages'   => [['role' => 'user', 'content' => $userContent]],
         ];
 
         $ch = curl_init('https://api.anthropic.com/v1/messages');
@@ -123,7 +139,7 @@ if (!function_exists('aiUniformisePdf')) {
         $costUsd = ($in / 1e6) * $rate[0] + ($out / 1e6) * $rate[1];
         $costEur = $costUsd * 0.92;
 
-        return ['ok' => true, 'text' => $text, 'error' => '', 'model' => $model, 'in' => $in, 'out' => $out, 'cost_eur' => $costEur];
+        return ['ok' => true, 'text' => $text, 'error' => '', 'model' => $model, 'in' => $in, 'out' => $out, 'cost_eur' => $costEur, 'images' => $images];
     }
 }
 

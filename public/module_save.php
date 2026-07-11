@@ -284,11 +284,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($uniformized === 1 && $pdfPath !== null && $pdfPath !== '') {
                     require_once __DIR__ . '/includes/ia_settings.php';
                     require_once __DIR__ . '/includes/ai_uniformise.php';
-                    $res = aiUniformisePdf($db, moduleFileAbsPath($pdfPath));
+                    $res = aiUniformisePdf($db, moduleFileAbsPath($pdfPath), $pdfPath);
                     if ($res['ok']) {
                         $contenuIa = $res['text'];
-                        $imgs = aiExtractPdfImages(moduleFileAbsPath($pdfPath), $pdfPath);
-                        $contenuImages = !empty($imgs) ? json_encode($imgs) : null;
+                        $contenuImages = !empty($res['images']) ? json_encode($res['images']) : null;
                         $flashMsg = "✅ Contenu uniformisé par l'IA (≈ " . number_format($res['cost_eur'], 3) . " €). Vérifie le rendu ci-dessous.";
                     } else {
                         $uniformized = 0;
