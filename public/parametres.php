@@ -57,6 +57,7 @@ if (!$isAdmin) {
 ensureModulesTable($db);
 
 require_once __DIR__ . '/includes/ia_settings.php';
+require_once __DIR__ . '/includes/perso_ui.php';
 iaSettingsHandlePost($db);
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
@@ -70,10 +71,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_perso'])) {
         foreach (array_keys(siteThemeCatalog()) as $tk) {
             $allowed[] = 'theme_' . $tk . '_on';
             $allowed[] = 'theme_' . $tk . '_anim';
+            $allowed[] = 'theme_' . $tk . '_intro';
         }
     }
     $allowed[] = 'theme_anniversaire_on';
     $allowed[] = 'theme_anniversaire_anim';
+    $allowed[] = 'theme_anniversaire_intro';
     if (in_array($key, $allowed, true)) {
         $cur = widgetGet($db, $key, '1');
         widgetSet($db, $key, $cur === '1' ? '0' : '1');
@@ -717,17 +720,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 
                 // Bouton de bascule ON/OFF (formulaire autonome). Confirmation à la désactivation.
                 $btnToggle = function ($key, $isOn, $confirmOnDisable = '') {
-                    $label = $isOn ? '✔ Activé — cliquer pour désactiver' : '✖ Désactivé — cliquer pour activer';
-                    $bg = $isOn ? '#2d5a37' : '#9aa6a0';
-                    $onsub = ($isOn && $confirmOnDisable !== '')
-                        ? ' onsubmit="return confirm(' . htmlspecialchars(json_encode($confirmOnDisable, JSON_UNESCAPED_UNICODE), ENT_QUOTES) . ')"'
-                        : '';
-                    echo '<form method="POST" action="parametres.php" style="display:inline-block; margin:0;"' . $onsub . '>'
-                        . csrfField()
-                        . '<input type="hidden" name="toggle_perso" value="1">'
-                        . '<input type="hidden" name="perso_key" value="' . htmlspecialchars($key) . '">'
-                        . '<button type="submit" style="border:none; border-radius:8px; padding:8px 14px; font-weight:700; color:#fff; cursor:pointer; background:' . $bg . ';">' . $label . '</button>'
-                        . '</form>';
+                    persoSwitch($key, $isOn, $confirmOnDisable);
                 };
 
                 // Liste des thèmes (anniversaire + catalogue) avec leur état on/anim.
@@ -779,25 +772,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         <p class="muted" style="margin:0 0 4px;">Le visuel du site change automatiquement selon la date.
                             <?php if ($activeTheme): ?><br><strong style="color:<?= htmlspecialchars($activeTheme['accent']) ?>;">Thème actif aujourd'hui : <?= htmlspecialchars(is_array($activeTheme['nom']) ? $activeTheme['nom'][0] : $activeTheme['nom']) ?></strong><?php else: ?><br>Aucun thème actif aujourd'hui.<?php endif; ?>
                         </p>
-                        <p class="muted" style="margin:6px 0 10px; font-size:.85rem;">
-                            <strong>Clic gauche</strong> = aperçu · <strong>Clic droit</strong> (ou appui long sur mobile) = activer/désactiver le thème et son animation.
-                            Un thème désactivé est grisé · ✨ = animation active.
-                            <a href="index.php?theme=off" style="color:#2d5a37;">Revenir au normal</a>.
-                        </p>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
-                            <?php foreach ($themeChips as $tk => $tc):
-                                $tOn = (widgetGet($db, 'theme_' . $tk . '_on', '1') === '1');
-                                $aOn = (widgetGet($db, 'theme_' . $tk . '_anim', '1') === '1');
-                                $col = $tOn ? htmlspecialchars($tc['accent']) : '#9aa6a0';
-                            ?>
-                                <a class="theme-chip" href="index.php?theme=<?= urlencode($tk) ?>"
-                                   data-key="<?= htmlspecialchars($tk) ?>" data-on="<?= $tOn ? '1' : '0' ?>" data-anim="<?= $aOn ? '1' : '0' ?>"
-                                   title="Clic = aperçu · Clic droit = options"
-                                   style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:1.5px solid <?= $col ?>; color:<?= $col ?>; border-radius:999px; padding:4px 12px; font-size:0.82rem; font-weight:700;<?= $tOn ? '' : ' opacity:.5; text-decoration:line-through;' ?>">
-                                    <?= htmlspecialchars($tc['nom']) ?><?php if ($tOn && $aOn): ?> <span style="font-size:.72rem;">✨</span><?php endif; ?>
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
+                        <?php renderEventThemeCards($db); ?>
                     </div>
 
                     <!-- À VENIR -->
