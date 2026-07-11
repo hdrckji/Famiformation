@@ -59,6 +59,8 @@ ensureModulesTable($db);
 require_once __DIR__ . '/includes/ia_settings.php';
 require_once __DIR__ . '/includes/perso_ui.php';
 iaSettingsHandlePost($db);
+require_once __DIR__ . '/includes/pdf_access.php';
+pdfAccessHandlePost($db);
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 // Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
@@ -707,6 +709,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </div>
 
             <?php iaSettingsCard($db); ?>
+            <?php pdfAccessCard($db); ?>
 
             <!-- 🎨 PERSONNALISATION : options « fun » regroupées, chaque bascule via un bouton
                  (confirmation à la désactivation) ou, pour les thèmes, un clic droit. -->

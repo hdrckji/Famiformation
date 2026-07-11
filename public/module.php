@@ -95,15 +95,20 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
 <body>
     <?= apercuBanner($db) ?>
     <?php
-        $uniHasContent = (!empty($module['uniformized']) && !empty($module['contenu_ia']) && !empty($module['pdf_path']));
-        $uniPdfUrl = $uniHasContent ? moduleFileUrl($module['pdf_path']) : '';
-        $uniCanDl = $uniHasContent && ((!empty($isAdmin)) || ((int) ($_SESSION['user_id'] ?? 0) > 0 && (int) ($_SESSION['user_id'] ?? 0) === (int) ($module['contenu_by'] ?? 0)));
+        require_once __DIR__ . '/includes/pdf_access.php';
+        $uniHasPdf = !empty($module['pdf_path']);
+        $uniHasContent = (!empty($module['uniformized']) && !empty($module['contenu_ia']) && $uniHasPdf);
+        $uniRole = function_exists('currentDisplayRole') ? currentDisplayRole() : ($_SESSION['role'] ?? '');
+        $uniPdfUrl = $uniHasPdf ? moduleFileUrl($module['pdf_path']) : '';
+        $canViewPdf = $uniHasContent && pdfCanView($db, $uniRole, !empty($isAdmin));
+        $canDlPdf = $uniHasPdf && pdfCanDownload($db, $uniRole, !empty($isAdmin));
     ?>
     <div class="topbar">
         <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
-        <?php if ($uniCanDl): ?>
+        <?php if ($canViewPdf || $canDlPdf): ?>
             <div class="uni-actions">
-                <a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF original">⤓</a>
+                <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="Voir le PDF original" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
+                <?php if ($canDlPdf): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF original">⤓</a><?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
@@ -165,7 +170,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
-                <?php renderUniformContent($module['contenu_ia'], moduleFileUrl($module['pdf_path'])); ?>
+                <?php renderUniformContent($module['contenu_ia'], $uniPdfUrl, $canViewPdf); ?>
             <?php elseif ($isUni): ?>
                 <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>
