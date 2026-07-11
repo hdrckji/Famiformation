@@ -1,10 +1,10 @@
 <?php
 // ============================================================
-// content_view.php — rendu DESIGNÉ du contenu uniformisé (IA).
+// content_view.php — rendu DESIGNÉ (template Famiflora Académie).
 //   Le contenu est un JSON de blocs (hero/section/text/list/steps/callout/
-//   keyfigures/image/quote) -> mise en page « fiche » stylée Famiflora.
-//   Repli : ancien contenu en Markdown -> rendu simple.
-//   Texte intégré à la page, navigation par page collée en bas.
+//   keyfigures/image/quote) -> mise en page « fiche de formation ».
+//   Pagination par section, navigation en bas, vue PDF original.
+//   CSS scopé sous .fami-doc pour ne pas toucher au reste de la page.
 // ============================================================
 require_once __DIR__ . '/ai_uniformise.php';
 
@@ -22,58 +22,77 @@ if (!function_exists('_uniImgUrl')) {
         return function_exists('moduleFileUrl') ? moduleFileUrl($key) : ('media.php?f=' . rawurlencode((string) $key));
     }
 }
+if (!function_exists('_uniCalloutIcon')) {
+    function _uniCalloutIcon($style)
+    {
+        $svg = [
+            'info'    => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r="0.6" fill="currentColor"/></svg>',
+            'tip'     => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21 q -1 -8 2 -13 q 5 1 5.5 7 q 0.5 6 -7.5 6 z"/><path d="M12 21 q 0.5 -7 -2.5 -11 q -4.5 1.5 -4.5 6.5 q 0 4.5 7 4.5 z"/></svg>',
+            'warning' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L22 20 H2 Z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>',
+        ];
+        return $svg[$style] ?? $svg['info'];
+    }
+}
 
-if (!function_exists('_dBlock')) {
-    /** Rendu HTML d'un bloc de design. */
-    function _dBlock($b, $images, &$used)
+if (!function_exists('_dBlockHtml')) {
+    /** Un bloc -> HTML du template. $ctx : ['sec'=>compteur section, 'images'=>[], 'used'=>&]. */
+    function _dBlockHtml($b, &$ctx)
     {
         $esc = function ($s) { return _uniInline(htmlspecialchars((string) $s)); };
         switch ($b['type']) {
-            case 'hero':
-                return '<div class="d-hero"><div class="d-hero-in"><h1>' . $esc($b['title']) . '</h1>'
-                    . (($b['subtitle'] ?? '') !== '' ? '<p>' . $esc($b['subtitle']) . '</p>' : '') . '</div></div>';
             case 'section':
-                return '<h2 class="d-sec">' . $esc($b['title']) . '</h2>';
+                $ctx['sec']++;
+                $eye = 'Partie ' . $ctx['sec'];
+                return '<section class="section"><p class="section__eyebrow">' . htmlspecialchars($eye) . '</p>'
+                    . '<h2 class="section__title">' . $esc($b['title']) . '</h2><hr class="section__rule"></section>';
             case 'text':
-                return '<p class="d-text">' . $esc($b['text']) . '</p>';
+                return '<p class="text">' . $esc($b['text']) . '</p>';
             case 'list':
                 $li = '';
                 foreach ($b['items'] as $it) { $li .= '<li>' . $esc($it) . '</li>'; }
-                return '<ul class="d-list">' . $li . '</ul>';
+                return '<ul class="list">' . $li . '</ul>';
             case 'steps':
-                $li = ''; $k = 1;
-                foreach ($b['items'] as $it) { $li .= '<li><span class="d-step-n">' . $k . '</span><span>' . $esc($it) . '</span></li>'; $k++; }
-                return '<ol class="d-steps">' . $li . '</ol>';
+                $li = '';
+                foreach ($b['items'] as $it) {
+                    $ti = is_array($it) ? (string) ($it['title'] ?? '') : '';
+                    $de = is_array($it) ? (string) ($it['desc'] ?? '') : (string) $it;
+                    $li .= '<li>' . ($ti !== '' ? '<span class="steps__title">' . $esc($ti) . '</span>' : '')
+                        . '<p class="steps__desc">' . $esc($de) . '</p></li>';
+                }
+                return '<ol class="steps">' . $li . '</ol>';
             case 'callout':
-                $ic = ['info' => 'ℹ️', 'tip' => '💡', 'warning' => '⚠️'];
-                $i = $ic[$b['style']] ?? 'ℹ️';
-                $h = ($b['title'] ?? '') !== '' ? '<div class="d-call-h">' . $i . ' ' . $esc($b['title']) . '</div>' : '';
-                return '<div class="d-call d-call-' . htmlspecialchars($b['style']) . '">' . $h . '<div class="d-call-t">' . $esc($b['text']) . '</div></div>';
+                $st = in_array($b['style'], ['info', 'tip', 'warning'], true) ? $b['style'] : 'info';
+                $ttl = ($b['title'] ?? '') !== '' ? '<p class="callout__title">' . $esc($b['title']) . '</p>' : '';
+                return '<aside class="callout callout--' . $st . '"><span class="callout__icon" aria-hidden="true">' . _uniCalloutIcon($st) . '</span>'
+                    . '<div>' . $ttl . '<p class="callout__text">' . $esc($b['text']) . '</p></div></aside>';
             case 'keyfigures':
                 $t = '';
                 foreach ($b['items'] as $it) {
-                    $t .= '<div class="d-kf-i"><div class="d-kf-v">' . htmlspecialchars((string) $it['value']) . '</div><div class="d-kf-l">' . htmlspecialchars((string) $it['label']) . '</div></div>';
+                    $t .= '<div class="keyfigure"><span class="keyfigure__number">' . htmlspecialchars((string) $it['value']) . '</span>'
+                        . '<span class="keyfigure__label">' . htmlspecialchars((string) $it['label']) . '</span></div>';
                 }
-                return '<div class="d-kf">' . $t . '</div>';
+                return '<div class="keyfigures">' . $t . '</div>';
             case 'image':
                 $n = (int) $b['n'] - 1;
-                if ($n >= 0 && $n < count($images) && empty($used[$n])) {
-                    $used[$n] = true;
-                    $cap = ($b['caption'] ?? '') !== '' ? '<figcaption>' . htmlspecialchars((string) $b['caption']) . '</figcaption>' : '';
-                    return '<figure class="d-fig"><img src="' . htmlspecialchars(_uniImgUrl($images[$n])) . '" alt="" loading="lazy">' . $cap . '</figure>';
+                if ($n >= 0 && $n < count($ctx['images']) && empty($ctx['used'][$n])) {
+                    $ctx['used'][$n] = true;
+                    $cap = ($b['caption'] ?? '') !== '' ? '<figcaption class="image__caption">' . htmlspecialchars((string) $b['caption']) . '</figcaption>' : '';
+                    return '<figure class="image"><img class="image__real" src="' . htmlspecialchars(_uniImgUrl($ctx['images'][$n])) . '" alt="" loading="lazy">' . $cap . '</figure>';
                 }
                 return '';
             case 'quote':
-                return '<blockquote class="d-quote">' . $esc($b['text']) . '</blockquote>';
+                return '<blockquote class="quote"><p class="quote__text">' . $esc($b['text']) . '</p></blockquote>';
         }
         return '';
     }
 }
 
 if (!function_exists('_designedPages')) {
-    /** Paginate les blocs (nouvelle page à chaque section) -> tableau de HTML de pages. */
+    /** Paginate (nouvelle page à chaque section) -> tableau de HTML de pages. */
     function _designedPages($blocks, $images, &$used)
     {
+        $ctx = ['sec' => 0, 'images' => $images, 'used' => &$used];
+        // Regroupe : nouvelle page dès qu'on rencontre une section (si la page courante a déjà du contenu).
         $groups = [[]];
         foreach ($blocks as $b) {
             if (($b['type'] ?? '') === 'section' && !empty($groups[count($groups) - 1])) { $groups[] = []; }
@@ -82,28 +101,35 @@ if (!function_exists('_designedPages')) {
         $pages = [];
         foreach ($groups as $g) {
             if (empty($g)) { continue; }
-            $html = '';
+            $heroHtml = '';
             $rest = $g;
-            if (($g[0]['type'] ?? '') === 'hero') { $html .= _dBlock($g[0], $images, $used); $rest = array_slice($g, 1); }
+            if (($g[0]['type'] ?? '') === 'hero') {
+                $h = $g[0];
+                $sub = ($h['subtitle'] ?? '') !== '' ? '<p class="hero__subtitle">' . _uniInline(htmlspecialchars($h['subtitle'])) . '</p>' : '';
+                $heroHtml = '<header class="hero"><div class="hero__inner">'
+                    . '<p class="hero__brand">Famiflora Académie · Fiche de formation</p>'
+                    . '<h1 class="hero__title">' . _uniInline(htmlspecialchars($h['title'])) . '</h1>' . $sub
+                    . '</div></header>';
+                $rest = array_slice($g, 1);
+            }
             $inner = '';
-            foreach ($rest as $b) { $inner .= _dBlock($b, $images, $used); }
-            $html .= '<div class="d-inner">' . $inner . '</div>';
-            $pages[] = $html;
+            foreach ($rest as $b) { $inner .= _dBlockHtml($b, $ctx); }
+            $pages[] = $heroHtml . '<main class="page">' . $inner . '</main>';
         }
-        if (empty($pages)) { $pages = ['<div class="d-inner"></div>']; }
+        if (empty($pages)) { $pages = ['<main class="page"></main>']; }
         return $pages;
     }
 }
 
 if (!function_exists('_mdPages')) {
-    /** Repli Markdown (ancien contenu) -> pages simples. */
+    /** Repli Markdown (ancien contenu) -> pages simples avec les classes du template. */
     function _mdPages($md, $images, &$used)
     {
         $lines = preg_split('/\r\n|\r|\n/', (string) $md);
         $chunks = []; $cur = [];
         $body = function ($a) { foreach ($a as $x) { $t = trim($x); if ($t !== '' && strpos($t, '#') !== 0) { return true; } } return false; };
         foreach ($lines as $l) { if (preg_match('/^##\s+\S/', $l) && $body($cur)) { $chunks[] = $cur; $cur = []; } $cur[] = $l; }
-        if ($body($cur) || !empty(array_filter($cur, function ($x) { return trim($x) !== ''; }))) { $chunks[] = $cur; }
+        if (!empty(array_filter($cur, function ($x) { return trim($x) !== ''; }))) { $chunks[] = $cur; }
         if (empty($chunks)) { $chunks = [[(string) $md]]; }
         $pages = [];
         foreach ($chunks as $ch) {
@@ -111,14 +137,16 @@ if (!function_exists('_mdPages')) {
             foreach ($ch as $line) {
                 $t = rtrim($line);
                 if ($t === '') { if ($inList) { $out .= '</ul>'; $inList = false; } continue; }
-                if (strpos($t, '### ') === 0)    { if ($inList) { $out .= '</ul>'; $inList = false; } $out .= '<h4>' . _uniInline(htmlspecialchars(substr($t, 4))) . '</h4>'; }
-                elseif (strpos($t, '## ') === 0) { if ($inList) { $out .= '</ul>'; $inList = false; } $out .= '<h2 class="d-sec">' . _uniInline(htmlspecialchars(substr($t, 3))) . '</h2>'; }
-                elseif (strpos($t, '# ') === 0)  { if ($inList) { $out .= '</ul>'; $inList = false; } $out .= '<h2 class="d-sec">' . _uniInline(htmlspecialchars(substr($t, 2))) . '</h2>'; }
-                elseif (preg_match('/^\s*[-*]\s+(.*)$/', $t, $li)) { if (!$inList) { $out .= '<ul class="d-list">'; $inList = true; } $out .= '<li>' . _uniInline(htmlspecialchars($li[1])) . '</li>'; }
-                else { if ($inList) { $out .= '</ul>'; $inList = false; } $out .= '<p class="d-text">' . _uniInline(htmlspecialchars($t)) . '</p>'; }
+                if (strpos($t, '## ') === 0 || strpos($t, '# ') === 0) {
+                    if ($inList) { $out .= '</ul>'; $inList = false; }
+                    $title = _uniInline(htmlspecialchars(ltrim($t, '# ')));
+                    $out .= '<section class="section"><h2 class="section__title">' . $title . '</h2><hr class="section__rule"></section>';
+                } elseif (strpos($t, '### ') === 0) { if ($inList) { $out .= '</ul>'; $inList = false; } $out .= '<h3 class="section__title" style="font-size:1.2rem">' . _uniInline(htmlspecialchars(substr($t, 4))) . '</h3>'; }
+                elseif (preg_match('/^\s*[-*]\s+(.*)$/', $t, $li)) { if (!$inList) { $out .= '<ul class="list">'; $inList = true; } $out .= '<li>' . _uniInline(htmlspecialchars($li[1])) . '</li>'; }
+                else { if ($inList) { $out .= '</ul>'; $inList = false; } $out .= '<p class="text">' . _uniInline(htmlspecialchars($t)) . '</p>'; }
             }
             if ($inList) { $out .= '</ul>'; }
-            $pages[] = '<div class="d-inner">' . $out . '</div>';
+            $pages[] = '<main class="page">' . $out . '</main>';
         }
         return $pages;
     }
@@ -132,68 +160,85 @@ if (!function_exists('renderUniformContent')) {
         $data = json_decode((string) $md, true);
         $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
         $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
-        // On n'affiche QUE les images que l'IA place dans le texte (aucune image ajoutée en trop).
         $n = count($pages);
         $withPdf = ($showPdfView && $pdfUrl !== '');
         ?>
         <style>
-        .doc { width:100%; box-sizing:border-box; background:#f4f8f4; }
-        .d-hero { background:linear-gradient(135deg,#2d5a37,#4e8a5f); color:#fff; padding:52px clamp(20px,6vw,60px); position:relative; overflow:hidden; }
-        .d-hero::after { content:"🌿"; position:absolute; right:6px; bottom:-24px; font-size:9rem; opacity:.13; transform:rotate(-15deg); }
-        .d-hero-in { max-width:860px; margin:0 auto; position:relative; z-index:1; }
-        .d-hero h1 { font-family:'Open Sans',sans-serif; font-weight:800; font-size:clamp(2rem,5vw,3rem); margin:0; line-height:1.12; }
-        .d-hero p { font-size:1.15rem; opacity:.96; margin:.6em 0 0; }
-        .d-inner { max-width:860px; margin:0 auto; padding:36px clamp(18px,5vw,44px) 30px; color:#2a3b31; font-size:1.07rem; line-height:1.8; min-height:200px; }
-        .d-inner > :first-child { margin-top:0; }
-        .d-sec { font-family:'Open Sans',sans-serif; color:#1f4a2b; font-size:1.7rem; font-weight:700; margin:1.1em 0 .55em; display:flex; align-items:center; gap:.5em; }
-        .d-sec::before { content:""; width:12px; height:32px; background:linear-gradient(#2d5a37,#7cb98f); border-radius:6px; flex:none; }
-        .d-inner > .d-sec:first-child { margin-top:0; }
-        .d-text { margin:.7em 0; }
-        .d-text strong, .d-call strong, .d-quote strong { color:#22402e; }
-        .d-list { list-style:none; margin:.6em 0 1.1em; padding:0; }
-        .d-list li { position:relative; padding:.2em 0 .2em 1.7em; margin:.25em 0; }
-        .d-list li::before { content:"🌱"; position:absolute; left:0; font-size:.95em; }
-        .d-steps { list-style:none; margin:1em 0; padding:0; display:flex; flex-direction:column; gap:12px; }
-        .d-steps li { display:flex; gap:14px; align-items:flex-start; background:#fff; border:1px solid #e6efe8; border-radius:14px; padding:13px 16px; box-shadow:0 3px 10px rgba(0,0,0,.05); }
-        .d-step-n { flex:none; width:34px; height:34px; border-radius:50%; background:#2d5a37; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; }
-        .d-call { border-radius:14px; padding:15px 18px; margin:1.2em 0; border-left:6px solid; }
-        .d-call-info { background:#eef6f0; border-color:#2d5a37; }
-        .d-call-tip { background:#e6f6f1; border-color:#12967e; }
-        .d-call-warning { background:#fdf3e2; border-color:#d99425; }
-        .d-call-h { font-weight:800; margin-bottom:5px; color:#22402e; }
-        .d-kf { display:flex; flex-wrap:wrap; gap:14px; margin:1.3em 0; }
-        .d-kf-i { flex:1 1 140px; background:#fff; border:1px solid #e6efe8; border-radius:16px; padding:18px 14px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.06); }
-        .d-kf-v { font-family:'Open Sans',sans-serif; font-size:2rem; font-weight:800; color:#2d5a37; line-height:1; }
-        .d-kf-l { color:#5a6b60; margin-top:6px; font-size:.9rem; }
-        .d-fig { margin:1.5em 0; text-align:center; }
-        .d-fig img { max-width:100%; height:auto; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.16); }
-        .d-fig figcaption { color:#7a8a80; font-style:italic; font-size:.9rem; margin-top:.5em; }
-        .d-quote { margin:1.3em 0; padding:14px 20px; border-left:5px solid #7cb98f; background:#eef7f1; border-radius:0 12px 12px 0; font-style:italic; color:#2f5540; font-size:1.12rem; }
-        .d-inner h4 { color:#3a5145; margin:1.1em 0 .3em; }
-        .doc-nav { position:sticky; bottom:0; z-index:20; display:flex; align-items:center; justify-content:center; gap:18px; padding:12px; background:rgba(255,255,255,.94); backdrop-filter:blur(6px); border-top:1px solid #e3ece5; }
-        .doc-arrow { border:none; width:46px; height:46px; border-radius:50%; background:#2d5a37; color:#fff; font-size:1.15rem; cursor:pointer; box-shadow:0 4px 12px rgba(45,90,55,.35); }
-        .doc-arrow:disabled { background:#c3ccc6; box-shadow:none; cursor:not-allowed; }
-        .doc-count { font-weight:800; color:#2d5a37; min-width:78px; text-align:center; }
-        .doc-pdf iframe { width:100%; height:82vh; border:none; display:block; background:#f4f7f6; }
+        .fami-doc{ --paper:#F7F8F2; --paper-deep:#EEF1E6; --ink:#21301F; --ink-soft:#46543F; --forest:#1E4D2B; --leaf:#3E8E4E; --moss:#74975B; --sprout:#A9C96B; --pollen:#C98A1B; --pollen-bg:#FBF3DF; --tip-bg:#EDF4E0; --info-bg:#E7F0E9; --line:#D8DECB;
+            --font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+            --font-body:Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,"Times New Roman",serif;
+            --font-label:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,"Liberation Mono",monospace;
+            --radius:14px; --shadow:0 1px 2px rgba(30,55,30,.06),0 8px 28px rgba(30,55,30,.07);
+            width:100%; background:var(--paper); color:var(--ink); font-family:var(--font-body); font-size:1.075rem; line-height:1.7; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+        .fami-doc a{ color:var(--forest); text-decoration-color:var(--moss); text-underline-offset:3px; }
+        .fami-doc a:hover{ color:var(--leaf); }
+        .fami-doc strong{ color:var(--forest); }
+        .fami-doc em{ font-style:italic; }
+        .fami-doc .page{ max-width:800px; margin:0 auto; padding:0 24px 40px; }
+        .fami-doc .hero{ position:relative; overflow:hidden; background:linear-gradient(155deg,#17381F 0%,var(--forest) 55%,#2A6339 100%); color:#F3F7EE; border-radius:0 0 28px 28px; padding:clamp(40px,7vw,72px) 24px clamp(36px,6vw,56px); }
+        .fami-doc .hero::before{ content:""; position:absolute; inset:0; pointer-events:none; opacity:.55; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='340' height='340' viewBox='0 0 340 340'%3E%3Cg fill='none' stroke='%23BFE0B8' stroke-opacity='0.14' stroke-width='1.4'%3E%3Cpath d='M40 300 C 60 220, 60 160, 90 90'/%3E%3Cpath d='M62 235 q 34 -22 40 -58 q -40 10 -40 58'/%3E%3Cpath d='M70 190 q -36 -14 -46 -50 q 40 4 46 50'/%3E%3Cpath d='M250 320 C 262 250, 258 200, 280 140'/%3E%3Cpath d='M262 260 q 30 -18 36 -50 q -36 8 -36 50'/%3E%3Cpath d='M268 215 q -32 -12 -40 -44 q 36 4 40 44'/%3E%3Cpath d='M170 60 q 26 -34 66 -36 q -8 40 -50 46 q -12 2 -16 -10 z'/%3E%3Cpath d='M150 66 q -26 -30 -62 -30 q 8 36 46 42 q 12 2 16 -12 z'/%3E%3C/g%3E%3C/svg%3E"); background-size:340px 340px; }
+        .fami-doc .hero__inner{ position:relative; max-width:752px; margin:0 auto; }
+        .fami-doc .hero__brand{ font-family:var(--font-label); font-size:.78rem; letter-spacing:.22em; text-transform:uppercase; color:var(--sprout); margin:0 0 16px; }
+        .fami-doc .hero__title{ font-family:var(--font-display); font-weight:800; font-size:clamp(2rem,5vw,3.2rem); line-height:1.08; letter-spacing:-.02em; margin:0 0 12px; text-wrap:balance; }
+        .fami-doc .hero__subtitle{ font-size:clamp(1.02rem,2.2vw,1.2rem); line-height:1.55; color:#DEEBD6; max-width:56ch; margin:0; }
+        .fami-doc .section{ margin:52px 0 8px; }
+        .fami-doc .page > .section:first-child{ margin-top:20px; }
+        .fami-doc .section__eyebrow{ font-family:var(--font-label); font-size:.74rem; letter-spacing:.2em; text-transform:uppercase; color:var(--leaf); margin:0 0 8px; }
+        .fami-doc .section__title{ font-family:var(--font-display); font-weight:800; font-size:clamp(1.45rem,3.4vw,1.9rem); letter-spacing:-.015em; line-height:1.2; margin:0 0 14px; color:var(--forest); text-wrap:balance; }
+        .fami-doc .section__rule{ height:12px; border:0; margin:0 0 10px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M0 8 H 96' stroke='%2374975B' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M96 8 q 10 -8 22 -7 q -4 10 -16 9 q -4 0 -6 -2 z' fill='%233E8E4E'/%3E%3C/svg%3E") left center / 120px 12px no-repeat; }
+        .fami-doc .text{ margin:0 0 1.2em; max-width:70ch; }
+        .fami-doc .list{ list-style:none; margin:0 0 1.4em; padding:0; max-width:70ch; }
+        .fami-doc .list li{ position:relative; padding-left:30px; margin-bottom:.55em; }
+        .fami-doc .list li::before{ content:""; position:absolute; left:4px; top:.52em; width:12px; height:12px; background:var(--leaf); border-radius:0 70% 0 70%; transform:rotate(45deg); }
+        .fami-doc .steps{ list-style:none; counter-reset:step; margin:8px 0 32px; padding:0; display:grid; gap:14px; }
+        .fami-doc .steps li{ counter-increment:step; position:relative; background:#fff; border:1px solid var(--line); border-left:4px solid var(--leaf); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 24px 20px 78px; }
+        .fami-doc .steps li::before{ content:counter(step,decimal-leading-zero); position:absolute; left:22px; top:20px; font-family:var(--font-display); font-weight:800; font-size:1.3rem; color:var(--leaf); letter-spacing:-.02em; }
+        .fami-doc .steps__title{ display:block; font-family:var(--font-display); font-weight:700; font-size:1.05rem; color:var(--forest); margin-bottom:4px; }
+        .fami-doc .steps__desc{ margin:0; color:var(--ink-soft); }
+        .fami-doc .callout{ display:grid; grid-template-columns:40px 1fr; gap:14px; align-items:start; border-radius:var(--radius); padding:20px 22px; margin:26px 0; border:1px solid; }
+        .fami-doc .callout__icon{ width:40px; height:40px; border-radius:50%; display:grid; place-items:center; }
+        .fami-doc .callout__icon svg{ width:22px; height:22px; display:block; }
+        .fami-doc .callout__title{ font-family:var(--font-display); font-weight:700; font-size:1rem; margin:0 0 4px; }
+        .fami-doc .callout__text{ margin:0; }
+        .fami-doc .callout--info{ background:var(--info-bg); border-color:#C4D8C9; } .fami-doc .callout--info .callout__icon{ background:var(--forest); color:#EAF4EC; } .fami-doc .callout--info .callout__title{ color:var(--forest); }
+        .fami-doc .callout--tip{ background:var(--tip-bg); border-color:#CFDFAF; } .fami-doc .callout--tip .callout__icon{ background:#5E8A3A; color:#F1F7E4; } .fami-doc .callout--tip .callout__title{ color:#4A6E2D; }
+        .fami-doc .callout--warning{ background:var(--pollen-bg); border-color:#E8D3A4; } .fami-doc .callout--warning .callout__icon{ background:var(--pollen); color:#FFF8E9; } .fami-doc .callout--warning .callout__title{ color:#8F6210; }
+        .fami-doc .keyfigures{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin:28px 0 32px; }
+        .fami-doc .keyfigure{ background:#fff; border:1px solid var(--line); border-top:4px solid var(--sprout); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 18px 16px; text-align:center; }
+        .fami-doc .keyfigure__number{ display:block; font-family:var(--font-display); font-weight:800; font-size:clamp(1.9rem,4.5vw,2.5rem); letter-spacing:-.03em; line-height:1.1; color:var(--forest); }
+        .fami-doc .keyfigure__label{ display:block; font-family:var(--font-label); font-size:.74rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-top:8px; }
+        .fami-doc .image{ margin:30px 0 34px; }
+        .fami-doc .image__real{ width:100%; height:auto; display:block; border-radius:var(--radius); box-shadow:var(--shadow); }
+        .fami-doc .image__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:10px; padding-left:14px; border-left:3px solid var(--sprout); }
+        .fami-doc .quote{ margin:36px 0; padding:8px 8px 8px 30px; border-left:4px solid var(--leaf); }
+        .fami-doc .quote__text{ font-size:clamp(1.2rem,2.8vw,1.45rem); line-height:1.5; font-style:italic; color:var(--forest); margin:0; text-wrap:balance; }
+        .fami-doc .quote__text::before{ content:"«\00A0"; color:var(--moss); } .fami-doc .quote__text::after{ content:"\00A0»"; color:var(--moss); }
+        .fami-doc .pagenav{ position:sticky; bottom:0; margin:40px auto 0; max-width:800px; padding:14px 24px; background:rgba(247,248,242,.94); backdrop-filter:blur(6px); border-top:1px solid var(--line); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:14px; }
+        .fami-doc .pagenav__link{ font-family:var(--font-display); font-weight:700; font-size:.95rem; color:var(--forest); background:#fff; border:1px solid var(--line); border-radius:999px; padding:11px 20px; display:inline-flex; align-items:center; gap:8px; box-shadow:var(--shadow); cursor:pointer; }
+        .fami-doc .pagenav__link:hover:not(:disabled){ background:var(--info-bg); border-color:var(--leaf); }
+        .fami-doc .pagenav__link--prev{ justify-self:start; } .fami-doc .pagenav__link--next{ justify-self:end; }
+        .fami-doc .pagenav__link:disabled{ opacity:.4; cursor:not-allowed; }
+        .fami-doc .pagenav__counter{ font-family:var(--font-label); font-size:.8rem; letter-spacing:.12em; color:var(--ink-soft); text-align:center; white-space:nowrap; }
+        .fami-doc .pagenav__counter strong{ color:var(--forest); }
+        .fami-doc .doc-pdf iframe{ width:100%; height:82vh; border:none; display:block; background:#f4f7f6; }
+        @media (max-width:560px){ .fami-doc .pagenav{ grid-template-columns:1fr 1fr; } .fami-doc .pagenav__counter{ grid-column:1/-1; order:3; } }
         </style>
 
-        <div class="doc">
+        <div class="fami-doc">
             <div class="doc-view doc-read">
                 <?php foreach ($pages as $i => $html): ?>
                     <div class="doc-page" data-page="<?= (int) $i ?>" <?= $i === 0 ? '' : 'style="display:none;"' ?>><?= $html ?></div>
                 <?php endforeach; ?>
                 <?php if ($n > 1): ?>
-                    <div class="doc-nav">
-                        <button type="button" class="doc-arrow" id="uniPrev" onclick="uniPage(-1)" title="Page précédente">◀</button>
-                        <span class="doc-count"><span id="uniCur">1</span> / <?= (int) $n ?></span>
-                        <button type="button" class="doc-arrow" id="uniNext" onclick="uniPage(1)" title="Page suivante">▶</button>
-                    </div>
+                    <nav class="pagenav" aria-label="Navigation entre les pages">
+                        <button type="button" class="pagenav__link pagenav__link--prev" id="uniPrev" onclick="uniPage(-1)"><span aria-hidden="true">←</span> Précédent</button>
+                        <p class="pagenav__counter">Page <strong id="uniCur">1</strong> / <?= (int) $n ?></p>
+                        <button type="button" class="pagenav__link pagenav__link--next" id="uniNext" onclick="uniPage(1)">Suivant <span aria-hidden="true">→</span></button>
+                    </nav>
                 <?php endif; ?>
             </div>
             <?php if ($withPdf): ?>
-                <div class="doc-view doc-pdf" style="display:none;">
-                    <iframe src="<?= htmlspecialchars($pdfUrl) ?>" title="PDF original"></iframe>
-                </div>
+                <div class="doc-view doc-pdf" style="display:none;"><iframe src="<?= htmlspecialchars($pdfUrl) ?>" title="PDF original"></iframe></div>
             <?php endif; ?>
         </div>
 
@@ -218,7 +263,7 @@ if (!function_exists('renderUniformContent')) {
                 var pv = document.getElementById('uniPrev'), nx = document.getElementById('uniNext');
                 if (pv) { pv.disabled = (idx === 0); }
                 if (nx) { nx.disabled = (idx === total - 1); }
-                var d = document.querySelector('.doc');
+                var d = document.querySelector('.fami-doc');
                 if (d && d.scrollIntoView) { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
             }
             window.uniPage = function (d) { show(idx + d); };

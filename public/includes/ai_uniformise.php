@@ -35,9 +35,22 @@ if (!function_exists('aiSanitizeBlocks')) {
                     if (trim((string) ($b['text'] ?? '')) !== '') { $ok[] = ['type' => 'text', 'text' => (string) $b['text']]; }
                     break;
                 case 'list':
-                case 'steps':
                     $items = array_values(array_filter(array_map(function ($x) { return trim((string) $x); }, (array) ($b['items'] ?? [])), 'strlen'));
-                    if (!empty($items)) { $ok[] = ['type' => $b['type'], 'items' => $items]; }
+                    if (!empty($items)) { $ok[] = ['type' => 'list', 'items' => $items]; }
+                    break;
+                case 'steps':
+                    $items = [];
+                    foreach ((array) ($b['items'] ?? []) as $it) {
+                        if (is_array($it)) {
+                            $ti = trim((string) ($it['title'] ?? ''));
+                            $de = trim((string) ($it['desc'] ?? ''));
+                            if ($ti !== '' || $de !== '') { $items[] = ['title' => $ti, 'desc' => $de]; }
+                        } else {
+                            $s = trim((string) $it);
+                            if ($s !== '') { $items[] = ['title' => '', 'desc' => $s]; }
+                        }
+                    }
+                    if (!empty($items)) { $ok[] = ['type' => 'steps', 'items' => $items]; }
                     break;
                 case 'callout':
                     $style = in_array(($b['style'] ?? 'info'), ['info', 'tip', 'warning'], true) ? $b['style'] : 'info';
@@ -113,7 +126,7 @@ if (!function_exists('aiUniformisePdf')) {
             . "- {\"type\":\"section\",\"title\":\"Titre de section\"}\n"
             . "- {\"type\":\"text\",\"text\":\"phrases complètes et lisibles ; **gras** pour les termes clés\"}\n"
             . "- {\"type\":\"list\",\"items\":[\"point\",\"point\"]}\n"
-            . "- {\"type\":\"steps\",\"items\":[\"étape 1\",\"étape 2\"]} : procédure ordonnée.\n"
+            . "- {\"type\":\"steps\",\"items\":[{\"title\":\"titre court de l'étape\",\"desc\":\"détail de l'étape\"}]} : procédure ordonnée.\n"
             . "- {\"type\":\"callout\",\"style\":\"info|tip|warning\",\"title\":\"court\",\"text\":\"information importante à mettre en avant\"}\n"
             . "- {\"type\":\"keyfigures\",\"items\":[{\"value\":\"24/7\",\"label\":\"court\"}]} : chiffres/points clés.\n"
             . "- {\"type\":\"image\",\"n\":2,\"caption\":\"légende courte\"} : place UNE image pertinente (n = son numéro fourni).\n"
