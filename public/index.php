@@ -280,10 +280,25 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 </style>
 <?php endif; ?>
 <?php if ($showWelcome): ?>
-<div id="wcOverlay" class="wc-overlay" onclick="this.classList.add('wc-hide')">
+<?php
+// Habillage de l'animation de bienvenue selon le theme actif du jour (sinon nature verte).
+$wcParticles = ['🌿', '🍃', '🌱', '✨'];
+$wcAccent = '#2d5a37';
+$wcBg = 'radial-gradient(circle at 50% 30%, #2d5a37, #123020 75%)';
+$wcThemeName = '';
+if (!empty($siteTheme) && is_array($siteTheme)) {
+    if (!empty($siteTheme['particles'])) { $wcParticles = $siteTheme['particles']; }
+    if (!empty($siteTheme['accent'])) { $wcAccent = $siteTheme['accent']; }
+    $wcThemeName = is_array($siteTheme['nom'] ?? null) ? $siteTheme['nom'][0] : ($siteTheme['nom'] ?? '');
+    // Fond toujours sombre (texte blanc lisible), teinte par l'accent du theme.
+    $wcBg = 'radial-gradient(circle at 50% 30%, ' . $wcAccent . ', #0e120e 80%)';
+}
+?>
+<div id="wcOverlay" class="wc-overlay" onclick="this.classList.add('wc-hide')" style="background:<?php echo htmlspecialchars($wcBg, ENT_QUOTES); ?>;">
     <div class="wc-fx"></div>
     <div class="wc-card">
-        <div class="wc-logo">🌿</div>
+        <?php if ($wcThemeName): ?><div style="display:inline-block; background:<?php echo htmlspecialchars($wcAccent, ENT_QUOTES); ?>; color:#fff; padding:5px 16px; border-radius:999px; font-weight:800; font-size:.95rem; margin-bottom:12px;"><?php echo htmlspecialchars($wcThemeName); ?></div><?php endif; ?>
+        <div class="wc-logo"><?php echo htmlspecialchars($wcThemeName ? $wcParticles[0] : '🌿'); ?></div>
         <div class="wc-hi"><?php echo t('Bienvenue sur Famiformation', 'Welkom op Famiformation'); ?></div>
         <div class="wc-name"><?php echo htmlspecialchars($welcomeName); ?></div>
         <div class="wc-sub"><?php echo t('Ravis de t\'accueillir chez Famiflora. Prends le temps de découvrir ton espace 🌱', 'Fijn dat je er bent bij Famiflora. Ontdek rustig jouw ruimte 🌱'); ?></div>
@@ -308,7 +323,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 <script>
 (function(){
   var ov=document.getElementById('wcOverlay'); if(!ov){return;}
-  var fx=ov.querySelector('.wc-fx'); var leaves=['🌿','🍃','🌱','✨'];
+  var fx=ov.querySelector('.wc-fx'); var leaves=<?php echo json_encode($wcParticles, JSON_UNESCAPED_UNICODE); ?>;
   for(var i=0;i<26;i++){var s=document.createElement('span');s.className='wc-leaf';s.textContent=leaves[i%leaves.length];s.style.left=(Math.random()*100)+'%';s.style.fontSize=(0.9+Math.random()*1.3)+'rem';s.style.animationDuration=(6+Math.random()*6)+'s';s.style.animationDelay=(Math.random()*7)+'s';fx.appendChild(s);}
   setTimeout(function(){ov.classList.add('wc-hide');},7500);
 })();
