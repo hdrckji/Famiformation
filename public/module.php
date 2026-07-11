@@ -148,7 +148,8 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
-                <?php renderUniformContent($module['contenu_ia'], moduleFileUrl($module['pdf_path'])); ?>
+                <?php $uniCanDl = (!empty($isAdmin)) || ((int) ($_SESSION['user_id'] ?? 0) > 0 && (int) ($_SESSION['user_id'] ?? 0) === (int) ($module['contenu_by'] ?? 0)); ?>
+                <?php renderUniformContent($module['contenu_ia'], moduleFileUrl($module['pdf_path']), $uniCanDl); ?>
             <?php elseif ($isUni): ?>
                 <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>

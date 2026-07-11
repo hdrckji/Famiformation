@@ -233,7 +233,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$db->query("SHOW COLUMNS FROM modules LIKE 'contenu_ia'")->fetch()) {
                         $db->exec("ALTER TABLE modules ADD COLUMN contenu_ia MEDIUMTEXT NULL");
                     }
+                    if (!$db->query("SHOW COLUMNS FROM modules LIKE 'contenu_by'")->fetch()) {
+                        $db->exec("ALTER TABLE modules ADD COLUMN contenu_by INT NULL");
+                    }
                 } catch (Exception $e) { /* migration non bloquante */ }
+
+                // Mémorise l'auteur du contenu (pour le droit de téléchargement).
+                $contenuBy = $module['contenu_by'] ?? null;
+                if (empty($contenuBy)) { $contenuBy = ((int) ($_SESSION['user_id'] ?? 0)) ?: null; }
 
                 // « Valider et uniformiser » : l'IA lit le PDF et réécrit le contenu.
                 if ($uniformized === 1 && $pdfPath !== null && $pdfPath !== '') {
@@ -249,8 +256,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ? WHERE id = ?")
-                   ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $contenuIa, $id]);
+                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
+                   ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $id]);
                 $_SESSION['module_flash'] = $flashMsg;
                 $redirectTo = 'module.php?id=' . $id;
             }
