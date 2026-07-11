@@ -112,6 +112,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             </div>
         <?php endif; ?>
     </div>
+    <?php if (empty($uniHasContent)): ?>
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main"><br>
         <h1><?= moduleIconHtml($module, '1.6rem') ?> <?= htmlspecialchars(moduleNom($module)) ?></h1>
@@ -122,6 +123,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             <div><span class="badge-eval">📝 <?= t('À évaluer', 'Te evalueren') ?></span></div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 
     <?php if ($flash): ?><div class="flash"><?= $flash ?></div><?php endif; ?>
 

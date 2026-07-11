@@ -87,37 +87,103 @@ if (!function_exists('_dBlockHtml')) {
     }
 }
 
+if (!function_exists('_uniShort')) {
+    function _uniShort($s, $len)
+    {
+        $s = trim(preg_replace('/\s+/', ' ', strip_tags(str_replace(['**', '*'], '', (string) $s))));
+        return (mb_strlen($s) <= $len) ? $s : (mb_substr($s, 0, $len - 1) . '…');
+    }
+}
+
+if (!function_exists('_uniCoverHtml')) {
+    /** Couverture plein écran + sommaire (page 0). */
+    function _uniCoverHtml($hero, $secNum, $minutes, $toc)
+    {
+        $title = _uniInline(htmlspecialchars($hero['title'] ?? 'Formation'));
+        $sub = ($hero && ($hero['subtitle'] ?? '') !== '') ? '<p class="cover__subtitle">' . _uniInline(htmlspecialchars($hero['subtitle'])) . '</p>' : '';
+        $meta = '<ul class="cover__meta">';
+        if ($secNum > 0) { $meta .= '<li>' . $secNum . ' partie' . ($secNum > 1 ? 's' : '') . '</li>'; }
+        $meta .= '<li>Lecture ~' . (int) $minutes . ' min</li></ul>';
+
+        $items = '';
+        foreach ($toc as $t) {
+            $desc = $t['desc'] !== '' ? '<span class="toc__desc">' . htmlspecialchars($t['desc']) . '</span>' : '';
+            $items .= '<li class="toc__item"><a class="toc__link" href="#" onclick="uniGoto(' . (int) $t['page'] . ');return false;">'
+                . '<span class="toc__num" aria-hidden="true">' . htmlspecialchars($t['num']) . '</span>'
+                . '<span class="toc__label"><span class="toc__name">' . _uniInline(htmlspecialchars($t['name'])) . '</span>' . $desc . '</span>'
+                . '<span class="toc__arrow" aria-hidden="true">→</span></a></li>';
+        }
+
+        $flora = '<svg class="cover__flora" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'
+            . '<path class="flora--soft flora--draw" d="M -40 820 C 120 640, 150 480, 190 300 C 210 210, 250 140, 320 90"/>'
+            . '<path class="flora--soft" d="M 160 520 q 90 -50 106 -140 q -100 26 -106 140"/>'
+            . '<path class="flora--soft" d="M 178 430 q -86 -34 -108 -122 q 96 12 108 122"/>'
+            . '<path class="flora--faint" d="M 200 330 q 76 -44 90 -120 q -86 22 -90 120"/>'
+            . '<path class="flora--soft flora--draw" d="M 1240 760 C 1080 620, 1050 470, 1020 300 C 1004 210, 970 130, 900 80"/>'
+            . '<path class="flora--soft" d="M 1046 500 q -92 -48 -110 -136 q 102 24 110 136"/>'
+            . '<path class="flora--soft" d="M 1030 410 q 84 -36 104 -122 q -94 14 -104 122"/>'
+            . '<path class="flora--bright flora--draw" d="M 90 800 q 40 -140 30 -260"/>'
+            . '<path class="flora--bright" d="M 104 660 q 52 -26 62 -84 q -60 14 -62 84"/>'
+            . '<path class="flora--bright flora--draw" d="M 1120 780 q -34 -130 -22 -240"/>'
+            . '</svg>';
+
+        return '<header class="cover">' . $flora . '<div class="cover__inner">'
+            . '<p class="cover__brand">Famiflora Académie</p>'
+            . '<h1 class="cover__title">' . $title . '</h1>' . $sub . $meta
+            . '<button type="button" class="cover__cta" onclick="uniGoto(1)">Commencer la formation <span class="arrow" aria-hidden="true">→</span></button>'
+            . '</div><a class="cover__scrollhint" href="#uni-toc">Au programme</a></header>'
+            . '<nav class="toc" id="uni-toc" aria-label="Sommaire de la formation"><p class="toc__eyebrow">Au programme</p>'
+            . '<h2 class="toc__title">Sommaire</h2><hr class="toc__rule"><ol class="toc__list">' . $items . '</ol></nav>';
+    }
+}
+
 if (!function_exists('_designedPages')) {
-    /** Paginate (nouvelle page à chaque section) -> tableau de HTML de pages. */
+    /** Page 0 = couverture + sommaire ; pages 1..N = une par section. */
     function _designedPages($blocks, $images, &$used)
     {
         $ctx = ['sec' => 0, 'images' => $images, 'used' => &$used];
-        // Regroupe : nouvelle page dès qu'on rencontre une section (si la page courante a déjà du contenu).
+
+        $hero = null;
+        $rest = $blocks;
+        if (!empty($rest) && ($rest[0]['type'] ?? '') === 'hero') { $hero = $rest[0]; $rest = array_slice($rest, 1); }
+
         $groups = [[]];
-        foreach ($blocks as $b) {
+        foreach ($rest as $b) {
             if (($b['type'] ?? '') === 'section' && !empty($groups[count($groups) - 1])) { $groups[] = []; }
             $groups[count($groups) - 1][] = $b;
         }
-        $pages = [];
+        $groups = array_values(array_filter($groups, function ($g) { return !empty($g); }));
+
+        $contentPages = [];
+        $toc = [];
+        $secNum = 0;
+        $pageIndex = 1;
         foreach ($groups as $g) {
-            if (empty($g)) { continue; }
-            $heroHtml = '';
-            $rest = $g;
-            if (($g[0]['type'] ?? '') === 'hero') {
-                $h = $g[0];
-                $sub = ($h['subtitle'] ?? '') !== '' ? '<p class="hero__subtitle">' . _uniInline(htmlspecialchars($h['subtitle'])) . '</p>' : '';
-                $heroHtml = '<header class="hero"><div class="hero__inner">'
-                    . '<p class="hero__brand">Famiflora Académie · Fiche de formation</p>'
-                    . '<h1 class="hero__title">' . _uniInline(htmlspecialchars($h['title'])) . '</h1>' . $sub
-                    . '</div></header>';
-                $rest = array_slice($g, 1);
-            }
+            $isSection = (($g[0]['type'] ?? '') === 'section');
+            $title = 'Introduction';
+            if ($isSection) { $secNum++; $title = (string) $g[0]['title']; }
+            $desc = '';
+            foreach ($g as $bb) { if (($bb['type'] ?? '') === 'text') { $desc = _uniShort((string) $bb['text'], 90); break; } }
+            $toc[] = ['num' => $isSection ? sprintf('%02d', $secNum) : '•', 'name' => $title, 'desc' => $desc, 'page' => $pageIndex];
+
             $inner = '';
-            foreach ($rest as $b) { $inner .= _dBlockHtml($b, $ctx); }
-            $pages[] = $heroHtml . '<main class="page">' . $inner . '</main>';
+            foreach ($g as $b) { $inner .= _dBlockHtml($b, $ctx); }
+            $contentPages[] = '<main class="page">' . $inner . '</main>';
+            $pageIndex++;
         }
-        if (empty($pages)) { $pages = ['<main class="page"></main>']; }
-        return $pages;
+
+        // Temps de lecture estimé.
+        $allText = ' ' . ($hero['title'] ?? '') . ' ' . ($hero['subtitle'] ?? '');
+        foreach ($rest as $b) {
+            $allText .= ' ' . ($b['title'] ?? '') . ' ' . ($b['text'] ?? '');
+            foreach ((array) ($b['items'] ?? []) as $it) {
+                $allText .= ' ' . (is_array($it) ? (($it['title'] ?? '') . ' ' . ($it['desc'] ?? '') . ' ' . ($it['value'] ?? '') . ' ' . ($it['label'] ?? '')) : $it);
+            }
+        }
+        $minutes = max(1, (int) round(str_word_count(strip_tags($allText)) / 180));
+
+        if (empty($contentPages)) { $contentPages = ['<main class="page"></main>']; }
+        return array_merge([_uniCoverHtml($hero, $secNum, $minutes, $toc)], $contentPages);
     }
 }
 
@@ -221,7 +287,41 @@ if (!function_exists('renderUniformContent')) {
         .fami-doc .pagenav__counter{ font-family:var(--font-label); font-size:.8rem; letter-spacing:.12em; color:var(--ink-soft); text-align:center; white-space:nowrap; }
         .fami-doc .pagenav__counter strong{ color:var(--forest); }
         .fami-doc .doc-pdf iframe{ width:100%; height:82vh; border:none; display:block; background:#f4f7f6; }
-        @media (max-width:560px){ .fami-doc .pagenav{ grid-template-columns:1fr 1fr; } .fami-doc .pagenav__counter{ grid-column:1/-1; order:3; } }
+        .fami-doc .cover{ position:relative; min-height:100svh; display:grid; place-items:center; overflow:hidden; color:#F3F7EE; background:radial-gradient(120% 90% at 85% -10%,#2F6B3C 0%,transparent 55%),radial-gradient(110% 80% at 0% 110%,#123018 0%,transparent 60%),linear-gradient(160deg,#17381F 0%,var(--forest) 60%,#235831 100%); padding:clamp(48px,8vh,96px) 24px; }
+        .fami-doc .cover__flora{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+        .fami-doc .cover__flora path{ fill:none; stroke:#BFE0B8; stroke-width:1.6; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+        .fami-doc .cover__flora .flora--faint{ stroke-opacity:.10; } .fami-doc .cover__flora .flora--soft{ stroke-opacity:.18; } .fami-doc .cover__flora .flora--bright{ stroke:var(--sprout); stroke-opacity:.55; }
+        .fami-doc .cover__flora .flora--draw{ stroke-dasharray:900; animation:flora-draw 2.4s cubic-bezier(.4,0,.2,1) both; }
+        .fami-doc .cover__inner{ position:relative; width:100%; max-width:var(--measure); text-align:center; animation:cover-in .8s ease-out both; }
+        .fami-doc .cover__brand{ font-family:var(--font-label); font-size:.8rem; letter-spacing:.26em; text-transform:uppercase; color:var(--sprout); margin:0 0 22px; }
+        .fami-doc .cover__brand::before,.fami-doc .cover__brand::after{ content:""; display:inline-block; width:10px; height:10px; background:var(--sprout); border-radius:0 70% 0 70%; transform:rotate(45deg); margin:0 14px; vertical-align:middle; }
+        .fami-doc .cover__title{ font-family:var(--font-display); font-weight:800; font-size:clamp(2.5rem,7.5vw,4.6rem); line-height:1.04; letter-spacing:-.025em; margin:0 0 20px; text-wrap:balance; }
+        .fami-doc .cover__subtitle{ font-size:clamp(1.1rem,2.6vw,1.3rem); line-height:1.55; color:#DEEBD6; max-width:52ch; margin:0 auto 30px; text-wrap:balance; }
+        .fami-doc .cover__meta{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px; padding:0; margin:0 0 40px; list-style:none; }
+        .fami-doc .cover__meta li{ font-family:var(--font-label); font-size:.8rem; letter-spacing:.04em; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.28); border-radius:999px; padding:7px 15px 7px 12px; display:inline-flex; align-items:center; gap:8px; }
+        .fami-doc .cover__meta li::before{ content:""; width:9px; height:9px; background:var(--sprout); border-radius:0 70% 0 70%; transform:rotate(45deg); flex:none; }
+        .fami-doc .cover__cta{ font-family:var(--font-display); font-weight:800; font-size:1.05rem; color:var(--forest); background:linear-gradient(180deg,#FDFEF9 0%,#EAF2DE 100%); border:1px solid #fff; border-radius:999px; padding:16px 34px; display:inline-flex; align-items:center; gap:12px; box-shadow:0 10px 30px rgba(0,0,0,.28),inset 0 1px 0 #fff; cursor:pointer; transition:transform .18s ease; }
+        .fami-doc .cover__cta:hover{ transform:translateY(-2px); } .fami-doc .cover__cta .arrow{ transition:transform .18s ease; } .fami-doc .cover__cta:hover .arrow{ transform:translateX(4px); }
+        .fami-doc .cover__scrollhint{ position:absolute; left:50%; bottom:22px; transform:translateX(-50%); font-family:var(--font-label); font-size:.7rem; letter-spacing:.22em; text-transform:uppercase; color:rgba(243,247,238,.6); text-decoration:none; }
+        .fami-doc .cover__scrollhint::after{ content:"↓"; display:block; text-align:center; margin-top:4px; animation:hint-bob 2s ease-in-out infinite; }
+        .fami-doc .toc{ max-width:var(--measure); margin:0 auto; padding:clamp(56px,9vw,88px) 24px 40px; }
+        .fami-doc .toc__eyebrow{ font-family:var(--font-label); font-size:.74rem; letter-spacing:.2em; text-transform:uppercase; color:var(--leaf); margin:0 0 8px; }
+        .fami-doc .toc__title{ font-family:var(--font-display); font-weight:800; font-size:clamp(1.5rem,3.6vw,2rem); letter-spacing:-.015em; line-height:1.2; color:var(--forest); margin:0 0 14px; }
+        .fami-doc .toc__rule{ height:12px; border:0; margin:0 0 30px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M0 8 H 96' stroke='%2374975B' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M96 8 q 10 -8 22 -7 q -4 10 -16 9 q -4 0 -6 -2 z' fill='%233E8E4E'/%3E%3C/svg%3E") left center / 120px 12px no-repeat; }
+        .fami-doc .toc__list{ list-style:none; margin:0; padding:0; display:grid; gap:14px; }
+        .fami-doc .toc__link{ display:grid; grid-template-columns:64px 1fr auto; align-items:center; gap:18px; text-decoration:none; color:inherit; background:#fff; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 22px; position:relative; overflow:hidden; transition:transform .2s ease,border-color .2s ease; }
+        .fami-doc .toc__link::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:linear-gradient(180deg,var(--sprout),var(--leaf)); transform:scaleY(0); transform-origin:bottom; transition:transform .25s ease; }
+        .fami-doc .toc__link:hover,.fami-doc .toc__link:focus-visible{ transform:translateY(-2px); border-color:var(--leaf); }
+        .fami-doc .toc__link:hover::before,.fami-doc .toc__link:focus-visible::before{ transform:scaleY(1); }
+        .fami-doc .toc__num{ font-family:var(--font-display); font-weight:800; font-size:1.7rem; letter-spacing:-.02em; color:var(--leaf); line-height:1; text-align:center; }
+        .fami-doc .toc__name{ display:block; font-family:var(--font-display); font-weight:700; font-size:1.1rem; color:var(--forest); line-height:1.3; }
+        .fami-doc .toc__desc{ display:block; font-size:.95rem; color:var(--ink-soft); margin-top:3px; }
+        .fami-doc .toc__arrow{ font-size:1.25rem; color:var(--moss); transition:transform .2s ease,color .2s ease; }
+        .fami-doc .toc__link:hover .toc__arrow,.fami-doc .toc__link:focus-visible .toc__arrow{ transform:translateX(5px); color:var(--leaf); }
+        @keyframes flora-draw{ from{ stroke-dashoffset:900; } to{ stroke-dashoffset:0; } }
+        @keyframes cover-in{ from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
+        @keyframes hint-bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(4px); } }
+        @media (max-width:560px){ .fami-doc .pagenav{ grid-template-columns:1fr 1fr; } .fami-doc .pagenav__counter{ grid-column:1/-1; order:3; } .fami-doc .toc__link{ grid-template-columns:48px 1fr auto; gap:14px; } .fami-doc .toc__num{ font-size:1.4rem; } }
         </style>
 
         <div class="fami-doc">
@@ -267,6 +367,7 @@ if (!function_exists('renderUniformContent')) {
                 if (d && d.scrollIntoView) { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
             }
             window.uniPage = function (d) { show(idx + d); };
+            window.uniGoto = function (i) { show(i); };
             show(0);
         })();
         </script>
