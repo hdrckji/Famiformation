@@ -132,12 +132,7 @@ if (!function_exists('renderUniformContent')) {
         $data = json_decode((string) $md, true);
         $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
         $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
-        // Images de contenu non placées par l'IA -> ajoutées en fin (les logos sont déjà filtrés à l'extraction).
-        $extra = '';
-        for ($i = 0; $i < count($images); $i++) {
-            if (empty($used[$i])) { $extra .= '<figure class="d-fig"><img src="' . htmlspecialchars(_uniImgUrl($images[$i])) . '" alt="" loading="lazy"></figure>'; }
-        }
-        if ($extra !== '' && !empty($pages)) { $pages[count($pages) - 1] .= '<div class="d-inner" style="padding-top:8px;">' . $extra . '</div>'; }
+        // On n'affiche QUE les images que l'IA place dans le texte (aucune image ajoutée en trop).
         $n = count($pages);
         $withPdf = ($showPdfView && $pdfUrl !== '');
         ?>
