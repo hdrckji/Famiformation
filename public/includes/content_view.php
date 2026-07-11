@@ -132,20 +132,25 @@ if (!function_exists('renderUniformContent')) {
         $data = json_decode((string) $md, true);
         $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
         $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
+        // Images de contenu non placées par l'IA -> ajoutées en fin (les logos sont déjà filtrés à l'extraction).
+        $extra = '';
+        for ($i = 0; $i < count($images); $i++) {
+            if (empty($used[$i])) { $extra .= '<figure class="d-fig"><img src="' . htmlspecialchars(_uniImgUrl($images[$i])) . '" alt="" loading="lazy"></figure>'; }
+        }
+        if ($extra !== '' && !empty($pages)) { $pages[count($pages) - 1] .= '<div class="d-inner" style="padding-top:8px;">' . $extra . '</div>'; }
         $n = count($pages);
         $withPdf = ($showPdfView && $pdfUrl !== '');
         ?>
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;800&display=swap');
         .doc { width:100%; box-sizing:border-box; background:#f4f8f4; }
         .d-hero { background:linear-gradient(135deg,#2d5a37,#4e8a5f); color:#fff; padding:52px clamp(20px,6vw,60px); position:relative; overflow:hidden; }
         .d-hero::after { content:"🌿"; position:absolute; right:6px; bottom:-24px; font-size:9rem; opacity:.13; transform:rotate(-15deg); }
         .d-hero-in { max-width:860px; margin:0 auto; position:relative; z-index:1; }
-        .d-hero h1 { font-family:'Poppins',sans-serif; font-weight:800; font-size:clamp(2rem,5vw,3rem); margin:0; line-height:1.12; }
+        .d-hero h1 { font-family:'Open Sans',sans-serif; font-weight:800; font-size:clamp(2rem,5vw,3rem); margin:0; line-height:1.12; }
         .d-hero p { font-size:1.15rem; opacity:.96; margin:.6em 0 0; }
         .d-inner { max-width:860px; margin:0 auto; padding:36px clamp(18px,5vw,44px) 30px; color:#2a3b31; font-size:1.07rem; line-height:1.8; min-height:200px; }
         .d-inner > :first-child { margin-top:0; }
-        .d-sec { font-family:'Poppins',sans-serif; color:#1f4a2b; font-size:1.7rem; font-weight:700; margin:1.1em 0 .55em; display:flex; align-items:center; gap:.5em; }
+        .d-sec { font-family:'Open Sans',sans-serif; color:#1f4a2b; font-size:1.7rem; font-weight:700; margin:1.1em 0 .55em; display:flex; align-items:center; gap:.5em; }
         .d-sec::before { content:""; width:12px; height:32px; background:linear-gradient(#2d5a37,#7cb98f); border-radius:6px; flex:none; }
         .d-inner > .d-sec:first-child { margin-top:0; }
         .d-text { margin:.7em 0; }
@@ -163,7 +168,7 @@ if (!function_exists('renderUniformContent')) {
         .d-call-h { font-weight:800; margin-bottom:5px; color:#22402e; }
         .d-kf { display:flex; flex-wrap:wrap; gap:14px; margin:1.3em 0; }
         .d-kf-i { flex:1 1 140px; background:#fff; border:1px solid #e6efe8; border-radius:16px; padding:18px 14px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.06); }
-        .d-kf-v { font-family:'Poppins',sans-serif; font-size:2rem; font-weight:800; color:#2d5a37; line-height:1; }
+        .d-kf-v { font-family:'Open Sans',sans-serif; font-size:2rem; font-weight:800; color:#2d5a37; line-height:1; }
         .d-kf-l { color:#5a6b60; margin-top:6px; font-size:.9rem; }
         .d-fig { margin:1.5em 0; text-align:center; }
         .d-fig img { max-width:100%; height:auto; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.16); }

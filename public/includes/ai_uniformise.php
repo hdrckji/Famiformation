@@ -118,8 +118,12 @@ if (!function_exists('aiUniformisePdf')) {
             . "- {\"type\":\"keyfigures\",\"items\":[{\"value\":\"24/7\",\"label\":\"court\"}]} : chiffres/points clés.\n"
             . "- {\"type\":\"image\",\"n\":2,\"caption\":\"légende courte\"} : place UNE image pertinente (n = son numéro fourni).\n"
             . "- {\"type\":\"quote\",\"text\":\"consigne ou phrase forte à mettre en avant\"}\n"
-            . "RÈGLES : fidélité TOTALE (n'invente rien, ne garde que ce qui est dans le document) ; aère et structure agréablement ; utilise callout / steps / keyfigures quand c'est pertinent pour rendre la fiche vivante ; supprime numéros de page et en-têtes répétés.\n"
-            . "IMAGES : n'utilise JAMAIS un logo, un bandeau, une décoration ou une image sans lien clair — en cas de doute, ne place pas l'image. Jamais deux fois la même.";
+            . "RÈGLES DE QUALITÉ (essentielles) :\n"
+            . "  - Commence TOUJOURS par un bloc hero (titre + sous-titre accrocheur).\n"
+            . "  - Découpe en PLUSIEURS sections claires, chacune avec un vrai contenu.\n"
+            . "  - Rends la fiche VIVANTE et riche : n'utilise PAS que des blocs text. Emploie réellement : callout (pour chaque info importante / consigne / point d'attention), steps (pour toute procédure ou étapes), keyfigures (pour les chiffres, horaires, repères), quote (pour une consigne forte). Vise un bon mélange de blocs.\n"
+            . "  - Fidélité TOTALE : n'invente rien, ne garde que ce qui est dans le document ; supprime numéros de page et en-têtes répétés.\n"
+            . "IMAGES : les images fournies sont déjà filtrées (pas de logos répétés). Place CHAQUE image de contenu fournie avec un bloc image ({\"type\":\"image\",\"n\":numéro,\"caption\":\"légende courte\"}), à l'endroit du texte où elle a du sens. N'ignore une image que si elle est vraiment décorative. Jamais deux fois la même.";
 
         $userContent = [
             ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($bytes)]],
