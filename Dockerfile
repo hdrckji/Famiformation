@@ -3,8 +3,8 @@ FROM dunglas/frankenphp:1-php8.3
 # Extensions PHP requises par le site (gd pour phpspreadsheet, zip, MySQL)
 RUN install-php-extensions gd zip pdo_mysql mysqli
 
-# ffmpeg : compression / ré-encodage automatique des vidéos déposées (720p faststart)
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+# ffmpeg : compression vidéo 720p ; poppler-utils : extraction des images des PDF (pdfimages)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg poppler-utils && rm -rf /var/lib/apt/lists/*
 
 # Limites d'upload relevées (on accepte une vidéo brute confortable ~500 Mo ; elle est
 # ensuite compressée côté serveur). upload_max_filesize < post_max_size (PDF + vidéo possibles).
