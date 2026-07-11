@@ -256,10 +256,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
-                   ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $id]);
-                $_SESSION['module_flash'] = $flashMsg;
-                $redirectTo = 'module.php?id=' . $id;
+                $hasPdf = ($pdfPath !== null && $pdfPath !== '');
+                $hasVideo = ($videoPath !== null && $videoPath !== '');
+
+                if ($hasPdf && $hasVideo) {
+                    // --- PDF + vidéo : découpe en 2 sous-modules (écrit + vidéo) ---
+                    try {
+                        if (!$db->query("SHOW COLUMNS FROM modules LIKE 'content_kind'")->fetch()) {
+                            $db->exec("ALTER TABLE modules ADD COLUMN content_kind VARCHAR(16) NULL");
+                        }
+                    } catch (Exception $e) { /* migration non bloquante */ }
+
+                    $roles = (string) ($module['roles'] ?? '');
+
+                    // Sous-module CONTENU ÉCRIT (PDF)
+                    $ecrit = null;
+                    try { $ecrit = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+                    if ($ecrit) {
+                        $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
+                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, (int) $ecrit['id']]);
+                    } else {
+                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, 'ecrit')")
+                           ->execute(['Contenu écrit', 'Geschreven inhoud', (int) $id, $roles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy]);
+                    }
+
+                    // Sous-module VIDÉO
+                    $vid = null;
+                    try { $vid = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'video' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+                    if ($vid) {
+                        $db->prepare("UPDATE modules SET video_path = ?, pdf_path = NULL WHERE id = ?")->execute([$videoPath, (int) $vid['id']]);
+                    } else {
+                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, video_path, content_kind) VALUES (?, ?, 0, ?, '🎬', ?, 1, ?, 'video')")
+                           ->execute(['Vidéo', 'Video', (int) $id, $roles, $videoPath]);
+                    }
+
+                    // Le module parent devient un conteneur (plus de contenu propre).
+                    $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, video_path = NULL, uniformized = 0, contenu_ia = NULL WHERE id = ?")->execute([$id]);
+
+                    $_SESSION['module_flash'] = "✅ 2 sous-modules créés : « Contenu écrit » + « Vidéo »." . ($uniformized ? " (écrit uniformisé par l'IA)" : "");
+                    $redirectTo = 'module.php?id=' . $id;
+                } else {
+                    // Un seul fichier : le contenu reste porté par le module lui-même.
+                    $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
+                       ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $id]);
+                    $_SESSION['module_flash'] = $flashMsg;
+                    $redirectTo = 'module.php?id=' . $id;
+                }
             }
         }
     } elseif ($action === 'toggle_lock') {
