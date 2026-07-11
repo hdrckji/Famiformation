@@ -305,7 +305,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                         <input type="file" name="video_file" accept="video/*" class="dz-input">
                         <div class="dz-icon">🎬</div>
                         <div class="dz-title">Vidéo</div>
-                        <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">N'importe quel format · jusqu'à 500 Mo · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
+                        <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">N'importe quel format · jusqu'à 1 Go · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
                         <div class="dz-file" hidden></div>
                     </div>
                     <?php if (!empty($module['video_path'])): ?>

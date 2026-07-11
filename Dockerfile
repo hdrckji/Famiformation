@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg poppler-
 
 # Limites d'upload relevées (on accepte une vidéo brute confortable ~500 Mo ; elle est
 # ensuite compressée côté serveur). upload_max_filesize < post_max_size (PDF + vidéo possibles).
-RUN printf "upload_max_filesize=512M\npost_max_size=540M\nmemory_limit=512M\nmax_execution_time=600\n" > "$PHP_INI_DIR/conf.d/zz-uploads.ini"
+RUN printf "upload_max_filesize=1024M\npost_max_size=1088M\nmemory_limit=512M\nmax_execution_time=600\n" > "$PHP_INI_DIR/conf.d/zz-uploads.ini"
 
 # Copie le contenu de public/ dans la racine servie par FrankenPHP
 COPY public/ /app/public/

@@ -234,13 +234,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newPdf = handleModuleFileUpload('pdf_file', ['application/pdf' => 'pdf'], 30 * 1024 * 1024, 'pdf');
             if ($newPdf !== null) { $pdfPath = $newPdf; }
 
-            // Vidéo : on range la source brute (jusqu'à 500 Mo), puis on lance la compression
+            // Vidéo : on range la source brute (jusqu'à 1 Go), puis on lance la compression
             // 720p faststart EN TÂCHE DE FOND. Le teamcoach n'attend pas.
             $startTranscode = false;
             $newVideoRaw = handleModuleFileUpload('video_file', [
                 'video/mp4' => 'mp4', 'video/webm' => 'webm', 'video/ogg' => 'ogv', 'video/quicktime' => 'mov',
                 'video/x-msvideo' => 'avi', 'video/x-matroska' => 'mkv', 'video/3gpp' => '3gp', 'video/x-m4v' => 'm4v',
-            ], 500 * 1024 * 1024, 'video_raw');
+            ], 1024 * 1024 * 1024, 'video_raw');
             if ($newVideoRaw !== null) {
                 $videoSrc = $newVideoRaw;
                 $videoStatus = 'processing';
