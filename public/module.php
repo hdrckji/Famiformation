@@ -85,11 +85,29 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         .dz-hint { color:#6c7a70; font-size:0.85rem; margin-top:4px; }
         .dz-file { margin-top:8px; font-weight:700; color:#244230; word-break:break-all; }
         .dz-existing { font-size:0.85rem; color:#555; margin:4px 0 2px; }
+        .topbar { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; padding:16px; gap:12px; }
+        .topbar .back-link { margin:0; align-self:auto; }
+        .uni-actions { display:flex; gap:10px; }
+        .uni-ico { width:46px; height:46px; display:inline-flex; align-items:center; justify-content:center; font-size:1.25rem; background:rgba(255,255,255,0.92); color:#2d5a37; border:none; border-radius:14px; cursor:pointer; text-decoration:none; box-shadow:0 4px 14px rgba(0,0,0,.14); transition:transform .12s ease, background .15s; }
+        .uni-ico:hover { background:#2d5a37; color:#fff; transform:translateY(-2px); }
     </style>
 </head>
 <body>
     <?= apercuBanner($db) ?>
-    <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
+    <?php
+        $uniHasContent = (!empty($module['uniformized']) && !empty($module['contenu_ia']) && !empty($module['pdf_path']));
+        $uniPdfUrl = $uniHasContent ? moduleFileUrl($module['pdf_path']) : '';
+        $uniCanDl = $uniHasContent && ((!empty($isAdmin)) || ((int) ($_SESSION['user_id'] ?? 0) > 0 && (int) ($_SESSION['user_id'] ?? 0) === (int) ($module['contenu_by'] ?? 0)));
+    ?>
+    <div class="topbar">
+        <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
+        <?php if ($uniHasContent): ?>
+            <div class="uni-actions">
+                <button type="button" id="uniEye" class="uni-ico" title="Voir le PDF original" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button>
+                <?php if ($uniCanDl): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF">⤓</a><?php endif; ?>
+            </div>
+        <?php endif; ?>
+    </div>
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main"><br>
         <h1><?= moduleIconHtml($module, '1.6rem') ?> <?= htmlspecialchars(moduleNom($module)) ?></h1>
@@ -148,8 +166,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
-                <?php $uniCanDl = (!empty($isAdmin)) || ((int) ($_SESSION['user_id'] ?? 0) > 0 && (int) ($_SESSION['user_id'] ?? 0) === (int) ($module['contenu_by'] ?? 0)); ?>
-                <?php renderUniformContent($module['contenu_ia'], moduleFileUrl($module['pdf_path']), $uniCanDl); ?>
+                <?php renderUniformContent($module['contenu_ia'], moduleFileUrl($module['pdf_path'])); ?>
             <?php elseif ($isUni): ?>
                 <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>
