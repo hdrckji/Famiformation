@@ -87,6 +87,8 @@ if ($welcomePreview) {
     }
 }
 $welcomeName = ucfirst(strtolower((string) ($user_data['prenom'] ?? '')));
+require_once __DIR__ . '/includes/event_intro.php';
+$eventIntro = detectEventIntro($db, $showWelcome);
 
 // --- Thème (calculé globalement dans config.php : événement / anniversaire / aperçu admin) ---
 $siteTheme = $GLOBALS['__fami_page_theme'] ?? null;
@@ -279,6 +281,7 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 @keyframes bdGold { to { background-position:200% center; } }
 </style>
 <?php endif; ?>
+<?php if (!empty($eventIntro)) { renderEventIntroOverlay($eventIntro); } ?>
 <?php if ($showWelcome): ?>
 <?php
 // Habillage de l'animation de bienvenue selon le theme actif du jour (sinon nature verte).
