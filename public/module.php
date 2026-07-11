@@ -174,11 +174,25 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             </div>
         <?php elseif (!empty($module['video_path'])): ?>
             <div class="content-card">
-                <video controls controlsList="nodownload" style="width:100%; border-radius:12px; background:#000;">
+                <video id="famiVideo" controls controlsList="nodownload" playsinline style="width:100%; border-radius:12px; background:#000;">
                     <source src="<?= htmlspecialchars(moduleFileUrl($module['video_path'])) ?>">
                     <?= t('Votre navigateur ne peut pas lire cette vidéo.', 'Uw browser kan deze video niet afspelen.') ?>
                 </video>
+                <div style="text-align:center; color:#7a8a80; font-size:.82rem; margin-top:8px;">⏱️ <?= t('Avance rapide désactivée — le retour en arrière reste possible.', 'Vooruitspoelen is uitgeschakeld — terugspoelen kan wel.') ?></div>
             </div>
+            <script>
+            (function () {
+                var v = document.getElementById('famiVideo');
+                if (!v) { return; }
+                var maxT = 0;
+                v.addEventListener('timeupdate', function () {
+                    if (!v.seeking) { maxT = Math.max(maxT, v.currentTime); }
+                });
+                v.addEventListener('seeking', function () {
+                    if (v.currentTime > maxT + 1) { v.currentTime = maxT; }
+                });
+            })();
+            </script>
         <?php endif; ?>
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
