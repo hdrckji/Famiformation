@@ -147,9 +147,8 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php endif; ?>
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
-                <?php require_once __DIR__ . '/includes/ai_uniformise.php'; ?>
-                <div class="content-card uni-content" style="line-height:1.6;"><?= aiMarkdownToHtml($module['contenu_ia']) ?></div>
-                <div style="margin-top:8px;"><a href="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>" download style="color:#2d5a37; font-size:.85rem;">⬇ PDF original</a></div>
+                <?php require_once __DIR__ . '/includes/content_view.php'; ?>
+                <?php renderUniformContent($module['contenu_ia'], moduleFileUrl($module['pdf_path'])); ?>
             <?php elseif ($isUni): ?>
                 <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>
