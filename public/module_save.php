@@ -109,6 +109,24 @@ function handleModuleFileUpload($field, array $allowedMap, $maxSize, $subdir)
     return 'modules/' . $subdir . '/' . $name;
 }
 
+// Lance la compression vidéo 720p (ffmpeg) EN TÂCHE DE FOND : l'utilisateur n'attend pas.
+// Le worker video_transcode.php ré-encode la source brute puis met à jour l'état du module.
+function spawnVideoTranscode($rawKey, $moduleId)
+{
+    $rawKey = (string) $rawKey;
+    $moduleId = (int) $moduleId;
+    if ($rawKey === '' || $moduleId <= 0) {
+        return;
+    }
+    // Sous Windows (dév local), on ne lance pas : le worker tourne sur le serveur Linux (Railway/OVH).
+    if (stripos(PHP_OS, 'WIN') === 0 || !function_exists('exec')) {
+        return;
+    }
+    $worker = __DIR__ . '/video_transcode.php';
+    $cmd = 'nohup php ' . escapeshellarg($worker) . ' ' . escapeshellarg($rawKey) . ' ' . $moduleId . ' > /dev/null 2>&1 &';
+    @exec($cmd);
+}
+
 $redirectTo = safeReturn($_POST['return'] ?? '', 'index.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -204,22 +222,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage requis, contenu inchangé.";
             $redirectTo = 'module.php?id=' . $id;
         } elseif ($module) {
-            $pdfPath   = $module['pdf_path'];
-            $videoPath = $module['video_path'];
+            $pdfPath     = $module['pdf_path'];
+            $videoPath   = $module['video_path'];
+            $videoStatus = $module['video_status'] ?? null;
+            $videoSrc    = $module['video_src_path'] ?? null;
 
             if (!empty($_POST['remove_pdf']))   { $pdfPath = null; }
-            if (!empty($_POST['remove_video'])) { $videoPath = null; }
+            if (!empty($_POST['remove_video'])) { $videoPath = null; $videoStatus = null; $videoSrc = null; }
 
-            $newPdf = handleModuleFileUpload('pdf_file', ['application/pdf' => 'pdf'], 50 * 1024 * 1024, 'pdf');
+            // PDF : limite alignée sur Claude (30 Mo) pour l'uniformisation par l'IA.
+            $newPdf = handleModuleFileUpload('pdf_file', ['application/pdf' => 'pdf'], 30 * 1024 * 1024, 'pdf');
             if ($newPdf !== null) { $pdfPath = $newPdf; }
 
-            $newVideo = handleModuleFileUpload('video_file', [
+            // Vidéo : on range la source brute (jusqu'à 500 Mo), puis on lance la compression
+            // 720p faststart EN TÂCHE DE FOND. Le teamcoach n'attend pas.
+            $startTranscode = false;
+            $newVideoRaw = handleModuleFileUpload('video_file', [
                 'video/mp4' => 'mp4', 'video/webm' => 'webm', 'video/ogg' => 'ogv', 'video/quicktime' => 'mov',
-            ], 300 * 1024 * 1024, 'video');
-            if ($newVideo !== null) { $videoPath = $newVideo; }
+                'video/x-msvideo' => 'avi', 'video/x-matroska' => 'mkv', 'video/3gpp' => '3gp', 'video/x-m4v' => 'm4v',
+            ], 500 * 1024 * 1024, 'video_raw');
+            if ($newVideoRaw !== null) {
+                $videoSrc = $newVideoRaw;
+                $videoStatus = 'processing';
+                $startTranscode = true;
+            }
 
-            // Règle : un contenu doit porter sur au moins 1 fichier (PDF ou vidéo).
-            if (($pdfPath === null || $pdfPath === '') && ($videoPath === null || $videoPath === '')) {
+            // Au moins 1 contenu : PDF, vidéo déjà prête, OU vidéo en cours de préparation.
+            $hasVideo = (!empty($videoPath) || $videoStatus === 'processing');
+            if (empty($pdfPath) && !$hasVideo) {
                 $_SESSION['module_flash'] = "❌ Il faut au moins 1 fichier (PDF ou vidéo) : contenu inchangé.";
                 $redirectTo = 'module.php?id=' . $id;
             } else {
@@ -256,8 +286,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
-                   ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $id]);
+                // Enregistrement : contenu IA + pipeline vidéo (compression 720p en tâche de fond).
+                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, video_status = ?, video_src_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
+                   ->execute([$pdfPath, $videoPath, $videoStatus, $videoSrc, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $id]);
+
+                if ($startTranscode) {
+                    spawnVideoTranscode($videoSrc, $id);
+                    $flashMsg .= " 🎬 La vidéo est en cours de préparation (compression automatique) — elle apparaîtra dans une minute ou deux.";
+                }
                 $_SESSION['module_flash'] = $flashMsg;
                 $redirectTo = 'module.php?id=' . $id;
             }
