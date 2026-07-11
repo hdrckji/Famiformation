@@ -64,7 +64,7 @@ if (!function_exists('aiUniformisePdf')) {
             . "- Rédige des phrases complètes et lisibles ; utilise des listes à puces (- ) pour les étapes/consignes ; mets en gras (**mot**) uniquement les termes clés, avec parcimonie.\n"
             . "- N'écris JAMAIS de symboles bruts parasites ni de « : ** » : le gras s'écrit strictement **texte**, rien d'autre.\n"
             . "- Supprime le superflu (numéros de page, en-têtes/pieds répétés).\n"
-            . "- IMAGES : les images extraites du document te sont fournies, numérotées (Image 1, Image 2, …). Place chaque image PERTINENTE à l'endroit du texte où elle a du sens, seule sur sa ligne, avec le marqueur [[IMG n]] (n = son numéro). Ignore les images purement décoratives (logos, fonds). N'utilise pas deux fois la même image.\n"
+            . "- IMAGES : les images extraites du document te sont fournies, numérotées (Image 1, Image 2, …). Place SEULEMENT celles qui illustrent vraiment le propos, à l'endroit du texte où elles ont du sens, seules sur leur ligne, avec le marqueur [[IMG n]] (n = son numéro). N'utilise JAMAIS un logo d'entreprise, un bandeau, une décoration, une image d'en-tête/pied de page ou une image sans lien clair : ignore-la totalement. En cas de doute sur l'utilité d'une image, NE LA PLACE PAS. N'utilise pas deux fois la même image.\n"
             . "- Aucun préambule ni méta-commentaire (pas de « Voici… ») : donne DIRECTEMENT la fiche en Markdown.";
 
         $userContent = [
@@ -192,10 +192,26 @@ if (!function_exists('aiExtractPdfImages')) {
 
         @shell_exec($bin . ' -all ' . escapeshellarg($pdfAbsPath) . ' ' . escapeshellarg($absDir . '/img') . ' 2>/dev/null');
 
-        $out = [];
-        foreach ((array) glob($absDir . '/img-*') as $f) {
+        // 1er passage : dimensions + hash de contenu (pour repérer les images répétées = logos/bandeaux).
+        $files = (array) glob($absDir . '/img-*');
+        $meta = [];
+        $hashCount = [];
+        foreach ($files as $f) {
             $info = @getimagesize($f);
-            if (!$info || $info[0] < 150 || $info[1] < 150) { @unlink($f); continue; } // ignore déco/logos
+            if (!$info) { @unlink($f); continue; }
+            $w = (int) $info[0];
+            $h = (int) $info[1];
+            $ratio = $h > 0 ? $w / $h : 0;
+            $ok = ($w >= 160 && $h >= 160 && $ratio <= 6 && $ratio >= (1 / 6)); // écarte petites + bandeaux/traits
+            $hash = @md5_file($f);
+            $meta[$f] = ['ok' => $ok, 'hash' => (string) $hash];
+            if ($ok && $hash) { $hashCount[$hash] = ($hashCount[$hash] ?? 0) + 1; }
+        }
+        // 2e passage : on garde les images valides ET UNIQUES (répétées sur plusieurs pages = déco -> écartées).
+        $out = [];
+        foreach ($files as $f) {
+            $m = $meta[$f] ?? null;
+            if (!$m || !$m['ok'] || (($hashCount[$m['hash']] ?? 0) !== 1)) { @unlink($f); continue; }
             $out[] = $relDir . '/' . basename($f);
         }
         sort($out); // ordre des pages
