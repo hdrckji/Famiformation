@@ -1,9 +1,9 @@
 <?php
 // ============================================================
 // ai_test.php — page de TEST (admin) du moteur IA d'uniformisation.
-// Dépose un PDF -> l'IA le réécrit en contenu uniformisé + affiche coût réel.
-// Sert à valider qualité + prix AVANT de brancher les boutons de contenu.
-// ⚠️ PDF UNIQUEMENT (petit). La vidéo se traite ailleurs (.srt / Whisper).
+// Dépose un PDF -> l'IA le réécrit + affiche coût, images extraites, et un
+// DIAGNOSTIC (poppler dispo ? stockage persistant ?).
+// ⚠️ PDF UNIQUEMENT (petit).
 // ============================================================
 require_once 'config.php';
 verifierConnexion($db);
@@ -24,15 +24,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
         $err = 'Aucun fichier reçu (ou fichier trop lourd rejeté par le serveur).';
     } elseif (($f['error'] ?? 0) === UPLOAD_ERR_INI_SIZE || ($f['error'] ?? 0) === UPLOAD_ERR_FORM_SIZE) {
-        $err = 'Fichier trop lourd pour l\'upload PHP. Dépose un PDF plus petit (30 Mo max), pas la vidéo.';
+        $err = 'Fichier trop lourd. Dépose un PDF plus petit (30 Mo max), pas la vidéo.';
     } elseif (($f['error'] ?? 0) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
         $err = 'Échec de l\'upload (code ' . (int) ($f['error'] ?? -1) . ').';
     } elseif (strtolower(pathinfo((string) $f['name'], PATHINFO_EXTENSION)) !== 'pdf') {
-        $err = 'Merci de déposer un fichier .pdf (pas une vidéo ni un autre format).';
+        $err = 'Merci de déposer un fichier .pdf.';
     } elseif ((int) ($f['size'] ?? 0) > 30 * 1024 * 1024) {
         $err = 'PDF trop lourd (max 30 Mo).';
     } else {
-        $result = aiUniformisePdf($db, $f['tmp_name']);
+        $stableName = 'test_' . preg_replace('/[^A-Za-z0-9]/', '_', pathinfo((string) $f['name'], PATHINFO_FILENAME));
+        $result = aiUniformisePdf($db, $f['tmp_name'], $stableName);
     }
 }
 
@@ -40,24 +41,11 @@ $cur = iaSelectedModel($db);
 $catalog = iaModelCatalog();
 $curLabel = $catalog[$cur]['label'] ?? $cur;
 
-// Mini-rendu Markdown -> HTML (aperçu de lecture).
-function mdMini($md)
-{
-    $out = [];
-    $inList = false;
-    foreach (preg_split('/\r\n|\r|\n/', (string) $md) as $line) {
-        $t = rtrim($line);
-        if ($t === '') { if ($inList) { $out[] = '</ul>'; $inList = false; } continue; }
-        $e = htmlspecialchars($t);
-        if (strpos($t, '### ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h4>' . htmlspecialchars(substr($t, 4)) . '</h4>'; }
-        elseif (strpos($t, '## ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h3>' . htmlspecialchars(substr($t, 3)) . '</h3>'; }
-        elseif (strpos($t, '# ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h2>' . htmlspecialchars(substr($t, 2)) . '</h2>'; }
-        elseif (strpos($t, '- ') === 0 || strpos($t, '* ') === 0) { if (!$inList) { $out[] = '<ul>'; $inList = true; } $out[] = '<li>' . htmlspecialchars(substr($t, 2)) . '</li>'; }
-        else { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<p>' . $e . '</p>'; }
-    }
-    if ($inList) { $out[] = '</ul>'; }
-    return implode("\n", $out);
-}
+// Diagnostic
+$diagBin     = function_exists('shell_exec') ? trim((string) @shell_exec('command -v pdfimages 2>/dev/null')) : '';
+$diagBase    = defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads');
+$diagPersist = (defined('FAMI_STORAGE_BASE') && FAMI_STORAGE_BASE !== (__DIR__ . '/uploads'));
+$diagShell   = function_exists('shell_exec');
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -77,19 +65,30 @@ function mdMini($md)
         .stat { display: inline-block; background: #e8f5e9; color: #1d6f42; border-radius: 999px; padding: 6px 14px; font-weight: 800; margin: 4px 8px 4px 0; }
         .err { background: #f9e1e1; color: #a83232; border-radius: 10px; padding: 12px 16px; font-weight: 700; }
         .warn { background: #fdf6e6; color: #8a6d1a; border: 1px solid #f0d9a8; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
-        textarea { width: 100%; box-sizing: border-box; min-height: 320px; font-family: ui-monospace, Consolas, monospace; font-size: .9rem; padding: 12px; border: 1px solid #cfdad3; border-radius: 10px; }
-        .preview { border: 1px solid #e3ece5; border-radius: 10px; padding: 6px 18px; background: #fbfdfb; }
-        .preview h2 { color: #2d5a37; } .preview h3 { color: #2d5a37; } .preview h4 { color: #33473b; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+        .diag { font-size: .92rem; line-height: 1.9; }
+        .ok { color: #1d6f42; font-weight: 700; } .ko { color: #a83232; font-weight: 700; }
+        textarea { width: 100%; box-sizing: border-box; min-height: 320px; font-family: ui-monospace, Consolas, monospace; font-size: .85rem; padding: 12px; border: 1px solid #cfdad3; border-radius: 10px; }
+        .thumbs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .thumbs img { height: 100px; border-radius: 8px; border: 1px solid #cfdad3; background:#fff; }
     </style>
 </head>
 <body>
 <div class="container">
     <a class="back" href="parametres.php#prefs">⬅ Retour aux paramètres</a>
     <h1>🧪 Test IA — Uniformisation d'un PDF</h1>
-    <p class="muted">Modèle actuel : <strong><?= htmlspecialchars($curLabel) ?></strong> (modifiable dans Préférences → 🤖 Intelligence artificielle).</p>
-    <div class="warn">📄 <strong>PDF uniquement, 30 Mo max.</strong> Ne dépose <strong>pas</strong> la vidéo ici (elle se traite ailleurs, via le sous-titre <code>.srt</code> ou Whisper).</div>
+    <p class="muted">Modèle actuel : <strong><?= htmlspecialchars($curLabel) ?></strong>.</p>
+
+    <div class="card">
+        <div class="diag">
+            🔧 <strong>Diagnostic images</strong><br>
+            • <code>pdfimages</code> (extraction photos) : <?= $diagBin !== '' ? '<span class="ok">✅ présent</span> <span class="muted">(' . htmlspecialchars($diagBin) . ')</span>' : '<span class="ko">❌ absent</span> — poppler-utils pas (encore) installé (attends le rebuild Docker)'; ?><br>
+            • <code>shell_exec</code> : <?= $diagShell ? '<span class="ok">✅ actif</span>' : '<span class="ko">❌ désactivé</span> (extraction impossible)'; ?><br>
+            • Stockage : <?= $diagPersist ? '<span class="ok">✅ volume persistant</span>' : '<span class="ko">⚠️ local — NON persistant</span> (les fichiers sont perdus au redéploiement : attache un volume Railway)'; ?>
+            <span class="muted">(<?= htmlspecialchars($diagBase) ?>)</span>
+        </div>
+    </div>
+
+    <div class="warn">📄 <strong>PDF uniquement, 30 Mo max.</strong> Ne dépose pas la vidéo ici.</div>
 
     <?php if ($err): ?><div class="card"><div class="err"><?= htmlspecialchars($err) ?></div></div><?php endif; ?>
 
@@ -108,21 +107,25 @@ function mdMini($md)
             <div class="card">
                 <div>
                     <span class="stat"><?= htmlspecialchars($catalog[$result['model']]['label'] ?? $result['model']) ?></span>
-                    <span class="stat"><?= number_format($result['in']) ?> tokens entrée</span>
-                    <span class="stat"><?= number_format($result['out']) ?> tokens sortie</span>
+                    <span class="stat"><?= number_format($result['in']) ?> tok. entrée</span>
+                    <span class="stat"><?= number_format($result['out']) ?> tok. sortie</span>
                     <span class="stat">≈ <?= number_format($result['cost_eur'], 3) ?> €</span>
+                    <span class="stat"><?= count($result['images'] ?? []) ?> image(s) extraite(s)</span>
                 </div>
-                <p class="muted" style="margin-top:10px;">Coût réel de <strong>ce</strong> document. Le contenu ci-dessous est éditable (à gauche = texte brut modifiable, à droite = aperçu de lecture).</p>
-                <div class="grid" style="margin-top:12px;">
-                    <div>
-                        <label style="font-weight:700; color:#244230;">Contenu uniformisé (éditable)</label>
-                        <textarea><?= htmlspecialchars($result['text']) ?></textarea>
+
+                <?php if (!empty($result['images'])): ?>
+                    <p class="muted" style="margin:12px 0 0;">Images extraites (servies depuis le stockage) :</p>
+                    <div class="thumbs">
+                        <?php foreach ($result['images'] as $imk): ?>
+                            <img src="<?= htmlspecialchars(moduleFileUrl($imk)) ?>" alt="">
+                        <?php endforeach; ?>
                     </div>
-                    <div>
-                        <label style="font-weight:700; color:#244230;">Aperçu</label>
-                        <div class="preview"><?= mdMini($result['text']) ?></div>
-                    </div>
-                </div>
+                <?php else: ?>
+                    <p class="muted" style="margin-top:12px;">Aucune image extraite (PDF sans photo, poppler absent, ou petites images/logos filtrés).</p>
+                <?php endif; ?>
+
+                <p class="muted" style="margin-top:14px;">Contenu généré (JSON de blocs de design) :</p>
+                <textarea readonly><?= htmlspecialchars($result['text']) ?></textarea>
             </div>
         <?php endif; ?>
     <?php endif; ?>
@@ -131,14 +134,8 @@ function mdMini($md)
 function checkPdf(form) {
     var f = form.pdf.files[0];
     if (!f) { alert('Choisis un PDF.'); return false; }
-    if (!/\.pdf$/i.test(f.name)) {
-        alert('Ce doit être un fichier .pdf — pas une vidéo ni un autre format.');
-        return false;
-    }
-    if (f.size > 30 * 1024 * 1024) {
-        alert('PDF trop lourd (' + (f.size / 1048576).toFixed(0) + ' Mo). Maximum 30 Mo.\n\nAstuce : ne dépose PAS la vidéo ici, seulement le document PDF de formation.');
-        return false;
-    }
+    if (!/\.pdf$/i.test(f.name)) { alert('Ce doit être un fichier .pdf.'); return false; }
+    if (f.size > 30 * 1024 * 1024) { alert('PDF trop lourd (max 30 Mo). Ne dépose pas la vidéo ici.'); return false; }
     return true;
 }
 </script>
