@@ -186,3 +186,89 @@ if (!function_exists('aiExtractPdfImages')) {
         return $out;
     }
 }
+
+if (!function_exists('aiGenerateQuiz')) {
+    /**
+     * Génère un quiz QCM à partir du contenu de formation (texte uniformisé).
+     * @return array ['ok'=>bool, 'quiz'=>['questions'=>[...]]|null, 'error'=>string, 'cost_eur'=>float]
+     */
+    function aiGenerateQuiz($db, $contentText, $nb = 75)
+    {
+        $contentText = trim((string) $contentText);
+        if ($contentText === '') {
+            return ['ok' => false, 'quiz' => null, 'error' => 'Contenu vide', 'cost_eur' => 0.0];
+        }
+        $apiKey = getenv('ANTHROPIC_API_KEY');
+        if (!$apiKey && isset($_SERVER['ANTHROPIC_API_KEY'])) { $apiKey = $_SERVER['ANTHROPIC_API_KEY']; }
+        if (!$apiKey) {
+            return ['ok' => false, 'quiz' => null, 'error' => 'Clé ANTHROPIC_API_KEY absente', 'cost_eur' => 0.0];
+        }
+        $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
+
+        $system = "Tu es formateur. À partir du CONTENU DE FORMATION fourni, crée un quiz d'évaluation de $nb questions à choix multiples (QCM), en français.\n"
+            . "Règles STRICTES :\n"
+            . "- Base-toi UNIQUEMENT sur le contenu fourni (aucune connaissance externe).\n"
+            . "- Chaque question a 3 à 5 options claires et distinctes.\n"
+            . "- \"type\" vaut \"single\" (une seule bonne réponse) ou \"multiple\" (plusieurs bonnes réponses) — sois exact.\n"
+            . "- \"correct\" est la liste des indices 0-based des bonnes options.\n"
+            . "- Si le contenu ne permet pas $nb questions de qualité, fais-en le maximum SANS inventer.\n"
+            . "- Réponds UNIQUEMENT en JSON valide, sans aucun texte autour :\n"
+            . '{"questions":[{"q":"...","type":"single","options":["...","..."],"correct":[0]}]}';
+
+        $payload = [
+            'model' => $model, 'max_tokens' => 16000, 'system' => $system,
+            'messages' => [['role' => 'user', 'content' => "CONTENU DE FORMATION :\n\n" . $contentText]],
+        ];
+        $ch = curl_init('https://api.anthropic.com/v1/messages');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['content-type: application/json', 'x-api-key: ' . $apiKey, 'anthropic-version: 2023-06-01'],
+            CURLOPT_POSTFIELDS => json_encode($payload), CURLOPT_TIMEOUT => 240,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $cErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($resp === false) { return ['ok' => false, 'quiz' => null, 'error' => 'Connexion API : ' . $cErr, 'cost_eur' => 0.0]; }
+        $data = json_decode($resp, true);
+        if ($code !== 200 || !is_array($data)) {
+            $msg = is_array($data) && isset($data['error']['message']) ? $data['error']['message'] : ('HTTP ' . $code);
+            return ['ok' => false, 'quiz' => null, 'error' => $msg, 'cost_eur' => 0.0];
+        }
+        if (($data['stop_reason'] ?? '') === 'refusal') { return ['ok' => false, 'quiz' => null, 'error' => 'IA a refusé', 'cost_eur' => 0.0]; }
+
+        $text = '';
+        foreach (($data['content'] ?? []) as $b) { if (($b['type'] ?? '') === 'text') { $text .= $b['text']; } }
+        $s = strpos($text, '{');
+        $e = strrpos($text, '}');
+        if ($s === false || $e === false || $e < $s) { return ['ok' => false, 'quiz' => null, 'error' => 'Réponse non-JSON', 'cost_eur' => 0.0]; }
+        $q = json_decode(substr($text, $s, $e - $s + 1), true);
+        if (!is_array($q) || empty($q['questions']) || !is_array($q['questions'])) {
+            return ['ok' => false, 'quiz' => null, 'error' => 'JSON quiz invalide (tronqué ?)', 'cost_eur' => 0.0];
+        }
+
+        $clean = [];
+        foreach ($q['questions'] as $it) {
+            if (empty($it['q']) || empty($it['options']) || !is_array($it['options'])) { continue; }
+            $opts = array_values(array_map('strval', $it['options']));
+            if (count($opts) < 2) { continue; }
+            $type = (($it['type'] ?? 'single') === 'multiple') ? 'multiple' : 'single';
+            $correct = array_values(array_filter(array_map('intval', (array) ($it['correct'] ?? [])), function ($i) use ($opts) {
+                return $i >= 0 && $i < count($opts);
+            }));
+            if (empty($correct)) { continue; }
+            if ($type === 'single') { $correct = [$correct[0]]; }
+            $clean[] = ['q' => (string) $it['q'], 'type' => $type, 'options' => $opts, 'correct' => $correct];
+        }
+        if (empty($clean)) { return ['ok' => false, 'quiz' => null, 'error' => 'Aucune question valide', 'cost_eur' => 0.0]; }
+
+        $in = (int) ($data['usage']['input_tokens'] ?? 0);
+        $out2 = (int) ($data['usage']['output_tokens'] ?? 0);
+        $pricing = aiModelPricing();
+        $rate = $pricing[$model] ?? [3.0, 15.0];
+        $costEur = (($in / 1e6) * $rate[0] + ($out2 / 1e6) * $rate[1]) * 0.92;
+
+        return ['ok' => true, 'quiz' => ['questions' => $clean], 'error' => '', 'cost_eur' => $costEur];
+    }
+}

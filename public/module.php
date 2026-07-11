@@ -211,6 +211,10 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === ''): ?>
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
         <?php endif; ?>
+        <?php if (!$isContainer && !empty($module['a_evaluer']) && !empty($module['quiz_json'])): ?>
+            <?php require_once __DIR__ . '/includes/quiz_view.php'; ?>
+            <?php renderQuizForm(json_decode((string) $module['quiz_json'], true), (int) $module['id']); ?>
+        <?php endif; ?>
     <?php endif; ?>
 
     <?php if ($isAdmin): ?>
@@ -311,7 +315,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
 
                     <label class="chk" style="margin-top:18px; padding:12px 14px; background:#f4f7f6; border-radius:10px;">
                         <input type="checkbox" name="a_evaluer" value="1" <?= !empty($module['a_evaluer']) ? 'checked' : '' ?>>
-                        📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(il apparaîtra aussi dans « Formation »)</small>
+                        📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz de 75 questions sera généré pour l'évaluer)</small>
                     </label>
 
                     <p style="font-size:0.82rem; color:#777; margin-top:14px;">« Valider et uniformiser » affiche le PDF dans une mise en page intégrée au site (au lieu du lecteur PDF brut).</p>

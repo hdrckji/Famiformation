@@ -1,0 +1,106 @@
+<?php
+// ============================================================
+// quiz_check.php — corrige le quiz côté serveur (les bonnes réponses ne
+// transitent jamais côté client avant validation) et affiche le score.
+// ============================================================
+require_once 'config.php';
+verifierConnexion($db);
+require_once 'includes/modules.php';
+
+$id = (int) ($_POST['module_id'] ?? 0);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $id <= 0) {
+    header('Location: index.php');
+    exit();
+}
+requireValidCSRF();
+
+$module = getModuleById($db, $id);
+if (!$module || empty($module['quiz_json'])) {
+    header('Location: module.php?id=' . $id);
+    exit();
+}
+
+$isAdmin = ((($_SESSION['role'] ?? '') === 'admin') && (!function_exists('isApercuActif') || !isApercuActif()));
+if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($module, function_exists('currentDisplayRole') ? currentDisplayRole() : (string) ($_SESSION['role'] ?? ''))) {
+    header('Location: index.php');
+    exit();
+}
+
+$quiz = json_decode((string) $module['quiz_json'], true);
+$qs = (isset($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
+$answers = $_POST['a'] ?? [];
+
+$total = count($qs);
+$score = 0;
+$results = [];
+foreach ($qs as $i => $q) {
+    $ua = array_values(array_unique(array_map('intval', (array) ($answers[$i] ?? []))));
+    sort($ua);
+    $cor = array_values(array_map('intval', (array) ($q['correct'] ?? [])));
+    sort($cor);
+    $ok = ($ua === $cor);
+    if ($ok) { $score++; }
+    $results[] = ['q' => $q, 'ua' => $ua, 'cor' => $cor, 'ok' => $ok];
+}
+$pct = $total > 0 ? round($score * 100 / $total) : 0;
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Résultat du quiz - FamiFormation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Open Sans', sans-serif; background: #f4f7f6; margin: 0; padding: 24px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        a.back { color: #2d5a37; text-decoration: none; font-weight: 700; }
+        .scorecard { background:#fff; border-radius:16px; box-shadow:0 8px 26px rgba(0,0,0,.08); padding:26px; margin:16px 0; text-align:center; }
+        .score-big { font-size:2.6rem; font-weight:800; color:#2d5a37; }
+        .bar { height:14px; background:#e8efe9; border-radius:999px; overflow:hidden; max-width:420px; margin:14px auto 0; }
+        .bar > span { display:block; height:100%; background:<?= $pct >= 50 ? '#2d5a37' : '#c94a42' ?>; width:<?= (int) $pct ?>%; }
+        .q { background:#fff; border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,.06); padding:18px 20px; margin:12px 0; border-left:6px solid #ccc; }
+        .q.ok { border-left-color:#2d9a4e; } .q.no { border-left-color:#c94a42; }
+        .qh { font-weight:800; color:#243b2e; margin-bottom:8px; }
+        .opt { padding:7px 12px; border-radius:8px; margin:4px 0; display:flex; gap:8px; align-items:center; }
+        .opt.correct { background:#e7f6ec; color:#1d6f42; font-weight:700; }
+        .opt.wrongpick { background:#fbe6e4; color:#a83232; text-decoration:line-through; }
+        .tag { font-size:.75rem; font-weight:800; padding:2px 8px; border-radius:999px; }
+        .tag.ok { background:#e7f6ec; color:#1d6f42; } .tag.no { background:#fbe6e4; color:#a83232; }
+        .btn { border:none; border-radius:10px; padding:11px 20px; font-weight:700; text-decoration:none; display:inline-block; }
+        .btn-primary { background:#2d5a37; color:#fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a class="back" href="module.php?id=<?= (int) $id ?>">⬅ Retour au module</a>
+    <div class="scorecard">
+        <div class="score-big"><?= (int) $score ?> / <?= (int) $total ?></div>
+        <div style="color:#5a6b60; font-weight:700; margin-top:4px;"><?= (int) $pct ?>% de bonnes réponses</div>
+        <div class="bar"><span></span></div>
+    </div>
+
+    <?php foreach ($results as $k => $r): $q = $r['q']; ?>
+        <div class="q <?= $r['ok'] ? 'ok' : 'no' ?>">
+            <div class="qh"><?= ($k + 1) ?>. <?= htmlspecialchars((string) $q['q']) ?>
+                <span class="tag <?= $r['ok'] ? 'ok' : 'no' ?>"><?= $r['ok'] ? '✓ Juste' : '✗ Faux' ?></span>
+            </div>
+            <?php foreach (($q['options'] ?? []) as $j => $opt):
+                $isCorrect = in_array((int) $j, $r['cor'], true);
+                $isPicked = in_array((int) $j, $r['ua'], true);
+                $cls = $isCorrect ? 'correct' : ($isPicked ? 'wrongpick' : '');
+            ?>
+                <div class="opt <?= $cls ?>">
+                    <?= $isCorrect ? '✓' : ($isPicked ? '✗' : '•') ?>
+                    <span><?= htmlspecialchars((string) $opt) ?></span>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endforeach; ?>
+
+    <div style="text-align:center; margin:20px 0;">
+        <a class="btn btn-primary" href="module.php?id=<?= (int) $id ?>">Refaire le quiz</a>
+    </div>
+</div>
+</body>
+</html>
