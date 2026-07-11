@@ -101,10 +101,9 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
     ?>
     <div class="topbar">
         <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
-        <?php if ($uniHasContent): ?>
+        <?php if ($uniCanDl): ?>
             <div class="uni-actions">
-                <button type="button" id="uniEye" class="uni-ico" title="Voir le PDF original" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button>
-                <?php if ($uniCanDl): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF">⤓</a><?php endif; ?>
+                <a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF original">⤓</a>
             </div>
         <?php endif; ?>
     </div>

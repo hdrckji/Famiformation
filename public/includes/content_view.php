@@ -1,11 +1,11 @@
 <?php
 // ============================================================
 // content_view.php — affichage soigné du contenu uniformisé (IA).
-//   renderUniformContent($md, $pdfUrl) :
+//   renderUniformContent($md) :
 //     - contenu large, intégré à la page (pas une petite fenêtre)
 //     - lecture paginée (une page par section ##) + navigation ◀ / ▶
-//   Les boutons 👁 (voir PDF) / ⤓ (télécharger) sont rendus par module.php
-//   dans la barre du haut ; ici on expose window.uniTogglePdf().
+//   Pas d'affichage du PDF (coûte de la bande passante) : seul le
+//   téléchargement (créateur + gérant) est proposé, via module.php.
 // Additif : autonome.
 // ============================================================
 require_once __DIR__ . '/ai_uniformise.php'; // aiMarkdownToHtml
@@ -60,30 +60,21 @@ if (!function_exists('renderUniformContent')) {
         .uni-btn:hover:not(:disabled) { background:#2d5a37; color:#fff; }
         .uni-btn:disabled { opacity:.35; cursor:not-allowed; }
         .uni-count { font-weight:800; color:#5a6b60; }
-        .uni-pdf iframe { width:100%; height:80vh; border:none; display:block; background:#f4f7f6; }
         </style>
 
         <div class="uni-wrap">
-            <div class="uni-view uni-read">
-                <div class="uni-body">
-                    <?php foreach ($pages as $i => $p): ?>
-                        <article class="uni-page" data-page="<?= (int) $i ?>" <?= $i === 0 ? '' : 'style="display:none;"' ?>>
-                            <?= aiMarkdownToHtml($p) ?>
-                        </article>
-                    <?php endforeach; ?>
-                </div>
-                <?php if ($n > 1): ?>
-                    <div class="uni-nav">
-                        <button type="button" class="uni-btn" id="uniPrev" onclick="uniPage(-1)">◀ Précédent</button>
-                        <span class="uni-count"><span id="uniCur">1</span> / <?= (int) $n ?></span>
-                        <button type="button" class="uni-btn" id="uniNext" onclick="uniPage(1)">Suivant ▶</button>
-                    </div>
-                <?php endif; ?>
+            <div class="uni-body">
+                <?php foreach ($pages as $i => $p): ?>
+                    <article class="uni-page" data-page="<?= (int) $i ?>" <?= $i === 0 ? '' : 'style="display:none;"' ?>>
+                        <?= aiMarkdownToHtml($p) ?>
+                    </article>
+                <?php endforeach; ?>
             </div>
-
-            <?php if ($pdfUrl !== ''): ?>
-                <div class="uni-view uni-pdf" style="display:none;">
-                    <iframe src="<?= htmlspecialchars($pdfUrl) ?>" title="PDF original"></iframe>
+            <?php if ($n > 1): ?>
+                <div class="uni-nav">
+                    <button type="button" class="uni-btn" id="uniPrev" onclick="uniPage(-1)">◀ Précédent</button>
+                    <span class="uni-count"><span id="uniCur">1</span> / <?= (int) $n ?></span>
+                    <button type="button" class="uni-btn" id="uniNext" onclick="uniPage(1)">Suivant ▶</button>
                 </div>
             <?php endif; ?>
         </div>
@@ -91,16 +82,6 @@ if (!function_exists('renderUniformContent')) {
         <script>
         (function () {
             var idx = 0, total = <?= (int) $n ?>;
-            window.uniTogglePdf = function () {
-                var read = document.querySelector('.uni-read'), pdf = document.querySelector('.uni-pdf'), eye = document.getElementById('uniEye');
-                if (!pdf) { return; }
-                var showPdf = (pdf.style.display === 'none');
-                pdf.style.display = showPdf ? '' : 'none';
-                if (read) { read.style.display = showPdf ? 'none' : ''; }
-                if (eye) { eye.textContent = showPdf ? '📖' : '👁'; eye.title = showPdf ? 'Revenir à la lecture' : 'Voir le PDF original'; }
-                var w = document.querySelector('.uni-wrap');
-                if (w && w.scrollIntoView) { w.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-            };
             function show(i) {
                 idx = Math.max(0, Math.min(total - 1, i));
                 document.querySelectorAll('.uni-page').forEach(function (p) {
