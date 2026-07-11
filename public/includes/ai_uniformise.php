@@ -125,3 +125,23 @@ if (!function_exists('aiUniformisePdf')) {
         return ['ok' => true, 'text' => $text, 'error' => '', 'model' => $model, 'in' => $in, 'out' => $out, 'cost_eur' => $costEur];
     }
 }
+
+if (!function_exists('aiMarkdownToHtml')) {
+    /** Mini-rendu Markdown -> HTML (titres ##/###, listes -, paragraphes). */
+    function aiMarkdownToHtml($md)
+    {
+        $out = [];
+        $inList = false;
+        foreach (preg_split('/\r\n|\r|\n/', (string) $md) as $line) {
+            $t = rtrim($line);
+            if ($t === '') { if ($inList) { $out[] = '</ul>'; $inList = false; } continue; }
+            if (strpos($t, '### ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h4>' . htmlspecialchars(substr($t, 4)) . '</h4>'; }
+            elseif (strpos($t, '## ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h3>' . htmlspecialchars(substr($t, 3)) . '</h3>'; }
+            elseif (strpos($t, '# ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h2>' . htmlspecialchars(substr($t, 2)) . '</h2>'; }
+            elseif (strpos($t, '- ') === 0 || strpos($t, '* ') === 0) { if (!$inList) { $out[] = '<ul>'; $inList = true; } $out[] = '<li>' . htmlspecialchars(substr($t, 2)) . '</li>'; }
+            else { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<p>' . htmlspecialchars($t) . '</p>'; }
+        }
+        if ($inList) { $out[] = '</ul>'; }
+        return implode("\n", $out);
+    }
+}

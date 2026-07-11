@@ -35,6 +35,16 @@ function safeReturn($value, $default = 'index.php')
     return $default;
 }
 
+// Chemin absolu d'un fichier de module (volume Railway, ou ancien uploads/).
+function moduleFileAbsPath($rel)
+{
+    $rel = (string) $rel;
+    if ($rel === '') { return ''; }
+    if (strpos($rel, 'uploads/') === 0) { return __DIR__ . '/' . $rel; }
+    $base = defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads');
+    return rtrim($base, '/') . '/' . $rel;
+}
+
 // Gère l'upload d'une image d'icône -> renvoie le chemin relatif, ou null
 function handleModuleIconUpload()
 {
@@ -215,10 +225,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $uniformized = (($_POST['uniformize'] ?? '0') === '1') ? 1 : 0;
                 $aEvaluer = !empty($_POST['a_evaluer']) ? 1 : 0;
+                $contenuIa = $module['contenu_ia'] ?? null;
+                $flashMsg = "✅ Contenu du module mis à jour.";
 
-                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ? WHERE id = ?")
-                   ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $id]);
-                $_SESSION['module_flash'] = "✅ Contenu du module mis à jour.";
+                // S'assurer que la colonne du contenu généré par l'IA existe.
+                try {
+                    if (!$db->query("SHOW COLUMNS FROM modules LIKE 'contenu_ia'")->fetch()) {
+                        $db->exec("ALTER TABLE modules ADD COLUMN contenu_ia MEDIUMTEXT NULL");
+                    }
+                } catch (Exception $e) { /* migration non bloquante */ }
+
+                // « Valider et uniformiser » : l'IA lit le PDF et réécrit le contenu.
+                if ($uniformized === 1 && $pdfPath !== null && $pdfPath !== '') {
+                    require_once __DIR__ . '/includes/ia_settings.php';
+                    require_once __DIR__ . '/includes/ai_uniformise.php';
+                    $res = aiUniformisePdf($db, moduleFileAbsPath($pdfPath));
+                    if ($res['ok']) {
+                        $contenuIa = $res['text'];
+                        $flashMsg = "✅ Contenu uniformisé par l'IA (≈ " . number_format($res['cost_eur'], 3) . " €). Vérifie le rendu ci-dessous.";
+                    } else {
+                        $uniformized = 0;
+                        $flashMsg = "⚠️ Uniformisation IA échouée : " . $res['error'] . " — le PDF est enregistré tel quel.";
+                    }
+                }
+
+                $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ? WHERE id = ?")
+                   ->execute([$pdfPath, $videoPath, $uniformized, $aEvaluer, $contenuIa, $id]);
+                $_SESSION['module_flash'] = $flashMsg;
                 $redirectTo = 'module.php?id=' . $id;
             }
         }
