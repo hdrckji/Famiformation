@@ -17,6 +17,55 @@ if (!function_exists('aiModelPricing')) {
     }
 }
 
+if (!function_exists('aiSanitizeBlocks')) {
+    /** Valide/normalise les blocs de design produits par l'IA. */
+    function aiSanitizeBlocks($blocks)
+    {
+        $ok = [];
+        foreach ((array) $blocks as $b) {
+            if (!is_array($b) || empty($b['type'])) { continue; }
+            switch ($b['type']) {
+                case 'hero':
+                    $ok[] = ['type' => 'hero', 'title' => (string) ($b['title'] ?? ''), 'subtitle' => (string) ($b['subtitle'] ?? '')];
+                    break;
+                case 'section':
+                    if (!empty($b['title'])) { $ok[] = ['type' => 'section', 'title' => (string) $b['title']]; }
+                    break;
+                case 'text':
+                    if (trim((string) ($b['text'] ?? '')) !== '') { $ok[] = ['type' => 'text', 'text' => (string) $b['text']]; }
+                    break;
+                case 'list':
+                case 'steps':
+                    $items = array_values(array_filter(array_map(function ($x) { return trim((string) $x); }, (array) ($b['items'] ?? [])), 'strlen'));
+                    if (!empty($items)) { $ok[] = ['type' => $b['type'], 'items' => $items]; }
+                    break;
+                case 'callout':
+                    $style = in_array(($b['style'] ?? 'info'), ['info', 'tip', 'warning'], true) ? $b['style'] : 'info';
+                    if (trim((string) ($b['text'] ?? '')) !== '' || trim((string) ($b['title'] ?? '')) !== '') {
+                        $ok[] = ['type' => 'callout', 'style' => $style, 'title' => (string) ($b['title'] ?? ''), 'text' => (string) ($b['text'] ?? '')];
+                    }
+                    break;
+                case 'keyfigures':
+                    $items = [];
+                    foreach ((array) ($b['items'] ?? []) as $it) {
+                        if (is_array($it) && trim((string) ($it['value'] ?? '')) !== '') {
+                            $items[] = ['value' => (string) $it['value'], 'label' => (string) ($it['label'] ?? '')];
+                        }
+                    }
+                    if (!empty($items)) { $ok[] = ['type' => 'keyfigures', 'items' => $items]; }
+                    break;
+                case 'image':
+                    $ok[] = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? '')];
+                    break;
+                case 'quote':
+                    if (trim((string) ($b['text'] ?? '')) !== '') { $ok[] = ['type' => 'quote', 'text' => (string) $b['text']]; }
+                    break;
+            }
+        }
+        return $ok;
+    }
+}
+
 if (!function_exists('aiUniformisePdf')) {
     /**
      * Envoie le PDF à Claude et récupère le contenu uniformisé (Markdown FR).
@@ -57,15 +106,20 @@ if (!function_exists('aiUniformisePdf')) {
         $images = function_exists('aiExtractPdfImages') ? aiExtractPdfImages($pdfPath, $relForImg) : [];
         $images = array_slice($images, 0, 12); // borne coût / taille de requête
 
-        $system = "Tu es un rédacteur pédagogique. À partir d'un document de formation (PDF), tu produis une FICHE claire, agréable et bien organisée, en français.\n"
-            . "EXIGENCES :\n"
-            . "- Fidélité TOTALE : n'ajoute aucune information absente du document, n'invente rien.\n"
-            . "- Réorganise proprement : commence par un titre (# Titre) suivi d'une phrase d'introduction, puis des sections logiques (## Titre de section) avec du VRAI contenu sous chaque titre (jamais un titre seul sans texte).\n"
-            . "- Rédige des phrases complètes et lisibles ; utilise des listes à puces (- ) pour les étapes/consignes ; mets en gras (**mot**) uniquement les termes clés, avec parcimonie.\n"
-            . "- N'écris JAMAIS de symboles bruts parasites ni de « : ** » : le gras s'écrit strictement **texte**, rien d'autre.\n"
-            . "- Supprime le superflu (numéros de page, en-têtes/pieds répétés).\n"
-            . "- IMAGES : les images extraites du document te sont fournies, numérotées (Image 1, Image 2, …). Place SEULEMENT celles qui illustrent vraiment le propos, à l'endroit du texte où elles ont du sens, seules sur leur ligne, avec le marqueur [[IMG n]] (n = son numéro). N'utilise JAMAIS un logo d'entreprise, un bandeau, une décoration, une image d'en-tête/pied de page ou une image sans lien clair : ignore-la totalement. En cas de doute sur l'utilité d'une image, NE LA PLACE PAS. N'utilise pas deux fois la même image.\n"
-            . "- Aucun préambule ni méta-commentaire (pas de « Voici… ») : donne DIRECTEMENT la fiche en Markdown.";
+        $system = "Tu es un designer pédagogique. À partir d'un document de formation (PDF), tu produis une FICHE web moderne, claire et agréable, en français, adaptée à Famiflora (jardinerie : ton chaleureux, univers nature).\n"
+            . "Tu réponds UNIQUEMENT en JSON valide au format {\"blocks\":[ ... ]}. AUCUN texte hors du JSON.\n"
+            . "Types de blocs disponibles (choisis les plus adaptés, dans l'ordre de lecture) :\n"
+            . "- {\"type\":\"hero\",\"title\":\"Titre principal\",\"subtitle\":\"sous-titre court\"} : une seule fois, tout au début.\n"
+            . "- {\"type\":\"section\",\"title\":\"Titre de section\"}\n"
+            . "- {\"type\":\"text\",\"text\":\"phrases complètes et lisibles ; **gras** pour les termes clés\"}\n"
+            . "- {\"type\":\"list\",\"items\":[\"point\",\"point\"]}\n"
+            . "- {\"type\":\"steps\",\"items\":[\"étape 1\",\"étape 2\"]} : procédure ordonnée.\n"
+            . "- {\"type\":\"callout\",\"style\":\"info|tip|warning\",\"title\":\"court\",\"text\":\"information importante à mettre en avant\"}\n"
+            . "- {\"type\":\"keyfigures\",\"items\":[{\"value\":\"24/7\",\"label\":\"court\"}]} : chiffres/points clés.\n"
+            . "- {\"type\":\"image\",\"n\":2,\"caption\":\"légende courte\"} : place UNE image pertinente (n = son numéro fourni).\n"
+            . "- {\"type\":\"quote\",\"text\":\"consigne ou phrase forte à mettre en avant\"}\n"
+            . "RÈGLES : fidélité TOTALE (n'invente rien, ne garde que ce qui est dans le document) ; aère et structure agréablement ; utilise callout / steps / keyfigures quand c'est pertinent pour rendre la fiche vivante ; supprime numéros de page et en-têtes répétés.\n"
+            . "IMAGES : n'utilise JAMAIS un logo, un bandeau, une décoration ou une image sans lien clair — en cas de doute, ne place pas l'image. Jamais deux fois la même.";
 
         $userContent = [
             ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($bytes)]],
@@ -80,8 +134,8 @@ if (!function_exists('aiUniformisePdf')) {
             $userContent[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mt, 'data' => base64_encode($imgBytes)]];
         }
         $userContent[] = ['type' => 'text', 'text' => count($images) > 0
-            ? ('Produis la fiche. Place les images pertinentes parmi les ' . count($images) . ' fournies avec [[IMG n]] au bon endroit.')
-            : 'Produis la fiche.'];
+            ? ('Produis la fiche en JSON de blocs. Place les images pertinentes parmi les ' . count($images) . ' fournies (bloc "image" avec "n").')
+            : 'Produis la fiche en JSON de blocs.'];
 
         $payload = [
             'model'      => $model,
@@ -129,6 +183,17 @@ if (!function_exists('aiUniformisePdf')) {
         $text = trim($text);
         if ($text === '') {
             return $fail('Réponse vide de l\'IA.');
+        }
+
+        // La réponse doit être un JSON de blocs de design ; on le valide/normalise (sinon on garde le brut).
+        $js = strpos($text, '{');
+        $je = strrpos($text, '}');
+        if ($js !== false && $je !== false && $je > $js) {
+            $parsed = json_decode(substr($text, $js, $je - $js + 1), true);
+            if (is_array($parsed) && !empty($parsed['blocks']) && is_array($parsed['blocks']) && function_exists('aiSanitizeBlocks')) {
+                $blocks = aiSanitizeBlocks($parsed['blocks']);
+                if (!empty($blocks)) { $text = json_encode(['blocks' => $blocks], JSON_UNESCAPED_UNICODE); }
+            }
         }
 
         // Coût.
