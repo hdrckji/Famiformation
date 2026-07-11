@@ -3,6 +3,7 @@
 // ai_test.php — page de TEST (admin) du moteur IA d'uniformisation.
 // Dépose un PDF -> l'IA le réécrit en contenu uniformisé + affiche coût réel.
 // Sert à valider qualité + prix AVANT de brancher les boutons de contenu.
+// ⚠️ PDF UNIQUEMENT (petit). La vidéo se traite ailleurs (.srt / Whisper).
 // ============================================================
 require_once 'config.php';
 verifierConnexion($db);
@@ -21,13 +22,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireValidCSRF();
     $f = $_FILES['pdf'] ?? null;
     if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        $err = 'Aucun fichier reçu.';
+        $err = 'Aucun fichier reçu (ou fichier trop lourd rejeté par le serveur).';
     } elseif (($f['error'] ?? 0) === UPLOAD_ERR_INI_SIZE || ($f['error'] ?? 0) === UPLOAD_ERR_FORM_SIZE) {
-        $err = 'Fichier trop lourd pour l\'upload PHP (limite serveur). Essaie un PDF plus petit.';
+        $err = 'Fichier trop lourd pour l\'upload PHP. Dépose un PDF plus petit (30 Mo max), pas la vidéo.';
     } elseif (($f['error'] ?? 0) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
         $err = 'Échec de l\'upload (code ' . (int) ($f['error'] ?? -1) . ').';
     } elseif (strtolower(pathinfo((string) $f['name'], PATHINFO_EXTENSION)) !== 'pdf') {
-        $err = 'Merci de déposer un fichier .pdf';
+        $err = 'Merci de déposer un fichier .pdf (pas une vidéo ni un autre format).';
+    } elseif ((int) ($f['size'] ?? 0) > 30 * 1024 * 1024) {
+        $err = 'PDF trop lourd (max 30 Mo).';
     } else {
         $result = aiUniformisePdf($db, $f['tmp_name']);
     }
@@ -73,6 +76,7 @@ function mdMini($md)
         .muted { color: #7a8a80; }
         .stat { display: inline-block; background: #e8f5e9; color: #1d6f42; border-radius: 999px; padding: 6px 14px; font-weight: 800; margin: 4px 8px 4px 0; }
         .err { background: #f9e1e1; color: #a83232; border-radius: 10px; padding: 12px 16px; font-weight: 700; }
+        .warn { background: #fdf6e6; color: #8a6d1a; border: 1px solid #f0d9a8; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
         textarea { width: 100%; box-sizing: border-box; min-height: 320px; font-family: ui-monospace, Consolas, monospace; font-size: .9rem; padding: 12px; border: 1px solid #cfdad3; border-radius: 10px; }
         .preview { border: 1px solid #e3ece5; border-radius: 10px; padding: 6px 18px; background: #fbfdfb; }
         .preview h2 { color: #2d5a37; } .preview h3 { color: #2d5a37; } .preview h4 { color: #33473b; }
@@ -84,14 +88,15 @@ function mdMini($md)
 <div class="container">
     <a class="back" href="parametres.php#prefs">⬅ Retour aux paramètres</a>
     <h1>🧪 Test IA — Uniformisation d'un PDF</h1>
-    <p class="muted">Modèle actuel : <strong><?= htmlspecialchars($curLabel) ?></strong> (modifiable dans Préférences → 🤖 Intelligence artificielle). Dépose un PDF de formation pour voir le rendu uniformisé et le coût réel.</p>
+    <p class="muted">Modèle actuel : <strong><?= htmlspecialchars($curLabel) ?></strong> (modifiable dans Préférences → 🤖 Intelligence artificielle).</p>
+    <div class="warn">📄 <strong>PDF uniquement, 30 Mo max.</strong> Ne dépose <strong>pas</strong> la vidéo ici (elle se traite ailleurs, via le sous-titre <code>.srt</code> ou Whisper).</div>
 
     <?php if ($err): ?><div class="card"><div class="err"><?= htmlspecialchars($err) ?></div></div><?php endif; ?>
 
     <div class="card">
-        <form method="POST" enctype="multipart/form-data" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <form method="POST" enctype="multipart/form-data" onsubmit="return checkPdf(this);" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <?= csrfField() ?>
-            <input type="file" name="pdf" accept="application/pdf" required>
+            <input type="file" name="pdf" accept="application/pdf,.pdf" required>
             <button type="submit" class="btn">⚙️ Uniformiser</button>
         </form>
     </div>
@@ -122,5 +127,20 @@ function mdMini($md)
         <?php endif; ?>
     <?php endif; ?>
 </div>
+<script>
+function checkPdf(form) {
+    var f = form.pdf.files[0];
+    if (!f) { alert('Choisis un PDF.'); return false; }
+    if (!/\.pdf$/i.test(f.name)) {
+        alert('Ce doit être un fichier .pdf — pas une vidéo ni un autre format.');
+        return false;
+    }
+    if (f.size > 30 * 1024 * 1024) {
+        alert('PDF trop lourd (' + (f.size / 1048576).toFixed(0) + ' Mo). Maximum 30 Mo.\n\nAstuce : ne dépose PAS la vidéo ici, seulement le document PDF de formation.');
+        return false;
+    }
+    return true;
+}
+</script>
 </body>
 </html>
