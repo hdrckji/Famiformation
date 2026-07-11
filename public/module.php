@@ -197,7 +197,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
-                <?php renderUniformContent($module['contenu_ia'], $uniPdfUrl, $canViewPdf); ?>
+                <?php renderUniformContent($module['contenu_ia'], $uniPdfUrl, $canViewPdf, (array) json_decode((string) ($module['contenu_images'] ?? '[]'), true)); ?>
             <?php elseif ($isUni): ?>
                 <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>

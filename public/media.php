@@ -60,6 +60,7 @@ $ext = strtolower(pathinfo($real, PATHINFO_EXTENSION));
 $types = [
     'pdf' => 'application/pdf',
     'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogv' => 'video/ogg', 'mov' => 'video/quicktime',
+    'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp',
 ];
 $ctype = $types[$ext] ?? 'application/octet-stream';
 

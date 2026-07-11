@@ -58,6 +58,7 @@ if (!function_exists('aiUniformisePdf')) {
             . "- N'ajoute AUCUNE information qui n'est pas dans le document.\n"
             . "- Structure en Markdown : titres avec ##, sous-titres avec ###, paragraphes courts, listes à puces (-).\n"
             . "- Garde toutes les informations utiles (procédures, chiffres, consignes), enlève le superflu (numéros de page, en-têtes répétés).\n"
+            . "- Là où le document contient une image, photo, schéma ou capture d'écran importante, insère un marqueur [IMAGE] seul sur sa ligne, à l'endroit correspondant, dans l'ordre d'apparition. N'invente pas d'images : un marqueur = une image réellement présente.\n"
             . "- Aucun préambule ni conclusion de ta part (pas de « Voici… »). Donne DIRECTEMENT le contenu formaté.";
 
         $payload = [
@@ -143,5 +144,45 @@ if (!function_exists('aiMarkdownToHtml')) {
         }
         if ($inList) { $out[] = '</ul>'; }
         return implode("\n", $out);
+    }
+}
+
+if (!function_exists('aiExtractPdfImages')) {
+    /**
+     * Extrait les images d'un PDF via `pdfimages` (poppler-utils) sur le volume.
+     * Filtre les petites images (déco/logos). Retourne les clés relatives (servies par media.php).
+     * @return string[] (vide si l'outil est absent ou pas d'images exploitables)
+     */
+    function aiExtractPdfImages($pdfAbsPath, $pdfRelPath)
+    {
+        if (!is_file($pdfAbsPath) || !function_exists('shell_exec')) {
+            return [];
+        }
+        $bin = trim((string) @shell_exec('command -v pdfimages 2>/dev/null'));
+        if ($bin === '') {
+            return []; // poppler-utils pas encore dispo -> pas d'images (dégradation propre)
+        }
+        $storeBase = defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads');
+        $name = preg_replace('/[^A-Za-z0-9_-]/', '_', pathinfo((string) $pdfRelPath, PATHINFO_FILENAME));
+        if ($name === '') {
+            $name = substr(md5((string) $pdfRelPath), 0, 12);
+        }
+        $relDir = 'modules/pdf_images/' . $name;
+        $absDir = rtrim($storeBase, '/') . '/' . $relDir;
+        if (!is_dir($absDir) && !@mkdir($absDir, 0775, true) && !is_dir($absDir)) {
+            return [];
+        }
+        foreach ((array) glob($absDir . '/*') as $old) { @unlink($old); }
+
+        @shell_exec($bin . ' -all ' . escapeshellarg($pdfAbsPath) . ' ' . escapeshellarg($absDir . '/img') . ' 2>/dev/null');
+
+        $out = [];
+        foreach ((array) glob($absDir . '/img-*') as $f) {
+            $info = @getimagesize($f);
+            if (!$info || $info[0] < 150 || $info[1] < 150) { @unlink($f); continue; } // ignore déco/logos
+            $out[] = $relDir . '/' . basename($f);
+        }
+        sort($out); // ordre des pages
+        return $out;
     }
 }

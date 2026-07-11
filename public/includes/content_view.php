@@ -1,17 +1,15 @@
 <?php
 // ============================================================
 // content_view.php — affichage soigné du contenu uniformisé (IA).
-//   renderUniformContent($md, $pdfUrl, $showPdfView) :
-//     - contenu large, intégré à la page (pas une petite fenêtre)
-//     - lecture paginée (une page par section ##) + navigation ◀ / ▶
-//     - $showPdfView = true : la vue du PDF d'origine est disponible
-//       (bascule via le bouton 👁 rendu par module.php -> window.uniTogglePdf).
+//   renderUniformContent($md, $pdfUrl, $showPdfView, $images) :
+//     - contenu large, intégré à la page ; lecture paginée (section ##)
+//     - marqueurs [IMAGE] remplacés par les photos extraites du PDF (dans l'ordre)
+//     - bouton 👁 (voir PDF) rendu par module.php -> window.uniTogglePdf
 // Additif : autonome.
 // ============================================================
-require_once __DIR__ . '/ai_uniformise.php'; // aiMarkdownToHtml
+require_once __DIR__ . '/ai_uniformise.php'; // aiMarkdownToHtml (secours)
 
 if (!function_exists('_splitUniformPages')) {
-    /** Découpe le Markdown en pages : une nouvelle page à chaque titre `## `. */
     function _splitUniformPages($md)
     {
         $lines = preg_split('/\r\n|\r|\n/', (string) $md);
@@ -28,21 +26,67 @@ if (!function_exists('_splitUniformPages')) {
             }
             $cur[] = $l;
         }
-        if ($notEmpty($cur)) {
-            $pages[] = implode("\n", $cur);
-        }
-        if (empty($pages)) {
-            $pages = [(string) $md];
-        }
+        if ($notEmpty($cur)) { $pages[] = implode("\n", $cur); }
+        if (empty($pages)) { $pages = [(string) $md]; }
         return $pages;
     }
 }
 
-if (!function_exists('renderUniformContent')) {
-    function renderUniformContent($md, $pdfUrl = '', $showPdfView = false)
+if (!function_exists('_uniImgUrl')) {
+    function _uniImgUrl($key)
     {
+        return function_exists('moduleFileUrl') ? moduleFileUrl($key) : ('media.php?f=' . rawurlencode((string) $key));
+    }
+}
+
+if (!function_exists('_uniRenderPageHtml')) {
+    /** Rendu d'une page : Markdown + marqueurs [IMAGE] (consomme $images dans l'ordre via $imgIdx). */
+    function _uniRenderPageHtml($md, &$imgIdx, $images)
+    {
+        $out = [];
+        $inList = false;
+        foreach (preg_split('/\r\n|\r|\n/', (string) $md) as $line) {
+            $t = rtrim($line);
+            if ($t === '') { if ($inList) { $out[] = '</ul>'; $inList = false; } continue; }
+            if (preg_match('/^\s*\[IMAGE[^\]]*\]\s*$/i', $t)) {
+                if ($inList) { $out[] = '</ul>'; $inList = false; }
+                if (isset($images[$imgIdx])) {
+                    $out[] = '<figure class="uni-fig"><img src="' . htmlspecialchars(_uniImgUrl($images[$imgIdx])) . '" alt="" loading="lazy"></figure>';
+                    $imgIdx++;
+                }
+                continue;
+            }
+            if (strpos($t, '### ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h4>' . htmlspecialchars(substr($t, 4)) . '</h4>'; }
+            elseif (strpos($t, '## ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h3>' . htmlspecialchars(substr($t, 3)) . '</h3>'; }
+            elseif (strpos($t, '# ') === 0) { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<h2>' . htmlspecialchars(substr($t, 2)) . '</h2>'; }
+            elseif (strpos($t, '- ') === 0 || strpos($t, '* ') === 0) { if (!$inList) { $out[] = '<ul>'; $inList = true; } $out[] = '<li>' . htmlspecialchars(substr($t, 2)) . '</li>'; }
+            else { if ($inList) { $out[] = '</ul>'; $inList = false; } $out[] = '<p>' . htmlspecialchars($t) . '</p>'; }
+        }
+        if ($inList) { $out[] = '</ul>'; }
+        return implode("\n", $out);
+    }
+}
+
+if (!function_exists('renderUniformContent')) {
+    function renderUniformContent($md, $pdfUrl = '', $showPdfView = false, $images = [])
+    {
+        if (!is_array($images)) { $images = []; }
+        $images = array_values($images);
+
         $pages = _splitUniformPages($md);
-        $n = count($pages);
+        $imgIdx = 0;
+        $rendered = [];
+        foreach ($pages as $p) { $rendered[] = _uniRenderPageHtml($p, $imgIdx, $images); }
+        // Images non placées par un marqueur -> ajoutées à la fin.
+        if ($imgIdx < count($images)) {
+            $extra = '';
+            for (; $imgIdx < count($images); $imgIdx++) {
+                $extra .= '<figure class="uni-fig"><img src="' . htmlspecialchars(_uniImgUrl($images[$imgIdx])) . '" alt="" loading="lazy"></figure>';
+            }
+            if (!empty($rendered)) { $rendered[count($rendered) - 1] .= "\n" . $extra; }
+            else { $rendered[] = $extra; }
+        }
+        $n = count($rendered);
         $withPdf = ($showPdfView && $pdfUrl !== '');
         ?>
         <style>
@@ -56,6 +100,8 @@ if (!function_exists('renderUniformContent')) {
         .uni-page ul { margin:.6em 0 .6em .3em; padding-left:1.3em; }
         .uni-page li { margin:.42em 0; padding-left:.2em; }
         .uni-page li::marker { color:#2d5a37; }
+        .uni-fig { margin:1.4em auto; text-align:center; }
+        .uni-fig img { max-width:100%; height:auto; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,.12); }
         .uni-nav { display:flex; align-items:center; justify-content:center; gap:22px; padding:18px; border-top:1px solid #eef3f0; background:#fbfdfb; }
         .uni-btn { border:1px solid #2d5a37; background:#fff; color:#2d5a37; border-radius:10px; padding:10px 22px; font-weight:700; cursor:pointer; font-size:.94rem; }
         .uni-btn:hover:not(:disabled) { background:#2d5a37; color:#fff; }
@@ -67,9 +113,9 @@ if (!function_exists('renderUniformContent')) {
         <div class="uni-wrap">
             <div class="uni-view uni-read">
                 <div class="uni-body">
-                    <?php foreach ($pages as $i => $p): ?>
+                    <?php foreach ($rendered as $i => $html): ?>
                         <article class="uni-page" data-page="<?= (int) $i ?>" <?= $i === 0 ? '' : 'style="display:none;"' ?>>
-                            <?= aiMarkdownToHtml($p) ?>
+                            <?= $html ?>
                         </article>
                     <?php endforeach; ?>
                 </div>

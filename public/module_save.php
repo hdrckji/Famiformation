@@ -266,11 +266,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$db->query("SHOW COLUMNS FROM modules LIKE 'contenu_by'")->fetch()) {
                         $db->exec("ALTER TABLE modules ADD COLUMN contenu_by INT NULL");
                     }
+                    if (!$db->query("SHOW COLUMNS FROM modules LIKE 'contenu_images'")->fetch()) {
+                        $db->exec("ALTER TABLE modules ADD COLUMN contenu_images MEDIUMTEXT NULL");
+                    }
                 } catch (Exception $e) { /* migration non bloquante */ }
 
                 // Mémorise l'auteur du contenu (pour le droit de téléchargement).
                 $contenuBy = $module['contenu_by'] ?? null;
                 if (empty($contenuBy)) { $contenuBy = ((int) ($_SESSION['user_id'] ?? 0)) ?: null; }
+                $contenuImages = $module['contenu_images'] ?? null;
 
                 // « Valider et uniformiser » : l'IA lit le PDF et réécrit le contenu.
                 if ($uniformized === 1 && $pdfPath !== null && $pdfPath !== '') {
@@ -279,6 +283,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $res = aiUniformisePdf($db, moduleFileAbsPath($pdfPath));
                     if ($res['ok']) {
                         $contenuIa = $res['text'];
+                        $imgs = aiExtractPdfImages(moduleFileAbsPath($pdfPath), $pdfPath);
+                        $contenuImages = !empty($imgs) ? json_encode($imgs) : null;
                         $flashMsg = "✅ Contenu uniformisé par l'IA (≈ " . number_format($res['cost_eur'], 3) . " €). Vérifie le rendu ci-dessous.";
                     } else {
                         $uniformized = 0;
@@ -302,11 +308,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ecrit = null;
                     try { $ecrit = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
                     if ($ecrit) {
-                        $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
-                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, (int) $ecrit['id']]);
+                        $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ? WHERE id = ?")
+                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, (int) $ecrit['id']]);
                     } else {
-                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, 'ecrit')")
-                           ->execute(['Contenu écrit', 'Geschreven inhoud', (int) $id, $roles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy]);
+                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, contenu_images, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, ?, 'ecrit')")
+                           ->execute(['Contenu écrit', 'Geschreven inhoud', (int) $id, $roles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages]);
                     }
 
                     // Sous-module VIDÉO (pipeline de compression 720p en tâche de fond)
@@ -324,7 +330,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     // Le module parent devient un conteneur (plus de contenu propre).
-                    $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = 0, contenu_ia = NULL WHERE id = ?")->execute([$id]);
+                    $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = 0, contenu_ia = NULL, contenu_images = NULL WHERE id = ?")->execute([$id]);
 
                     $splitMsg = "✅ 2 sous-modules créés : « Contenu écrit » + « Vidéo ».";
                     if ($uniformized) { $splitMsg .= " Écrit uniformisé par l'IA."; }
@@ -336,8 +342,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $redirectTo = 'module.php?id=' . $id;
                 } else {
                     // Un seul fichier : contenu IA + pipeline vidéo (compression 720p en tâche de fond).
-                    $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, video_status = ?, video_src_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ? WHERE id = ?")
-                       ->execute([$pdfPath, $videoPath, $videoStatus, $videoSrc, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $id]);
+                    $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, video_status = ?, video_src_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ? WHERE id = ?")
+                       ->execute([$pdfPath, $videoPath, $videoStatus, $videoSrc, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $id]);
 
                     if ($startTranscode) {
                         spawnVideoTranscode($videoSrc, $id);
