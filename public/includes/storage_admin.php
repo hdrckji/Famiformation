@@ -302,8 +302,9 @@ if (!function_exists('renderStorageTab')) {
                                 <div class="sa-loc-full" style="display:none; margin-top:4px; padding-left:8px; border-left:2px solid #d9e3dc;">
                                     <?php if ($modName !== ''): ?>
                                         <div>📂 <?= htmlspecialchars($storageCrumb((int) $mod['id'])) ?></div>
+                                    <?php else: ?>
+                                        <div class="muted">Rattaché à aucun module du site.</div>
                                     <?php endif; ?>
-                                    <div style="word-break:break-all;">🗄 <?= htmlspecialchars($f['key']) ?></div>
                                 </div>
                             </div>
                         </td>
