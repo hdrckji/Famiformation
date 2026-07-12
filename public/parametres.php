@@ -65,6 +65,7 @@ require_once __DIR__ . '/includes/storage_admin.php';
 storageHandlePost($db);
 require_once __DIR__ . '/includes/bulk.php';
 require_once __DIR__ . '/includes/ia_usage.php';
+iaUsageHandlePost($db);
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 // Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
