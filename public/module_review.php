@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                 if (in_array((($rotate % 360) + 360) % 360, [90, 180, 270], true) && isset($images[$n - 1])) {
                     aiRotateImageFile($imgBase . '/' . $images[$n - 1], $rotate);
                 }
-                $size = in_array(($bi['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $bi['size'] : 'm';
+                $size = ($bi['size'] ?? 'm'); if (!in_array($size, ['s', 'm', 'l'], true)) { $size = 'm'; }
                 $blocks[] = ['type' => 'image', 'n' => $n, 'caption' => trim((string) ($bi['caption'] ?? '')), 'size' => $size];
                 break;
             case 'quote':
@@ -254,7 +254,7 @@ $ta = function ($s) { return htmlspecialchars((string) $s); };
 
             <?php elseif ($type === 'image'): ?>
                 <?php $n = (int) ($b['n'] ?? 0); $imgUrl = isset($images[$n - 1]) ? moduleFileUrl($images[$n - 1]) : ''; ?>
-                <?php $curSize = in_array(($b['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $b['size'] : 'm'; $prevW = ['s' => 160, 'm' => 220, 'l' => 280][$curSize]; ?>
+                <?php $curSize = ($b['size'] ?? 'm'); if (!in_array($curSize, ['s', 'm', 'l'], true)) { $curSize = 'm'; } $prevW = ['s' => 160, 'm' => 220, 'l' => 280][$curSize]; ?>
                 <input type="hidden" name="b[<?= $i ?>][n]" value="<?= $n ?>">
                 <input type="hidden" name="b[<?= $i ?>][rotate]" id="b_<?= $i ?>_rot" value="0">
                 <input type="hidden" name="b[<?= $i ?>][size]" id="b_<?= $i ?>_size" value="<?= $curSize ?>">

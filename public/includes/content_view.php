@@ -76,7 +76,7 @@ if (!function_exists('_dBlockHtml')) {
                 $n = (int) $b['n'] - 1;
                 if ($n >= 0 && $n < count($ctx['images']) && empty($ctx['used'][$n])) {
                     $ctx['used'][$n] = true;
-                    $size = in_array(($b['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $b['size'] : 'm';
+                    $size = ($b['size'] ?? 'm'); if (!in_array($size, ['s', 'm', 'l'], true)) { $size = 'm'; }
                     $cap = ($b['caption'] ?? '') !== '' ? '<figcaption class="image__caption">' . htmlspecialchars((string) $b['caption']) . '</figcaption>' : '';
                     return '<figure class="image image--' . $size . '"><img class="image__real" src="' . htmlspecialchars(_uniImgUrl($ctx['images'][$n])) . '" alt="" loading="lazy">' . $cap . '</figure>';
                 }
