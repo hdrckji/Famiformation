@@ -44,6 +44,24 @@ foreach ($children as $__c) {
 // Le formulaire « Ajout de contenu » : sur un élément vierge OU un conteneur-contenu (pour compléter), jamais sur un sous-module enfant.
 $showContentForm = empty($module['is_booking']) && !$isContentChild && (empty($isContainer) || $hasContentChildren);
 
+// Y a-t-il déjà du contenu (sur l'élément OU sur ses sous-modules Le guide / Vidéo) ?
+// Calculé ici (tôt) pour placer le bloc « Ajout de contenu » EN PREMIER quand le module est vierge.
+$existPdf = !empty($module['pdf_path']) ? $module['pdf_path'] : null;
+$existVideo = !empty($module['video_path']) ? $module['video_path'] : null;
+$existVideoProc = (($module['video_status'] ?? '') === 'processing');
+if ($isContainer) {
+    foreach ($children as $cc) {
+        if (($cc['content_kind'] ?? '') === 'ecrit' && !empty($cc['pdf_path'])) { $existPdf = $cc['pdf_path']; }
+        if (($cc['content_kind'] ?? '') === 'video') {
+            if (!empty($cc['video_path'])) { $existVideo = $cc['video_path']; }
+            if (($cc['video_status'] ?? '') === 'processing') { $existVideoProc = true; }
+        }
+    }
+}
+$hasAnyContent = $existPdf || $existVideo || $existVideoProc;
+// Module vierge (aucun contenu) : on remonte le formulaire d'ajout tout en haut.
+$emptyContentFocus = $showContentForm && !$hasAnyContent;
+
 // Page vidéo dédiée (gabarit Famiformation) : module non-conteneur avec vidéo et sans PDF.
 $mVideoStatus = (string) ($module['video_status'] ?? '');
 $mHasVideoAny = !empty($module['video_path']) || $mVideoStatus === 'processing' || $mVideoStatus === 'failed';
@@ -74,6 +92,10 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .badge-eval { display:inline-block; background:#2d5a37; color:#fff; font-size:0.78rem; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:8px; }
         .tile .badge-eval { position:absolute; top:12px; right:12px; margin:0; }
         .content-card { background: rgba(255,255,255,0.96); border-radius: 18px; padding: 32px; width: 90%; max-width: 900px; margin: 30px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        /* Module vierge : le bloc « Ajout de contenu » remonte tout en haut (après le titre). */
+        body.fami-empty-content .topbar { order:-3; }
+        body.fami-empty-content .header { order:-2; }
+        body.fami-empty-content .content-card.add-content { order:-1; }
         .flash { background: #fff8e1; border: 1px solid #ffe082; color: #6a5400; padding: 12px 18px; border-radius: 12px; width: 90%; max-width: 900px; margin-top: 16px; font-weight: 700; }
         .admin-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
         .btn { border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
@@ -105,6 +127,11 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .dz-hint { color:#6c7a70; font-size:0.85rem; margin-top:4px; }
         .dz-file { margin-top:8px; font-weight:700; color:#244230; word-break:break-all; }
         .dz-existing { font-size:0.85rem; color:#555; margin:4px 0 2px; }
+        /* Variante FINE (sous-titres .srt) : même style que la vidéo, en plus discret */
+        .drop-zone--slim { padding:12px 14px; border-width:2px; margin:8px 0 2px; }
+        .drop-zone--slim .dz-icon { font-size:1.4rem; }
+        .drop-zone--slim .dz-title { font-size:0.95rem; margin-top:2px; }
+        .drop-zone--slim .dz-hint { font-size:0.78rem; margin-top:2px; }
         .topbar { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; padding:16px; gap:12px; }
         .topbar .back-link { margin:0; align-self:auto; }
         .uni-actions { display:flex; gap:10px; }
@@ -112,7 +139,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .uni-ico:hover { background:#2d5a37; color:#fff; transform:translateY(-2px); }
     </style>
 </head>
-<body>
+<body class="<?= $emptyContentFocus ? 'fami-empty-content' : '' ?>">
     <?= apercuBanner($db) ?>
     <?php
         require_once __DIR__ . '/includes/pdf_access.php';
@@ -248,7 +275,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </div>
             <?php endif; ?>
         <?php endif; ?>
-        <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === ''): ?>
+        <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === '' && !$emptyContentFocus): ?>
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
         <?php endif; ?>
         <?php if ($canEditContent && ($isGuide || $quizModuleId > 0)): ?>
@@ -410,24 +437,8 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php endif; ?>
         <?php endif; ?>
 
-        <?php if ($showContentForm): ?>
-        <?php
-            // Contenu déjà en place (sur l'élément OU sur les sous-modules Le guide / Vidéo) ?
-            $existPdf = !empty($module['pdf_path']) ? $module['pdf_path'] : null;
-            $existVideo = !empty($module['video_path']) ? $module['video_path'] : null;
-            $existVideoProc = (($module['video_status'] ?? '') === 'processing');
-            if ($isContainer) {
-                foreach ($children as $cc) {
-                    if (($cc['content_kind'] ?? '') === 'ecrit' && !empty($cc['pdf_path'])) { $existPdf = $cc['pdf_path']; }
-                    if (($cc['content_kind'] ?? '') === 'video') {
-                        if (!empty($cc['video_path'])) { $existVideo = $cc['video_path']; }
-                        if (($cc['video_status'] ?? '') === 'processing') { $existVideoProc = true; }
-                    }
-                }
-            }
-            $hasAnyContent = $existPdf || $existVideo || $existVideoProc;
-        ?>
-        <div class="content-card" style="max-width:900px; text-align:left; margin:26px auto;<?= $hasAnyContent ? '' : ' border:2px solid #bfe0c8; box-shadow:0 12px 34px rgba(30,90,55,.14);' ?>">
+        <?php if ($showContentForm): // $existPdf/$existVideo/$existVideoProc/$hasAnyContent calculés en tête de page ?>
+        <div class="content-card add-content" style="max-width:900px; text-align:left; margin:26px auto;<?= $hasAnyContent ? '' : ' border:2px solid #bfe0c8; box-shadow:0 12px 34px rgba(30,90,55,.14);' ?>">
             <?php if ($hasAnyContent): ?>
                 <button type="button" id="editContentBtn" onclick="toggleContentForm()" style="width:100%; border:none; background:linear-gradient(180deg,#eef7f0,#e0efe3); color:#2d5a37; font-weight:800; font-size:1.05rem; padding:16px; border-radius:12px; cursor:pointer;">✏️ Modifier le contenu <span id="editContentCaret" style="opacity:.6;">▾</span></button>
             <?php else: ?>
@@ -481,22 +492,18 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             // fabriquer un .srt. Ce champ n'est là que pour ceux qui EN ONT
                             // DÉJÀ un (export CapCut, etc.) : c'est gratuit et plus exact.
                         ?>
-                        <details style="margin-top:8px;">
-                            <summary style="cursor:pointer; color:#6c7a70; font-size:.84rem;">💬 J'ai déjà un fichier de sous-titres (.srt) — facultatif</summary>
-                            <div style="padding:8px 2px 2px;">
-                                <div style="color:#6c7a70; font-size:.82rem; margin-bottom:6px;">
-                                    Inutile dans la plupart des cas : <strong>le site génère les sous-titres tout seul</strong>
-                                    (et les traduit en néerlandais). Ne déposez un <code>.srt</code> que si vous en avez déjà
-                                    un — il sera utilisé tel quel, c'est plus exact et gratuit.
-                                </div>
-                                <input type="file" name="srt_file" accept=".srt,.vtt,text/plain" style="font-size:.85rem;">
-                                <?php if (!empty($module['sub_src_path'])): ?>
-                                    <div class="dz-existing" style="margin-top:6px;">💬 Sous-titres fournis
-                                        <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_srt" value="1"> Supprimer</label>
-                                    </div>
-                                <?php endif; ?>
+                        <div class="drop-zone drop-zone--slim" id="dz_srt" data-has-existing="<?= !empty($module['sub_src_path']) ? '1' : '0' ?>" data-remove="remove_srt">
+                            <input type="file" name="srt_file" accept=".srt,.vtt,text/plain" class="dz-input">
+                            <div class="dz-icon">💬</div>
+                            <div class="dz-title">Sous-titres <span style="font-weight:400; color:#8a968f;">· .srt facultatif</span></div>
+                            <div class="dz-hint">Le site les génère et les traduit tout seul — déposez un .srt seulement si vous en avez déjà un.</div>
+                            <div class="dz-file" hidden></div>
+                        </div>
+                        <?php if (!empty($module['sub_src_path'])): ?>
+                            <div class="dz-existing">💬 Sous-titres fournis
+                                <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_srt" value="1"> Supprimer</label>
                             </div>
-                        </details>
+                        <?php endif; ?>
                         <?php if ($existVideo): ?>
                             <div class="dz-existing">
                                 🎬 <a href="<?= htmlspecialchars(moduleFileUrl($existVideo)) ?>" download>Vidéo actuelle</a>

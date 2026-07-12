@@ -1,6 +1,7 @@
 <?php
 
 require_once 'config.php';
+require_once __DIR__ . '/includes/theme.php'; // famiDefaultVectorBg() : fond vectoriel net
 // Correction : forcer l'initialisation du token CSRF dès la première visite
 initCSRF();
 
@@ -198,6 +199,10 @@ if ($host === 'famiformation.com') {
     </style>
 </head>
 <body>
+<?php // Fond vectoriel net (sauf sur la page de connexion Famijob, qui garde son visuel de marque).
+if (empty($isFamijobLogin) && function_exists('famiDefaultVectorBg')): ?>
+<style id="fami-vec-bg"><?= famiDefaultVectorBg() ?></style>
+<?php endif; ?>
 
 <div class="container">
     <div class="logo">
