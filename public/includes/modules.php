@@ -708,6 +708,10 @@ if (!function_exists('ensureModulesTable')) {
      * Traduit le nom + la description d'un module en néerlandais (MyMemory, gratuit, sans clé).
      * Renvoie ['nom' => '', 'desc' => ''] si la traduction échoue.
      */
+    /**
+     * NOTE (bilingue) : préfère moduleNlFromPost() quand un formulaire est en jeu —
+     * elle respecte une saisie NL manuelle et ne traduit que ce qui est vide.
+     */
     function translateModuleToNl($nom, $desc)
     {
         $nom = trim((string) $nom);
@@ -715,6 +719,32 @@ if (!function_exists('ensureModulesTable')) {
         return [
             'nom'  => $nom !== ''  ? mb_substr(mymemoryTranslateFrToNl($nom), 0, 150)  : '',
             'desc' => $desc !== '' ? mb_substr(mymemoryTranslateFrToNl($desc), 0, 500) : '',
+        ];
+    }
+
+    /**
+     * Version NL à enregistrer, à partir du formulaire :
+     *  - si l'admin a SAISI un texte NL → on le garde tel quel (il corrige la machine) ;
+     *  - sinon → traduction automatique depuis le français.
+     * C'est ce qui rend le bilingue à la fois automatique ET corrigeable.
+     */
+    function moduleNlFromPost($nom, $desc)
+    {
+        $nomNl  = trim((string) ($_POST['nom_nl'] ?? ''));
+        $descNl = trim((string) ($_POST['description_nl'] ?? ''));
+
+        // Rien de saisi : on traduit tout automatiquement (comportement historique).
+        if ($nomNl === '' && $descNl === '') {
+            return translateModuleToNl($nom, $desc);
+        }
+        // Saisie partielle : on complète l'autre champ par une traduction automatique.
+        $auto = ['nom' => '', 'desc' => ''];
+        if ($nomNl === '' || $descNl === '') {
+            $auto = translateModuleToNl($nomNl === '' ? $nom : '', $descNl === '' ? $desc : '');
+        }
+        return [
+            'nom'  => $nomNl !== ''  ? mb_substr($nomNl, 0, 150)  : $auto['nom'],
+            'desc' => $descNl !== '' ? mb_substr($descNl, 0, 500) : $auto['desc'],
         ];
     }
 
@@ -932,6 +962,28 @@ if (!function_exists('ensureModulesTable')) {
         <input type="text" name="nom" required maxlength="150" value="<?= $nom ?>">
         <label>Description (quelques mots)</label>
         <textarea name="description" rows="2" maxlength="500"><?= $desc ?></textarea>
+
+        <?php
+            // 🌐 NÉERLANDAIS — le site est bilingue : l'admin doit pouvoir VOIR et CORRIGER
+            // la version NL (avant, elle était traduite en douce sans être ni visible ni
+            // modifiable). Laisser vide = traduction automatique depuis le français.
+            $nomNl  = htmlspecialchars($module['nom_nl'] ?? '');
+            $descNl = htmlspecialchars($module['description_nl'] ?? '');
+        ?>
+        <details class="access-drop" <?= ($nomNl !== '' || $descNl !== '') ? 'open' : '' ?>>
+            <summary>🌐 Néerlandais (facultatif)</summary>
+            <div style="padding:6px 2px;">
+                <div class="muted" style="font-size:.84rem; margin-bottom:8px;">
+                    Laissez vide : le site <strong>traduit automatiquement</strong> depuis le français.
+                    Remplissez seulement si vous voulez <strong>corriger</strong> la traduction.
+                </div>
+                <label>Nom (NL)</label>
+                <input type="text" name="nom_nl" maxlength="150" value="<?= $nomNl ?>" placeholder="(traduit automatiquement si vide)">
+                <label>Description (NL)</label>
+                <textarea name="description_nl" rows="2" maxlength="500" placeholder="(traduit automatiquement si vide)"><?= $descNl ?></textarea>
+            </div>
+        </details>
+
         <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
 
         <label>Accès <small>(rien de coché = visible par tous)</small></label>

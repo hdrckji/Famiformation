@@ -269,6 +269,40 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             <?php endif; ?>
         </div>
         <?php if ($isAdmin): ?>
+        <?php
+            // 🌐 ÉTAT DE LA VERSION NÉERLANDAISE.
+            // Le NL se régénère tout seul en tâche de fond après chaque enregistrement.
+            // Cet encart montre où ça en est, et permet de RELANCER à la main si le fond
+            // n'a pas pu tourner (ou après avoir corrigé le texte français).
+            $nlHasContent = trim((string) ($module['contenu_ia_nl'] ?? '')) !== '';
+            $nlHasQuiz    = trim((string) ($module['quiz_json_nl'] ?? '')) !== '';
+            $frHasContent = trim((string) ($module['contenu_ia'] ?? '')) !== '';
+            $frHasQuiz    = trim((string) ($module['quiz_json'] ?? '')) !== '';
+            $nlUpToDate   = ((string) ($module['nl_hash'] ?? '')) === hash('sha256', (string) ($module['contenu_ia'] ?? '') . '|' . (string) ($module['quiz_json'] ?? ''));
+            $nlNeeded     = ($frHasContent || $frHasQuiz);
+        ?>
+        <?php if ($nlNeeded): ?>
+        <div style="color:#fff; background:rgba(0,0,0,0.32); padding:10px 14px; border-radius:10px; font-size:0.85rem; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap;">
+            <span>
+                🌐 <strong>Néerlandais :</strong>
+                <?php if ($nlUpToDate && ($nlHasContent || $nlHasQuiz)): ?>
+                    à jour ✓
+                    <?= $frHasContent ? ($nlHasContent ? '(guide ✓)' : '(guide ✗)') : '' ?>
+                    <?= $frHasQuiz ? ($nlHasQuiz ? '(quiz ✓)' : '(quiz ✗)') : '' ?>
+                <?php elseif ($nlHasContent || $nlHasQuiz): ?>
+                    <span style="color:#ffd98a;">à rafraîchir</span> — le français a changé depuis la dernière traduction
+                <?php else: ?>
+                    <span style="color:#ffd98a;">pas encore traduit</span> — la traduction tourne en tâche de fond après un enregistrement
+                <?php endif; ?>
+            </span>
+            <form method="POST" action="module_save.php" style="margin:0;" onsubmit="this.querySelector('button').textContent='⏳ Traduction en cours…'; this.querySelector('button').disabled=true;">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="nl_sync">
+                <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                <button type="submit" class="btn" style="background:#fff; color:#244230; padding:6px 12px; font-size:.82rem;" title="Relance la traduction néerlandaise maintenant (peut prendre ~1 min)">🌐 Traduire en NL</button>
+            </form>
+        </div>
+        <?php endif; ?>
         <div style="color:#fff; background:rgba(0,0,0,0.3); padding:8px 14px; border-radius:10px; font-size:0.85rem; margin-top:8px;">ℹ️ La suppression se fait dans ⚙️ Paramètres → Gestion des modules.</div>
 
         <!-- Modale : modifier ce module -->

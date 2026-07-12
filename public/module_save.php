@@ -186,7 +186,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['module_flash'] = "❌ Le nom du module est obligatoire.";
         } else {
             $iconImage = handleModuleIconUpload();
-            $nl = translateModuleToNl($nom, $description);
+            // Bilingue : respecte un NL saisi à la main, traduit automatiquement sinon.
+            $nl = moduleNlFromPost($nom, $description);
             // Nouveau module placé EN DERNIER parmi ses frères (sort_order = max + 1),
             // sinon il hérite de 0 et remonte tout en haut de la liste.
             if ($parentId === null) {
@@ -247,7 +248,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $uploaded = handleModuleIconUpload();
                 if ($uploaded !== null) { $iconImage = $uploaded; }
 
-                $nl = translateModuleToNl($nom, $description);
+                // Bilingue : respecte un NL saisi à la main, traduit automatiquement sinon.
+                $nl = moduleNlFromPost($nom, $description);
                 $stmt = $db->prepare(
                     "UPDATE modules SET nom = ?, description = ?, is_container = ?, icon = ?, roles = ?, icon_image = ?, nom_nl = ?, description_nl = ? WHERE id = ?"
                 );
@@ -495,6 +497,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $redirectTo = 'module_edit.php?id=' . $guideChildId;
                 }
             }
+        }
+    } elseif ($action === 'nl_sync') {
+        // Secours MANUEL de la traduction néerlandaise.
+        // La synchro se fait normalement toute seule en tâche de fond après chaque
+        // enregistrement. Ce bouton sert si le fond n'a pas pu s'exécuter, ou pour
+        // forcer une retraduction après avoir corrigé le texte français.
+        // Ici on traduit de façon SYNCHRONE (l'admin a cliqué exprès et accepte d'attendre).
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            @set_time_limit(600);
+            $res = nlSyncModule($db, $id, true);
+            if ($res['ok']) {
+                $quoi = !empty($res['done']) ? implode(', ', array_unique($res['done'])) : 'rien à traduire';
+                $_SESSION['module_flash'] = "🌐 Version néerlandaise mise à jour (" . $quoi . ").";
+            } else {
+                $_SESSION['module_flash'] = "⚠️ Traduction NL incomplète : " . $res['error'] . " — le français reste affiché.";
+            }
+            $redirectTo = 'module.php?id=' . $id;
         }
     } elseif ($action === 'toggle_lock') {
         $id = (int) ($_POST['id'] ?? 0);
