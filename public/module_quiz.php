@@ -8,6 +8,7 @@
 require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
+require_once 'includes/i18n_nl.php'; // spawnNlSync : régénère le quiz NL après édition
 
 $isAdmin = (($_SESSION['role'] ?? '') === 'admin');
 $uid = (int) ($_SESSION['user_id'] ?? 0);
@@ -43,7 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     }
     $json = $questions ? json_encode(['questions' => $questions], JSON_UNESCAPED_UNICODE) : null;
     $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$json, $id]);
-    $_SESSION['module_flash'] = $questions ? ("✅ Quiz enregistré (" . count($questions) . " question" . (count($questions) > 1 ? 's' : '') . ").") : "✅ Quiz vidé.";
+    spawnNlSync($id); // le quiz FR a changé → on régénère le quiz NL en tâche de fond
+    $_SESSION['module_flash'] = $questions ? ("✅ Quiz enregistré (" . count($questions) . " question" . (count($questions) > 1 ? 's' : '') . "). 🌐 La version néerlandaise se met à jour.") : "✅ Quiz vidé.";
     header('Location: module.php?id=' . $id);
     exit();
 }

@@ -3,6 +3,7 @@ require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
 require_once 'includes/rendezvous.php';
+require_once 'includes/i18n_nl.php'; // moduleContenu() / moduleQuizJson() : version NL si dispo
 
 // En mode aperçu, l'admin voit la page comme l'utilisateur (boutons admin masqués)
 $isAdmin = ((($_SESSION['role'] ?? '') === 'admin') && !isApercuActif());
@@ -235,7 +236,8 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
-                <?php renderUniformContent($module['contenu_ia'], $uniPdfUrl, $canViewPdf, (array) json_decode((string) ($module['contenu_images'] ?? '[]'), true), $quizHref); ?>
+                <?php // moduleContenu() sert la version NL si l'utilisateur est en néerlandais (sinon FR). ?>
+                <?php renderUniformContent(moduleContenu($module), $uniPdfUrl, $canViewPdf, (array) json_decode((string) ($module['contenu_images'] ?? '[]'), true), $quizHref); ?>
             <?php elseif ($isUni): ?>
                 <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>

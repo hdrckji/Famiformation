@@ -9,6 +9,7 @@ require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
 require_once 'includes/ai_uniformise.php'; // aiRotateImageFile
+require_once 'includes/i18n_nl.php';       // spawnNlSync : régénère le NL après édition
 
 $isAdmin = (($_SESSION['role'] ?? '') === 'admin');
 $uid = (int) ($_SESSION['user_id'] ?? 0);
@@ -55,7 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
         $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")
            ->execute([json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE), $id]);
-        $_SESSION['module_flash'] = "✅ Contenu relu et enregistré.";
+        spawnNlSync($id); // le FR a changé → on régénère le NL en tâche de fond
+        $_SESSION['module_flash'] = "✅ Contenu relu et enregistré. 🌐 La version néerlandaise se met à jour.";
         header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
         exit();
     }
@@ -120,7 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocks) : $blocks;
     $json = json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE);
     $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")->execute([$json, $id]);
-    $_SESSION['module_flash'] = "✅ Contenu relu et enregistré.";
+    spawnNlSync($id); // le FR a changé → on régénère le NL en tâche de fond
+    $_SESSION['module_flash'] = "✅ Contenu relu et enregistré. 🌐 La version néerlandaise se met à jour.";
     header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
     exit();
 }

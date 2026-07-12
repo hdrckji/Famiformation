@@ -7,6 +7,7 @@ require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
 require_once 'includes/quiz_view.php';
+require_once 'includes/i18n_nl.php'; // moduleQuizJson() : quiz en NL si l'utilisateur est néerlandophone
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $module = $id > 0 ? getModuleById($db, $id) : null;
@@ -17,7 +18,10 @@ if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($modul
     header('Location: index.php'); exit();
 }
 
-$quiz = json_decode((string) $module['quiz_json'], true);
+// Version NL si l'utilisateur est en néerlandais (sinon FR). Les indices des bonnes
+// réponses sont IDENTIQUES dans les deux langues (la traduction ne touche pas à
+// `correct` ni à `type`) → quiz_check.php peut continuer à corriger sur le FR.
+$quiz = json_decode((string) moduleQuizJson($module), true);
 $backId = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) $id;
 ?>
 <!DOCTYPE html>

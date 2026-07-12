@@ -4,6 +4,7 @@ verifierConnexion($db);
 require_once 'includes/modules.php';
 require_once 'includes/contrib_settings.php';
 require_once 'includes/storage_stats.php';
+require_once 'includes/i18n_nl.php'; // synchronisation automatique FR -> NL
 
 $actorRole = (string) ($_SESSION['role'] ?? '');
 $isAdminActor = ($actorRole === 'admin');
@@ -478,6 +479,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $structMsg .= " En attente de validation par un admin.";
                 }
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
+
+                // AUTONOMIE BILINGUE : dès qu'un contenu FR est enregistré, on régénère le NL
+                // (guide + quiz + titre) EN TÂCHE DE FOND. L'utilisateur n'attend pas ; si la
+                // traduction échoue, le FR reste affiché et l'admin peut relancer à la main.
+                if ($guideChildId) {
+                    spawnNlSync((int) $guideChildId);
+                }
+                spawnNlSync((int) $id); // le module parent (titre/description)
+
                 $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;
                 // Étape de relecture (visuelle par défaut) : l'uploadeur relit/corrige avant publication.
