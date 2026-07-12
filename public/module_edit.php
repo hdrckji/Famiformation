@@ -55,8 +55,16 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     .intro b { color:var(--forest); }
     .ve-doc { max-width:820px; margin:0 auto; padding:8px 20px 140px; }
     [contenteditable] { outline:none; border-radius:6px; transition:box-shadow .12s, background .12s; }
-    [contenteditable]:hover { box-shadow:0 0 0 2px #e2ebe1; }
-    [contenteditable]:focus { box-shadow:0 0 0 2px var(--leaf); background:#fff; }
+    body.editing [data-f] { cursor:text; }
+    body.editing [contenteditable]:hover { box-shadow:0 0 0 2px #e2ebe1; }
+    body.editing [contenteditable]:focus { box-shadow:0 0 0 2px var(--leaf); background:#fff; }
+    /* Verrou d'édition : outils et boutons cachés tant qu'on n'a pas cliqué « Modifier ». */
+    .ve-tools, .ve-add, .ve-del, .fix { display:none; }
+    body.editing .ve-tools { display:flex; }
+    body.editing .ve-add { display:inline-block; }
+    body.editing .ve-del { display:inline; }
+    body.editing .fix { display:block; }
+    body.editing .intro::after { content:" — mode édition ACTIF"; color:#8a5a00; font-weight:700; }
     .ve-hero { background:linear-gradient(155deg,#17381F,#1E4D2B 60%,#2A6339); color:#F3F7EE; border-radius:0 0 24px 24px; padding:40px 26px; margin:0 -20px 8px; text-align:center; }
     .ve-hero .eyebrow { font-family:ui-monospace,monospace; letter-spacing:.22em; text-transform:uppercase; font-size:.72rem; color:var(--sprout); }
     .ve-hero h1 { font-family:var(--fdisplay); font-weight:800; font-size:clamp(1.9rem,5vw,3rem); margin:10px 0; letter-spacing:-.02em; }
@@ -109,6 +117,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <a href="module_review.php?id=<?= (int) $id ?>" class="btn btn-adv">⚙️ Mode avancé</a>
             <?php if ($pdfUrl !== ''): ?><button type="button" class="btn btn-pdf" onclick="document.getElementById('pdfp').classList.toggle('open')">📄 PDF original</button><?php endif; ?>
+            <button type="button" id="editToggle" class="btn" style="background:#fff3d6; color:#8a5a00; border:1px solid #f0d089;" onclick="veSetEdit(!window._veEditing)">✏️ Modifier</button>
             <button type="button" class="btn btn-save" onclick="veSubmit()">✅ Valider</button>
         </div>
     </div>
@@ -335,6 +344,19 @@ function veSubmit() {
     document.getElementById('veJson').value = JSON.stringify({ blocks: veBuild() });
     document.getElementById('veForm').submit();
 }
+// Verrou d'édition : la page démarre en LECTURE SEULE ; « Modifier » déverrouille.
+function veSetEdit(on) {
+    window._veEditing = !!on;
+    document.querySelectorAll('#veDoc [data-f]').forEach(function (e) { e.setAttribute('contenteditable', on ? 'true' : 'false'); });
+    document.body.classList.toggle('editing', !!on);
+    var b = document.getElementById('editToggle');
+    if (b) {
+        b.textContent = on ? '🔒 Terminer' : '✏️ Modifier';
+        b.style.background = on ? '#e8f5e9' : '#fff3d6';
+        b.style.color = on ? '#2d5a37' : '#8a5a00';
+    }
+}
+veSetEdit(false);
 </script>
 </body>
 </html>
