@@ -328,17 +328,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $madeGuide = false;
                 $madeVideo = false;
                 $vidChildId = 0;
+                $guideChildId = 0;
 
                 // Sous-module Le guide (contenu ecrit issu du document)
                 if ($hasPdf) {
                     $guide = null;
                     try { $guide = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
                     if ($guide) {
+                        $guideChildId = (int) $guide['id'];
                         $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ?, quiz_json = ? WHERE id = ?")
                            ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, (int) $guide['id']]);
                     } else {
                         $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, contenu_images, quiz_json, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, ?, ?, 'ecrit')")
                            ->execute(['Le guide', 'De gids', (int) $id, $childRoles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson]);
+                        $guideChildId = (int) $db->lastInsertId();
                     }
                     $madeGuide = true;
                 }
@@ -372,6 +375,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;
+                // Étape de relecture : si le guide a été uniformisé, l'uploadeur relit/corrige avant publication.
+                if ($madeGuide && $uniformized === 1 && $contenuIa && $guideChildId) {
+                    $redirectTo = 'module_review.php?id=' . $guideChildId;
+                }
             }
         }
     } elseif ($action === 'toggle_lock') {

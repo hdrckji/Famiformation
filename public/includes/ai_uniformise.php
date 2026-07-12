@@ -32,7 +32,11 @@ if (!function_exists('aiSanitizeBlocks')) {
                     if (!empty($b['title'])) { $ok[] = ['type' => 'section', 'title' => (string) $b['title']]; }
                     break;
                 case 'text':
-                    if (trim((string) ($b['text'] ?? '')) !== '') { $ok[] = ['type' => 'text', 'text' => (string) $b['text']]; }
+                    if (trim((string) ($b['text'] ?? '')) !== '') {
+                        $blk = ['type' => 'text', 'text' => (string) $b['text']];
+                        if (trim((string) ($b['fix'] ?? '')) !== '') { $blk['fix'] = (string) $b['fix']; }
+                        $ok[] = $blk;
+                    }
                     break;
                 case 'list':
                     $items = array_values(array_filter(array_map(function ($x) { return trim((string) $x); }, (array) ($b['items'] ?? [])), 'strlen'));
@@ -55,7 +59,9 @@ if (!function_exists('aiSanitizeBlocks')) {
                 case 'callout':
                     $style = in_array(($b['style'] ?? 'info'), ['info', 'tip', 'warning'], true) ? $b['style'] : 'info';
                     if (trim((string) ($b['text'] ?? '')) !== '' || trim((string) ($b['title'] ?? '')) !== '') {
-                        $ok[] = ['type' => 'callout', 'style' => $style, 'title' => (string) ($b['title'] ?? ''), 'text' => (string) ($b['text'] ?? '')];
+                        $blk = ['type' => 'callout', 'style' => $style, 'title' => (string) ($b['title'] ?? ''), 'text' => (string) ($b['text'] ?? '')];
+                        if (trim((string) ($b['fix'] ?? '')) !== '') { $blk['fix'] = (string) $b['fix']; }
+                        $ok[] = $blk;
                     }
                     break;
                 case 'keyfigures':
@@ -138,7 +144,8 @@ if (!function_exists('aiUniformisePdf')) {
             . "  - Découpe en PLUSIEURS sections claires, chacune avec un vrai contenu.\n"
             . "  - Rends la fiche VIVANTE et riche : n'utilise PAS que des blocs text. Emploie réellement : callout (pour chaque info importante / consigne / point d'attention), steps (pour toute procédure ou étapes), keyfigures (pour les chiffres, horaires, repères), quote (pour une consigne forte). Vise un bon mélange de blocs.\n"
             . "  - Fidélité au fond : n'invente aucune donnée absente, ne garde que ce qui est dans le document ; supprime numéros de page et en-têtes répétés.\n"
-            . "  - CORRECTION : corrige les fautes d'orthographe, de grammaire, de ponctuation et de casse. Si une information est manifestement incohérente ou erronée (faute de frappe sur un mot/chiffre clé, contradiction évidente), corrige-la de façon logique en restant fidèle au sens du document. Ne modifie JAMAIS une information métier volontaire (procédure, montant, règle) juste parce qu'elle te surprend, et n'invente rien.\n"
+            . "  - CORRECTION (forme) : corrige directement les fautes d'orthographe, de grammaire, de ponctuation et de casse.\n"
+            . "  - DOUTE (fond) : si une INFORMATION te semble fausse ou douteuse (chiffre, affirmation, contradiction évidente) — pas une simple faute de forme — NE la modifie PAS dans \"text\". Garde le texte original et ajoute un champ \"fix\" au bloc avec ta correction proposée (uniquement sur les blocs \"text\" et \"callout\"). L'humain tranchera. Mets \"fix\" UNIQUEMENT en cas de vrai doute, jamais autrement, et n'invente aucune donnée.\n"
             . "IMAGES : les images fournies sont déjà filtrées (pas de logos répétés). Place CHAQUE image de contenu fournie avec un bloc image, à l'endroit du texte où elle a du sens. N'ignore une image que si elle est vraiment décorative. Jamais deux fois la même. Pour CHAQUE image, regarde son orientation : si elle est pivotée/de travers, renseigne \"rotate\" (angle horaire) pour la redresser.";
 
         $userContent = [
