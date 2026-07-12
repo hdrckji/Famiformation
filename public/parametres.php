@@ -92,6 +92,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_perso'])) {
     exit();
 }
 
+// Prix du stockage et de l'egress (saisis par l'admin) → sert au calcul du coût.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_costs'])) {
+    requireValidCSRF();
+    $ps = str_replace(',', '.', (string) ($_POST['price_storage_gb'] ?? '0'));
+    $pe = str_replace(',', '.', (string) ($_POST['price_egress_gb'] ?? '0'));
+    widgetSet($db, 'price_storage_gb', (string) max(0, (float) $ps));
+    widgetSet($db, 'price_egress_gb', (string) max(0, (float) $pe));
+    $_SESSION['module_flash'] = "✅ Prix enregistrés.";
+    header('Location: parametres.php#prefs');
+    exit();
+}
+
 $flash = '';
 if (!empty($_SESSION['module_flash'])) {
     $flash = $_SESSION['module_flash'];
@@ -785,8 +797,21 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
             <p class="muted">Réservé aux administrateurs.</p>
 
-            <?php $onVolume = (defined('FAMI_STORAGE_BASE') && FAMI_STORAGE_BASE !== (__DIR__ . '/uploads')); ?>
-            <div style="border:1px solid <?= $onVolume ? '#cfe6d5' : '#f0d9a8' ?>; background:<?= $onVolume ? '#f2f9f4' : '#fdf6e6' ?>; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:.9rem;">
+            <?php
+                $onVolume = (defined('FAMI_STORAGE_BASE') && FAMI_STORAGE_BASE !== (__DIR__ . '/uploads'));
+                require_once __DIR__ . '/includes/storage_stats.php';
+                $stUse   = famiStorageUsage();
+                $egBytes = egressMonth($db);
+                $priceSt = (float) widgetGet($db, 'price_storage_gb', '0');
+                $priceEg = (float) widgetGet($db, 'price_egress_gb', '0');
+                $goSt    = famiBytesToGo($stUse['total']);
+                $goEg    = famiBytesToGo($egBytes);
+                $costSt  = $goSt * $priceSt;
+                $costEg  = $goEg * $priceEg;
+                $costTot = $costSt + $costEg;
+                $catLabels = ['video' => '🎬 Vidéos', 'video_raw' => '🎬 Vidéos (sources en attente)', 'pdf' => '📄 PDF', 'icons' => '🖼️ Icônes'];
+            ?>
+            <div style="border:1px solid <?= $onVolume ? '#cfe6d5' : '#f0d9a8' ?>; background:<?= $onVolume ? '#f2f9f4' : '#fdf6e6' ?>; border-radius:10px; padding:10px 14px; margin-bottom:6px; font-size:.9rem;">
                 🗄️ <strong>Stockage des fichiers :</strong>
                 <?php if ($onVolume): ?>
                     <span style="color:#256b39; font-weight:700;">Volume persistant ✓</span>
@@ -795,6 +820,54 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <span style="color:#8a6d1a; font-weight:700;">Local — non persistant ⚠</span>
                     <span class="muted">Aucun volume détecté. Attache un volume Railway au service pour ne pas perdre les fichiers à chaque redéploiement.</span>
                 <?php endif; ?>
+            </div>
+
+            <!-- 💰 Coût d'hébergement des contenus = stockage + trafic (egress) -->
+            <div style="border:1px solid #e2e6ea; background:#fbfcfc; border-radius:10px; padding:14px 16px; margin-bottom:16px;">
+                <h3 style="margin:0 0 4px; color:#244230; font-size:1.05rem;">💰 Coût d'hébergement des contenus</h3>
+                <p class="muted" style="margin:0 0 12px; font-size:.85rem;">Renseigne les prix de ton hébergeur, le site calcule le coût réel. <em>(Chez OVH l'egress est gratuit → mets 0.)</em></p>
+
+                <form method="POST" action="parametres.php" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="save_costs" value="1">
+                    <div>
+                        <label style="display:block; font-weight:700; color:#244230; font-size:.82rem;">Prix stockage ($/Go/mois)</label>
+                        <input type="text" name="price_storage_gb" value="<?= htmlspecialchars((string) $priceSt) ?>" placeholder="0.01" style="width:130px; padding:8px 10px; border:1px solid #ccc; border-radius:8px;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-weight:700; color:#244230; font-size:.82rem;">Prix egress ($/Go envoyé)</label>
+                        <input type="text" name="price_egress_gb" value="<?= htmlspecialchars((string) $priceEg) ?>" placeholder="0.05" style="width:130px; padding:8px 10px; border:1px solid #ccc; border-radius:8px;">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </form>
+
+                <table style="margin:0;">
+                    <tbody>
+                        <tr>
+                            <td style="font-weight:700; color:#244230;">📦 Stockage utilisé</td>
+                            <td><?= famiFormatSize($stUse['total']) ?> <span class="muted">(<?= (int) $stUse['files'] ?> fichier<?= $stUse['files'] > 1 ? 's' : '' ?>)</span></td>
+                            <td style="text-align:right; font-weight:700;"><?= number_format($costSt, 3, ',', ' ') ?> $ <span class="muted" style="font-weight:400;">/ mois</span></td>
+                        </tr>
+                        <?php foreach ($stUse['by'] as $cat => $b): ?>
+                        <tr>
+                            <td class="muted" style="padding-left:22px; font-size:.85rem;">↳ <?= htmlspecialchars($catLabels[$cat] ?? $cat) ?></td>
+                            <td class="muted" style="font-size:.85rem;"><?= famiFormatSize($b) ?></td>
+                            <td></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <tr>
+                            <td style="font-weight:700; color:#244230;">📡 Trafic envoyé (ce mois-ci)</td>
+                            <td><?= famiFormatSize($egBytes) ?></td>
+                            <td style="text-align:right; font-weight:700;"><?= number_format($costEg, 3, ',', ' ') ?> $</td>
+                        </tr>
+                        <tr style="border-top:2px solid #dde3e0;">
+                            <td style="font-weight:800; color:#2d5a37;">TOTAL estimé ce mois</td>
+                            <td></td>
+                            <td style="text-align:right; font-weight:800; color:#2d5a37; font-size:1.05rem;"><?= number_format($costTot, 2, ',', ' ') ?> $</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="muted" style="margin:10px 0 0; font-size:.8rem;">ℹ️ Le trafic ne compte que ce qui <strong>sort réellement</strong> du serveur : un fichier relu depuis le cache du navigateur n'est <strong>ni envoyé ni facturé</strong>. Le compteur repart à zéro chaque mois (comme la facture). Il a démarré à la mise en place de cette fonction.</p>
             </div>
 
             <?php iaSettingsCard($db); ?>

@@ -6,6 +6,7 @@
 // ============================================================
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/modules.php';
+require_once __DIR__ . '/includes/storage_stats.php';
 
 // 1) Connexion obligatoire.
 if (empty($_SESSION['user_id'])) {
@@ -90,6 +91,11 @@ if (isset($_SERVER['HTTP_RANGE']) && preg_match('/bytes=(\d*)-(\d*)/', $_SERVER[
     header("Content-Range: bytes $start-$end/$size");
 }
 header('Content-Length: ' . ($end - $start + 1));
+
+// 6bis) Compteur d'EGRESS : on ne compte QUE ce qui sort réellement du serveur.
+// (Un fichier servi depuis le cache du navigateur ne passe pas ici → non compté,
+//  ce qui est exact puisque le fournisseur ne le facture pas non plus.)
+egressAdd($db, $end - $start + 1);
 
 // 7) Envoi par blocs.
 $fp = fopen($real, 'rb');
