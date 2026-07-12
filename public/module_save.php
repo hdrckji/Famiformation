@@ -428,9 +428,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
                 $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;
-                // Étape de relecture : si le guide a été uniformisé, l'uploadeur relit/corrige avant publication.
+                // Étape de relecture (visuelle par défaut) : l'uploadeur relit/corrige avant publication.
                 if ($madeGuide && $uniformized === 1 && $contenuIa && $guideChildId) {
-                    $redirectTo = 'module_review.php?id=' . $guideChildId;
+                    $redirectTo = 'module_edit.php?id=' . $guideChildId;
                 }
             }
         }

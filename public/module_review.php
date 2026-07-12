@@ -27,6 +27,29 @@ $imgBase = rtrim((defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . 
 // ---- Enregistrement de la relecture ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_review') {
     requireValidCSRF();
+
+    // --- Mode visuel : les blocs arrivent en JSON (édition directement sur la page) ---
+    if (isset($_POST['blocks_json'])) {
+        $arr = json_decode((string) $_POST['blocks_json'], true);
+        $blocksIn = (is_array($arr) && isset($arr['blocks']) && is_array($arr['blocks'])) ? $arr['blocks'] : (is_array($arr) ? $arr : []);
+        foreach ($blocksIn as &$bl) {
+            if (is_array($bl) && ($bl['type'] ?? '') === 'image' && !empty($bl['rotate'])) {
+                $idx = (int) ($bl['n'] ?? 0) - 1;
+                if ($idx >= 0 && isset($images[$idx]) && function_exists('aiRotateImageFile')) {
+                    aiRotateImageFile($imgBase . '/' . $images[$idx], (int) $bl['rotate']);
+                }
+                $bl['rotate'] = 0;
+            }
+        }
+        unset($bl);
+        $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
+        $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")
+           ->execute([json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE), $id]);
+        $_SESSION['module_flash'] = "✅ Contenu relu et enregistré.";
+        header('Location: module.php?id=' . $id);
+        exit();
+    }
+
     $blocks = [];
     foreach ((array) ($_POST['b'] ?? []) as $bi) {
         $type = is_array($bi) ? (string) ($bi['type'] ?? '') : '';
@@ -157,6 +180,7 @@ $ta = function ($s) { return htmlspecialchars((string) $s); };
     <div class="topbar">
         <a href="module.php?id=<?= (int) $id ?>" class="btn btn-back">⬅ Quitter sans enregistrer</a>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="module_edit.php?id=<?= (int) $id ?>" class="btn btn-pdf" style="background:#eef2ff; color:#33417a; border-color:#ccd4f5;">🖼 Aperçu visuel</a>
             <?php if ($pdfUrl !== ''): ?><button type="button" class="btn btn-pdf" onclick="togglePdf()">📄 Voir le PDF original</button><?php endif; ?>
             <button type="submit" class="btn btn-save">✅ Valider la relecture</button>
         </div>
