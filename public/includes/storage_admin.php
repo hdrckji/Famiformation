@@ -53,7 +53,7 @@ if (!function_exists('storageCategories')) {
             'pdf'       => ['dir' => 'modules/pdf',        'label' => 'PDF',                       'listable' => true,  'type' => 'pdf'],
             'video'     => ['dir' => 'modules/video',      'label' => 'Vidéos',                    'listable' => true,  'type' => 'video'],
             'video_raw' => ['dir' => 'modules/video_raw',  'label' => 'Vidéos (sources en attente)', 'listable' => true, 'type' => 'video'],
-            'images'    => ['dir' => 'modules/pdf_images', 'label' => 'Images extraites des PDF',  'listable' => false, 'type' => 'image'],
+            'images'    => ['dir' => 'modules/pdf_images', 'label' => 'Images extraites des PDF',  'listable' => true,  'type' => 'image'],
         ];
     }
 }
@@ -66,12 +66,18 @@ if (!function_exists('storageScan')) {
 
         // Carte clé_relative -> module propriétaire (pour nom + uploadeur).
         $owners = [];
+        $imgOwners = [];
         try {
-            $rows = $db->query("SELECT id, nom, nom_nl, pdf_path, video_path, video_src_path, contenu_by FROM modules WHERE pdf_path IS NOT NULL OR video_path IS NOT NULL OR video_src_path IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $db->query("SELECT id, nom, nom_nl, pdf_path, video_path, video_src_path, contenu_by, contenu_images FROM modules WHERE pdf_path IS NOT NULL OR video_path IS NOT NULL OR video_src_path IS NOT NULL OR contenu_images IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rows as $r) {
                 foreach (['pdf_path', 'video_path', 'video_src_path'] as $col) {
                     $k = (string) ($r[$col] ?? '');
                     if ($k !== '') { $owners[$k] = $r; }
+                }
+                // Images extraites : rattachées à leur module via contenu_images (JSON de clés).
+                $imgs = json_decode((string) ($r['contenu_images'] ?? ''), true);
+                if (is_array($imgs)) {
+                    foreach ($imgs as $ik) { if (is_string($ik) && $ik !== '') { $imgOwners[$ik] = $r; } }
                 }
             }
         } catch (Exception $e) { /* table absente -> pas de propriétaires */ }
@@ -90,7 +96,7 @@ if (!function_exists('storageScan')) {
                         'mtime'  => @filemtime($p),
                         'type'   => $c['type'],
                         'cat'    => $ck,
-                        'module' => $owners[$rel] ?? null,
+                        'module' => ($ck === 'images') ? ($imgOwners[$rel] ?? null) : ($owners[$rel] ?? null),
                     ];
                 }
             }
@@ -174,6 +180,18 @@ if (!function_exists('storageHandlePost')) {
             $db->prepare("UPDATE modules SET pdf_path = NULL, uniformized = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE pdf_path = ?")->execute([$key]);
             $db->prepare("UPDATE modules SET video_path = NULL, video_status = NULL WHERE video_path = ?")->execute([$key]);
             $db->prepare("UPDATE modules SET video_src_path = NULL WHERE video_src_path = ?")->execute([$key]);
+
+            // Image extraite supprimée seule : on la retire des contenu_images en gardant l'indice
+            // (remplacée par une chaîne vide) pour ne pas décaler les autres images de la fiche.
+            $st = $db->prepare("SELECT id, contenu_images FROM modules WHERE contenu_images LIKE ?");
+            $st->execute(['%' . $key . '%']);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $arr = json_decode((string) $r['contenu_images'], true);
+                if (is_array($arr) && in_array($key, $arr, true)) {
+                    $arr = array_map(function ($k) use ($key) { return ($k === $key) ? '' : $k; }, $arr);
+                    $db->prepare("UPDATE modules SET contenu_images = ? WHERE id = ?")->execute([json_encode($arr), (int) $r['id']]);
+                }
+            }
         } catch (Exception $e) { /* non bloquant */ }
 
         $_SESSION['module_flash'] = "✅ Fichier supprimé du stockage (" . htmlspecialchars(basename($key)) . ").";
@@ -219,8 +237,15 @@ if (!function_exists('renderStorageTab')) {
             <?php if (empty($scan['files'])): ?>
                 <p class="muted">Aucun fichier pour l'instant.</p>
             <?php else: ?>
+            <div style="display:flex; gap:8px; margin:6px 0 14px; flex-wrap:wrap; align-items:center;">
+                <span class="muted" style="font-weight:700;">Afficher :</span>
+                <button type="button" class="btn btn-primary sa-filter" onclick="filterMedia('all', this)">Tous</button>
+                <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('pdf', this)">📄 PDF</button>
+                <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('video', this)">🎬 Vidéos</button>
+                <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('image', this)">🖼 Images extraites</button>
+            </div>
             <div style="overflow-x:auto;">
-            <table>
+            <table id="saFileTable">
                 <thead>
                     <tr>
                         <th style="text-align:left;">Fichier / emplacement</th>
@@ -239,12 +264,13 @@ if (!function_exists('renderStorageTab')) {
                         $uploaderId = $mod ? (int) ($mod['contenu_by'] ?? 0) : 0;
                         $uploader = $uploaderId && isset($names[$uploaderId]) && $names[$uploaderId] !== '' ? $names[$uploaderId] : '—';
                         $when = $f['mtime'] ? date('d/m/Y H:i', (int) $f['mtime']) : '—';
-                        $icon = $f['type'] === 'video' ? '🎬' : '📄';
+                        $icon = $f['type'] === 'video' ? '🎬' : ($f['type'] === 'image' ? '🖼' : '📄');
+                        $typeLabel = $f['type'] === 'video' ? 'Vidéo' : ($f['type'] === 'image' ? 'Image' : 'PDF');
                         $isRaw = ($f['cat'] === 'video_raw');
                         $url = function_exists('moduleFileUrl') ? moduleFileUrl($f['key']) : ('media.php?f=' . rawurlencode($f['key']));
                         $rowLabel = ($modName !== '' ? $modName . ' — ' : '') . basename($f['key']);
                     ?>
-                    <tr>
+                    <tr data-type="<?= htmlspecialchars($f['type']) ?>"<?= $f['type'] === 'image' ? ' style="display:none;"' : '' ?>>
                         <td>
                             <div style="font-weight:700; color:#244230; word-break:break-all;"><?= htmlspecialchars(basename($f['key'])) ?></div>
                             <div class="muted" style="font-size:0.8rem;">
@@ -256,7 +282,7 @@ if (!function_exists('renderStorageTab')) {
                                 <?php if ($isRaw): ?> · source en attente<?php endif; ?>
                             </div>
                         </td>
-                        <td><?= $icon ?> <?= $f['type'] === 'video' ? 'Vidéo' : 'PDF' ?></td>
+                        <td><?= $icon ?> <?= htmlspecialchars($typeLabel) ?></td>
                         <td style="text-align:right; white-space:nowrap;"><?= htmlspecialchars(storageHumanSize($f['size'])) ?></td>
                         <td style="white-space:nowrap;"><?= htmlspecialchars($when) ?></td>
                         <td><?= htmlspecialchars($uploader) ?></td>
@@ -337,6 +363,16 @@ if (!function_exists('renderStorageTab')) {
         function closePreviewMedia() {
             document.getElementById('previewMediaModal').classList.remove('open');
             document.getElementById('saPrevBody').innerHTML = '';
+        }
+        function filterMedia(type, btn) {
+            document.querySelectorAll('.sa-filter').forEach(function (b) { b.classList.remove('btn-primary'); b.classList.add('btn-light'); });
+            if (btn) { btn.classList.remove('btn-light'); btn.classList.add('btn-primary'); }
+            document.querySelectorAll('#saFileTable tbody tr').forEach(function (tr) {
+                var t = tr.getAttribute('data-type');
+                // « Tous » = PDF + vidéos (les images extraites restent à part, via leur propre filtre).
+                var show = (type === 'all') ? (t !== 'image') : (t === type);
+                tr.style.display = show ? '' : 'none';
+            });
         }
         </script>
         <?php
