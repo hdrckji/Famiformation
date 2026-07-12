@@ -279,7 +279,7 @@ if (!function_exists('renderUniformContent')) {
         .fami-doc .image--s .image__real{ max-width:min(100%,280px); max-height:300px; }
         .fami-doc .image--m .image__real{ max-width:min(100%,420px); max-height:400px; }
         .fami-doc .image--l .image__real{ max-width:min(100%,560px); max-height:480px; }
-        .fami-doc .image__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:10px; padding-left:14px; border-left:3px solid var(--sprout); }
+        .fami-doc .image__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:10px; text-align:center; }
         .fami-doc .quote{ margin:36px 0; padding:8px 8px 8px 30px; border-left:4px solid var(--leaf); }
         .fami-doc .quote__text{ font-size:clamp(1.2rem,2.8vw,1.45rem); line-height:1.5; font-style:italic; color:var(--forest); margin:0; text-wrap:balance; }
         .fami-doc .quote__text::before{ content:"«\00A0"; color:var(--moss); } .fami-doc .quote__text::after{ content:"\00A0»"; color:var(--moss); }

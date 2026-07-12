@@ -151,7 +151,7 @@ function addOpt(btn) {
         + '<span class="del" onclick="delOpt(this)" title="Supprimer l\'option">✕</span>';
     opts.appendChild(d); d.querySelector('input[type=text]').focus();
 }
-function delQ(x) { var q = x.closest('[data-q]'); if (q) { q.remove(); } }
+function delQ(x) { if (!confirm('Supprimer définitivement cette question ?')) { return; } var q = x.closest('[data-q]'); if (q) { q.remove(); } }
 function addQ() {
     var i = QC++;
     var list = document.getElementById('qlist');

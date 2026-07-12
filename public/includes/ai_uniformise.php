@@ -384,7 +384,7 @@ if (!function_exists('aiGenerateQuiz')) {
             . '{"questions":[{"q":"...","type":"single","options":["...","..."],"correct":[0]}]}';
 
         $payload = [
-            'model' => $model, 'max_tokens' => 16000, 'system' => $system,
+            'model' => $model, 'max_tokens' => 32000, 'system' => $system,
             'messages' => [['role' => 'user', 'content' => "CONTENU DE FORMATION :\n\n" . $contentText]],
         ];
         $ch = curl_init('https://api.anthropic.com/v1/messages');

@@ -85,7 +85,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     .ve-quote { border-left:4px solid var(--leaf); padding:6px 6px 6px 24px; font-style:italic; color:var(--forest); font-size:1.25rem; }
     figure.ve-img { margin:24px 0; text-align:center; }
     figure.ve-img img { max-width:100%; border-radius:12px; box-shadow:0 8px 24px rgba(30,55,30,.12); display:inline-block; }
-    figure.ve-img figcaption { font-family:ui-monospace,monospace; font-size:.8rem; color:var(--ink-soft); border-left:3px solid var(--sprout); padding-left:12px; margin-top:8px; display:inline-block; text-align:left; }
+    figure.ve-img figcaption { font-family:ui-monospace,monospace; font-size:.8rem; color:var(--ink-soft); margin-top:8px; display:block; text-align:center; }
     .ve-tools { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
     .ve-tools button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:4px 10px; cursor:pointer; font:inherit; font-size:.82rem; }
     .ve-tools button.on { background:var(--forest); color:#fff; border-color:var(--forest); }
@@ -289,14 +289,14 @@ function veAddLi(a) {
     li.innerHTML = '<span contenteditable="true" data-f="item"></span><span class="ve-del" onclick="veDelItem(this)" title="Supprimer">✕</span>';
     ul.appendChild(li); li.querySelector('span').focus();
 }
-function veDelItem(x) { var li = x.closest('.ve-li'); if (li) { li.remove(); } }
+function veDelItem(x) { if (!confirm('Supprimer ce point ?')) { return; } var li = x.closest('.ve-li'); if (li) { li.remove(); } }
 function veAddStep(a) {
     var box = a.previousElementSibling;
     var d = document.createElement('div'); d.className = 've-step';
     d.innerHTML = '<div class="st-t" contenteditable="true" data-f="title"></div><div class="st-d" contenteditable="true" data-f="desc"></div><span class="ve-del" onclick="veDelStep(this)">✕</span>';
     box.appendChild(d); d.querySelector('.st-t').focus();
 }
-function veDelStep(x) { var s = x.closest('.ve-step'); if (s) { s.remove(); } }
+function veDelStep(x) { if (!confirm('Supprimer cette étape ?')) { return; } var s = x.closest('.ve-step'); if (s) { s.remove(); } }
 
 function veBuild() {
     var blocks = [];
