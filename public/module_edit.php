@@ -31,10 +31,7 @@ function _veInline($s)
 {
     $t = htmlspecialchars((string) $s);
     $t = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $t);
-    $pal = ['red' => '#c0392b', 'green' => '#1E4D2B', 'orange' => '#C98A1B', 'blue' => '#2c5aa0', 'gray' => '#5a6b60'];
-    $t = preg_replace_callback('/\[\[c:([a-z]+)\]\](.+?)\[\[\/c\]\]/s', function ($m) use ($pal) {
-        return isset($pal[$m[1]]) ? ('<span data-c="' . $m[1] . '" style="color:' . $pal[$m[1]] . '">' . $m[2] . '</span>') : $m[2];
-    }, $t);
+    $t = preg_replace('/\[\[c:[a-z]+\]\](.+?)\[\[\/c\]\]/s', '$1', $t);
     return $t;
 }
 $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
@@ -141,15 +138,8 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
 
     <div class="intro"><b>Clique sur « ✏️ Modifier »</b> pour éditer. Ensuite : clique un texte pour le corriger, sélectionne des mots pour les mettre en <b>gras</b> ou en <b style="color:#c0392b;">couleur</b>, ajoute des blocs en bas, déplace/supprime‑les. Puis <b>Valider</b>.</div>
     <div class="ve-format" id="veFormat">
-        <button type="button" onclick="veBold()" title="Gras (sélectionne d'abord des mots)"><b>G</b></button>
-        <span class="sep"></span>
-        <span class="lbl">Couleur :</span>
-        <button type="button" class="sw" style="background:#c0392b" onclick="veColor('red')" title="Rouge"></button>
-        <button type="button" class="sw" style="background:#1E4D2B" onclick="veColor('green')" title="Vert"></button>
-        <button type="button" class="sw" style="background:#C98A1B" onclick="veColor('orange')" title="Orange"></button>
-        <button type="button" class="sw" style="background:#2c5aa0" onclick="veColor('blue')" title="Bleu"></button>
-        <button type="button" class="sw" style="background:#5a6b60" onclick="veColor('gray')" title="Gris"></button>
-        <button type="button" onclick="veColor('none')" title="Enlever la couleur">✕ couleur</button>
+        <button type="button" onclick="veBold()" title="Mettre en gras"><b>G</b> Gras</button>
+        <span class="lbl" style="color:#7a8a80; font-weight:400;">Sélectionne des mots, puis clique « Gras ».</span>
     </div>
     <?php if ($pdfUrl !== ''): ?><div class="pdfp" id="pdfp"><iframe src="<?= htmlspecialchars($pdfUrl) ?>"></iframe></div><?php endif; ?>
 

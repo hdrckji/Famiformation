@@ -235,7 +235,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
-                <?php renderUniformContent($module['contenu_ia'], $uniPdfUrl, $canViewPdf, (array) json_decode((string) ($module['contenu_images'] ?? '[]'), true)); ?>
+                <?php renderUniformContent($module['contenu_ia'], $uniPdfUrl, $canViewPdf, (array) json_decode((string) ($module['contenu_images'] ?? '[]'), true), $quizHref); ?>
             <?php elseif ($isUni): ?>
                 <div class="content-card" id="uniPdf" data-src="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>">
                     <div style="text-align:center; color:#2d5a37; font-weight:700;"><?= t('Chargement du document…', 'Document laden…') ?></div>
@@ -248,11 +248,6 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php endif; ?>
         <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === ''): ?>
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
-        <?php endif; ?>
-        <?php if ($quizModuleId > 0 && !$isVideoPage): ?>
-            <div style="text-align:center; margin:22px 0;">
-                <a href="quiz.php?id=<?= $quizModuleId ?>" class="btn btn-create" style="text-decoration:none; background:linear-gradient(180deg,#2A6339,#1E4D2B); color:#fff; padding:14px 30px; font-size:1.05rem; border-radius:999px;">📝 <?= t('Passer le quiz', 'Naar de quiz') ?> →</a>
-            </div>
         <?php endif; ?>
         <?php if ($canEditContent && ($isGuide || $quizModuleId > 0)): ?>
             <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:10px 0 4px;">

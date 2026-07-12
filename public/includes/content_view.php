@@ -13,11 +13,8 @@ if (!function_exists('_uniInline')) {
     {
         $t = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
         $t = preg_replace('/(?<!\*)\*(?!\s)([^\*\n]+?)\*(?!\*)/', '<em>$1</em>', $t);
-        // Couleur (palette sûre, posée par l'éditeur) : [[c:nom]]texte[[/c]]
-        $pal = ['red' => '#c0392b', 'green' => '#1E4D2B', 'orange' => '#C98A1B', 'blue' => '#2c5aa0', 'gray' => '#5a6b60'];
-        $t = preg_replace_callback('/\[\[c:([a-z]+)\]\](.+?)\[\[\/c\]\]/s', function ($m) use ($pal) {
-            return isset($pal[$m[1]]) ? ('<span style="color:' . $pal[$m[1]] . '">' . $m[2] . '</span>') : $m[2];
-        }, $t);
+        // Couleur retirée (instable) : on ne garde que le texte des éventuels marqueurs.
+        $t = preg_replace('/\[\[c:[a-z]+\]\](.+?)\[\[\/c\]\]/s', '$1', $t);
         return $t;
     }
 }
@@ -225,7 +222,7 @@ if (!function_exists('_mdPages')) {
 }
 
 if (!function_exists('renderUniformContent')) {
-    function renderUniformContent($md, $pdfUrl = '', $showPdfView = false, $images = [])
+    function renderUniformContent($md, $pdfUrl = '', $showPdfView = false, $images = [], $quizHref = '')
     {
         $images = array_values((array) $images);
         $used = [];
@@ -233,9 +230,17 @@ if (!function_exists('renderUniformContent')) {
         $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
         $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
         // Page de fin AUTOMATIQUE sur CHAQUE guide (ne dépend pas du PDF d'origine).
-        $pages[] = '<main class="page"><section class="outro"><div class="outro__leaf">🌿</div>'
-            . '<h2 class="outro__title">Merci pour votre écoute</h2>'
-            . '<p class="outro__msg">Une question&nbsp;? N\'hésitez pas à demander au personnel.</p></section></main>';
+        $outroCta = ($quizHref !== '')
+            ? '<a class="outro__cta" href="' . htmlspecialchars($quizHref) . '">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>'
+            : '';
+        $pages[] = '<main class="page"><section class="outro"><div class="outro__card">'
+            . '<div class="outro__leaf">🌿</div>'
+            . '<p class="outro__eyebrow">Formation terminée</p>'
+            . '<h2 class="outro__title">Bravo, vous avez tout parcouru&nbsp;!</h2>'
+            . '<p class="outro__message">Une question&nbsp;? N\'hésitez pas à demander au personnel.</p>'
+            . '<p class="outro__thanks">Merci pour votre écoute 🌿</p>'
+            . $outroCta
+            . '</div></section></main>';
         $n = count($pages);
         $withPdf = ($showPdfView && $pdfUrl !== '');
         ?>
@@ -292,10 +297,15 @@ if (!function_exists('renderUniformContent')) {
         .fami-doc .quote{ margin:36px 0; padding:8px 8px 8px 30px; border-left:4px solid var(--leaf); }
         .fami-doc .quote__text{ font-size:clamp(1.2rem,2.8vw,1.45rem); line-height:1.5; font-style:italic; color:var(--forest); margin:0; text-wrap:balance; }
         .fami-doc .quote__text::before{ content:"«\00A0"; color:var(--moss); } .fami-doc .quote__text::after{ content:"\00A0»"; color:var(--moss); }
-        .fami-doc .outro{ text-align:center; background:linear-gradient(160deg,#17381F,#1E4D2B 60%,#2A6339); color:#F3F7EE; border-radius:24px; padding:clamp(40px,8vw,72px) 24px; margin:24px 0; }
+        .fami-doc .outro{ margin:24px 0; }
+        .fami-doc .outro__card{ text-align:center; background:radial-gradient(110% 90% at 50% -20%,#2F6B3C 0%,transparent 60%),linear-gradient(165deg,#17381F,#1E4D2B 65%,#235831); color:#F3F7EE; border-radius:24px; padding:clamp(44px,8vw,72px) clamp(24px,6vw,56px); }
         .fami-doc .outro__leaf{ font-size:2.6rem; }
-        .fami-doc .outro__title{ font-family:var(--font-display); font-weight:800; font-size:clamp(1.6rem,4vw,2.4rem); margin:10px 0; color:#fff; }
-        .fami-doc .outro__msg{ color:#DEEBD6; font-size:1.1rem; max-width:46ch; margin:0 auto; }
+        .fami-doc .outro__eyebrow{ font-family:var(--font-label); font-size:.74rem; letter-spacing:.24em; text-transform:uppercase; color:var(--sprout); margin:8px 0 10px; }
+        .fami-doc .outro__title{ font-family:var(--font-display); font-weight:800; font-size:clamp(1.6rem,4vw,2.4rem); margin:0 0 14px; color:#fff; }
+        .fami-doc .outro__message{ color:#DEEBD6; font-size:1.1rem; max-width:48ch; margin:0 auto 8px; }
+        .fami-doc .outro__thanks{ font-style:italic; color:#C9DEBE; margin:0 0 28px; }
+        .fami-doc .outro__cta{ font-family:var(--font-display); font-weight:800; font-size:1.05rem; text-decoration:none; color:var(--forest); background:linear-gradient(180deg,#FDFEF9,#EAF2DE); border:1px solid #fff; border-radius:999px; padding:15px 32px; display:inline-flex; align-items:center; gap:12px; box-shadow:0 10px 30px rgba(0,0,0,.28); transition:transform .18s ease; }
+        .fami-doc .outro__cta:hover{ transform:translateY(-2px); color:var(--forest); } .fami-doc .outro__cta .arrow{ transition:transform .18s ease; } .fami-doc .outro__cta:hover .arrow{ transform:translateX(4px); }
         .fami-doc .pagenav{ position:sticky; bottom:0; margin:40px auto 0; max-width:800px; padding:14px 24px; background:rgba(247,248,242,.94); backdrop-filter:blur(6px); border-top:1px solid var(--line); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:14px; }
         .fami-doc .pagenav__link{ font-family:var(--font-display); font-weight:700; font-size:.95rem; color:var(--forest); background:#fff; border:1px solid var(--line); border-radius:999px; padding:11px 20px; display:inline-flex; align-items:center; gap:8px; box-shadow:var(--shadow); cursor:pointer; }
         .fami-doc .pagenav__link:hover:not(:disabled){ background:var(--info-bg); border-color:var(--leaf); }
