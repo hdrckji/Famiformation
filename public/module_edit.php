@@ -31,6 +31,10 @@ function _veInline($s)
 {
     $t = htmlspecialchars((string) $s);
     $t = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $t);
+    $pal = ['red' => '#c0392b', 'green' => '#1E4D2B', 'orange' => '#C98A1B', 'blue' => '#2c5aa0', 'gray' => '#5a6b60'];
+    $t = preg_replace_callback('/\[\[c:([a-z]+)\]\](.+?)\[\[\/c\]\]/s', function ($m) use ($pal) {
+        return isset($pal[$m[1]]) ? ('<span data-c="' . $m[1] . '" style="color:' . $pal[$m[1]] . '">' . $m[2] . '</span>') : $m[2];
+    }, $t);
     return $t;
 }
 $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
@@ -65,6 +69,20 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     body.editing .ve-del { display:inline; }
     body.editing .fix { display:block; }
     body.editing .intro::after { content:" — mode édition ACTIF"; color:#8a5a00; font-weight:700; }
+    /* Barre de mise en forme (gras / couleur) + barre d'ajout de bloc + contrôles par bloc. */
+    .ve-format, .ve-addbar, .ve-ctrl { display:none; }
+    body.editing .ve-format { display:flex; flex-wrap:wrap; gap:8px; align-items:center; position:sticky; top:60px; z-index:15; background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 12px; max-width:820px; margin:10px auto 0; box-shadow:0 4px 14px rgba(0,0,0,.06); }
+    .ve-format button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; font:inherit; font-weight:700; }
+    .ve-format .sw { width:24px; height:24px; border-radius:50%; padding:0; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; }
+    .ve-format .sep { width:1px; height:22px; background:var(--line); }
+    .ve-format .lbl { color:#5a6b60; font-weight:700; font-size:.85rem; }
+    body.editing .ve-addbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; max-width:820px; margin:22px auto; padding:14px 16px; background:#fff; border:1px dashed var(--moss); border-radius:14px; }
+    .ve-addbar .lbl { font-weight:800; color:var(--forest); }
+    .ve-addbar button { background:#eef7f0; color:var(--forest); border:1px solid #cfe3d5; border-radius:9px; padding:8px 14px; cursor:pointer; font-weight:700; }
+    .ve-addbar button:hover { background:#e0efe3; }
+    body.editing .ve-ctrl { display:flex; gap:5px; justify-content:flex-end; margin-top:8px; }
+    .ve-ctrl button { border:1px solid var(--line); background:#fff; border-radius:7px; padding:3px 9px; cursor:pointer; font-size:.82rem; }
+    .ve-ctrl button:last-child { color:#b3261e; }
     .ve-hero { background:linear-gradient(155deg,#17381F,#1E4D2B 60%,#2A6339); color:#F3F7EE; border-radius:0 0 24px 24px; padding:40px 26px; margin:0 -20px 8px; text-align:center; }
     .ve-hero .eyebrow { font-family:ui-monospace,monospace; letter-spacing:.22em; text-transform:uppercase; font-size:.72rem; color:var(--sprout); }
     .ve-hero h1 { font-family:var(--fdisplay); font-weight:800; font-size:clamp(1.9rem,5vw,3rem); margin:10px 0; letter-spacing:-.02em; }
@@ -121,7 +139,18 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
         </div>
     </div>
 
-    <div class="intro"><b>Clique sur un texte pour le corriger</b>, directement sur la page. Survole une <b>image</b> pour la pivoter / changer sa taille. Les <b style="color:#c0392b;">doutes de l'IA</b> apparaissent en rouge : <b>Appliquer</b> ou <b>Ignorer</b>. Puis <b>Valider</b>.</div>
+    <div class="intro"><b>Clique sur « ✏️ Modifier »</b> pour éditer. Ensuite : clique un texte pour le corriger, sélectionne des mots pour les mettre en <b>gras</b> ou en <b style="color:#c0392b;">couleur</b>, ajoute des blocs en bas, déplace/supprime‑les. Puis <b>Valider</b>.</div>
+    <div class="ve-format" id="veFormat">
+        <button type="button" onclick="veBold()" title="Gras (sélectionne d'abord des mots)"><b>G</b></button>
+        <span class="sep"></span>
+        <span class="lbl">Couleur :</span>
+        <button type="button" class="sw" style="background:#c0392b" onclick="veColor('red')" title="Rouge"></button>
+        <button type="button" class="sw" style="background:#1E4D2B" onclick="veColor('green')" title="Vert"></button>
+        <button type="button" class="sw" style="background:#C98A1B" onclick="veColor('orange')" title="Orange"></button>
+        <button type="button" class="sw" style="background:#2c5aa0" onclick="veColor('blue')" title="Bleu"></button>
+        <button type="button" class="sw" style="background:#5a6b60" onclick="veColor('gray')" title="Gris"></button>
+        <button type="button" onclick="veColor('none')" title="Enlever la couleur">✕ couleur</button>
+    </div>
     <?php if ($pdfUrl !== ''): ?><div class="pdfp" id="pdfp"><iframe src="<?= htmlspecialchars($pdfUrl) ?>"></iframe></div><?php endif; ?>
 
     <div class="ve-doc" id="veDoc">
@@ -230,6 +259,17 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
         <?php endforeach; ?>
     </div>
 
+    <div class="ve-addbar" id="veAddbar">
+        <span class="lbl">+ Ajouter un bloc :</span>
+        <button type="button" onclick="veAddBlk('section')">Titre</button>
+        <button type="button" onclick="veAddBlk('text')">Paragraphe</button>
+        <button type="button" onclick="veAddBlk('list')">Liste</button>
+        <button type="button" onclick="veAddBlk('steps')">Étapes</button>
+        <button type="button" onclick="veAddBlk('callout')">Encadré</button>
+        <button type="button" onclick="veAddBlk('keyfigures')">Chiffres clés</button>
+        <button type="button" onclick="veAddBlk('quote')">Citation</button>
+    </div>
+
     <div class="savebar">
         <a href="module.php?id=<?= (int) $id ?>" class="btn btn-back" style="text-decoration:none;">Annuler</a>
         <button type="button" class="btn btn-save" onclick="veSubmit()">✅ Valider la relecture</button>
@@ -252,6 +292,7 @@ function veMd(el) {
             var tag = node.tagName.toLowerCase();
             var inner = veMd(node);
             if (tag === 'strong' || tag === 'b') { out += '**' + inner + '**'; }
+            else if (node.getAttribute && node.getAttribute('data-c')) { out += '[[c:' + node.getAttribute('data-c') + ']]' + inner + '[[/c]]'; }
             else if (tag === 'br') { out += '\n'; }
             else if (tag === 'div' || tag === 'p') { out += (out ? '\n' : '') + inner; }
             else { out += inner; }
@@ -355,6 +396,55 @@ function veSetEdit(on) {
         b.style.color = on ? '#2d5a37' : '#8a5a00';
     }
 }
+// --- Mise en forme : gras + couleur (palette sûre) ---
+function veBold() { document.execCommand('bold'); }
+var VEPAL = { red: '#c0392b', green: '#1E4D2B', orange: '#C98A1B', blue: '#2c5aa0', gray: '#5a6b60' };
+function veColor(name) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) { return; }
+    var range = sel.getRangeAt(0);
+    var span = document.createElement('span');
+    if (name !== 'none') { span.setAttribute('data-c', name); span.style.color = VEPAL[name] || '#000'; }
+    else { span.style.color = 'inherit'; }
+    try { span.appendChild(range.extractContents()); range.insertNode(span); sel.removeAllRanges(); } catch (e) {}
+}
+// --- Ajout / déplacement / suppression de blocs ---
+function veCtrlHtml() {
+    return '<div class="ve-ctrl"><button type="button" onclick="veMoveBlk(this,-1)" title="Monter">▲</button>'
+        + '<button type="button" onclick="veMoveBlk(this,1)" title="Descendre">▼</button>'
+        + '<button type="button" onclick="veDelBlk(this)" title="Supprimer le bloc">🗑</button></div>';
+}
+function veMoveBlk(btn, dir) {
+    var b = btn.closest('.ve-blk');
+    if (dir < 0) { var p = b.previousElementSibling; if (p && !p.classList.contains('ve-hero')) { b.parentNode.insertBefore(b, p); } }
+    else { var nx = b.nextElementSibling; if (nx) { b.parentNode.insertBefore(nx, b); } }
+    b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function veDelBlk(btn) { if (!confirm('Supprimer ce bloc entier ?')) { return; } var b = btn.closest('.ve-blk'); if (b) { b.remove(); } }
+function veNewBlock(type) {
+    var d = document.createElement('div'); d.className = 've-blk'; d.setAttribute('data-type', type);
+    if (type === 'section') { d.innerHTML = '<h2 class="ve-sec" contenteditable="true" data-f="title">Titre de section</h2>'; }
+    else if (type === 'text') { d.innerHTML = '<div class="ve-text" contenteditable="true" data-f="text">Votre texte…</div>'; }
+    else if (type === 'quote') { d.innerHTML = '<div class="ve-quote" contenteditable="true" data-f="text">Citation…</div>'; }
+    else if (type === 'list') { d.innerHTML = '<ul class="ve-list" data-list><li class="ve-li"><span contenteditable="true" data-f="item">Point…</span><span class="ve-del" onclick="veDelItem(this)">✕</span></li></ul><span class="ve-add" onclick="veAddLi(this)">+ Ajouter un point</span>'; }
+    else if (type === 'steps') { d.innerHTML = '<div class="ve-steps" data-steps><div class="ve-step"><div class="st-t" contenteditable="true" data-f="title">Titre de l\'étape</div><div class="st-d" contenteditable="true" data-f="desc">Détail…</div><span class="ve-del" onclick="veDelStep(this)">✕</span></div></div><span class="ve-add" onclick="veAddStep(this)">+ Ajouter une étape</span>'; }
+    else if (type === 'callout') { d.className = 've-blk ve-callout info'; d.setAttribute('data-style', 'info'); d.innerHTML = '<div class="bar"></div><div><div class="c-t" contenteditable="true" data-f="title">À noter</div><div contenteditable="true" data-f="text">Information importante…</div><div class="ve-tools" style="justify-content:flex-start; margin-top:6px;"><button type="button" class="on" onclick="veStyle(this,\'info\')">Info</button><button type="button" onclick="veStyle(this,\'tip\')">Astuce</button><button type="button" onclick="veStyle(this,\'warning\')">Attention</button></div></div>'; }
+    else if (type === 'keyfigures') { d.innerHTML = '<div class="ve-kf" data-kf><div class="kf"><div class="v" contenteditable="true" data-f="value">100</div><div class="l" contenteditable="true" data-f="label">Libellé</div></div></div>'; }
+    else { d.innerHTML = '<div class="ve-text" contenteditable="true" data-f="text">Texte…</div>'; }
+    d.insertAdjacentHTML('beforeend', veCtrlHtml());
+    return d;
+}
+function veAddBlk(type) {
+    var blk = veNewBlock(type);
+    document.getElementById('veDoc').appendChild(blk);
+    var first = blk.querySelector('[data-f]'); if (first) { first.focus(); }
+    blk.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+// Ajoute les contrôles (déplacer/supprimer) à chaque bloc existant (sauf la couverture).
+document.querySelectorAll('#veDoc .ve-blk').forEach(function (blk) {
+    if (blk.classList.contains('ve-hero')) { return; }
+    blk.insertAdjacentHTML('beforeend', veCtrlHtml());
+});
 veSetEdit(false);
 </script>
 </body>

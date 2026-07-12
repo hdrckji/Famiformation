@@ -13,6 +13,11 @@ if (!function_exists('_uniInline')) {
     {
         $t = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
         $t = preg_replace('/(?<!\*)\*(?!\s)([^\*\n]+?)\*(?!\*)/', '<em>$1</em>', $t);
+        // Couleur (palette sûre, posée par l'éditeur) : [[c:nom]]texte[[/c]]
+        $pal = ['red' => '#c0392b', 'green' => '#1E4D2B', 'orange' => '#C98A1B', 'blue' => '#2c5aa0', 'gray' => '#5a6b60'];
+        $t = preg_replace_callback('/\[\[c:([a-z]+)\]\](.+?)\[\[\/c\]\]/s', function ($m) use ($pal) {
+            return isset($pal[$m[1]]) ? ('<span style="color:' . $pal[$m[1]] . '">' . $m[2] . '</span>') : $m[2];
+        }, $t);
         return $t;
     }
 }
@@ -227,6 +232,10 @@ if (!function_exists('renderUniformContent')) {
         $data = json_decode((string) $md, true);
         $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
         $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
+        // Page de fin AUTOMATIQUE sur CHAQUE guide (ne dépend pas du PDF d'origine).
+        $pages[] = '<main class="page"><section class="outro"><div class="outro__leaf">🌿</div>'
+            . '<h2 class="outro__title">Merci pour votre écoute</h2>'
+            . '<p class="outro__msg">Une question&nbsp;? N\'hésitez pas à demander au personnel.</p></section></main>';
         $n = count($pages);
         $withPdf = ($showPdfView && $pdfUrl !== '');
         ?>
@@ -283,6 +292,10 @@ if (!function_exists('renderUniformContent')) {
         .fami-doc .quote{ margin:36px 0; padding:8px 8px 8px 30px; border-left:4px solid var(--leaf); }
         .fami-doc .quote__text{ font-size:clamp(1.2rem,2.8vw,1.45rem); line-height:1.5; font-style:italic; color:var(--forest); margin:0; text-wrap:balance; }
         .fami-doc .quote__text::before{ content:"«\00A0"; color:var(--moss); } .fami-doc .quote__text::after{ content:"\00A0»"; color:var(--moss); }
+        .fami-doc .outro{ text-align:center; background:linear-gradient(160deg,#17381F,#1E4D2B 60%,#2A6339); color:#F3F7EE; border-radius:24px; padding:clamp(40px,8vw,72px) 24px; margin:24px 0; }
+        .fami-doc .outro__leaf{ font-size:2.6rem; }
+        .fami-doc .outro__title{ font-family:var(--font-display); font-weight:800; font-size:clamp(1.6rem,4vw,2.4rem); margin:10px 0; color:#fff; }
+        .fami-doc .outro__msg{ color:#DEEBD6; font-size:1.1rem; max-width:46ch; margin:0 auto; }
         .fami-doc .pagenav{ position:sticky; bottom:0; margin:40px auto 0; max-width:800px; padding:14px 24px; background:rgba(247,248,242,.94); backdrop-filter:blur(6px); border-top:1px solid var(--line); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:14px; }
         .fami-doc .pagenav__link{ font-family:var(--font-display); font-weight:700; font-size:.95rem; color:var(--forest); background:#fff; border:1px solid var(--line); border-radius:999px; padding:11px 20px; display:inline-flex; align-items:center; gap:8px; box-shadow:var(--shadow); cursor:pointer; }
         .fami-doc .pagenav__link:hover:not(:disabled){ background:var(--info-bg); border-color:var(--leaf); }
