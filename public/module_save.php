@@ -146,8 +146,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $iconImage = handleModuleIconUpload();
             $nl = translateModuleToNl($nom, $description);
+            // Nouveau module placé EN DERNIER parmi ses frères (sort_order = max + 1),
+            // sinon il hérite de 0 et remonte tout en haut de la liste.
+            if ($parentId === null) {
+                $nextSort = (int) $db->query("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM modules WHERE parent_id IS NULL")->fetchColumn();
+            } else {
+                $ss = $db->prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM modules WHERE parent_id = ?");
+                $ss->execute([$parentId]);
+                $nextSort = (int) $ss->fetchColumn();
+            }
             $stmt = $db->prepare(
-                "INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, icon_image, nom_nl, description_nl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, icon_image, nom_nl, description_nl, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->execute([
                 mb_substr($nom, 0, 150),
@@ -159,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $iconImage,
                 $nl['nom'] !== '' ? $nl['nom'] : null,
                 $nl['desc'] !== '' ? $nl['desc'] : null,
+                $nextSort,
             ]);
             $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé.";
         }
@@ -508,7 +518,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             if ($ok) {
-                $db->prepare("UPDATE modules SET parent_id = ? WHERE id = ?")->execute([$newParent, $id]);
+                // Placé EN DERNIER dans son nouveau parent (sort_order = max + 1).
+                if ($newParent === null) {
+                    $nextSort = (int) $db->query("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM modules WHERE parent_id IS NULL")->fetchColumn();
+                } else {
+                    $ss = $db->prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM modules WHERE parent_id = ?");
+                    $ss->execute([$newParent]);
+                    $nextSort = (int) $ss->fetchColumn();
+                }
+                $db->prepare("UPDATE modules SET parent_id = ?, sort_order = ? WHERE id = ?")->execute([$newParent, $nextSort, $id]);
                 if ($newParent !== null) {
                     $db->prepare("UPDATE modules SET is_container = 1 WHERE id = ?")->execute([$newParent]);
                 }
