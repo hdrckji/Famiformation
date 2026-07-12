@@ -243,6 +243,9 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             <?php require_once __DIR__ . '/includes/quiz_view.php'; ?>
             <?php renderQuizForm(json_decode((string) $module['quiz_json'], true), (int) $module['id']); ?>
         <?php endif; ?>
+        <?php if (!$isContainer && !empty($module['quiz_json']) && ($isAdmin || !empty($canContribHere) || (int) ($module['contenu_by'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0))): ?>
+            <div style="text-align:center; margin:14px 0;"><a href="module_quiz.php?id=<?= (int) $module['id'] ?>" class="btn btn-create" style="text-decoration:none; background:#2d5a37; color:#fff;">📝 Contrôler le quiz</a></div>
+        <?php endif; ?>
     <?php endif; ?>
 
     <?php if ($isAdmin || $canContribHere): ?>

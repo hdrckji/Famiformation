@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")
            ->execute([json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE), $id]);
         $_SESSION['module_flash'] = "✅ Contenu relu et enregistré.";
-        header('Location: module.php?id=' . $id);
+        header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
         exit();
     }
 
@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     $json = json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE);
     $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")->execute([$json, $id]);
     $_SESSION['module_flash'] = "✅ Contenu relu et enregistré.";
-    header('Location: module.php?id=' . $id);
+    header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
     exit();
 }
 
