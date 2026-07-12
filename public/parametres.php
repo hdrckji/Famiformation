@@ -1233,7 +1233,24 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     document.addEventListener('DOMContentLoaded', function () {
         var c = document.getElementById('swConfirm');
         if (c) { c.addEventListener('click', function () { if (_swForm) { _swForm.submit(); } }); }
+        // Ré-active l'onglet depuis l'ancre (#prefs…) après un rechargement (ex : aperçu de thème).
+        var h = (location.hash || '').replace('#', '');
+        if (h && document.getElementById('tab-' + h)) {
+            document.querySelectorAll('.tab-btn').forEach(function (b) {
+                if ((b.getAttribute('onclick') || '').indexOf("showTab('" + h + "'") !== -1) { showTab(h, b); }
+            });
+        }
+        // Restaure la position de défilement mémorisée juste avant l'aperçu.
+        try {
+            var y = sessionStorage.getItem('fami_prefs_scroll');
+            if (y !== null) { sessionStorage.removeItem('fami_prefs_scroll'); requestAnimationFrame(function () { window.scrollTo(0, parseInt(y, 10) || 0); }); }
+        } catch (e) {}
     });
+    // Mémorise la position avant de lancer / arrêter un aperçu (liens ?theme=…).
+    document.addEventListener('click', function (e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href*="theme="]') : null;
+        if (a) { try { sessionStorage.setItem('fami_prefs_scroll', String(window.scrollY || window.pageYOffset || 0)); } catch (x) {} }
+    }, true);
 
     // Ouvre la modale de suppression, adaptée au module (et alerte si sous-modules verrouillés).
     function askDeleteModule(id, nom, hasLocked, hasChildren) {
