@@ -432,6 +432,7 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
                 <a href="events.php" class="btn-param" title="<?= t('Notifications', 'Meldingen') ?>" style="position:relative;">🔔<?php $pc = $isAdmin ? eventsPendingCount($db) : 0; if ($pc > 0): ?><span style="position:absolute; top:-6px; right:-6px; background:#c0392b; color:#fff; border-radius:999px; font-size:0.7rem; font-weight:800; padding:1px 6px; line-height:1.4;"><?= (int) $pc ?></span><?php endif; ?></a>
+                <?php if ($isAdmin): ?><a href="gestion_quiz.php" class="btn-param" title="Gestion Quiz">🧩</a><?php endif; ?>
                 <a href="parametres.php" class="btn-param" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                 <a href="logout.php" class="btn-logout" onclick="return confirm('<?= t('Êtes-vous sûr de vouloir vous déconnecter ?', 'Weet je zeker dat je je wilt afmelden?') ?>');"><?= t('Déconnexion', 'Afmelden') ?></a>
             </div>

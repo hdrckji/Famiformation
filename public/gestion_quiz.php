@@ -1,0 +1,137 @@
+<?php
+// ============================================================
+// gestion_quiz.php — HUB CENTRAL « Gestion Quiz » (admin).
+//   Liste tous les quiz générés (un par module, format multi-réponses),
+//   avec recherche (module + texte des questions), stats, et accès à l'éditeur
+//   complet (module_quiz.php : ajout / suppression / modif / unique-multiple / création).
+// ============================================================
+require_once 'config.php';
+verifierConnexion($db);
+require_once 'includes/modules.php';
+
+if (($_SESSION['role'] ?? '') !== 'admin') { header('Location: index.php'); exit(); }
+
+$flash = '';
+if (!empty($_SESSION['module_flash'])) { $flash = $_SESSION['module_flash']; unset($_SESSION['module_flash']); }
+
+// Arbre pour le fil d'Ariane.
+$tree = [];
+try {
+    foreach ($db->query("SELECT id, nom, nom_nl, parent_id FROM modules")->fetchAll(PDO::FETCH_ASSOC) as $m) { $tree[(int) $m['id']] = $m; }
+} catch (Exception $e) {}
+$crumb = function ($id) use ($tree) {
+    $parts = []; $cur = (int) $id; $g = 0;
+    while ($cur && isset($tree[$cur]) && $g++ < 50) { $parts[] = moduleNom($tree[$cur]); $cur = (int) ($tree[$cur]['parent_id'] ?? 0); }
+    return implode(' › ', array_reverse($parts));
+};
+
+// Modules ayant un quiz.
+$rows = [];
+try {
+    $rows = $db->query("SELECT id, nom, nom_nl, quiz_json FROM modules WHERE quiz_json IS NOT NULL AND quiz_json <> ''")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
+
+$quizzes = [];
+$totQ = 0; $totMul = 0; $totSin = 0;
+foreach ($rows as $r) {
+    $q = json_decode((string) $r['quiz_json'], true);
+    $questions = (is_array($q) && !empty($q['questions']) && is_array($q['questions'])) ? $q['questions'] : [];
+    if (empty($questions)) { continue; }
+    $mul = 0; $sin = 0; $texts = [];
+    foreach ($questions as $qq) {
+        if (($qq['type'] ?? 'single') === 'multiple') { $mul++; } else { $sin++; }
+        $texts[] = (string) ($qq['q'] ?? '');
+    }
+    $quizzes[] = [
+        'id' => (int) $r['id'], 'name' => moduleNom($r), 'path' => $crumb((int) $r['id']),
+        'nb' => count($questions), 'mul' => $mul, 'sin' => $sin, 'texts' => $texts,
+    ];
+    $totQ += count($questions); $totMul += $mul; $totSin += $sin;
+}
+usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); });
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion Quiz — FamiFormation</title>
+<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+<style>
+    :root { --forest:#1E4D2B; --leaf:#3E8E4E; --line:#d9e3dc; }
+    * { box-sizing:border-box; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; background:#f4f7f6; margin:0; color:#21301F; }
+    .topbar { background:#fff; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; padding:14px 18px; }
+    .topbar a { color:var(--forest); text-decoration:none; font-weight:700; }
+    .wrap { max-width:900px; margin:0 auto; padding:20px 16px 60px; }
+    h1 { color:var(--forest); margin:0 0 4px; }
+    .flash { background:#dff3e3; border:1px solid #b6e0c2; color:#1d6a39; padding:12px 18px; border-radius:12px; margin-bottom:16px; font-weight:700; }
+    .stats { display:flex; gap:12px; flex-wrap:wrap; margin:14px 0; }
+    .stat { background:#eef7f0; border:1px solid #cfe3d5; border-radius:12px; padding:12px 18px; }
+    .stat .n { font-size:1.6rem; font-weight:800; color:var(--forest); } .stat .l { font-size:.8rem; color:#5a6b60; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+    .search { width:100%; padding:12px 14px; border:1px solid #cfdad3; border-radius:12px; font-size:1rem; margin-bottom:14px; }
+    .qz { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .qz .name { font-weight:800; color:var(--forest); font-size:1.1rem; }
+    .qz .path { color:#5a6b60; font-size:.82rem; }
+    .qz .badges span { display:inline-block; background:#eef7f0; border:1px solid #cfe3d5; color:var(--forest); border-radius:999px; padding:3px 10px; font-size:.8rem; font-weight:700; margin:4px 6px 0 0; }
+    .btn { border:none; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; text-decoration:none; font:inherit; background:var(--forest); color:#fff; white-space:nowrap; }
+    .muted { color:#7a8a80; }
+    #empty { display:none; }
+</style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="index.php">⬅ Accueil</a>
+        <strong style="color:#1E4D2B;">🧩 Gestion Quiz</strong>
+        <span></span>
+    </div>
+    <div class="wrap">
+        <?php if ($flash): ?><div class="flash"><?= htmlspecialchars($flash) ?></div><?php endif; ?>
+        <h1>Tous les quiz</h1>
+        <p class="muted" style="margin-top:0;">Chaque formation a son quiz (format à réponses multiples). Recherche, puis « Gérer » pour ajouter / modifier / supprimer des questions.</p>
+
+        <div class="stats">
+            <div class="stat"><div class="n"><?= count($quizzes) ?></div><div class="l">Quiz</div></div>
+            <div class="stat"><div class="n"><?= (int) $totQ ?></div><div class="l">Questions</div></div>
+            <div class="stat"><div class="n"><?= (int) $totMul ?></div><div class="l">Multiples</div></div>
+            <div class="stat"><div class="n"><?= (int) $totSin ?></div><div class="l">Uniques</div></div>
+        </div>
+
+        <input type="text" class="search" id="qsearch" placeholder="🔍 Rechercher un quiz ou une question…" onkeyup="filterQ()">
+
+        <div id="qlist">
+        <?php if (empty($quizzes)): ?>
+            <p class="muted">Aucun quiz pour l'instant. Ils apparaîtront ici dès qu'un contenu « à évaluer » sera importé.</p>
+        <?php else: ?>
+            <?php foreach ($quizzes as $qz): ?>
+            <div class="qz" data-search="<?= htmlspecialchars(strtolower($qz['name'] . ' ' . $qz['path'] . ' ' . implode(' ', $qz['texts'])), ENT_QUOTES) ?>">
+                <div>
+                    <div class="name"><?= htmlspecialchars($qz['name']) ?></div>
+                    <?php if ($qz['path'] !== ''): ?><div class="path">📍 <?= htmlspecialchars($qz['path']) ?></div><?php endif; ?>
+                    <div class="badges">
+                        <span><?= (int) $qz['nb'] ?> question<?= $qz['nb'] > 1 ? 's' : '' ?></span>
+                        <span><?= (int) $qz['mul'] ?> multiple<?= $qz['mul'] > 1 ? 's' : '' ?></span>
+                        <span><?= (int) $qz['sin'] ?> unique<?= $qz['sin'] > 1 ? 's' : '' ?></span>
+                    </div>
+                </div>
+                <a class="btn" href="module_quiz.php?id=<?= (int) $qz['id'] ?>">📝 Gérer le quiz</a>
+            </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+        </div>
+        <p class="muted" id="empty">Aucun quiz ne correspond à ta recherche.</p>
+    </div>
+<script>
+function filterQ() {
+    var q = document.getElementById('qsearch').value.toLowerCase().trim();
+    var n = 0;
+    document.querySelectorAll('#qlist .qz').forEach(function (c) {
+        var show = (q === '' || c.getAttribute('data-search').indexOf(q) !== -1);
+        c.style.display = show ? '' : 'none';
+        if (show) { n++; }
+    });
+    document.getElementById('empty').style.display = (n === 0) ? 'block' : 'none';
+}
+</script>
+</body>
+</html>
