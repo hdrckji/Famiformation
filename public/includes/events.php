@@ -113,6 +113,50 @@ if (!function_exists('rejectSubmission')) {
     }
 }
 
+if (!function_exists('eventsEnsureUserSeen')) {
+    function eventsEnsureUserSeen($db)
+    {
+        try {
+            if (!$db->query("SHOW COLUMNS FROM utilisateurs LIKE 'events_seen_at'")->fetch()) {
+                $db->exec("ALTER TABLE utilisateurs ADD COLUMN events_seen_at DATETIME NULL");
+            }
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('eventsMarkSeen')) {
+    function eventsMarkSeen($db, $userId)
+    {
+        eventsEnsureUserSeen($db);
+        try { $db->prepare("UPDATE utilisateurs SET events_seen_at = ? WHERE id = ?")->execute([date('Y-m-d H:i:s'), (int) $userId]); } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('eventsUnseenCount')) {
+    /** Nb de contenus PUBLIÉS depuis la dernière visite des notifs, que CET utilisateur peut voir. */
+    function eventsUnseenCount($db, $userId, $role)
+    {
+        eventsEnsureUserSeen($db);
+        $seen = '2000-01-01 00:00:00';
+        try { $st = $db->prepare("SELECT events_seen_at FROM utilisateurs WHERE id = ?"); $st->execute([(int) $userId]); $s = $st->fetchColumn(); if ($s) { $seen = (string) $s; } } catch (Exception $e) {}
+        try {
+            $st = $db->prepare("SELECT DISTINCT module_id FROM site_events WHERE type = 'content_published' AND created_at > ? ORDER BY created_at DESC LIMIT 100");
+            $st->execute([$seen]);
+            $mods = $st->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) { return 0; }
+        $n = 0;
+        foreach ($mods as $mid) {
+            $mid = (int) $mid;
+            if ($mid <= 0) { continue; }
+            try {
+                $m = getModuleById($db, $mid);
+                if ($m && (int) ($m['is_active'] ?? 0) === 1 && (!function_exists('userCanSeeModule') || userCanSeeModule($m, $role))) { $n++; }
+            } catch (Exception $e) {}
+        }
+        return $n;
+    }
+}
+
 if (!function_exists('eventsRecent')) {
     function eventsRecent($db, $limit = 60)
     {

@@ -33,6 +33,8 @@ if (!empty($_SESSION['module_flash'])) { $flash = $_SESSION['module_flash']; uns
 
 $pending = $isAdmin ? eventsPendingSubmissions($db) : [];
 $recent = eventsRecent($db, 60);
+// Ouvrir les notifications = « tout vu » -> remet le badge de la cloche à zéro.
+eventsMarkSeen($db, (int) ($_SESSION['user_id'] ?? 0));
 
 // Noms des auteurs + guide (pour « Relire »).
 $authorNames = [];

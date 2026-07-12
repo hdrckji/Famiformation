@@ -467,6 +467,22 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </div>
             </div>
         </div>
+        <!-- Modale : confirmation « Valider et uniformiser » (avec rappel du choix quiz) -->
+        <div id="uniConfirmModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">🪄</div>
+                <div class="fc-modal-title">Uniformiser le contenu ?</div>
+                <div class="fc-modal-text">L'IA va lire le document et construire la belle page « Le guide ». Vérifie ton choix ci-dessous.</div>
+                <label class="chk" style="display:flex; align-items:center; gap:10px; justify-content:center; background:#f4f7f6; border-radius:10px; padding:12px; margin:0 0 8px; font-weight:700; color:#244230;">
+                    <input type="checkbox" id="uniAEval"> 📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz sera généré)</small>
+                </label>
+                <div id="uniOneFileNote" style="display:none; color:#8a5a00; font-size:.85rem; margin-bottom:8px;">⚠️ Un seul fichier sur deux — le contenu ne portera que sur celui-ci.</div>
+                <div class="fc-modal-actions">
+                    <button type="button" class="btn" style="background:#e9ecef; color:#333;" onclick="document.getElementById('uniConfirmModal').style.display='none';">Annuler</button>
+                    <button type="button" class="btn btn-create" onclick="uniConfirm();">✅ Confirmer</button>
+                </div>
+            </div>
+        </div>
         <style>
         .fc-modal { position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:20px; }
         .fc-modal-box { background:#fff; border-radius:16px; padding:28px; max-width:440px; width:100%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.35); animation:fcIn .25s ease; }
@@ -523,11 +539,27 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 document.getElementById('fileErrorModal').style.display = 'flex';
                 return false;
             }
+            if (fcPendingUniformize === '1') {
+                // Confirmation + rappel du choix quiz (au cas où on aurait oublié de cocher).
+                var fe = document.querySelector('#contentForm input[name="a_evaluer"]');
+                document.getElementById('uniAEval').checked = fe ? fe.checked : false;
+                document.getElementById('uniOneFileNote').style.display = (n === 1) ? 'block' : 'none';
+                document.getElementById('uniConfirmModal').style.display = 'flex';
+                return false;
+            }
             if (n === 1) {
                 document.getElementById('fileWarnModal').style.display = 'flex';
                 return false;
             }
-            return true; // 2 fichiers : enregistrement direct
+            return true; // 2 fichiers, sans uniformisation : enregistrement direct
+        }
+        function uniConfirm() {
+            var fe = document.querySelector('#contentForm input[name="a_evaluer"]');
+            if (fe) { fe.checked = document.getElementById('uniAEval').checked; }
+            document.getElementById('uniConfirmModal').style.display = 'none';
+            var f = document.getElementById('contentForm');
+            var h = document.createElement('input'); h.type = 'hidden'; h.name = 'uniformize'; h.value = '1'; f.appendChild(h);
+            f.submit();
         }
         function fcConfirmContent() {
             document.getElementById('fileWarnModal').style.display = 'none';
