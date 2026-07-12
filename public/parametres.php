@@ -86,6 +86,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_perso'])) {
     $allowed[] = 'theme_anniversaire_on';
     $allowed[] = 'theme_anniversaire_anim';
     $allowed[] = 'theme_anniversaire_intro';
+    // « Bienvenue » est un événement à part entière (thème vert/doré + effets + animation).
+    $allowed[] = 'theme_bienvenue_on';
+    $allowed[] = 'theme_bienvenue_anim';
+    $allowed[] = 'theme_bienvenue_intro';
     if (in_array($key, $allowed, true)) {
         $cur = widgetGet($db, $key, '1');
         widgetSet($db, $key, $cur === '1' ? '0' : '1');
@@ -296,6 +300,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .tree-spacer { display:inline-block; width:28px; margin-right:8px; }
         .child-count { display:inline-block; margin-left:8px; font-size:0.72rem; font-weight:700; color:#2d5a37; background:#e8f5e9; padding:2px 9px; border-radius:999px; vertical-align:middle; }
         .type-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:0.76rem; font-weight:700; white-space:nowrap; }
+        /* Paramètres administrateur : séparation NETTE entre chaque réglage
+           (avant, tout était collé dans un seul bloc → illisible). */
+        .admin-settings > div { border-top:3px solid #e3ece5; margin-top:26px; padding-top:22px; }
+        .admin-settings > div:first-of-type { border-top:none; margin-top:10px; padding-top:0; }
+        .admin-settings > div > h3:first-child { margin-top:0; }
+
         .type-container { background:#e8f5e9; color:#2d5a37; }
         /* Sous-types d'Élément : C = affiche du contenu (PDF/vidéo) · S = fonction spéciale dédiée */
         .type-content { background:#e3f0fb; color:#1f5c8c; }
@@ -795,7 +805,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         </div>
 
         <!-- Catégorie 2 : Paramètres administrateur -->
-        <div class="card" style="margin-top:20px;">
+        <div class="card admin-settings" style="margin-top:20px;">
             <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
             <p class="muted">Réservé aux administrateurs.</p>
 
@@ -940,17 +950,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         <h3 style="margin:0; color:#2d5a37; font-size:1.2rem;">🎬 Animations</h3>
                         <?php $btnToggle('anim_enabled', $animOn, 'Désactiver toute la catégorie Animations ?'); ?>
                     </div>
-                    <div style="<?= $animOn ? '' : 'opacity:.5; pointer-events:none;' ?> border-left:3px solid #e3ece5; padding-left:14px; margin:12px 0 6px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                            <div>
-                                <div style="font-weight:700; color:#244230;">🌿 Animation de bienvenue</div>
-                                <div class="muted" style="font-size:.85rem;">Apparition affichée <strong>à la toute première connexion</strong> d'un collaborateur.</div>
-                            </div>
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <a href="index.php?welcome=preview" target="_blank" rel="noopener" style="text-decoration:none; border:1.5px solid #2d5a37; color:#2d5a37; background:#fff; border-radius:8px; padding:7px 12px; font-weight:700;">▶ Prévisualiser</a>
-                                <?php $btnToggle('welcome_enabled', $welcomeOn); ?>
-                            </div>
-                        </div>
+                    <div style="<?= $animOn ? '' : 'opacity:.5;' ?> border-left:3px solid #e3ece5; padding-left:14px; margin:12px 0 6px;">
+                        <p class="muted" style="margin:0; font-size:.87rem;">
+                            Interrupteur général des animations de 1ère connexion. Chaque animation se règle
+                            <strong>événement par événement</strong> dans la liste ci-dessous (ligne <strong>🎬 Animation</strong>) —
+                            y compris <strong>🌿 Bienvenue</strong>, qui est désormais un événement à part entière avec son thème et ses effets.
+                        </p>
                     </div>
 
                     <!-- 🎨 THÈMES -->
@@ -1198,7 +1203,40 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     </div>
 </div>
 
+<!-- Modale : confirmation avant de basculer un interrupteur (tous les switchs passent par ici) -->
+<div id="switchModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width:460px;">
+        <div style="text-align:center;">
+            <div id="swIcon" style="font-size:2.6rem; line-height:1;">⚙️</div>
+            <h3 id="swTitle" style="margin:8px 0 6px;">Confirmer le changement</h3>
+            <p id="swMsg" style="color:#555; line-height:1.55; margin:0;"></p>
+        </div>
+        <div class="modal-actions" style="margin-top:20px;">
+            <button type="button" class="btn btn-light" onclick="closeModal('switchModal')">Annuler</button>
+            <button type="button" id="swConfirm" class="btn btn-primary">Confirmer</button>
+        </div>
+    </div>
+</div>
+
 <script>
+    // --- Bascule d'un interrupteur : on demande TOUJOURS confirmation via une modale. ---
+    var _swForm = null;
+    function askSwitch(btn, label, isOn) {
+        _swForm = btn.closest('form');
+        document.getElementById('swIcon').textContent = isOn ? '🔕' : '🔔';
+        document.getElementById('swTitle').textContent = isOn ? 'Désactiver ?' : 'Activer ?';
+        document.getElementById('swMsg').textContent =
+            'Veux-tu vraiment ' + (isOn ? 'désactiver' : 'activer') + ' : ' + label + ' ?';
+        var c = document.getElementById('swConfirm');
+        c.style.background = isOn ? '#c94a42' : '';
+        c.textContent = isOn ? 'Oui, désactiver' : 'Oui, activer';
+        openModal('switchModal');
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        var c = document.getElementById('swConfirm');
+        if (c) { c.addEventListener('click', function () { if (_swForm) { _swForm.submit(); } }); }
+    });
+
     // Ouvre la modale de suppression, adaptée au module (et alerte si sous-modules verrouillés).
     function askDeleteModule(id, nom, hasLocked, hasChildren) {
         document.getElementById('delId').value = id;

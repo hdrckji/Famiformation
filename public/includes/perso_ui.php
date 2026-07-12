@@ -14,24 +14,22 @@ if (!function_exists('persoSwitch')) {
      * @param bool   $isOn  état courant
      * @param string $confirmOnDisable  message de confirmation à la désactivation (optionnel)
      */
-    function persoSwitch($key, $isOn, $confirmOnDisable = '')
+    function persoSwitch($key, $isOn, $label = '')
     {
+        // Interrupteur COMPACT (vert = activé, gris = désactivé). Le clic n'envoie rien
+        // directement : il ouvre une modale de confirmation (askSwitch), qui soumet ce formulaire.
         $track = $isOn ? '#2d5a37' : '#c3ccc6';
         $knob  = $isOn ? 'right:3px;' : 'left:3px;';
-        $lblPos = $isOn ? 'left:11px;' : 'right:10px;';
-        $lbl = $isOn ? 'ON' : 'OFF';
         $title = $isOn ? 'Activé — cliquer pour désactiver' : 'Désactivé — cliquer pour activer';
-        $onsub = ($isOn && $confirmOnDisable !== '')
-            ? ' onsubmit="return confirm(' . htmlspecialchars(json_encode($confirmOnDisable, JSON_UNESCAPED_UNICODE), ENT_QUOTES) . ')"'
-            : '';
-        echo '<form method="POST" action="parametres.php#prefs" style="display:inline-block; margin:0; line-height:0;"' . $onsub . '>'
+        $lblJs = htmlspecialchars(json_encode($label !== '' ? $label : $key, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+        echo '<form method="POST" action="parametres.php#prefs" style="display:inline-block; margin:0; line-height:0;">'
             . csrfField()
             . '<input type="hidden" name="toggle_perso" value="1">'
             . '<input type="hidden" name="perso_key" value="' . htmlspecialchars($key) . '">'
-            . '<button type="submit" title="' . htmlspecialchars($title, ENT_QUOTES) . '" aria-label="' . $lbl . '" '
-            . 'style="position:relative; display:inline-block; width:64px; height:30px; border:none; border-radius:999px; background:' . $track . '; cursor:pointer; vertical-align:middle; transition:background .15s;">'
-            . '<span style="position:absolute; top:0; bottom:0; ' . $lblPos . ' display:flex; align-items:center; font-size:.66rem; font-weight:800; color:#fff; letter-spacing:.5px;">' . $lbl . '</span>'
-            . '<span style="position:absolute; top:3px; ' . $knob . ' width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.35);"></span>'
+            . '<button type="button" onclick="askSwitch(this, ' . $lblJs . ', ' . ($isOn ? 'true' : 'false') . ')" '
+            . 'title="' . htmlspecialchars($title, ENT_QUOTES) . '" aria-label="' . ($isOn ? 'ON' : 'OFF') . '" '
+            . 'style="position:relative; display:inline-block; width:44px; height:23px; padding:0; border:none; border-radius:999px; background:' . $track . '; cursor:pointer; vertical-align:middle; transition:background .15s;">'
+            . '<span style="position:absolute; top:2.5px; ' . $knob . ' width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.35); transition:all .15s;"></span>'
             . '</button>'
             . '</form>';
     }
@@ -62,8 +60,19 @@ if (!function_exists('renderEventThemeCards')) {
     /** Cartes par événement : 🎨 Thème / ✨ Effets / 🎬 Animation, chacun interrupteur + aperçu en place. */
     function renderEventThemeCards($db)
     {
-        // Construction de la liste des événements (anniversaire + catalogue).
+        // Construction de la liste des événements (bienvenue + anniversaire + catalogue).
         $events = [];
+
+        // 🌿 BIENVENUE : événement à part entière (1ère connexion), thème vert + doré brillant.
+        $wt = function_exists('welcomeTheme') ? welcomeTheme() : [];
+        $events['bienvenue'] = [
+            'nom'       => is_array($wt['nom'] ?? null) ? $wt['nom'][0] : ($wt['nom'] ?? '🌿 Bienvenue'),
+            'accent'    => $wt['accent'] ?? '#2d5a37',
+            'particles' => $wt['particles'] ?? ['✨', '🌟', '🌿', '⭐'],
+            'page_bg'   => $wt['page_bg'] ?? 'radial-gradient(circle at 50% 28%, #35794a, #10251a 78%)',
+            'date'      => 'à la toute 1ère connexion',
+        ];
+
         $bd = function_exists('birthdayTheme') ? birthdayTheme() : [];
         $events['anniversaire'] = [
             'nom'       => is_array($bd['nom'] ?? null) ? $bd['nom'][0] : ($bd['nom'] ?? '🎂 Anniversaire'),
@@ -87,14 +96,15 @@ if (!function_exists('renderEventThemeCards')) {
         <style>
         @keyframes evFall { to { transform: translateY(115vh) rotate(360deg); } }
         @keyframes evPop  { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
-        .ev-card { border:1px solid #e0e8e2; border-radius:12px; padding:14px 16px; margin-bottom:12px; background:#fff; }
-        .ev-head { font-weight:800; color:#244230; font-size:1.05rem; margin-bottom:12px; }
-        .ev-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:7px 0; border-top:1px solid #f0f4f1; }
+        .ev-card { border:1px solid #e0e8e2; border-radius:10px; padding:10px 13px; margin-bottom:8px; background:#fff; }
+        .ev-head { font-weight:800; color:#244230; font-size:.95rem; margin-bottom:7px; }
+        .ev-row { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:5px 0; border-top:1px solid #f2f5f3; }
         .ev-row:first-of-type { border-top:none; }
-        .ev-lbl { color:#33473b; font-weight:600; }
-        .ev-ctrl { display:flex; align-items:center; gap:10px; }
-        .ev-eye { border:1.5px solid #2d5a37; color:#2d5a37; background:#fff; border-radius:8px; padding:6px 12px; font-weight:700; cursor:pointer; font-size:.85rem; }
-        .ev-eye:hover { background:#2d5a37; color:#fff; }
+        .ev-lbl { color:#33473b; font-weight:600; font-size:.87rem; }
+        .ev-ctrl { display:flex; align-items:center; gap:8px; }
+        /* Boutons d'aperçu compacts (avant : trop gros, visuellement lourds) */
+        .ev-eye { border:1px solid #cfdcd4; color:#2d5a37; background:#fff; border-radius:6px; padding:3px 8px; font-weight:700; cursor:pointer; font-size:.74rem; line-height:1.5; }
+        .ev-eye:hover { background:#2d5a37; color:#fff; border-color:#2d5a37; }
         </style>
         <script>
         (function () {
@@ -156,6 +166,8 @@ if (!function_exists('renderEventThemeCards')) {
             };
         })();
         </script>
+        <button type="button" id="evToggle" class="btn btn-light" style="margin-bottom:8px;" onclick="famiToggleEvents()">▸ Voir les <?= count($events) ?> événements (thème · effets · animation)</button>
+        <div id="evList" style="display:none;">
         <?php foreach ($events as $k => $ev):
             $on    = (widgetGet($db, 'theme_' . $k . '_on', '1') === '1');
             $fx    = (widgetGet($db, 'theme_' . $k . '_anim', '1') === '1');
@@ -174,7 +186,7 @@ if (!function_exists('renderEventThemeCards')) {
                     <div class="ev-lbl">🎨 Thème <span class="muted" style="font-weight:400;">(fond + couleurs)</span></div>
                     <div class="ev-ctrl">
                         <button type="button" class="ev-eye" onclick="famiPrevTemplate(this)">👁 Aperçu</button>
-                        <?php persoSwitch('theme_' . $k . '_on', $on); ?>
+                        <?php persoSwitch('theme_' . $k . '_on', $on, '🎨 Thème — ' . $ev['nom']); ?>
                     </div>
                 </div>
 
@@ -182,7 +194,7 @@ if (!function_exists('renderEventThemeCards')) {
                     <div class="ev-lbl">✨ Effets <span class="muted" style="font-weight:400;">(<?= htmlspecialchars($fxEmojis) ?> qui tombent)</span></div>
                     <div class="ev-ctrl">
                         <button type="button" class="ev-eye" onclick="famiPrevFx(this)">👁 Aperçu</button>
-                        <?php persoSwitch('theme_' . $k . '_anim', $fx); ?>
+                        <?php persoSwitch('theme_' . $k . '_anim', $fx, '✨ Effets — ' . $ev['nom']); ?>
                     </div>
                 </div>
 
@@ -190,11 +202,20 @@ if (!function_exists('renderEventThemeCards')) {
                     <div class="ev-lbl">🎬 Animation <span class="muted" style="font-weight:400;">(1ère connexion)</span></div>
                     <div class="ev-ctrl">
                         <button type="button" class="ev-eye" onclick="famiPrevIntro(this)">👁 Aperçu</button>
-                        <?php persoSwitch('theme_' . $k . '_intro', $intro); ?>
+                        <?php persoSwitch('theme_' . $k . '_intro', $intro, '🎬 Animation — ' . $ev['nom']); ?>
                     </div>
                 </div>
             </div>
         <?php endforeach; ?>
+        </div>
+        <script>
+        function famiToggleEvents() {
+            var w = document.getElementById('evList'), b = document.getElementById('evToggle');
+            var open = w.style.display !== 'none';
+            w.style.display = open ? 'none' : 'block';
+            b.textContent = (open ? '▸ Voir les ' : '▾ Masquer les ') + <?= count($events) ?> + ' événements (thème · effets · animation)';
+        }
+        </script>
         <?php
     }
 }

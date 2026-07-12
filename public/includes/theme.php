@@ -186,6 +186,21 @@ if (!function_exists('birthdayTheme')) {
     }
 }
 
+if (!function_exists('welcomeTheme')) {
+    /** Thème « Bienvenue » (1ère connexion) : vert Famiflora + doré qui brille. */
+    function welcomeTheme()
+    {
+        return [
+            'key' => 'bienvenue',
+            'nom' => ['Bienvenue 🌿', 'Welkom 🌿'],
+            'accent' => '#2d5a37', 'accent2' => '#d4af37',
+            'particles' => ['✨', '🌟', '🌿', '⭐'],
+            'page_bg' => 'radial-gradient(circle at 50% 28%, #35794a, #10251a 78%)',
+            'dark' => true,
+        ];
+    }
+}
+
 if (!function_exists('activePageTheme')) {
     /**
      * Thème à appliquer GLOBALEMENT (fond du site), sur toutes les pages.

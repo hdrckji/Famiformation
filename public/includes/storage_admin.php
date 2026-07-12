@@ -83,10 +83,12 @@ if (!function_exists('storageScan')) {
         } catch (Exception $e) { /* table absente -> pas de propriétaires */ }
 
         $total = 0; $count = 0; $byCat = []; $files = [];
+        $seen = []; // fichiers déjà rangés dans une catégorie connue
         foreach (storageCategories() as $ck => $c) {
             $abs = $base . '/' . $c['dir'];
             $cBytes = 0; $cCount = 0;
             foreach (storageWalkFiles($abs) as $p => $sz) {
+                $seen[$p] = true;
                 $cBytes += $sz; $cCount++;
                 if (!empty($c['listable'])) {
                     $rel = str_replace('\\', '/', substr($p, strlen($base) + 1));
@@ -103,6 +105,19 @@ if (!function_exists('storageScan')) {
             $total += $cBytes; $count += $cCount;
             $byCat[$ck] = ['label' => $c['label'], 'bytes' => $cBytes, 'count' => $cCount];
         }
+
+        // DIVERS : tout le RESTE du volume (photos de profil, images de thèmes, icônes…).
+        // Fourre-tout : ainsi le total reflète VRAIMENT tout ce qui est stocké, sans rien oublier.
+        // Non listable : on ne propose pas de les supprimer ici (une photo de profil supprimée
+        // casserait l'avatar d'un collaborateur) — on les compte, c'est tout.
+        $dBytes = 0; $dCount = 0;
+        foreach (storageWalkFiles($base) as $p => $sz) {
+            if (isset($seen[$p])) { continue; }
+            $dBytes += $sz; $dCount++;
+        }
+        $total += $dBytes; $count += $dCount;
+        $byCat['divers'] = ['label' => 'Divers (photos de profil, images de thèmes…)', 'bytes' => $dBytes, 'count' => $dCount];
+
         usort($files, function ($a, $b) { return ($b['mtime'] ?? 0) <=> ($a['mtime'] ?? 0); });
         return ['base' => $base, 'total' => $total, 'count' => $count, 'byCat' => $byCat, 'files' => $files];
     }

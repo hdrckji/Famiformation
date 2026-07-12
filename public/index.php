@@ -72,8 +72,10 @@ if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
 
 // --- Message de bienvenue (toute première connexion de l'utilisateur) ---
 $showWelcome = false;
+// « Bienvenue » est désormais un ÉVÉNEMENT comme les autres : son animation est pilotée
+// par theme_bienvenue_intro (son thème et ses effets par theme_bienvenue_on / _anim).
 $welcomeEnabled = function_exists('persoFeatureOn')
-    ? (persoFeatureOn($db, 'anim_enabled') && widgetGet($db, 'welcome_enabled', '1') === '1')
+    ? (persoFeatureOn($db, 'anim_enabled') && widgetGet($db, 'theme_bienvenue_intro', '1') === '1')
     : true;
 // Aperçu admin : ?welcome=preview rejoue l'animation sans toucher au statut de l'utilisateur.
 $welcomePreview = (($_SESSION['role'] ?? '') === 'admin') && (($_GET['welcome'] ?? '') === 'preview');
@@ -285,19 +287,37 @@ body.birthday-mode::before { content:''; position:fixed; top:0; left:0; right:0;
 <?php if (!empty($eventIntro)) { renderEventIntroOverlay($eventIntro); } ?>
 <?php if ($showWelcome): ?>
 <?php
-// Habillage de l'animation de bienvenue selon le theme actif du jour (sinon nature verte).
-$wcParticles = ['🌿', '🍃', '🌱', '✨'];
-$wcAccent = '#2d5a37';
-$wcBg = 'radial-gradient(circle at 50% 30%, #2d5a37, #123020 75%)';
+// « Bienvenue » = événement à part entière : thème vert + doré brillant, pilotable
+// (theme_bienvenue_on = thème, theme_bienvenue_anim = effets). Un événement du jour prime.
+$wcT       = function_exists('welcomeTheme') ? welcomeTheme() : [];
+$wcThemeOn = (!function_exists('widgetGet') || widgetGet($db, 'theme_bienvenue_on', '1') === '1');
+$wcFxOn    = (!function_exists('widgetGet') || widgetGet($db, 'theme_bienvenue_anim', '1') === '1');
+
+$wcParticles = $wcFxOn ? ($wcT['particles'] ?? ['✨', '🌟', '🌿', '⭐']) : [];
+$wcAccent    = $wcT['accent'] ?? '#2d5a37';
+$wcGold      = $wcT['accent2'] ?? '#d4af37';
+$wcBg        = $wcThemeOn
+    ? ($wcT['page_bg'] ?? 'radial-gradient(circle at 50% 28%, #35794a, #10251a 78%)')
+    : 'radial-gradient(circle at 50% 30%, #24402e, #101a13 78%)'; // thème coupé : fond sobre
 $wcThemeName = '';
-if (!empty($siteTheme) && is_array($siteTheme)) {
-    if (!empty($siteTheme['particles'])) { $wcParticles = $siteTheme['particles']; }
+$wcShine     = $wcThemeOn; // titre doré scintillant
+
+// Si un événement du jour est actif (Noël, Halloween...), il habille la bienvenue.
+if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
+    if (!empty($siteTheme['particles']) && $wcFxOn) { $wcParticles = $siteTheme['particles']; }
     if (!empty($siteTheme['accent'])) { $wcAccent = $siteTheme['accent']; }
     $wcThemeName = is_array($siteTheme['nom'] ?? null) ? $siteTheme['nom'][0] : ($siteTheme['nom'] ?? '');
-    // Fond toujours sombre (texte blanc lisible), teinte par l'accent du theme.
     $wcBg = 'radial-gradient(circle at 50% 30%, ' . $wcAccent . ', #0e120e 80%)';
+    $wcShine = false; // on garde les couleurs de l'événement
 }
 ?>
+<?php if ($wcShine): ?>
+<style>
+/* Doré qui brille (thème Bienvenue) */
+#wcOverlay .wc-hi { background:linear-gradient(90deg,<?= htmlspecialchars($wcGold, ENT_QUOTES) ?>,#fff6cf,<?= htmlspecialchars($wcGold, ENT_QUOTES) ?>); background-size:200% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; animation:wcGold 3s linear infinite; }
+@keyframes wcGold { to { background-position:200% center; } }
+</style>
+<?php endif; ?>
 <div id="wcOverlay" class="wc-overlay" onclick="this.classList.add('wc-hide')" style="background:<?php echo htmlspecialchars($wcBg, ENT_QUOTES); ?>;">
     <div class="wc-fx"></div>
     <div class="wc-card">
@@ -328,7 +348,7 @@ if (!empty($siteTheme) && is_array($siteTheme)) {
 (function(){
   var ov=document.getElementById('wcOverlay'); if(!ov){return;}
   var fx=ov.querySelector('.wc-fx'); var leaves=<?php echo json_encode($wcParticles, JSON_UNESCAPED_UNICODE); ?>;
-  for(var i=0;i<26;i++){var s=document.createElement('span');s.className='wc-leaf';s.textContent=leaves[i%leaves.length];s.style.left=(Math.random()*100)+'%';s.style.fontSize=(0.9+Math.random()*1.3)+'rem';s.style.animationDuration=(6+Math.random()*6)+'s';s.style.animationDelay=(Math.random()*7)+'s';fx.appendChild(s);}
+  if(fx&&leaves&&leaves.length){for(var i=0;i<26;i++){var s=document.createElement('span');s.className='wc-leaf';s.textContent=leaves[i%leaves.length];s.style.left=(Math.random()*100)+'%';s.style.fontSize=(0.9+Math.random()*1.3)+'rem';s.style.animationDuration=(6+Math.random()*6)+'s';s.style.animationDelay=(Math.random()*7)+'s';fx.appendChild(s);}}
   setTimeout(function(){ov.classList.add('wc-hide');},7500);
 })();
 </script>
