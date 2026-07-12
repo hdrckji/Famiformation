@@ -224,8 +224,6 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             <button type="button" class="btn btn-create" onclick="document.getElementById('editModal').style.display='flex';">✏️ Modifier ce module</button>
             <?php if ($isContainer): ?>
                 <button type="button" class="btn btn-create" onclick="document.getElementById('createModal').style.display='flex';">➕ Ajouter un sous-module</button>
-            <?php elseif (empty($module['is_booking'])): ?>
-                <button type="button" class="btn btn-create" onclick="document.getElementById('contentModal').style.display='flex';">📎 Ajouter du contenu</button>
             <?php endif; ?>
         </div>
         <div style="color:#fff; background:rgba(0,0,0,0.3); padding:8px 14px; border-radius:10px; font-size:0.85rem; margin-top:8px;">ℹ️ La suppression se fait dans ⚙️ Paramètres → Gestion des modules.</div>
@@ -269,65 +267,69 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         <?php endif; ?>
 
         <?php if (!$isContainer && empty($module['is_booking'])): ?>
-        <!-- Modale : gérer le contenu (PDF / vidéo) -->
-        <div id="contentModal" class="modal-backdrop">
-            <div class="modal-card" style="max-width:620px;">
-                <h3>Contenu du module</h3>
-                <form id="contentForm" method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return validateContent(event);">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="action" value="content">
-                    <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
-                    <input type="hidden" name="return" value="module.php?id=<?= (int) $module['id'] ?>">
+        <!-- Gestion du contenu : les deux blocs PDF / Vidéo sont affichés DIRECTEMENT
+             (plus de bouton « Ajouter du contenu »). Cliquer sur un bloc dépose le fichier. -->
+        <div class="content-card" style="max-width:900px; text-align:left;">
+            <h3 style="margin-top:0; color:#2d5a37;">📎 Contenu du module</h3>
+            <p style="color:#666; margin:-6px 0 12px;">Cliquez sur un bloc pour déposer votre fichier (PDF et/ou vidéo).</p>
+            <form id="contentForm" method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return validateContent(event);">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="content">
+                <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                <input type="hidden" name="return" value="module.php?id=<?= (int) $module['id'] ?>">
 
-                    <?php if (!empty($module['is_locked'])): ?>
-                        <div style="background:#fff8e1; border:1px solid #ffe082; color:#6a5400; padding:10px 12px; border-radius:10px; font-weight:700; font-size:0.86rem;">🔒 Module verrouillé — mot de passe requis pour enregistrer.</div>
-                        <label style="display:block; font-weight:700; color:#244230; margin:12px 0 4px;">Mot de passe de verrouillage</label>
-                        <input type="password" name="admin_password" required autocomplete="off" placeholder="Mot de passe de verrouillage" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
-                    <?php endif; ?>
+                <?php if (!empty($module['is_locked'])): ?>
+                    <div style="background:#fff8e1; border:1px solid #ffe082; color:#6a5400; padding:10px 12px; border-radius:10px; font-weight:700; font-size:0.86rem;">🔒 Module verrouillé — mot de passe requis pour enregistrer.</div>
+                    <label style="display:block; font-weight:700; color:#244230; margin:12px 0 4px;">Mot de passe de verrouillage</label>
+                    <input type="password" name="admin_password" required autocomplete="off" placeholder="Mot de passe de verrouillage" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
+                <?php endif; ?>
 
-                    <!-- Grand bloc PDF -->
-                    <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
-                        <input type="file" name="pdf_file" accept="application/pdf" class="dz-input">
-                        <div class="dz-icon">📄</div>
-                        <div class="dz-title">PDF</div>
-                        <div class="dz-hint">Glissez votre PDF ici ou cliquez pour parcourir</div>
-                        <div class="dz-file" hidden></div>
-                    </div>
-                    <?php if (!empty($module['pdf_path'])): ?>
-                        <div class="dz-existing">
-                            <a href="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>" download>⬇ Télécharger le PDF actuel</a>
-                            <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_pdf" value="1"> Supprimer</label>
+                <!-- Les deux blocs, côte à côte -->
+                <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
+                    <div style="flex:1; min-width:260px;">
+                        <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
+                            <input type="file" name="pdf_file" accept="application/pdf" class="dz-input">
+                            <div class="dz-icon">📄</div>
+                            <div class="dz-title">PDF</div>
+                            <div class="dz-hint">Glissez votre PDF ici ou cliquez pour parcourir</div>
+                            <div class="dz-file" hidden></div>
                         </div>
-                    <?php endif; ?>
-
-                    <!-- Grand bloc Vidéo -->
-                    <div class="drop-zone" id="dz_video" data-has-existing="<?= !empty($module['video_path']) ? '1' : '0' ?>" data-remove="remove_video">
-                        <input type="file" name="video_file" accept="video/*" class="dz-input">
-                        <div class="dz-icon">🎬</div>
-                        <div class="dz-title">Vidéo</div>
-                        <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">N'importe quel format · jusqu'à 1 Go · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
-                        <div class="dz-file" hidden></div>
+                        <?php if (!empty($module['pdf_path'])): ?>
+                            <div class="dz-existing">
+                                <a href="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>" download>⬇ Télécharger le PDF actuel</a>
+                                <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_pdf" value="1"> Supprimer</label>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                    <?php if (!empty($module['video_path'])): ?>
-                        <div class="dz-existing">
-                            <a href="<?= htmlspecialchars(moduleFileUrl($module['video_path'])) ?>" download>⬇ Télécharger la vidéo actuelle</a>
-                            <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_video" value="1"> Supprimer</label>
+
+                    <div style="flex:1; min-width:260px;">
+                        <div class="drop-zone" id="dz_video" data-has-existing="<?= !empty($module['video_path']) ? '1' : '0' ?>" data-remove="remove_video">
+                            <input type="file" name="video_file" accept="video/*" class="dz-input">
+                            <div class="dz-icon">🎬</div>
+                            <div class="dz-title">Vidéo</div>
+                            <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">N'importe quel format · jusqu'à 1 Go · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
+                            <div class="dz-file" hidden></div>
                         </div>
-                    <?php endif; ?>
-
-                    <label class="chk" style="margin-top:18px; padding:12px 14px; background:#f4f7f6; border-radius:10px;">
-                        <input type="checkbox" name="a_evaluer" value="1" <?= !empty($module['a_evaluer']) ? 'checked' : '' ?>>
-                        📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz de 75 questions sera généré pour l'évaluer)</small>
-                    </label>
-
-                    <p style="font-size:0.82rem; color:#777; margin-top:14px;">« Valider et uniformiser » affiche le PDF dans une mise en page intégrée au site (au lieu du lecteur PDF brut).</p>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-cancel" onclick="document.getElementById('contentModal').style.display='none';">Annuler</button>
-                        <button type="submit" name="uniformize" value="0" class="btn" style="background:#e9ecef; color:#333;">Valider</button>
-                        <button type="submit" name="uniformize" value="1" class="btn btn-create">Valider et uniformiser</button>
+                        <?php if (!empty($module['video_path'])): ?>
+                            <div class="dz-existing">
+                                <a href="<?= htmlspecialchars(moduleFileUrl($module['video_path'])) ?>" download>⬇ Télécharger la vidéo actuelle</a>
+                                <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_video" value="1"> Supprimer</label>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                </form>
-            </div>
+                </div>
+
+                <label class="chk" style="margin-top:18px; padding:12px 14px; background:#f4f7f6; border-radius:10px;">
+                    <input type="checkbox" name="a_evaluer" value="1" <?= !empty($module['a_evaluer']) ? 'checked' : '' ?>>
+                    📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz de 75 questions sera généré pour l'évaluer)</small>
+                </label>
+
+                <p style="font-size:0.82rem; color:#777; margin-top:14px;">« Valider et uniformiser » : l'IA lit le PDF et met en forme le contenu (au lieu du lecteur PDF brut).</p>
+                <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
+                    <button type="submit" name="uniformize" value="0" class="btn" style="background:#e9ecef; color:#333;">Valider</button>
+                    <button type="submit" name="uniformize" value="1" class="btn btn-create">Valider et uniformiser</button>
+                </div>
+            </form>
         </div>
         <!-- Modale : aucun fichier -->
         <div id="fileErrorModal" class="fc-modal">
