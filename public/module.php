@@ -127,11 +127,12 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .dz-hint { color:#6c7a70; font-size:0.85rem; margin-top:4px; }
         .dz-file { margin-top:8px; font-weight:700; color:#244230; word-break:break-all; }
         .dz-existing { font-size:0.85rem; color:#555; margin:4px 0 2px; }
-        /* Variante FINE (sous-titres .srt) : même style que la vidéo, en plus discret */
-        .drop-zone--slim { padding:12px 14px; border-width:2px; margin:8px 0 2px; }
-        .drop-zone--slim .dz-icon { font-size:1.4rem; }
-        .drop-zone--slim .dz-title { font-size:0.95rem; margin-top:2px; }
-        .drop-zone--slim .dz-hint { font-size:0.78rem; margin-top:2px; }
+        /* Variante FINE (sous-titres .srt) : compacte, sur une ligne, moitié moins haute */
+        .drop-zone--slim { padding:7px 12px; border-width:2px; margin:6px 0 2px; display:flex; align-items:center; gap:8px; text-align:left; }
+        .drop-zone--slim .dz-icon { font-size:1.05rem; margin:0; }
+        .drop-zone--slim .dz-title { font-size:0.85rem; margin:0; }
+        .drop-zone--slim .dz-hint { font-size:0.72rem; margin:0; color:#8a968f; }
+        .drop-zone--slim .dz-file { margin:0 0 0 auto; font-size:0.8rem; }
         .topbar { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; padding:16px; gap:12px; }
         .topbar .back-link { margin:0; align-self:auto; }
         .uni-actions { display:flex; gap:10px; }
@@ -492,11 +493,11 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             // fabriquer un .srt. Ce champ n'est là que pour ceux qui EN ONT
                             // DÉJÀ un (export CapCut, etc.) : c'est gratuit et plus exact.
                         ?>
-                        <div class="drop-zone drop-zone--slim" id="dz_srt" data-has-existing="<?= !empty($module['sub_src_path']) ? '1' : '0' ?>" data-remove="remove_srt">
+                        <div class="drop-zone drop-zone--slim" id="dz_srt" data-has-existing="<?= !empty($module['sub_src_path']) ? '1' : '0' ?>" data-remove="remove_srt" title="Facultatif : le site génère et traduit les sous-titres tout seul. Déposez un .srt seulement si vous en avez déjà un.">
                             <input type="file" name="srt_file" accept=".srt,.vtt,text/plain" class="dz-input">
                             <div class="dz-icon">💬</div>
-                            <div class="dz-title">Sous-titres <span style="font-weight:400; color:#8a968f;">· .srt facultatif</span></div>
-                            <div class="dz-hint">Le site les génère et les traduit tout seul — déposez un .srt seulement si vous en avez déjà un.</div>
+                            <div class="dz-title">Sous-titres <span style="font-weight:400; color:#8a968f;">.srt · facultatif</span></div>
+                            <div class="dz-hint">générés tout seuls sinon</div>
                             <div class="dz-file" hidden></div>
                         </div>
                         <?php if (!empty($module['sub_src_path'])): ?>
