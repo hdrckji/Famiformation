@@ -41,14 +41,15 @@ if (!function_exists('_dBlockHtml')) {
     function _dBlockHtml($b, &$ctx)
     {
         $esc = function ($s) { return _uniInline(htmlspecialchars((string) $s)); };
+        $alStyle = in_array(($b['align'] ?? ''), ['center', 'right', 'left'], true) ? ' style="text-align:' . $b['align'] . '"' : '';
         switch ($b['type']) {
             case 'section':
                 $ctx['sec']++;
                 $eye = 'Partie ' . $ctx['sec'];
-                return '<section class="section"><p class="section__eyebrow">' . htmlspecialchars($eye) . '</p>'
+                return '<section class="section"' . $alStyle . '><p class="section__eyebrow">' . htmlspecialchars($eye) . '</p>'
                     . '<h2 class="section__title">' . $esc($b['title']) . '</h2><hr class="section__rule"></section>';
             case 'text':
-                return '<p class="text">' . $esc($b['text']) . '</p>';
+                return '<p class="text"' . $alStyle . '>' . $esc($b['text']) . '</p>';
             case 'list':
                 $li = '';
                 foreach ($b['items'] as $it) { $li .= '<li>' . $esc($it) . '</li>'; }
@@ -66,7 +67,7 @@ if (!function_exists('_dBlockHtml')) {
                 $st = in_array($b['style'], ['info', 'tip', 'warning'], true) ? $b['style'] : 'info';
                 $ttl = ($b['title'] ?? '') !== '' ? '<p class="callout__title">' . $esc($b['title']) . '</p>' : '';
                 return '<aside class="callout callout--' . $st . '"><span class="callout__icon" aria-hidden="true">' . _uniCalloutIcon($st) . '</span>'
-                    . '<div>' . $ttl . '<p class="callout__text">' . $esc($b['text']) . '</p></div></aside>';
+                    . '<div' . $alStyle . '>' . $ttl . '<p class="callout__text">' . $esc($b['text']) . '</p></div></aside>';
             case 'keyfigures':
                 $t = '';
                 foreach ($b['items'] as $it) {
@@ -84,7 +85,7 @@ if (!function_exists('_dBlockHtml')) {
                 }
                 return '';
             case 'quote':
-                return '<blockquote class="quote"><p class="quote__text">' . $esc($b['text']) . '</p></blockquote>';
+                return '<blockquote class="quote"' . $alStyle . '><p class="quote__text">' . $esc($b['text']) . '</p></blockquote>';
         }
         return '';
     }

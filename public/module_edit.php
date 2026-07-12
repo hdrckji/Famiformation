@@ -73,6 +73,10 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     .ve-format .sw { width:24px; height:24px; border-radius:50%; padding:0; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; }
     .ve-format .sep { width:1px; height:22px; background:var(--line); }
     .ve-format .lbl { color:#5a6b60; font-weight:700; font-size:.85rem; }
+    .ve-format select { border:1px solid var(--line); border-radius:8px; padding:6px 10px; font:inherit; font-weight:700; background:#fff; cursor:pointer; }
+    .ve-blk[data-align="center"] [data-f] { text-align:center; }
+    .ve-blk[data-align="right"] [data-f] { text-align:right; }
+    .ve-blk[data-align="left"] [data-f] { text-align:left; }
     body.editing .ve-addbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; max-width:820px; margin:22px auto; padding:14px 16px; background:#fff; border:1px dashed var(--moss); border-radius:14px; }
     .ve-addbar .lbl { font-weight:800; color:var(--forest); }
     .ve-addbar button { background:#eef7f0; color:var(--forest); border:1px solid #cfe3d5; border-radius:9px; padding:8px 14px; cursor:pointer; font-weight:700; }
@@ -138,13 +142,28 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
 
     <div class="intro"><b>Clique sur « ✏️ Modifier »</b> pour éditer. Ensuite : clique un texte pour le corriger, sélectionne des mots pour les mettre en <b>gras</b> ou en <b style="color:#c0392b;">couleur</b>, ajoute des blocs en bas, déplace/supprime‑les. Puis <b>Valider</b>.</div>
     <div class="ve-format" id="veFormat">
-        <button type="button" onclick="veBold()" title="Mettre en gras"><b>G</b> Gras</button>
-        <span class="lbl" style="color:#7a8a80; font-weight:400;">Sélectionne des mots, puis clique « Gras ».</span>
+        <button type="button" onclick="veBold()" title="Gras (sélectionne des mots)"><b>G</b></button>
+        <span class="sep"></span>
+        <button type="button" onclick="veAlign('left')" title="Aligner à gauche">⬅</button>
+        <button type="button" onclick="veAlign('center')" title="Centrer">↔</button>
+        <button type="button" onclick="veAlign('right')" title="Aligner à droite">➡</button>
+        <span class="sep"></span>
+        <select id="veAddSel" onchange="if(this.value){veAddBlk(this.value); this.value='';}">
+            <option value="">＋ Ajouter un bloc…</option>
+            <option value="section">Titre de section</option>
+            <option value="text">Paragraphe</option>
+            <option value="list">Liste</option>
+            <option value="steps">Étapes</option>
+            <option value="callout">Encadré</option>
+            <option value="keyfigures">Chiffres clés</option>
+            <option value="quote">Citation</option>
+        </select>
+        <span class="lbl" style="color:#7a8a80; font-weight:400;">Le bloc s'ajoute où ton curseur se trouve.</span>
     </div>
     <?php if ($pdfUrl !== ''): ?><div class="pdfp" id="pdfp"><iframe src="<?= htmlspecialchars($pdfUrl) ?>"></iframe></div><?php endif; ?>
 
     <div class="ve-doc" id="veDoc">
-        <?php foreach ($blocks as $b): $type = (string) ($b['type'] ?? ''); ?>
+        <?php foreach ($blocks as $b): $type = (string) ($b['type'] ?? ''); $alAttr = in_array(($b['align'] ?? ''), ['center', 'right', 'left'], true) ? ' data-align="' . $b['align'] . '"' : ''; ?>
         <?php if ($type === 'hero'): ?>
             <div class="ve-blk ve-hero" data-type="hero">
                 <div class="eyebrow">Famiformation</div>
@@ -152,11 +171,11 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
                 <div class="sub" contenteditable="true" data-f="subtitle"><?= _veInline($b['subtitle'] ?? '') ?></div>
             </div>
         <?php elseif ($type === 'section'): ?>
-            <div class="ve-blk" data-type="section">
+            <div class="ve-blk" data-type="section"<?= $alAttr ?>>
                 <h2 class="ve-sec" contenteditable="true" data-f="title"><?= _veInline($b['title'] ?? '') ?></h2>
             </div>
         <?php elseif ($type === 'text'): ?>
-            <div class="ve-blk" data-type="text">
+            <div class="ve-blk" data-type="text"<?= $alAttr ?>>
                 <div class="ve-text" contenteditable="true" data-f="text"><?= _veInline($b['text'] ?? '') ?></div>
                 <?php if (trim((string) ($b['fix'] ?? '')) !== ''): ?>
                 <div class="fix" data-fix="<?= htmlspecialchars((string) $b['fix'], ENT_QUOTES) ?>">
@@ -191,7 +210,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
             </div>
         <?php elseif ($type === 'callout'): ?>
             <?php $st = in_array(($b['style'] ?? 'info'), ['info', 'tip', 'warning'], true) ? $b['style'] : 'info'; ?>
-            <div class="ve-blk ve-callout <?= $st ?>" data-type="callout" data-style="<?= $st ?>">
+            <div class="ve-blk ve-callout <?= $st ?>" data-type="callout" data-style="<?= $st ?>"<?= $alAttr ?>>
                 <div class="bar"></div>
                 <div>
                     <div class="c-t" contenteditable="true" data-f="title"><?= _veInline($b['title'] ?? '') ?></div>
@@ -242,22 +261,11 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
                 <?php endif; ?>
             </div>
         <?php elseif ($type === 'quote'): ?>
-            <div class="ve-blk" data-type="quote">
+            <div class="ve-blk" data-type="quote"<?= $alAttr ?>>
                 <div class="ve-quote" contenteditable="true" data-f="text"><?= _veInline($b['text'] ?? '') ?></div>
             </div>
         <?php endif; ?>
         <?php endforeach; ?>
-    </div>
-
-    <div class="ve-addbar" id="veAddbar">
-        <span class="lbl">+ Ajouter un bloc :</span>
-        <button type="button" onclick="veAddBlk('section')">Titre</button>
-        <button type="button" onclick="veAddBlk('text')">Paragraphe</button>
-        <button type="button" onclick="veAddBlk('list')">Liste</button>
-        <button type="button" onclick="veAddBlk('steps')">Étapes</button>
-        <button type="button" onclick="veAddBlk('callout')">Encadré</button>
-        <button type="button" onclick="veAddBlk('keyfigures')">Chiffres clés</button>
-        <button type="button" onclick="veAddBlk('quote')">Citation</button>
     </div>
 
     <div class="savebar">
@@ -341,10 +349,11 @@ function veBuild() {
     var blocks = [];
     document.querySelectorAll('#veDoc > .ve-blk').forEach(function (blk) {
         var t = blk.getAttribute('data-type');
+        var al = blk.getAttribute('data-align') || '';
         if (t === 'hero') { blocks.push({ type: 'hero', title: fld(blk, 'title'), subtitle: fld(blk, 'subtitle') }); }
-        else if (t === 'section') { var x = fld(blk, 'title'); if (x) { blocks.push({ type: 'section', title: x }); } }
-        else if (t === 'text') { var x = fld(blk, 'text'); if (x) { blocks.push({ type: 'text', text: x }); } }
-        else if (t === 'quote') { var x = fld(blk, 'text'); if (x) { blocks.push({ type: 'quote', text: x }); } }
+        else if (t === 'section') { var x = fld(blk, 'title'); if (x) { blocks.push({ type: 'section', title: x, align: al }); } }
+        else if (t === 'text') { var x = fld(blk, 'text'); if (x) { blocks.push({ type: 'text', text: x, align: al }); } }
+        else if (t === 'quote') { var x = fld(blk, 'text'); if (x) { blocks.push({ type: 'quote', text: x, align: al }); } }
         else if (t === 'list') {
             var items = []; blk.querySelectorAll('[data-f="item"]').forEach(function (e) { var v = veMd(e); if (v) { items.push(v); } });
             if (items.length) { blocks.push({ type: 'list', items: items }); }
@@ -356,7 +365,7 @@ function veBuild() {
             if (items.length) { blocks.push({ type: 'steps', items: items }); }
         } else if (t === 'callout') {
             var tx = fld(blk, 'text'); var ti = fld(blk, 'title');
-            if (tx || ti) { blocks.push({ type: 'callout', style: blk.getAttribute('data-style') || 'info', title: ti, text: tx }); }
+            if (tx || ti) { blocks.push({ type: 'callout', style: blk.getAttribute('data-style') || 'info', title: ti, text: tx, align: al }); }
         } else if (t === 'keyfigures') {
             var items = []; blk.querySelectorAll('.kf').forEach(function (k) {
                 var v = veMd(k.querySelector('[data-f="value"]')); var l = veMd(k.querySelector('[data-f="label"]'));
@@ -426,10 +435,32 @@ function veNewBlock(type) {
 }
 function veAddBlk(type) {
     var blk = veNewBlock(type);
-    document.getElementById('veDoc').appendChild(blk);
+    var doc = document.getElementById('veDoc');
+    var ref = window._veLastBlk;
+    if (ref && ref.parentNode === doc && !ref.classList.contains('ve-hero')) {
+        doc.insertBefore(blk, ref.nextSibling); // à l'endroit du curseur
+    } else {
+        doc.appendChild(blk);
+    }
     var first = blk.querySelector('[data-f]'); if (first) { first.focus(); }
+    window._veLastBlk = blk;
     blk.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
+// Alignement du bloc courant (gauche / centre / droite).
+function veAlign(a) {
+    var blk = window._veLastBlk || (document.activeElement && document.activeElement.closest ? document.activeElement.closest('.ve-blk') : null);
+    if (!blk || blk.classList.contains('ve-hero')) { return; }
+    blk.setAttribute('data-align', a);
+}
+// Mémorise le dernier bloc où on a cliqué (pour insérer / aligner au bon endroit).
+document.getElementById('veDoc').addEventListener('focusin', function (e) {
+    var b = e.target.closest('.ve-blk');
+    if (b) { window._veLastBlk = b; }
+});
+document.getElementById('veDoc').addEventListener('click', function (e) {
+    var b = e.target.closest('.ve-blk');
+    if (b) { window._veLastBlk = b; }
+});
 // Ajoute les contrôles (déplacer/supprimer) à chaque bloc existant (sauf la couverture).
 document.querySelectorAll('#veDoc .ve-blk').forEach(function (blk) {
     if (blk.classList.contains('ve-hero')) { return; }

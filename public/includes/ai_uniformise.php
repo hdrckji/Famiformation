@@ -29,12 +29,17 @@ if (!function_exists('aiSanitizeBlocks')) {
                     $ok[] = ['type' => 'hero', 'title' => (string) ($b['title'] ?? ''), 'subtitle' => (string) ($b['subtitle'] ?? '')];
                     break;
                 case 'section':
-                    if (!empty($b['title'])) { $ok[] = ['type' => 'section', 'title' => (string) $b['title']]; }
+                    if (!empty($b['title'])) {
+                        $blk = ['type' => 'section', 'title' => (string) $b['title']];
+                        if (in_array(($b['align'] ?? ''), ['center', 'right', 'left'], true)) { $blk['align'] = $b['align']; }
+                        $ok[] = $blk;
+                    }
                     break;
                 case 'text':
                     if (trim((string) ($b['text'] ?? '')) !== '') {
                         $blk = ['type' => 'text', 'text' => (string) $b['text']];
                         if (trim((string) ($b['fix'] ?? '')) !== '') { $blk['fix'] = (string) $b['fix']; }
+                        if (in_array(($b['align'] ?? ''), ['center', 'right', 'left'], true)) { $blk['align'] = $b['align']; }
                         $ok[] = $blk;
                     }
                     break;
@@ -61,6 +66,7 @@ if (!function_exists('aiSanitizeBlocks')) {
                     if (trim((string) ($b['text'] ?? '')) !== '' || trim((string) ($b['title'] ?? '')) !== '') {
                         $blk = ['type' => 'callout', 'style' => $style, 'title' => (string) ($b['title'] ?? ''), 'text' => (string) ($b['text'] ?? '')];
                         if (trim((string) ($b['fix'] ?? '')) !== '') { $blk['fix'] = (string) $b['fix']; }
+                        if (in_array(($b['align'] ?? ''), ['center', 'right', 'left'], true)) { $blk['align'] = $b['align']; }
                         $ok[] = $blk;
                     }
                     break;
@@ -80,7 +86,11 @@ if (!function_exists('aiSanitizeBlocks')) {
                     $ok[] = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? ''), 'rotate' => $rot, 'size' => $size];
                     break;
                 case 'quote':
-                    if (trim((string) ($b['text'] ?? '')) !== '') { $ok[] = ['type' => 'quote', 'text' => (string) $b['text']]; }
+                    if (trim((string) ($b['text'] ?? '')) !== '') {
+                        $blk = ['type' => 'quote', 'text' => (string) $b['text']];
+                        if (in_array(($b['align'] ?? ''), ['center', 'right', 'left'], true)) { $blk['align'] = $b['align']; }
+                        $ok[] = $blk;
+                    }
                     break;
             }
         }
