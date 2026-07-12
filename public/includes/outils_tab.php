@@ -27,10 +27,20 @@ if (!function_exists('outilsBinaryOk')) {
         if (!function_exists('exec')) {
             return false;
         }
+        // Présence réelle dans le PATH : `command -v` renvoie 0 si le binaire existe.
+        // (C'est exactement ce que fait le vrai code d'extraction d'images.)
+        $out = [];
+        $code = 1;
+        @exec('command -v ' . escapeshellarg($bin) . ' 2>/dev/null', $out, $code);
+        if ($code === 0 && !empty($out)) {
+            return true;
+        }
+        // Repli : certains binaires poppler renvoient un code NON NUL sur « -version »
+        // tout en fonctionnant parfaitement. On les considère présents si la bannière sort.
         $out = [];
         $code = 1;
         @exec(escapeshellarg($bin) . ' -version 2>&1', $out, $code);
-        return $code === 0;
+        return !empty($out);
     }
 }
 
