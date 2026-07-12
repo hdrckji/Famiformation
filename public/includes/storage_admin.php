@@ -127,37 +127,20 @@ if (!function_exists('storageUserNames')) {
     }
 }
 
-if (!function_exists('storageHandlePost')) {
-    /** Traite la suppression d'un fichier (POST action=delete_media), protégée par le mot de passe admin. */
-    function storageHandlePost($db)
+if (!function_exists('storageDeleteOne')) {
+    /** Supprime UN fichier + nettoie les references en base. Renvoie true si efface. */
+    function storageDeleteOne($db, $key, $base, $baseReal)
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'delete_media') {
-            return;
-        }
-        requireValidCSRF();
-        if (($_SESSION['role'] ?? '') !== 'admin') { header('Location: index.php'); exit(); }
-
-        $key = (string) ($_POST['media_key'] ?? '');
-        $pw  = (string) ($_POST['admin_password'] ?? '');
-
+        $key = (string) $key;
         if ($key === '' || strpos($key, '..') !== false || preg_match('#^[A-Za-z0-9_./-]+$#', $key) !== 1) {
-            $_SESSION['module_flash'] = "❌ Clé de fichier invalide : suppression annulée.";
-            header('Location: parametres.php#contenu'); exit();
+            return false;
         }
-        if (!adminPasswordOk($db, $pw)) {
-            $_SESSION['module_flash'] = "❌ Mot de passe incorrect : fichier conservé.";
-            header('Location: parametres.php#contenu'); exit();
-        }
-
-        $base = storageBaseDir();
-        $baseReal = realpath($base);
         $abs = realpath($base . '/' . $key);
         if ($abs === false || $baseReal === false || strpos($abs, $baseReal) !== 0 || !is_file($abs)) {
-            $_SESSION['module_flash'] = "❌ Fichier introuvable : rien supprimé.";
-            header('Location: parametres.php#contenu'); exit();
+            return false;
         }
 
-        // Si c'est le PDF d'un module, on supprime aussi ses images extraites (sinon elles restent orphelines).
+        // Si c'est le PDF d'un module, on supprime aussi ses images extraites.
         try {
             $st = $db->prepare("SELECT contenu_images FROM modules WHERE pdf_path = ? LIMIT 1");
             $st->execute([$key]);
@@ -175,14 +158,11 @@ if (!function_exists('storageHandlePost')) {
 
         @unlink($abs);
 
-        // On nettoie les références en base pour ne pas pointer vers un fichier disparu.
         try {
             $db->prepare("UPDATE modules SET pdf_path = NULL, uniformized = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE pdf_path = ?")->execute([$key]);
             $db->prepare("UPDATE modules SET video_path = NULL, video_status = NULL WHERE video_path = ?")->execute([$key]);
             $db->prepare("UPDATE modules SET video_src_path = NULL WHERE video_src_path = ?")->execute([$key]);
 
-            // Image extraite supprimée seule : on la retire des contenu_images en gardant l'indice
-            // (remplacée par une chaîne vide) pour ne pas décaler les autres images de la fiche.
             $st = $db->prepare("SELECT id, contenu_images FROM modules WHERE contenu_images LIKE ?");
             $st->execute(['%' . $key . '%']);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -194,7 +174,47 @@ if (!function_exists('storageHandlePost')) {
             }
         } catch (Exception $e) { /* non bloquant */ }
 
-        $_SESSION['module_flash'] = "✅ Fichier supprimé du stockage (" . htmlspecialchars(basename($key)) . ").";
+        return true;
+    }
+}
+
+if (!function_exists('storageHandlePost')) {
+    /** Suppression d'un OU plusieurs fichiers (delete_media / delete_media_bulk), protegee par mot de passe admin. */
+    function storageHandlePost($db)
+    {
+        $action = $_POST['action'] ?? '';
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($action !== 'delete_media' && $action !== 'delete_media_bulk')) {
+            return;
+        }
+        requireValidCSRF();
+        if (($_SESSION['role'] ?? '') !== 'admin') { header('Location: index.php'); exit(); }
+
+        if ($action === 'delete_media_bulk') {
+            $keys = is_array($_POST['media_keys'] ?? null) ? $_POST['media_keys'] : [];
+        } else {
+            $keys = [(string) ($_POST['media_key'] ?? '')];
+        }
+        $keys = array_values(array_unique(array_filter(array_map('strval', $keys), function ($k) { return $k !== ''; })));
+
+        if (empty($keys)) {
+            $_SESSION['module_flash'] = "❌ Aucun fichier selectionne.";
+            header('Location: parametres.php#contenu'); exit();
+        }
+        if (!adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+            $_SESSION['module_flash'] = "❌ Mot de passe incorrect : aucun fichier supprime.";
+            header('Location: parametres.php#contenu'); exit();
+        }
+
+        $base = storageBaseDir();
+        $baseReal = realpath($base);
+        $done = 0;
+        foreach ($keys as $key) {
+            if (storageDeleteOne($db, $key, $base, $baseReal)) { $done++; }
+        }
+        $fail = count($keys) - $done;
+        $msg = "✅ " . $done . " fichier" . ($done > 1 ? 's' : '') . " supprime" . ($done > 1 ? 's' : '') . " du stockage.";
+        if ($fail > 0) { $msg .= " (" . $fail . " introuvable" . ($fail > 1 ? 's' : '') . ")"; }
+        $_SESSION['module_flash'] = $msg;
         header('Location: parametres.php#contenu'); exit();
     }
 }
@@ -259,11 +279,13 @@ if (!function_exists('renderStorageTab')) {
                 <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('pdf', this)">📄 PDF</button>
                 <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('video', this)">🎬 Vidéos</button>
                 <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('image', this)">🖼 Images extraites</button>
+                <button type="button" id="saBulkBtn" class="btn btn-danger" style="margin-left:auto;" disabled onclick="askDeleteSelected()">🗑 Supprimer la sélection (<span id="saBulkN">0</span>)</button>
             </div>
             <div style="overflow-x:auto;">
             <table id="saFileTable">
                 <thead>
                     <tr>
+                        <th style="text-align:center; width:34px;"><input type="checkbox" id="saCheckAll" onclick="saToggleAll(this)" title="Tout sélectionner"></th>
                         <th style="text-align:left;">Fichier / emplacement</th>
                         <th style="text-align:left;">Type</th>
                         <th style="text-align:right;">Taille</th>
@@ -287,6 +309,7 @@ if (!function_exists('renderStorageTab')) {
                         $rowLabel = ($modName !== '' ? $modName . ' — ' : '') . basename($f['key']);
                     ?>
                     <tr data-type="<?= htmlspecialchars($f['type']) ?>"<?= $f['type'] === 'image' ? ' style="display:none;"' : '' ?>>
+                        <td style="text-align:center;"><input type="checkbox" class="sa-check" value="<?= htmlspecialchars($f['key'], ENT_QUOTES) ?>" onchange="saUpdateCount()"></td>
                         <td>
                             <div style="font-weight:700; color:#244230; word-break:break-all;"><?= htmlspecialchars(basename($f['key'])) ?></div>
                             <div class="muted" style="font-size:0.8rem;">
@@ -317,7 +340,7 @@ if (!function_exists('renderStorageTab')) {
                                 onclick="previewMedia('<?= htmlspecialchars($url, ENT_QUOTES) ?>', '<?= htmlspecialchars($f['type'], ENT_QUOTES) ?>', '<?= htmlspecialchars($rowLabel, ENT_QUOTES) ?>')">👁</button>
                             <a class="btn btn-light" style="padding:6px 10px;" title="Télécharger" href="<?= htmlspecialchars($url) ?>" download>⬇</a>
                             <button type="button" class="btn btn-danger" style="padding:6px 10px;" title="Supprimer"
-                                onclick="askDeleteMedia('<?= htmlspecialchars($f['key'], ENT_QUOTES) ?>', '<?= htmlspecialchars($rowLabel, ENT_QUOTES) ?>')">🗑</button>
+                                onclick="askDelete(['<?= htmlspecialchars($f['key'], ENT_QUOTES) ?>'])">🗑</button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -331,13 +354,13 @@ if (!function_exists('renderStorageTab')) {
         <div id="deleteMediaModal" class="sa-modal">
             <div class="sa-modal-box">
                 <div style="font-size:2.6rem;">🗑️</div>
-                <h3 style="color:#c0392b; margin:8px 0 6px;">Supprimer définitivement ce fichier ?</h3>
-                <p class="muted" style="margin:0 0 6px;">Cette action est <strong>irréversible</strong>. Le fichier sera effacé du stockage et le module concerné perdra ce contenu.</p>
+                <h3 style="color:#c0392b; margin:8px 0 6px;">Supprimer définitivement ?</h3>
+                <p class="muted" style="margin:0 0 6px;">Cette action est <strong>irréversible</strong>. Le(s) fichier(s) seront effacés du stockage et les modules concernés perdront ce contenu.</p>
                 <p id="saDelName" style="font-weight:700; color:#244230; word-break:break-all; margin:0 0 14px;"></p>
                 <form method="POST" action="parametres.php">
                     <?= csrfField() ?>
-                    <input type="hidden" name="action" value="delete_media">
-                    <input type="hidden" name="media_key" id="saDelKey" value="">
+                    <input type="hidden" name="action" value="delete_media_bulk">
+                    <div id="saDelKeys"></div>
                     <label style="display:block; font-weight:700; color:#244230; margin:0 0 4px; text-align:left;">Mot de passe administrateur</label>
                     <input type="password" name="admin_password" required autocomplete="off" placeholder="Mot de passe de verrouillage"
                         style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
@@ -366,13 +389,40 @@ if (!function_exists('renderStorageTab')) {
         .btn-danger { background:#c94a42; color:#fff; }
         </style>
         <script>
-        function askDeleteMedia(key, label) {
-            document.getElementById('saDelKey').value = key;
-            document.getElementById('saDelName').textContent = label;
+        function askDelete(keys) {
+            var box = document.getElementById('saDelKeys');
+            box.innerHTML = '';
+            keys.forEach(function (k) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden'; inp.name = 'media_keys[]'; inp.value = k;
+                box.appendChild(inp);
+            });
+            document.getElementById('saDelName').textContent = (keys.length === 1)
+                ? keys[0].split('/').pop()
+                : (keys.length + ' fichiers sélectionnés');
             document.getElementById('deleteMediaModal').classList.add('open');
+        }
+        function askDeleteSelected() {
+            var keys = [];
+            document.querySelectorAll('#saFileTable .sa-check:checked').forEach(function (c) { keys.push(c.value); });
+            if (!keys.length) { return; }
+            askDelete(keys);
         }
         function closeDeleteMedia() {
             document.getElementById('deleteMediaModal').classList.remove('open');
+        }
+        function saUpdateCount() {
+            var n = document.querySelectorAll('#saFileTable .sa-check:checked').length;
+            var el = document.getElementById('saBulkN'); if (el) { el.textContent = n; }
+            var btn = document.getElementById('saBulkBtn'); if (btn) { btn.disabled = (n === 0); }
+        }
+        function saToggleAll(cb) {
+            document.querySelectorAll('#saFileTable tbody tr').forEach(function (tr) {
+                if (tr.style.display === 'none') { return; } // seulement les lignes visibles (filtre courant)
+                var c = tr.querySelector('.sa-check');
+                if (c) { c.checked = cb.checked; }
+            });
+            saUpdateCount();
         }
         function previewMedia(url, type, label) {
             document.getElementById('saPrevTitle').textContent = label;
@@ -406,7 +456,10 @@ if (!function_exists('renderStorageTab')) {
                 // « Tous » = PDF + vidéos (les images extraites restent à part, via leur propre filtre).
                 var show = (type === 'all') ? (t !== 'image') : (t === type);
                 tr.style.display = show ? '' : 'none';
+                if (!show) { var c = tr.querySelector('.sa-check'); if (c) { c.checked = false; } } // on décoche ce qui est masqué
             });
+            var all = document.getElementById('saCheckAll'); if (all) { all.checked = false; }
+            saUpdateCount();
         }
         </script>
         <?php
