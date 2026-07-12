@@ -62,8 +62,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         header('Location: module_quiz.php?id=' . $id . '&lang=nl');
         exit();
     }
+    // PASSAGE 2 — re-vérification orthographe du quiz FR (forme uniquement, jamais le sens
+    // ni les bonnes réponses). Sans risque : en cas d'échec, on garde le texte tel quel.
+    if ($json !== null && function_exists('nlProofreadQuizJson')) {
+        $pr = nlProofreadQuizJson($db, $json);
+        if ($pr['ok'] && trim((string) $pr['json']) !== '') { $json = $pr['json']; }
+    }
     $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$json, $id]);
-    spawnNlSync($id); // le quiz FR a changé → on régénère le quiz NL en tâche de fond
+    spawnNlSync($id); // le quiz FR (corrigé) a changé → on régénère le quiz NL en tâche de fond
     $_SESSION['module_flash'] = $questions ? ("✅ Quiz enregistré (" . count($questions) . " question" . (count($questions) > 1 ? 's' : '') . "). 🌐 La version néerlandaise se met à jour.") : "✅ Quiz vidé.";
     header('Location: module.php?id=' . $id);
     exit();

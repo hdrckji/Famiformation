@@ -449,6 +449,38 @@ if (!function_exists('nlTranslateQuizJson')) {
     }
 }
 
+if (!function_exists('nlProofreadQuizJson')) {
+    /** PASSAGE 2 — corrige l'orthographe FR du quiz (énoncés + options). Type/correct INTACTS. */
+    function nlProofreadQuizJson($db, $quizJson)
+    {
+        $quiz = json_decode((string) $quizJson, true);
+        if (!is_array($quiz) || empty($quiz['questions'])) {
+            return ['ok' => false, 'json' => '', 'error' => 'Quiz vide ou invalide'];
+        }
+        $src = [];
+        $copy = $quiz;
+        nlWalkQuiz($copy, function (&$s) use (&$src) { $src[] = (string) $s; });
+        if (empty($src)) {
+            return ['ok' => false, 'json' => '', 'error' => 'Aucun texte à corriger'];
+        }
+        $pr = aiProofreadStringsFr($db, $src);
+        if (!$pr['ok']) {
+            return ['ok' => false, 'json' => '', 'error' => $pr['error']];
+        }
+        $i = 0;
+        $items = $pr['items'];
+        nlWalkQuiz($quiz, function (&$s) use (&$i, $items) {
+            if (array_key_exists($i, $items)) { $s = $items[$i]; }
+            $i++;
+        });
+        return [
+            'ok' => true,
+            'json' => json_encode($quiz, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'error' => '',
+        ];
+    }
+}
+
 if (!function_exists('nlSyncModule')) {
     /**
      * Met à jour TOUTE la version NL d'un module : titre, description, guide, quiz.
