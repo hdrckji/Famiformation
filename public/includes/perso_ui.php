@@ -151,6 +151,30 @@ if (!function_exists('renderEventThemeCards')) {
                 document.body.appendChild(ov);
                 setTimeout(function () { if (ov.parentNode) { ov.style.opacity = '0'; setTimeout(function () { ov.remove(); }, 600); } }, 4200);
             };
+            // 🎬 ANIMATION : joue la VRAIE animation (celle que l'utilisateur verra, avec le
+            // prénom du compte connecté) EN SURIMPRESSION, sans quitter la page des réglages.
+            window.famiPrevRealIntro = function (url) {
+                var old = document.getElementById('famiIntroPrev');
+                if (old) { old.remove(); }
+                var ov = document.createElement('div');
+                ov.id = 'famiIntroPrev';
+                ov.style.cssText = 'position:fixed; inset:0; top:0; left:0; right:0; bottom:0; z-index:100001; background:#000;';
+
+                var f = document.createElement('iframe');
+                f.src = url;
+                f.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; border:none;';
+                ov.appendChild(f);
+
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = '✕ Fermer l’aperçu';
+                btn.style.cssText = 'position:absolute; top:16px; right:16px; z-index:2; background:#fff; color:#244230; border:none; border-radius:999px; padding:10px 18px; font-weight:800; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.35);';
+                btn.onclick = function () { ov.remove(); };
+                ov.appendChild(btn);
+
+                document.body.appendChild(ov);
+            };
+
             // 🎨 THÈME : aperçu PERSISTANT — il reste actif aussi longtemps qu'on veut.
             // Reclic sur le même bouton (devenu « ↩ Revenir ») = retour à la normale.
             var _pvBtn = null, _pvOrig = null;
@@ -237,7 +261,7 @@ if (!function_exists('renderEventThemeCards')) {
                                 ? 'index.php?welcome=preview'
                                 : (($k === 'anniversaire') ? 'index.php?bday=preview' : 'index.php?intro=' . urlencode($k));
                         ?>
-                        <a class="ev-eye" href="<?= htmlspecialchars($introUrl) ?>" target="_blank" rel="noopener" style="text-decoration:none;" title="Ouvre la VRAIE animation, telle que l'utilisateur la verra">👁 Aperçu réel</a>
+                        <button type="button" class="ev-eye" onclick="famiPrevRealIntro('<?= htmlspecialchars($introUrl, ENT_QUOTES) ?>')" title="Joue la VRAIE animation (avec ton prénom), sans quitter cette page">👁 Aperçu réel</button>
                         <?php persoSwitch('theme_' . $k . '_intro', $intro, '🎬 Animation — ' . $ev['nom']); ?>
                     </div>
                 </div>
