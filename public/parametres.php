@@ -66,6 +66,8 @@ storageHandlePost($db);
 require_once __DIR__ . '/includes/bulk.php';
 require_once __DIR__ . '/includes/ia_usage.php';
 iaUsageHandlePost($db);
+require_once __DIR__ . '/includes/contrib_settings.php';
+contribHandlePost($db);
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 // Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
@@ -872,6 +874,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 
             <?php iaSettingsCard($db); ?>
             <?php pdfAccessCard($db); ?>
+            <?php contribSettingsCard($db); ?>
 
             <!-- 🎨 PERSONNALISATION : options « fun » regroupées, chaque bascule via un bouton
                  (confirmation à la désactivation) ou, pour les thèmes, un clic droit. -->

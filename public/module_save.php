@@ -2,11 +2,19 @@
 require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
+require_once 'includes/contrib_settings.php';
 
-// Réservé à l'admin
-if (($_SESSION['role'] ?? '') !== 'admin') {
-    header('Location: index.php');
-    exit();
+$actorRole = (string) ($_SESSION['role'] ?? '');
+$isAdminActor = ($actorRole === 'admin');
+$reqAction = $_POST['action'] ?? '';
+
+// L'admin a tous les droits. Un contributeur autorisé (profil coché) ne peut faire QUE
+// « create » ou « content » — et seulement dans une zone autorisée, vérifié par action ci-dessous.
+if (!$isAdminActor) {
+    if (!in_array($reqAction, ['create', 'content'], true) || !contribRoleAllowed($db, $actorRole)) {
+        header('Location: index.php');
+        exit();
+    }
 }
 
 ensureModulesTable($db);
@@ -141,6 +149,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $roles = sanitizeModuleRoles($_POST['roles'] ?? []);
         $parentId = isset($_POST['parent_id']) && $_POST['parent_id'] !== '' ? (int) $_POST['parent_id'] : null;
 
+        // Contributeur non-admin : uniquement dans une zone autorisée (jamais à la racine).
+        if (!$isAdminActor && !contribCanCreateIn($db, $parentId, $actorRole)) {
+            $_SESSION['module_flash'] = "❌ Vous n'avez pas le droit de créer un module ici.";
+            header('Location: ' . ($parentId ? 'module.php?id=' . (int) $parentId : 'index.php'));
+            exit();
+        }
+
         if ($nom === '') {
             $_SESSION['module_flash'] = "❌ Le nom du module est obligatoire.";
         } else {
@@ -228,6 +243,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'content') {
         $id = (int) ($_POST['id'] ?? 0);
         $module = $id > 0 ? getModuleById($db, $id) : null;
+        // Contributeur non-admin : uniquement dans une zone autorisée.
+        if (!$isAdminActor && (!$module || !contribCanAddContent($db, $module, $actorRole))) {
+            $_SESSION['module_flash'] = "❌ Vous n'avez pas le droit d'ajouter du contenu ici.";
+            header('Location: index.php');
+            exit();
+        }
         if ($module && !empty($module['is_locked']) && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
             $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage requis, contenu inchangé.";
             $redirectTo = 'module.php?id=' . $id;

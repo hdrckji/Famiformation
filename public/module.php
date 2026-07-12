@@ -30,6 +30,11 @@ $isContainer = !empty($module['is_container']);
 $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
 
 // Structure « contenu » : ce module est-il un sous-module écrit/vidéo, ou un conteneur qui en regroupe ?
+// Droits de contribution (non-admin autorisé dans une zone) — voir includes/contrib_settings.php.
+require_once __DIR__ . '/includes/contrib_settings.php';
+$actorRole = (string) ($_SESSION['role'] ?? '');
+$canContribHere = !$isAdmin && contribRoleAllowed($db, $actorRole) && contribModuleInZone($db, (int) $module['id']);
+
 $isContentChild = in_array((string) ($module['content_kind'] ?? ''), ['ecrit', 'video'], true);
 $hasContentChildren = false;
 foreach ($children as $__c) {
@@ -240,13 +245,16 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php endif; ?>
     <?php endif; ?>
 
-    <?php if ($isAdmin): ?>
+    <?php if ($isAdmin || $canContribHere): ?>
         <div class="admin-actions">
+            <?php if ($isAdmin): ?>
             <button type="button" class="btn btn-create" onclick="document.getElementById('editModal').style.display='flex';">✏️ Modifier ce module</button>
+            <?php endif; ?>
             <?php if ($isContainer): ?>
                 <button type="button" class="btn btn-create" onclick="document.getElementById('createModal').style.display='flex';">➕ Ajouter un sous-module</button>
             <?php endif; ?>
         </div>
+        <?php if ($isAdmin): ?>
         <div style="color:#fff; background:rgba(0,0,0,0.3); padding:8px 14px; border-radius:10px; font-size:0.85rem; margin-top:8px;">ℹ️ La suppression se fait dans ⚙️ Paramètres → Gestion des modules.</div>
 
         <!-- Modale : modifier ce module -->
@@ -266,6 +274,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </form>
             </div>
         </div>
+        <?php endif; ?>
 
         <?php if ($isContainer): ?>
         <!-- Modale : ajouter un sous-module -->
