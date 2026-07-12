@@ -501,8 +501,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id > 0) {
             $module = getModuleById($db, $id);
             if ($module) {
-                if (!empty($module['is_locked'])) {
-                    $_SESSION['module_flash'] = "❌ Module verrouillé : déverrouillez-le d'abord pour le supprimer.";
+                if (!adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+                    $_SESSION['module_flash'] = "❌ Mot de passe incorrect : suppression annulée.";
                 } else {
                     // Suppression RÉCURSIVE : le module + TOUS ses descendants (sous-modules,
                     // sous-sous-modules...), même verrouillés (l'admin a confirmé via l'alerte).

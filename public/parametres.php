@@ -1191,6 +1191,8 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="id" id="delId" value="">
             <input type="hidden" name="return" value="parametres.php">
+            <label style="display:block; font-weight:700; color:#244230; margin:14px 0 4px; text-align:left;">Mot de passe administrateur</label>
+            <input type="password" name="admin_password" required autocomplete="off" placeholder="Mot de passe de verrouillage" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
             <div class="modal-actions">
                 <button type="button" class="btn btn-light" onclick="closeModal('delModal')">Annuler</button>
                 <button type="submit" id="delConfirmBtn" class="btn btn-danger">🗑 Supprimer définitivement</button>

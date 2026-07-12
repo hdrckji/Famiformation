@@ -54,10 +54,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
             $del = array_values(array_diff($ids, $locked));
             $skipped = count($locked);
             if ($del) {
-                $ph2 = implode(',', array_fill(0, count($del), '?'));
-                // supprime les modules choisis ET leurs sous-modules directs
-                $db->prepare("DELETE FROM modules WHERE id IN ($ph2) OR parent_id IN ($ph2)")
-                   ->execute(array_merge($del, $del));
+                // Descendants récursifs (sous-sous-modules compris).
+                $all = $del; $queue = $del; $g = 0;
+                while ($queue && $g++ < 10000) {
+                    $qp = implode(',', array_fill(0, count($queue), '?'));
+                    $cs = $db->prepare("SELECT id FROM modules WHERE parent_id IN ($qp)");
+                    $cs->execute(array_values($queue));
+                    $kids = array_values(array_diff(array_map('intval', $cs->fetchAll(PDO::FETCH_COLUMN)), $all));
+                    $all = array_merge($all, $kids);
+                    $queue = $kids;
+                }
+                $all = array_values(array_unique($all));
+                $ap = implode(',', array_fill(0, count($all), '?'));
+                // Nettoyage du VOLUME (PDF, vidéos, sources, images) des modules supprimés.
+                try {
+                    $fbase = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/uploads');
+                    $fbaseReal = realpath($fbase);
+                    $fs = $db->prepare("SELECT pdf_path, video_path, video_src_path, contenu_images FROM modules WHERE id IN ($ap)");
+                    $fs->execute($all);
+                    foreach ($fs->fetchAll(PDO::FETCH_ASSOC) as $fr) {
+                        $keys = [];
+                        foreach (['pdf_path', 'video_path', 'video_src_path'] as $col) { if (!empty($fr[$col])) { $keys[] = (string) $fr[$col]; } }
+                        $imgs = json_decode((string) ($fr['contenu_images'] ?? '[]'), true);
+                        if (is_array($imgs)) { foreach ($imgs as $ik) { if (is_string($ik) && $ik !== '') { $keys[] = $ik; } } }
+                        foreach ($keys as $k) {
+                            $abs = realpath($fbase . '/' . $k);
+                            if ($abs !== false && $fbaseReal !== false && strpos($abs, $fbaseReal) === 0 && is_file($abs)) { @unlink($abs); }
+                        }
+                    }
+                } catch (Exception $e) {}
+                $db->prepare("DELETE FROM modules WHERE id IN ($ap)")->execute($all);
                 $done = count($del);
             }
         } elseif ($entity === 'profile') {
