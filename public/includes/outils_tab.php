@@ -34,6 +34,42 @@ if (!function_exists('outilsBinaryOk')) {
     }
 }
 
+if (!function_exists('outilsBackgroundCheck')) {
+    /**
+     * LE test le plus important de cette page.
+     *
+     * La compression vidéo, les sous-titres et la traduction NL tournent tous en
+     * TÂCHE DE FOND (« nohup php worker & »). Ce mécanisme n'avait jamais été
+     * vérifié en production : s'il ne marche pas, les vidéos restent bloquées sur
+     * « en préparation » et le NL ne se génère jamais — sans message d'erreur.
+     *
+     * Ici on teste POUR DE VRAI, en direct : exec() est-il autorisé, et le PHP en
+     * ligne de commande répond-il ? Si les deux sont OK, les tâches de fond peuvent
+     * s'exécuter.
+     */
+    function outilsBackgroundCheck()
+    {
+        $r = ['exec' => false, 'php_cli' => false, 'ok' => false, 'detail' => ''];
+        if (!function_exists('exec')) {
+            $r['detail'] = 'La fonction exec() est désactivée sur ce serveur.';
+            return $r;
+        }
+        $r['exec'] = true;
+
+        $out = [];
+        $code = 1;
+        @exec('php -v 2>&1', $out, $code);
+        if ($code === 0 && !empty($out)) {
+            $r['php_cli'] = true;
+            $r['detail'] = trim((string) $out[0]); // ex: "PHP 8.3.x (cli) ..."
+        } else {
+            $r['detail'] = "La commande « php » n'est pas joignable depuis le site.";
+        }
+        $r['ok'] = $r['exec'] && $r['php_cli'];
+        return $r;
+    }
+}
+
 if (!function_exists('renderOutilsTab')) {
     function renderOutilsTab($db)
     {
@@ -143,6 +179,7 @@ if (!function_exists('renderOutilsTab')) {
             ],
         ];
         ?>
+        <?php $bg = outilsBackgroundCheck(); ?>
         <div class="card">
             <h2 style="margin-top:0; color:#2d5a37;">🧰 Outils utilisés par le site</h2>
             <p class="muted" style="margin-top:-6px;">
@@ -150,6 +187,38 @@ if (!function_exists('renderOutilsTab')) {
                 à quoi sert chaque brique, et <strong>où se configure sa clé</strong>.
                 L'état est <strong>vérifié en direct</strong> à chaque affichage.
             </p>
+
+            <!-- LE test le plus important : les tâches de fond peuvent-elles tourner ? -->
+            <div style="border:2px solid <?= $bg['ok'] ? '#cfe6d5' : '#e8a0a0' ?>; background:<?= $bg['ok'] ? '#f2f9f4' : '#fdf0f0' ?>; border-radius:12px; padding:14px 16px; margin-top:14px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:1.4rem;">⚙️</span>
+                    <strong style="color:#244230; font-size:1.02rem;">Tâches de fond</strong>
+                    <span style="margin-left:auto; font-size:.78rem; font-weight:800; border-radius:999px; padding:3px 11px; background:<?= $bg['ok'] ? '#e6f4ea' : '#fbe3e3' ?>; color:<?= $bg['ok'] ? '#1e6b3a' : '#9b1c1c' ?>;">
+                        <?= $bg['ok'] ? '✓ OPÉRATIONNELLES' : '✗ NE FONCTIONNENT PAS' ?>
+                    </span>
+                </div>
+                <div style="color:#4a5a50; margin-top:7px; line-height:1.5;">
+                    La <strong>compression vidéo</strong>, les <strong>sous-titres</strong> et la
+                    <strong>traduction néerlandaise</strong> tournent en arrière-plan pour ne pas te faire attendre.
+                    Ce test vérifie en direct qu'elles <em>peuvent</em> réellement s'exécuter.
+                </div>
+                <div style="margin-top:8px; font-size:.86rem; color:#33473b;">
+                    <strong>exec() autorisé :</strong> <?= $bg['exec'] ? '✓ oui' : '✗ non' ?> ·
+                    <strong>PHP en ligne de commande :</strong> <?= $bg['php_cli'] ? '✓ joignable' : '✗ injoignable' ?>
+                    <?php if ($bg['detail'] !== ''): ?>
+                        <div class="muted" style="font-size:.82rem; margin-top:3px;"><?= htmlspecialchars($bg['detail']) ?></div>
+                    <?php endif; ?>
+                </div>
+                <?php if (!$bg['ok']): ?>
+                    <div style="margin-top:10px; background:#fff; border:1px solid #f0c9c9; border-radius:8px; padding:10px 12px; font-size:.86rem; color:#8a1f1f; line-height:1.55;">
+                        <strong>⚠️ Conséquence concrète :</strong> les vidéos resteront bloquées sur
+                        « en préparation » et le néerlandais ne se générera pas tout seul.<br>
+                        <strong>Ce n'est pas grave pour les utilisateurs</strong> — le français reste affiché et la vidéo
+                        reste lisible — mais il faudra basculer ces traitements en mode synchrone.
+                        Le bouton <strong>« 🌐 Traduire en NL »</strong> (sur chaque module) fonctionne, lui, en direct.
+                    </div>
+                <?php endif; ?>
+            </div>
 
             <div style="display:grid; gap:12px; margin-top:16px;">
                 <?php foreach ($tools as $t): ?>
