@@ -148,6 +148,24 @@ function flattenModules(array $byParent, $parentId, $depth, array &$out)
     }
 }
 
+// Un module a-t-il au moins un DESCENDANT (enfant, petit-enfant...) verrouillé ?
+// Sert à alerter en rouge avant une suppression irréversible.
+function moduleHasLockedDescendant(array $byParent, $parentId)
+{
+    if (empty($byParent[$parentId])) {
+        return false;
+    }
+    foreach ($byParent[$parentId] as $child) {
+        if (!empty($child['is_locked'])) {
+            return true;
+        }
+        if (moduleHasLockedDescendant($byParent, (int) $child['id'])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * Rendu en arborescence des modules visibles par un profil.
  * - À la racine : on filtre par accès ($checkVisibility).
@@ -323,7 +341,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $childCount = isset($byParent[(int) $m['id']]) ? count($byParent[(int) $m['id']]) : 0; $hasChildren = $childCount > 0; ?>
+                    <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $childCount = isset($byParent[(int) $m['id']]) ? count($byParent[(int) $m['id']]) : 0; $hasChildren = $childCount > 0; $hasLockedDesc = moduleHasLockedDescendant($byParent, (int) $m['id']); ?>
                     <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>"<?= $depth > 0 ? ' style="display:none;"' : '' ?>>
                         <td><?= moduleIconHtml($m, '1.6rem') ?></td>
                         <td>
@@ -365,12 +383,17 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                                     <input type="hidden" name="return" value="parametres.php">
                                     <button type="submit" class="btn btn-light" title="<?= $lk ? 'Module verrouillé — déverrouillez-le pour changer le statut' : 'Activer / Désactiver' ?>" <?= $lk ? 'disabled' : '' ?>><?= (int) $m['is_active'] === 1 ? '⏸' : '▶' ?></button>
                                 </form>
-                                <form method="POST" action="module_save.php" style="display:inline;" onsubmit="return confirm('Supprimer définitivement ce module (et ses sous-modules) ?');">
+                                <?php
+                                    $delMsg = $hasLockedDesc
+                                        ? "⚠️ ATTENTION : ce module contient des sous-modules VERROUILLÉS.\n\nLes supprimer avec est IRRÉVERSIBLE. Es-tu vraiment sûr de vouloir tout supprimer ?"
+                                        : ('Supprimer définitivement ce module' . ($hasChildren ? ' (et ses sous-modules)' : '') . ' ?');
+                                ?>
+                                <form method="POST" action="module_save.php" style="display:inline;" onsubmit="return confirm(<?= htmlspecialchars(json_encode($delMsg, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>);">
                                     <?= csrfField() ?>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
                                     <input type="hidden" name="return" value="parametres.php">
-                                    <button type="submit" class="btn btn-danger" title="<?= $lk ? 'Module verrouillé — déverrouillez-le pour supprimer' : 'Supprimer' ?>" <?= $lk ? 'disabled' : '' ?>>🗑</button>
+                                    <button type="submit" class="btn btn-danger" style="<?= $hasLockedDesc ? 'background:#9b1c1c; box-shadow:0 0 0 2px #ffb3b3;' : '' ?>" title="<?= $lk ? 'Module verrouillé — déverrouillez-le pour supprimer' : ($hasLockedDesc ? 'Contient des sous-modules VERROUILLÉS — suppression irréversible' : 'Supprimer') ?>" <?= $lk ? 'disabled' : '' ?>><?= $hasLockedDesc ? '⚠️🗑' : '🗑' ?></button>
                                 </form>
                             </div>
                         </td>

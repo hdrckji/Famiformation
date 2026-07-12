@@ -392,9 +392,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($module['is_locked'])) {
                     $_SESSION['module_flash'] = "❌ Module verrouillé : déverrouillez-le d'abord pour le supprimer.";
                 } else {
-                    // Supprime aussi les éventuels sous-modules
-                    $db->prepare("DELETE FROM modules WHERE id = ? OR parent_id = ?")->execute([$id, $id]);
-                    $_SESSION['module_flash'] = "✅ Module supprimé.";
+                    // Suppression RÉCURSIVE : le module + TOUS ses descendants (sous-modules,
+                    // sous-sous-modules...), même verrouillés (l'admin a confirmé via l'alerte).
+                    // Évite les orphelins que laissait l'ancienne suppression (enfants directs only).
+                    $toDelete = [$id];
+                    $queue = [$id];
+                    $guard = 0;
+                    while ($queue && $guard++ < 10000) {
+                        $pid = array_shift($queue);
+                        $st = $db->prepare("SELECT id FROM modules WHERE parent_id = ?");
+                        $st->execute([$pid]);
+                        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $cid) {
+                            $cid = (int) $cid;
+                            $toDelete[] = $cid;
+                            $queue[] = $cid;
+                        }
+                    }
+                    $toDelete = array_values(array_unique($toDelete));
+                    $ph = implode(',', array_fill(0, count($toDelete), '?'));
+                    $db->prepare("DELETE FROM modules WHERE id IN ($ph)")->execute($toDelete);
+                    $nbSub = count($toDelete) - 1;
+                    $_SESSION['module_flash'] = "✅ Module supprimé" . ($nbSub > 0 ? " (et $nbSub sous-module" . ($nbSub > 1 ? 's' : '') . ")" : "") . ".";
                     if (!empty($module['parent_id'])) {
                         $redirectTo = 'module.php?id=' . (int) $module['parent_id'];
                     }
