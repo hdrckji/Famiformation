@@ -154,14 +154,14 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     $childExternal = (stripos($childLink, 'http') === 0);
                 ?>
                 <?php if ($childActive): ?>
-                <a href="<?= htmlspecialchars($childHref) ?>" class="tile"<?= $childExternal ? ' target="_blank" rel="noopener"' : '' ?>>
+                <a href="<?= htmlspecialchars($childHref) ?>" class="tile<?= $isAdmin ? ' mod-tile' : '' ?>"<?= $isAdmin ? ' data-mod-id="' . (int) $child['id'] . '"' : '' ?><?= $childExternal ? ' target="_blank" rel="noopener"' : '' ?>>
                     <?php if (!empty($child['a_evaluer'])): ?><span class="badge-eval">📝</span><?php endif; ?>
                     <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
                     <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
                     <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
                 </a>
                 <?php else: ?>
-                <div class="tile inactive" title="Module inactif — réactive-le dans Gestion des modules" style="cursor:not-allowed;">
+                <div class="tile inactive<?= $isAdmin ? ' mod-tile' : '' ?>"<?= $isAdmin ? ' data-mod-id="' . (int) $child['id'] . '"' : '' ?> title="<?= $isAdmin ? 'Module inactif — clic droit pour modifier' : 'Module inactif — réactive-le dans Gestion des modules' ?>" style="cursor:<?= $isAdmin ? 'context-menu' : 'not-allowed' ?>;">
                     <span class="badge-eval" style="background:#999;">Inactif</span>
                     <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
                     <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
@@ -173,6 +173,9 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 <div class="content-card" style="text-align:center;">Aucun sous-module pour l'instant.</div>
             <?php endif; ?>
         </div>
+        <?php if ($isAdmin && !empty($children)): ?>
+        <div style="color:#fff; background:rgba(0,0,0,0.28); padding:6px 12px; border-radius:10px; font-size:0.82rem; margin-top:6px;">💡 Astuce admin : <strong>clic droit</strong> sur une tuile pour la <strong>modifier</strong>.</div>
+        <?php endif; ?>
     <?php else: ?>
         <?php $isUni = !empty($module['uniformized']); ?>
         <?php $vStatus = (string) ($module['video_status'] ?? ''); ?>
@@ -282,6 +285,72 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </form>
             </div>
         </div>
+
+        <?php if (!empty($children)): ?>
+        <!-- Édition d'un sous-module par CLIC DROIT sur sa tuile : une modale par enfant. -->
+        <?php foreach ($children as $child): ?>
+        <div id="editModal_<?= (int) $child['id'] ?>" class="modal-backdrop">
+            <div class="modal-card">
+                <h3>Modifier « <?= htmlspecialchars(moduleNom($child)) ?> »</h3>
+                <?php if (!empty($child['is_locked'])): ?>
+                    <div style="background:#fff8e1; border:1px solid #ffe082; color:#6a5400; padding:10px 12px; border-radius:10px; font-weight:700; font-size:0.86rem;">🔒 Sous-module verrouillé — déverrouillez-le dans la Gestion des modules pour le modifier.</div>
+                    <div class="modal-actions"><button type="button" class="btn btn-cancel" onclick="document.getElementById('editModal_<?= (int) $child['id'] ?>').style.display='none';">Fermer</button></div>
+                <?php else: ?>
+                <form method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return confirm('Enregistrer les modifications ?');">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="id" value="<?= (int) $child['id'] ?>">
+                    <input type="hidden" name="return" value="module.php?id=<?= (int) $module['id'] ?>">
+                    <?php renderModuleFields('mchild' . (int) $child['id'], $child, moduleProfiles($db), moduleIconChoices()); ?>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-cancel" onclick="document.getElementById('editModal_<?= (int) $child['id'] ?>').style.display='none';">Annuler</button>
+                        <button type="submit" class="btn btn-create">Enregistrer</button>
+                    </div>
+                </form>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endforeach; ?>
+
+        <!-- Menu contextuel (clic droit / appui long sur une tuile) -->
+        <div id="tileCtx" style="position:fixed; z-index:100000; display:none; background:#fff; border:1px solid #d0d7d2; border-radius:10px; box-shadow:0 10px 34px rgba(0,0,0,.2); padding:6px; min-width:190px;">
+            <button type="button" data-act="edit" style="display:block; width:100%; text-align:left; border:none; background:none; padding:9px 12px; border-radius:7px; cursor:pointer; font-weight:600; color:#244230;">✏️ Modifier</button>
+            <button type="button" data-act="open" style="display:block; width:100%; text-align:left; border:none; background:none; padding:9px 12px; border-radius:7px; cursor:pointer; font-weight:600; color:#244230;">➡ Ouvrir</button>
+        </div>
+        <script>
+        (function () {
+            var menu = document.getElementById('tileCtx');
+            if (!menu) { return; }
+            var curId = null, curHref = null;
+            function show(x, y) {
+                menu.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+                menu.style.top = Math.min(y, window.innerHeight - 110) + 'px';
+                menu.style.display = 'block';
+            }
+            function hide() { menu.style.display = 'none'; curId = null; curHref = null; }
+            document.querySelectorAll('.mod-tile').forEach(function (tile) {
+                tile.addEventListener('contextmenu', function (e) {
+                    e.preventDefault();
+                    curId = tile.getAttribute('data-mod-id');
+                    curHref = tile.getAttribute('href') || ('module.php?id=' + curId);
+                    show(e.clientX, e.clientY);
+                });
+                var t;
+                tile.addEventListener('touchstart', function () { t = setTimeout(function () { tile._sup = true; curId = tile.getAttribute('data-mod-id'); curHref = tile.getAttribute('href') || ('module.php?id=' + curId); var r = tile.getBoundingClientRect(); show(r.left, r.bottom); }, 500); }, { passive: true });
+                tile.addEventListener('touchend', function () { clearTimeout(t); });
+                tile.addEventListener('touchmove', function () { clearTimeout(t); });
+                tile.addEventListener('click', function (e) { if (tile._sup) { e.preventDefault(); tile._sup = false; } });
+            });
+            menu.querySelector('[data-act=edit]').addEventListener('click', function () {
+                if (curId) { var m = document.getElementById('editModal_' + curId); if (m) { m.style.display = 'flex'; } }
+                hide();
+            });
+            menu.querySelector('[data-act=open]').addEventListener('click', function () { if (curHref) { window.location = curHref; } });
+            document.addEventListener('click', function (e) { if (menu.style.display === 'block' && !menu.contains(e.target)) { hide(); } });
+            window.addEventListener('scroll', hide, true);
+        })();
+        </script>
+        <?php endif; ?>
         <?php endif; ?>
 
         <?php if ($showContentForm): ?>
