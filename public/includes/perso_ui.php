@@ -151,18 +151,40 @@ if (!function_exists('renderEventThemeCards')) {
                 document.body.appendChild(ov);
                 setTimeout(function () { if (ov.parentNode) { ov.style.opacity = '0'; setTimeout(function () { ov.remove(); }, 600); } }, 4200);
             };
-            // 🎨 THÈME : applique temporairement le fond du template à la page.
+            // 🎨 THÈME : aperçu PERSISTANT — il reste actif aussi longtemps qu'on veut.
+            // Reclic sur le même bouton (devenu « ↩ Revenir ») = retour à la normale.
+            var _pvBtn = null, _pvOrig = null;
+            function _pvStop() {
+                if (!_pvBtn) { return; }
+                document.body.style.background = _pvOrig;
+                var t = document.getElementById('famiPrevToast');
+                if (t) { t.remove(); }
+                _pvBtn.textContent = '👁 Aperçu';
+                _pvBtn = null;
+                _pvOrig = null;
+            }
             window.famiPrevTemplate = function (btn) {
-                var c = card(btn), bg = c.getAttribute('data-pagebg') || '', accent = c.getAttribute('data-accent') || '#2d5a37', nom = c.getAttribute('data-nom') || '';
+                var wasSame = (_pvBtn === btn);
+                _pvStop();                 // on coupe l'aperçu en cours (quel qu'il soit)
+                if (wasSame) { return; }   // c'était le même bouton → on s'arrête là
+
+                var c = card(btn),
+                    bg = c.getAttribute('data-pagebg') || '',
+                    accent = c.getAttribute('data-accent') || '#2d5a37',
+                    nom = c.getAttribute('data-nom') || '';
                 if (!bg) { bg = 'linear-gradient(160deg, ' + accent + '22, ' + accent + '55)'; }
-                var old = document.body.style.background;
+
+                _pvOrig = document.body.style.background;
+                _pvBtn = btn;
                 document.body.style.transition = 'background .5s';
                 document.body.style.background = bg;
+                btn.textContent = '↩ Revenir';
+
                 var toast = document.createElement('div');
-                toast.textContent = '🎨 Aperçu du thème : ' + nom;
+                toast.id = 'famiPrevToast';
+                toast.textContent = '🎨 Aperçu : ' + nom + ' — reclique sur « ↩ Revenir » pour arrêter';
                 toast.style.cssText = 'position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:100000; background:' + accent + '; color:#fff; padding:10px 20px; border-radius:999px; font-weight:800; box-shadow:0 8px 24px rgba(0,0,0,.3);';
                 document.body.appendChild(toast);
-                setTimeout(function () { document.body.style.background = old; toast.remove(); }, 4200);
             };
         })();
         </script>
