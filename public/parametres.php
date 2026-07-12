@@ -125,6 +125,17 @@ foreach ($allModules as $m) {
     }
     $byParent[$pid][] = $m;
 }
+// Tri de l'arborescence : « order » (ordre actuel/base) ou « alpha » (A→Z par nom),
+// en CONSERVANT la hiérarchie (on ne trie que les frères de chaque parent).
+$moduleSort = (($_GET['msort'] ?? '') === 'alpha') ? 'alpha' : 'order';
+if ($moduleSort === 'alpha') {
+    foreach ($byParent as $pid => &$kids) {
+        usort($kids, function ($a, $b) {
+            return strcasecmp((string) ($a['nom'] ?? ''), (string) ($b['nom'] ?? ''));
+        });
+    }
+    unset($kids);
+}
 function flattenModules(array $byParent, $parentId, $depth, array &$out)
 {
     if (empty($byParent[$parentId])) {
@@ -297,9 +308,15 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     <!-- ONGLET : Gestion des modules -->
     <div id="tab-modules" class="tab-content active">
         <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <h2 style="margin:0; color:#2d5a37;">Modules</h2>
                 <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer un module</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; margin:12px 0 6px; font-size:0.85rem; flex-wrap:wrap;">
+                <span class="muted" style="font-weight:700;">Trier :</span>
+                <a href="parametres.php?msort=order#modules" class="btn <?= $moduleSort === 'order' ? 'btn-primary' : 'btn-light' ?>" style="padding:5px 12px;">↕ Ordre actuel</a>
+                <a href="parametres.php?msort=alpha#modules" class="btn <?= $moduleSort === 'alpha' ? 'btn-primary' : 'btn-light' ?>" style="padding:5px 12px;">🔤 A → Z</a>
+                <span class="muted" style="font-size:0.8rem;">(la hiérarchie est conservée : on trie les modules d'un même niveau)</span>
             </div>
             <table>
                 <thead>
@@ -555,6 +572,8 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <button type="submit" class="btn btn-primary">➕ Ajouter</button>
             </form>
 
+            <button type="button" id="phrasesToggle" class="btn btn-light" style="margin-bottom:4px;" onclick="famiTogglePhrases()">▸ Voir les phrases (<?= count($wPhrases) ?>)</button>
+            <div id="phrasesList" style="display:none; margin-top:10px;">
             <table>
                 <thead><tr><th>Phrase (modifiable)</th><th>Affichée</th><th>Suppr.</th></tr></thead>
                 <tbody>
@@ -597,6 +616,15 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     <?php if (empty($wPhrases)): ?><tr><td colspan="3" class="muted">Aucune phrase pour l'instant.</td></tr><?php endif; ?>
                 </tbody>
             </table>
+            </div>
+            <script>
+            function famiTogglePhrases() {
+                var w = document.getElementById('phrasesList'), b = document.getElementById('phrasesToggle');
+                var open = w.style.display !== 'none';
+                w.style.display = open ? 'none' : 'block';
+                b.textContent = (open ? '▸ Voir' : '▾ Masquer') + ' les phrases (<?= count($wPhrases) ?>)';
+            }
+            </script>
         </div>
 
         <!-- Révision quiz : synchronisation en direct -->
