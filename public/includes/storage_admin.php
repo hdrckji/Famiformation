@@ -209,6 +209,22 @@ if (!function_exists('renderStorageTab')) {
             if ($f['module'] && !empty($f['module']['contenu_by'])) { $ids[] = (int) $f['module']['contenu_by']; }
         }
         $names = storageUserNames($db, $ids);
+
+        // Arbre des modules -> fil d'Ariane complet pour l'emplacement (parent › enfant › …).
+        $tree = [];
+        try {
+            foreach ($db->query("SELECT id, nom, nom_nl, parent_id FROM modules")->fetchAll(PDO::FETCH_ASSOC) as $m) {
+                $tree[(int) $m['id']] = $m;
+            }
+        } catch (Exception $e) { /* table absente */ }
+        $storageCrumb = function ($id) use ($tree) {
+            $parts = []; $cur = (int) $id; $guard = 0;
+            while ($cur && isset($tree[$cur]) && $guard++ < 50) {
+                $parts[] = moduleNom($tree[$cur]);
+                $cur = (int) ($tree[$cur]['parent_id'] ?? 0);
+            }
+            return implode(' › ', array_reverse($parts));
+        };
         ?>
         <div class="card">
             <h2 style="margin-top:0; color:#2d5a37;">💾 Stockage — espace occupé</h2>
@@ -274,12 +290,21 @@ if (!function_exists('renderStorageTab')) {
                         <td>
                             <div style="font-weight:700; color:#244230; word-break:break-all;"><?= htmlspecialchars(basename($f['key'])) ?></div>
                             <div class="muted" style="font-size:0.8rem;">
-                                <?php if ($modName !== ''): ?>
-                                    📍 <?= htmlspecialchars($modName) ?>
-                                <?php else: ?>
-                                    <span style="color:#b06a00;">⚠ Orphelin · <?= htmlspecialchars(dirname($f['key'])) ?></span>
-                                <?php endif; ?>
+                                <span class="sa-loc" onclick="toggleLoc(this)" style="cursor:pointer; user-select:none;" title="Cliquer pour voir le chemin complet">
+                                    <?php if ($modName !== ''): ?>
+                                        📍 <?= htmlspecialchars($modName) ?>
+                                    <?php else: ?>
+                                        <span style="color:#b06a00;">⚠ Orphelin</span>
+                                    <?php endif; ?>
+                                    <span class="sa-loc-caret" style="opacity:.55;">▸</span>
+                                </span>
                                 <?php if ($isRaw): ?> · source en attente<?php endif; ?>
+                                <div class="sa-loc-full" style="display:none; margin-top:4px; padding-left:8px; border-left:2px solid #d9e3dc;">
+                                    <?php if ($modName !== ''): ?>
+                                        <div>📂 <?= htmlspecialchars($storageCrumb((int) $mod['id'])) ?></div>
+                                    <?php endif; ?>
+                                    <div style="word-break:break-all;">🗄 <?= htmlspecialchars($f['key']) ?></div>
+                                </div>
                             </div>
                         </td>
                         <td><?= $icon ?> <?= htmlspecialchars($typeLabel) ?></td>
@@ -363,6 +388,14 @@ if (!function_exists('renderStorageTab')) {
         function closePreviewMedia() {
             document.getElementById('previewMediaModal').classList.remove('open');
             document.getElementById('saPrevBody').innerHTML = '';
+        }
+        function toggleLoc(el) {
+            var full = el.parentNode.querySelector('.sa-loc-full');
+            var caret = el.querySelector('.sa-loc-caret');
+            if (!full) { return; }
+            var open = (full.style.display === 'none' || full.style.display === '');
+            full.style.display = open ? 'block' : 'none';
+            if (caret) { caret.textContent = open ? '▾' : '▸'; }
         }
         function filterMedia(type, btn) {
             document.querySelectorAll('.sa-filter').forEach(function (b) { b.classList.remove('btn-primary'); b.classList.add('btn-light'); });
