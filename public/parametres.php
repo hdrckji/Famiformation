@@ -63,6 +63,7 @@ require_once __DIR__ . '/includes/pdf_access.php';
 pdfAccessHandlePost($db);
 require_once __DIR__ . '/includes/storage_admin.php';
 storageHandlePost($db);
+require_once __DIR__ . '/includes/bulk.php';
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 // Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
@@ -354,13 +355,15 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <span class="type-badge type-content">📄 Élément <span class="tb-letter">C</span></span><span class="muted">affiche du <strong>contenu</strong> (PDF / vidéo)</span>
                 <span class="type-badge type-special">⚙️ Élément <span class="tb-letter">S</span></span><span class="muted">fonction <strong>spéciale</strong> (ex. Formation présentiel, Classement)</span>
             </div>
-            <table>
+            <?php bulkBar('module'); ?>
+            <table class="bulk-table" data-entity="module">
                 <thead>
-                    <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
+                    <tr><?php bulkAllTh(); ?><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($orderedModules as $m): $depth = (int) ($m['_depth'] ?? 0); $lk = !empty($m['is_locked']); $childCount = isset($byParent[(int) $m['id']]) ? count($byParent[(int) $m['id']]) : 0; $hasChildren = $childCount > 0; $hasLockedDesc = moduleHasLockedDescendant($byParent, (int) $m['id']); ?>
                     <tr data-id="<?= (int) $m['id'] ?>" data-parent="<?= (int) ($m['parent_id'] ?? 0) ?>"<?= $depth > 0 ? ' style="display:none;"' : '' ?>>
+                        <?php bulkCheck((int) $m['id']); ?>
                         <td><?= moduleIconHtml($m, '1.6rem') ?></td>
                         <td>
                             <div style="padding-left:<?= $depth * 18 ?>px;">
@@ -430,7 +433,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     </tr>
                     <?php endforeach; ?>
                     <?php if (empty($orderedModules)): ?>
-                    <tr><td colspan="8" class="muted" style="text-align:center;">Aucun module créé pour l'instant.</td></tr>
+                    <tr><td colspan="9" class="muted" style="text-align:center;">Aucun module créé pour l'instant.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -483,11 +486,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <button type="submit" class="btn btn-primary">➕ Ajouter le profil</button>
             </form>
 
-            <table>
-                <thead><tr><th>Profil</th><th>Clé technique</th><th>Utilisateurs</th><th>Verrou</th><th>Action</th></tr></thead>
+            <?php bulkBar('profile'); ?>
+            <table class="bulk-table" data-entity="profile">
+                <thead><tr><?php bulkAllTh(); ?><th>Profil</th><th>Clé technique</th><th>Utilisateurs</th><th>Verrou</th><th>Action</th></tr></thead>
                 <tbody>
                     <?php foreach ($profilsRows as $p): ?>
                     <tr>
+                        <?php bulkCheck((int) $p['id']); ?>
                         <td><?= htmlspecialchars($p['libelle']) ?><?= !empty($p['is_core']) ? ' <span class="pill on">base</span>' : '' ?></td>
                         <td class="muted"><?= htmlspecialchars($p['cle']) ?></td>
                         <td><?= (int) ($roleCounts[$p['cle']] ?? 0) ?></td>
@@ -512,7 +517,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         </td>
                     </tr>
                     <?php endforeach; ?>
-                    <?php if (empty($profilsRows)): ?><tr><td colspan="5" class="muted">Aucun profil.</td></tr><?php endif; ?>
+                    <?php if (empty($profilsRows)): ?><tr><td colspan="6" class="muted">Aucun profil.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -620,11 +625,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 
             <button type="button" id="phrasesToggle" class="btn btn-light" style="margin-bottom:4px;" onclick="famiTogglePhrases()">▸ Voir les phrases (<?= count($wPhrases) ?>)</button>
             <div id="phrasesList" style="display:none; margin-top:10px;">
-            <table>
-                <thead><tr><th>Phrase (modifiable)</th><th>Affichée</th><th>Suppr.</th></tr></thead>
+            <?php bulkBar('phrase'); ?>
+            <table class="bulk-table" data-entity="phrase">
+                <thead><tr><?php bulkAllTh(); ?><th>Phrase (modifiable)</th><th>Affichée</th><th>Suppr.</th></tr></thead>
                 <tbody>
                     <?php foreach ($wPhrases as $ph): ?>
                     <tr>
+                        <?php bulkCheck((int) $ph['id']); ?>
                         <td>
                             <form method="POST" action="widget_save.php" style="display:flex; gap:8px; align-items:center;">
                                 <?= csrfField() ?>
@@ -659,7 +666,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         </td>
                     </tr>
                     <?php endforeach; ?>
-                    <?php if (empty($wPhrases)): ?><tr><td colspan="3" class="muted">Aucune phrase pour l'instant.</td></tr><?php endif; ?>
+                    <?php if (empty($wPhrases)): ?><tr><td colspan="4" class="muted">Aucune phrase pour l'instant.</td></tr><?php endif; ?>
                 </tbody>
             </table>
             </div>
@@ -1041,6 +1048,8 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     </div>
 </div>
 <?php endforeach; ?>
+
+<?php bulkModalAndJs('parametres.php'); ?>
 
 <!-- Modale : confirmation par mot de passe admin (verrou / suppression d'un module verrouillé) -->
 <div id="pwdModal" class="modal-backdrop">
