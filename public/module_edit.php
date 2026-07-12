@@ -19,8 +19,18 @@ if (!$module) { header('Location: index.php'); exit(); }
 $canReview = $isAdmin || ((int) ($module['contenu_by'] ?? 0) === $uid && $uid > 0);
 if (!$canReview) { header('Location: module.php?id=' . $id); exit(); }
 
-$data = json_decode((string) ($module['contenu_ia'] ?? ''), true);
+// Langue éditée : FR (original) ou NL (version néerlandaise, pour corriger la traduction auto).
+$lang = (($_GET['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
+$srcCol = ($lang === 'nl') ? 'contenu_ia_nl' : 'contenu_ia';
+$data = json_decode((string) ($module[$srcCol] ?? ''), true);
 $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
+$nlFromFr = false;
+if (!$blocks && $lang === 'nl') {
+    // NL pas encore généré : on part de la version FR comme base à corriger.
+    $data = json_decode((string) ($module['contenu_ia'] ?? ''), true);
+    $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
+    $nlFromFr = true;
+}
 if (!$blocks) { header('Location: module_review.php?id=' . $id); exit(); }
 
 $images = (array) json_decode((string) ($module['contenu_images'] ?? '[]'), true);
@@ -132,7 +142,11 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
 <body>
     <div class="topbar">
         <a href="module.php?id=<?= (int) $id ?>" class="btn btn-back">⬅ Quitter</a>
-        <strong style="color:#1E4D2B;">✍️ Relecture — édite directement sur la page</strong>
+        <strong style="color:#1E4D2B;">✍️ Relecture <?= $lang === 'nl' ? '<span style="color:#b06a00;">— version néerlandaise</span>' : '' ?></strong>
+        <div style="display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden;">
+            <a href="module_edit.php?id=<?= (int) $id ?>&lang=fr" class="btn" style="border-radius:0; <?= $lang === 'fr' ? 'background:#1E4D2B; color:#fff;' : 'background:#fff; color:#1E4D2B;' ?>">🇫🇷 FR</a>
+            <a href="module_edit.php?id=<?= (int) $id ?>&lang=nl" class="btn" style="border-radius:0; <?= $lang === 'nl' ? 'background:#1E4D2B; color:#fff;' : 'background:#fff; color:#1E4D2B;' ?>">🇳🇱 NL</a>
+        </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <?php if ($pdfUrl !== ''): ?><button type="button" class="btn btn-pdf" onclick="document.getElementById('pdfp').classList.toggle('open')">📄 PDF original</button><?php endif; ?>
             <button type="button" id="editToggle" class="btn" style="background:#fff3d6; color:#8a5a00; border:1px solid #f0d089;" onclick="veSetEdit(!window._veEditing)">✏️ Modifier</button>
@@ -141,6 +155,12 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     </div>
 
     <div class="intro"><b>Clique sur « ✏️ Modifier »</b> pour éditer. Ensuite : clique un texte pour le corriger, sélectionne des mots pour les mettre en <b>gras</b> ou en <b style="color:#c0392b;">couleur</b>, ajoute des blocs en bas, déplace/supprime‑les. Puis <b>Valider</b>.</div>
+    <?php if ($lang === 'nl'): ?>
+    <div class="intro" style="background:#fff3e0; border:1px solid #f0d089; color:#8a5a00;">
+        🇳🇱 <b>Version néerlandaise.</b> Tu corriges ici la traduction. <?php if ($nlFromFr): ?><b>Elle n'était pas encore générée : tu pars du texte français comme base.</b> <?php endif; ?>
+        ⚠️ Si tu modifies ensuite le <b>français</b>, cette version NL sera <b>régénérée automatiquement</b> et tes corrections d'ici seront remplacées (le français fait autorité).
+    </div>
+    <?php endif; ?>
     <div class="ve-format" id="veFormat">
         <button type="button" onclick="veBold()" title="Gras (sélectionne des mots)"><b>G</b></button>
         <span class="sep"></span>
@@ -279,6 +299,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
         <?= csrfField() ?>
         <input type="hidden" name="action" value="save_review">
         <input type="hidden" name="id" value="<?= (int) $id ?>">
+        <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
         <input type="hidden" name="blocks_json" id="veJson" value="">
     </form>
 

@@ -29,10 +29,40 @@ $imgBase = rtrim((defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_review') {
     requireValidCSRF();
 
+    $lang = (($_POST['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
+
     // --- Mode visuel : les blocs arrivent en JSON (édition directement sur la page) ---
     if (isset($_POST['blocks_json'])) {
         $arr = json_decode((string) $_POST['blocks_json'], true);
         $blocksIn = (is_array($arr) && isset($arr['blocks']) && is_array($arr['blocks'])) ? $arr['blocks'] : (is_array($arr) ? $arr : []);
+
+        // Édition MANUELLE de la version néerlandaise : on n'écrit QUE le NL.
+        // Pas de rotation (images partagées avec le FR), pas de retraduction (le FR reste maître).
+        if ($lang === 'nl') {
+            foreach ($blocksIn as &$bln) { if (is_array($bln) && ($bln['type'] ?? '') === 'image') { $bln['rotate'] = 0; } }
+            unset($bln);
+            $cleanNl = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
+            // On marque le NL « à jour » avec le FR actuel : la resynchro auto ne l'écrasera pas
+            // tant que le FR ne change pas. On ne le fait QUE si le quiz NL n'est pas en attente,
+            // pour ne jamais bloquer une future traduction du quiz.
+            $frHash = hash('sha256',
+                trim((string) ($module['nom'] ?? '')) . '|' .
+                trim((string) ($module['description'] ?? '')) . '|' .
+                (string) ($module['contenu_ia'] ?? '') . '|' .
+                (string) ($module['quiz_json'] ?? ''));
+            $quizNlReady = trim((string) ($module['quiz_json'] ?? '')) === '' || trim((string) ($module['quiz_json_nl'] ?? '')) !== '';
+            if ($quizNlReady) {
+                $db->prepare("UPDATE modules SET contenu_ia_nl = ?, nl_hash = ? WHERE id = ?")
+                   ->execute([json_encode(['blocks' => $cleanNl], JSON_UNESCAPED_UNICODE), $frHash, $id]);
+            } else {
+                $db->prepare("UPDATE modules SET contenu_ia_nl = ? WHERE id = ?")
+                   ->execute([json_encode(['blocks' => $cleanNl], JSON_UNESCAPED_UNICODE), $id]);
+            }
+            $_SESSION['module_flash'] = "✅ Version néerlandaise corrigée et enregistrée.";
+            header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id . '&lang=nl' : 'module.php?id=' . $id));
+            exit();
+        }
+
         foreach ($blocksIn as &$bl) {
             if (is_array($bl) && ($bl['type'] ?? '') === 'image' && !empty($bl['rotate']) && function_exists('aiRotateImageFile')) {
                 $src = trim((string) ($bl['src'] ?? ''));
