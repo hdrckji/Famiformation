@@ -84,10 +84,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         }
         unset($bl);
         $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
+        $frJson = json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE);
+
+        // PASSAGE 2 — re-vérification orthographe du FR (forme uniquement) APRÈS tes
+        // corrections manuelles. Silencieux et sans risque : en cas d'échec, on garde ton texte.
+        $proofed = false;
+        if (function_exists('nlProofreadBlocksJson')) {
+            $pr = nlProofreadBlocksJson($db, $frJson);
+            if ($pr['ok'] && trim((string) $pr['json']) !== '') {
+                $frJson = $pr['json'];
+                $proofed = true;
+            }
+        }
+
         $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")
-           ->execute([json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE), $id]);
-        spawnNlSync($id); // le FR a changé → on régénère le NL en tâche de fond
-        $_SESSION['module_flash'] = "✅ Contenu relu et enregistré. 🌐 La version néerlandaise se met à jour.";
+           ->execute([$frJson, $id]);
+        spawnNlSync($id); // le FR (corrigé) a changé → on régénère le NL en tâche de fond
+        $_SESSION['module_flash'] = ($proofed ? "✅ Contenu relu, orthographe vérifiée et enregistré." : "✅ Contenu relu et enregistré.") . " 🌐 La version néerlandaise se met à jour.";
         header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
         exit();
     }

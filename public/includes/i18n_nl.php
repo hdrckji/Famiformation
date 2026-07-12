@@ -243,10 +243,14 @@ if (!function_exists('nlTranslateBlocksJson')) {
     /** Guide (JSON de blocs) FR → NL, structure préservée. @return array ['ok','json','error'] */
     function nlTranslateBlocksJson($db, $blocksJson)
     {
-        $blocks = json_decode((string) $blocksJson, true);
-        if (!is_array($blocks) || empty($blocks)) {
+        $decoded = json_decode((string) $blocksJson, true);
+        if (!is_array($decoded) || empty($decoded)) {
             return ['ok' => false, 'json' => '', 'error' => 'Contenu vide ou invalide'];
         }
+        // Le guide est stocké enveloppé : {"blocks":[...]}. On travaille sur le tableau
+        // de blocs et on ré-enveloppe à la sortie (sinon on n'extrait aucun texte).
+        $wrapped = isset($decoded['blocks']) && is_array($decoded['blocks']);
+        $blocks = $wrapped ? $decoded['blocks'] : $decoded;
 
         // 1) Extraction (ordre déterministe)
         $src = [];
@@ -276,7 +280,130 @@ if (!function_exists('nlTranslateBlocksJson')) {
 
         return [
             'ok' => true,
-            'json' => json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'json' => json_encode($wrapped ? ['blocks' => $blocks] : $blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'error' => '',
+        ];
+    }
+}
+
+if (!function_exists('aiProofreadStringsFr')) {
+    /**
+     * PASSAGE 2 — corrige l'ORTHOGRAPHE d'un tableau de chaînes FR (forme uniquement).
+     * Ne reformule rien, ne change aucun mot correct, ne touche ni au sens ni au style.
+     * Même mécanisme sûr que la traduction (même longueur, même ordre, refus si écart).
+     * @return array ['ok','items','error']
+     */
+    function aiProofreadStringsFr($db, array $strings)
+    {
+        if (empty($strings)) {
+            return ['ok' => true, 'items' => [], 'error' => ''];
+        }
+        $apiKey = getenv('ANTHROPIC_API_KEY');
+        if (!$apiKey && isset($_SERVER['ANTHROPIC_API_KEY'])) {
+            $apiKey = $_SERVER['ANTHROPIC_API_KEY'];
+        }
+        if (!$apiKey) {
+            return ['ok' => false, 'items' => [], 'error' => 'Clé ANTHROPIC_API_KEY absente'];
+        }
+        $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
+
+        $system = "Tu es correcteur orthographique professionnel en français.\n"
+            . "Tu reçois un TABLEAU JSON de chaînes en français.\n"
+            . "Règles STRICTES :\n"
+            . "- Renvoie UNIQUEMENT un tableau JSON de MÊME LONGUEUR et dans le MÊME ORDRE.\n"
+            . "- Corrige SEULEMENT l'orthographe, les accents, la conjugaison, les accords et la ponctuation évidente.\n"
+            . "- Ne REFORMULE rien. Ne change AUCUN mot déjà correct. Ne modifie NI le sens NI le style.\n"
+            . "- Si une chaîne n'a aucune faute, renvoie-la STRICTEMENT à l'identique.\n"
+            . "- Conserve la mise en forme markdown **gras** et les retours à la ligne.\n"
+            . "- Ne touche pas aux noms propres (Famiflora, Famiformation) ni aux nombres/unités.\n"
+            . "- Aucun texte autour du JSON.";
+
+        $out = [];
+        foreach (array_chunk($strings, 100) as $chunk) {
+            $payload = [
+                'model' => $model,
+                'max_tokens' => 16000,
+                'system' => $system,
+                'messages' => [[
+                    'role' => 'user',
+                    'content' => json_encode(array_values($chunk), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]],
+            ];
+            $ch = curl_init('https://api.anthropic.com/v1/messages');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'content-type: application/json',
+                    'x-api-key: ' . $apiKey,
+                    'anthropic-version: 2023-06-01',
+                ],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_TIMEOUT => 240,
+            ]);
+            $resp = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $cErr = curl_error($ch);
+            curl_close($ch);
+
+            if ($resp === false) {
+                return ['ok' => false, 'items' => [], 'error' => 'Connexion API : ' . $cErr];
+            }
+            $data = json_decode($resp, true);
+            if ($code !== 200 || !is_array($data)) {
+                $msg = is_array($data) && isset($data['error']['message']) ? $data['error']['message'] : ('HTTP ' . $code);
+                return ['ok' => false, 'items' => [], 'error' => $msg];
+            }
+            $text = '';
+            foreach (($data['content'] ?? []) as $blk) {
+                if (($blk['type'] ?? '') === 'text') { $text .= $blk['text']; }
+            }
+            $s = strpos($text, '[');
+            $e = strrpos($text, ']');
+            if ($s === false || $e === false || $e < $s) {
+                return ['ok' => false, 'items' => [], 'error' => 'Réponse non-JSON'];
+            }
+            $arr = json_decode(substr($text, $s, $e - $s + 1), true);
+            if (!is_array($arr) || count($arr) !== count($chunk)) {
+                return ['ok' => false, 'items' => [], 'error' => 'Correction incomplète (nombre d\'éléments différent)'];
+            }
+            foreach ($arr as $v) {
+                $out[] = (string) $v;
+            }
+        }
+        return ['ok' => true, 'items' => $out, 'error' => ''];
+    }
+}
+
+if (!function_exists('nlProofreadBlocksJson')) {
+    /** Guide (JSON de blocs) : corrige l'orthographe FR, structure préservée. @return ['ok','json','error'] */
+    function nlProofreadBlocksJson($db, $blocksJson)
+    {
+        $decoded = json_decode((string) $blocksJson, true);
+        if (!is_array($decoded) || empty($decoded)) {
+            return ['ok' => false, 'json' => '', 'error' => 'Contenu vide ou invalide'];
+        }
+        $wrapped = isset($decoded['blocks']) && is_array($decoded['blocks']);
+        $blocks = $wrapped ? $decoded['blocks'] : $decoded;
+        $src = [];
+        $copy = $blocks;
+        nlWalkBlocks($copy, function (&$s) use (&$src) { $src[] = (string) $s; });
+        if (empty($src)) {
+            return ['ok' => false, 'json' => '', 'error' => 'Aucun texte à corriger'];
+        }
+        $pr = aiProofreadStringsFr($db, $src);
+        if (!$pr['ok']) {
+            return ['ok' => false, 'json' => '', 'error' => $pr['error']];
+        }
+        $i = 0;
+        $items = $pr['items'];
+        nlWalkBlocks($blocks, function (&$s) use (&$i, $items) {
+            if (array_key_exists($i, $items)) { $s = $items[$i]; }
+            $i++;
+        });
+        return [
+            'ok' => true,
+            'json' => json_encode($wrapped ? ['blocks' => $blocks] : $blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'error' => '',
         ];
     }
