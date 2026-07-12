@@ -223,7 +223,7 @@ if (!function_exists('renderStorageTab')) {
             <table>
                 <thead>
                     <tr>
-                        <th style="text-align:left;">Fichier / module</th>
+                        <th style="text-align:left;">Fichier / emplacement</th>
                         <th style="text-align:left;">Type</th>
                         <th style="text-align:right;">Taille</th>
                         <th style="text-align:left;">Ajouté le</th>
@@ -246,13 +246,15 @@ if (!function_exists('renderStorageTab')) {
                     ?>
                     <tr>
                         <td>
-                            <?php if ($modName !== ''): ?>
-                                <strong style="color:#2d5a37;"><?= htmlspecialchars($modName) ?></strong>
-                            <?php else: ?>
-                                <span style="color:#b06a00; font-weight:700;">⚠ Orphelin</span>
-                            <?php endif; ?>
-                            <?php if ($isRaw): ?><span class="muted" style="font-size:0.78rem;"> · source en attente</span><?php endif; ?>
-                            <div class="muted" style="font-size:0.76rem; word-break:break-all;"><?= htmlspecialchars(basename($f['key'])) ?></div>
+                            <div style="font-weight:700; color:#244230; word-break:break-all;"><?= htmlspecialchars(basename($f['key'])) ?></div>
+                            <div class="muted" style="font-size:0.8rem;">
+                                <?php if ($modName !== ''): ?>
+                                    📍 <?= htmlspecialchars($modName) ?>
+                                <?php else: ?>
+                                    <span style="color:#b06a00;">⚠ Orphelin · <?= htmlspecialchars(dirname($f['key'])) ?></span>
+                                <?php endif; ?>
+                                <?php if ($isRaw): ?> · source en attente<?php endif; ?>
+                            </div>
                         </td>
                         <td><?= $icon ?> <?= $f['type'] === 'video' ? 'Vidéo' : 'Document' ?></td>
                         <td style="text-align:right; white-space:nowrap;"><?= htmlspecialchars(storageHumanSize($f['size'])) ?></td>

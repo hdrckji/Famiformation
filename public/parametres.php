@@ -322,7 +322,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <button class="tab-btn" onclick="showTab('histprofil', this)">Gestion des profils</button>
         <button class="tab-btn" onclick="showTab('histagence', this)">Gestion des agences</button>
         <button class="tab-btn" onclick="showTab('widget', this)">Widget</button>
-        <button class="tab-btn" onclick="showTab('contenu', this)">Contenu</button>
+        <button class="tab-btn" onclick="showTab('contenu', this)">Stockage</button>
         <button class="tab-btn" onclick="showTab('prefs', this)">Préférences</button>
     </div>
 
