@@ -542,6 +542,16 @@ if (!function_exists('ensureModulesTable')) {
                 $db->exec("UPDATE modules SET link = 'garden.php'      WHERE nom = 'Garden'");
                 $setFlag('restore_functional_links_v1');
             }
+
+            // 20) CORRECTIF ORDRE : les modules RACINE créés à la main AVANT le fix de
+            //     création avaient sort_order = 0 → ils remontaient tout en haut de la
+            //     gestion, alors que sur l'accueil ils sont en fin (boucle dynamique).
+            //     On les repousse à la fin (900 + id = ordre de création). SÛR : aucun
+            //     module racine « de base » n'a sort_order = 0 (ils sont à 1..900).
+            if (!$hasFlag('fix_root_zero_sort_v1')) {
+                $db->exec("UPDATE modules SET sort_order = 900 + id WHERE parent_id IS NULL AND sort_order = 0");
+                $setFlag('fix_root_zero_sort_v1');
+            }
         } catch (Exception $e) {
             // migration non critique : on ignore
         }
