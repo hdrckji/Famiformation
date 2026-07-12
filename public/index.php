@@ -5,6 +5,7 @@ require_once 'includes/quizz_status.php';
 require_once 'includes/modules.php';
 require_once 'includes/widget.php';
 require_once 'includes/theme.php';
+require_once 'includes/events.php';
 
 $role = currentDisplayRole(); // rôle d'AFFICHAGE (tient compte de l'aperçu admin), pas le rôle réel
 if ($role === 'agence_interim') {
@@ -399,6 +400,7 @@ if (!empty($siteTheme) && is_array($siteTheme)) {
 
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
+                <a href="events.php" class="btn-param" title="<?= t('Notifications', 'Meldingen') ?>" style="position:relative;">🔔<?php $pc = $isAdmin ? eventsPendingCount($db) : 0; if ($pc > 0): ?><span style="position:absolute; top:-6px; right:-6px; background:#c0392b; color:#fff; border-radius:999px; font-size:0.7rem; font-weight:800; padding:1px 6px; line-height:1.4;"><?= (int) $pc ?></span><?php endif; ?></a>
                 <a href="parametres.php" class="btn-param" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                 <a href="logout.php" class="btn-logout" onclick="return confirm('<?= t('Êtes-vous sûr de vouloir vous déconnecter ?', 'Weet je zeker dat je je wilt afmelden?') ?>');"><?= t('Déconnexion', 'Afmelden') ?></a>
             </div>

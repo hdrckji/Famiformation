@@ -186,6 +186,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $nextSort,
             ]);
             $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé.";
+
+            // Contributeur : le module reste EN ATTENTE (caché) jusqu'à validation admin.
+            if (!$isAdminActor) {
+                require_once __DIR__ . '/includes/events.php';
+                eventsEnsureTables($db);
+                $newId = (int) $db->lastInsertId();
+                $uid = ((int) ($_SESSION['user_id'] ?? 0)) ?: null;
+                try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id = ?")->execute([$newId]); } catch (Exception $e) {}
+                try { $db->prepare("UPDATE modules SET contenu_by = ? WHERE id = ?")->execute([$uid, $newId]); } catch (Exception $e) {}
+                logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $newId, 'Nouveau module proposé : ' . $nom);
+                $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé — en attente de validation par un admin.";
+            }
         }
 
         if ($parentId) {
@@ -399,6 +411,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($startTranscode && $vidChildId) {
                     spawnVideoTranscode($videoSrc, $vidChildId);
                     $structMsg .= " La vidéo est en préparation (compression automatique).";
+                }
+                // Contributeur : le contenu déposé reste EN ATTENTE (caché) jusqu'à validation admin.
+                if (!$isAdminActor) {
+                    require_once __DIR__ . '/includes/events.php';
+                    eventsEnsureTables($db);
+                    $subIds = array_values(array_filter([(int) $guideChildId, (int) $vidChildId]));
+                    if ($subIds) {
+                        $ph = implode(',', array_fill(0, count($subIds), '?'));
+                        try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id IN ($ph)")->execute($subIds); } catch (Exception $e) {}
+                    }
+                    logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu déposé, en attente de validation.');
+                    $structMsg .= " En attente de validation par un admin.";
                 }
                 $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;
