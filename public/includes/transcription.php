@@ -17,7 +17,7 @@
 //    une API. MAIS tout est derrière une ABSTRACTION (famiSttProvider / famiSttRun)
 //    et une variable d'env → basculer vers un Whisper LOCAL plus tard ne demandera
 //    que d'ajouter un cas dans famiSttRun(). Rien d'autre à toucher.
-//      FAMI_STT_PROVIDER = openai (défaut) | groq | local (à venir)
+//      FAMI_STT_PROVIDER = groq (défaut, le moins cher) | openai | local (à venir)
 //      OPENAI_API_KEY / GROQ_API_KEY
 //    Anthropic ne fait pas de speech-to-text : utiliser Whisper ici est normal,
 //    le reste du projet reste sur Claude.
@@ -51,7 +51,13 @@ if (!function_exists('famiSttProvider')) {
             $p = $_SERVER['FAMI_STT_PROVIDER'];
         }
         $p = strtolower(trim((string) $p));
-        return in_array($p, ['openai', 'groq', 'local'], true) ? $p : 'openai';
+        if (in_array($p, ['openai', 'groq', 'local'], true)) { return $p; }
+        // Défaut : Groq (même modèle Whisper, nettement moins cher qu'OpenAI).
+        // Repli automatique sur OpenAI si SEULE la clé OpenAI est configurée (pas de piège).
+        $hasGroq = getenv('GROQ_API_KEY') || isset($_SERVER['GROQ_API_KEY']);
+        $hasOpenai = getenv('OPENAI_API_KEY') || isset($_SERVER['OPENAI_API_KEY']);
+        if (!$hasGroq && $hasOpenai) { return 'openai'; }
+        return 'groq';
     }
 }
 
