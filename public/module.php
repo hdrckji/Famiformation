@@ -28,6 +28,20 @@ if (!empty($_SESSION['module_flash'])) {
 
 $isContainer = !empty($module['is_container']);
 $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
+
+// Structure « contenu » : ce module est-il un sous-module écrit/vidéo, ou un conteneur qui en regroupe ?
+$isContentChild = in_array((string) ($module['content_kind'] ?? ''), ['ecrit', 'video'], true);
+$hasContentChildren = false;
+foreach ($children as $__c) {
+    if (in_array((string) ($__c['content_kind'] ?? ''), ['ecrit', 'video'], true)) { $hasContentChildren = true; break; }
+}
+// Le formulaire « Ajout de contenu » : sur un élément vierge OU un conteneur-contenu (pour compléter), jamais sur un sous-module enfant.
+$showContentForm = empty($module['is_booking']) && !$isContentChild && (empty($isContainer) || $hasContentChildren);
+
+// Page vidéo dédiée (gabarit Famiformation) : module non-conteneur avec vidéo et sans PDF.
+$mVideoStatus = (string) ($module['video_status'] ?? '');
+$mHasVideoAny = !empty($module['video_path']) || $mVideoStatus === 'processing' || $mVideoStatus === 'failed';
+$isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny && empty($module['pdf_path']);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -112,7 +126,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             </div>
         <?php endif; ?>
     </div>
-    <?php if (empty($uniHasContent)): ?>
+    <?php if (empty($uniHasContent) && empty($isVideoPage)): ?>
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main"><br>
         <h1><?= moduleIconHtml($module, '1.6rem') ?> <?= htmlspecialchars(moduleNom($module)) ?></h1>
@@ -162,7 +176,10 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
     <?php else: ?>
         <?php $isUni = !empty($module['uniformized']); ?>
         <?php $vStatus = (string) ($module['video_status'] ?? ''); ?>
-        <?php if ($vStatus === 'processing'): ?>
+        <?php if ($isVideoPage): ?>
+            <?php require_once __DIR__ . '/includes/video_view.php'; ?>
+            <?php renderVideoPage($module, $isAdmin); ?>
+        <?php elseif ($vStatus === 'processing'): ?>
             <div class="content-card" style="text-align:center;">
                 <div style="font-size:2.4rem;">🎬</div>
                 <div style="font-weight:800; color:#2d5a37; font-size:1.15rem; margin-top:6px;"><?= t('Vidéo en cours de préparation…', 'Video wordt voorbereid…') ?></div>
@@ -214,6 +231,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
         <?php endif; ?>
         <?php if (!$isContainer && !empty($module['a_evaluer']) && !empty($module['quiz_json'])): ?>
+            <div id="famiformation-quiz"></div>
             <?php require_once __DIR__ . '/includes/quiz_view.php'; ?>
             <?php renderQuizForm(json_decode((string) $module['quiz_json'], true), (int) $module['id']); ?>
         <?php endif; ?>
@@ -266,12 +284,12 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
         </div>
         <?php endif; ?>
 
-        <?php if (!$isContainer && empty($module['is_booking'])): ?>
-        <!-- Gestion du contenu : les deux blocs PDF / Vidéo sont affichés DIRECTEMENT
-             (plus de bouton « Ajouter du contenu »). Cliquer sur un bloc dépose le fichier. -->
+        <?php if ($showContentForm): ?>
+        <!-- Ajout de contenu : les deux blocs « Le guide » / Vidéo sont affichés DIRECTEMENT.
+             Cliquer sur un bloc dépose le fichier ; à la validation, les sous-modules apparaissent. -->
         <div class="content-card" style="max-width:900px; text-align:left;">
-            <h3 style="margin-top:0; color:#2d5a37;">📎 Contenu du module</h3>
-            <p style="color:#666; margin:-6px 0 12px;">Cliquez sur un bloc pour déposer votre fichier (PDF et/ou vidéo).</p>
+            <h3 style="margin-top:0; color:#2d5a37;">📎 Ajout de contenu</h3>
+            <p style="color:#666; margin:-6px 0 12px;">Cliquez sur un bloc pour déposer votre fichier. À la validation : « Le guide » pour le document, « Vidéo » pour la vidéo.</p>
             <form id="contentForm" method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return validateContent(event);">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="content">
@@ -290,13 +308,13 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                         <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
                             <input type="file" name="pdf_file" accept="application/pdf" class="dz-input">
                             <div class="dz-icon">📄</div>
-                            <div class="dz-title">PDF</div>
-                            <div class="dz-hint">Glissez votre PDF ici ou cliquez pour parcourir</div>
+                            <div class="dz-title">Le guide</div>
+                            <div class="dz-hint">Glissez votre document ici ou cliquez pour parcourir</div>
                             <div class="dz-file" hidden></div>
                         </div>
                         <?php if (!empty($module['pdf_path'])): ?>
                             <div class="dz-existing">
-                                <a href="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>" download>⬇ Télécharger le PDF actuel</a>
+                                <a href="<?= htmlspecialchars(moduleFileUrl($module['pdf_path'])) ?>" download>⬇ Télécharger le document actuel</a>
                                 <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_pdf" value="1"> Supprimer</label>
                             </div>
                         <?php endif; ?>
@@ -324,7 +342,7 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
                     📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz de 75 questions sera généré pour l'évaluer)</small>
                 </label>
 
-                <p style="font-size:0.82rem; color:#777; margin-top:14px;">« Valider et uniformiser » : l'IA lit le PDF et met en forme le contenu (au lieu du lecteur PDF brut).</p>
+                <p style="font-size:0.82rem; color:#777; margin-top:14px;">« Valider et uniformiser » : l'IA lit le document et construit la belle page « Le guide » (au lieu de l'afficher brut).</p>
                 <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
                     <button type="submit" name="uniformize" value="0" class="btn" style="background:#e9ecef; color:#333;">Valider</button>
                     <button type="submit" name="uniformize" value="1" class="btn btn-create">Valider et uniformiser</button>

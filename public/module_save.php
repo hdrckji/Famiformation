@@ -256,7 +256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $uniformized = (($_POST['uniformize'] ?? '0') === '1') ? 1 : 0;
                 $aEvaluer = !empty($_POST['a_evaluer']) ? 1 : 0;
                 $contenuIa = $module['contenu_ia'] ?? null;
-                $flashMsg = "✅ Contenu du module mis à jour.";
+                $flashMsg = "";
 
                 // S'assurer que la colonne du contenu généré par l'IA existe.
                 try {
@@ -305,29 +305,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $hasPdf = ($pdfPath !== null && $pdfPath !== '');
 
-                if ($hasPdf && $hasVideo) {
-                    // --- PDF + vidéo : découpe en 2 sous-modules (écrit + vidéo) ---
-                    try {
-                        if (!$db->query("SHOW COLUMNS FROM modules LIKE 'content_kind'")->fetch()) {
-                            $db->exec("ALTER TABLE modules ADD COLUMN content_kind VARCHAR(16) NULL");
-                        }
-                    } catch (Exception $e) { /* migration non bloquante */ }
+                // --- Structuration systematique en sous-modules ---
+                // PDF -> sous-module Le guide (contenu ecrit) ; video -> sous-module Video.
+                // Le module courant devient le conteneur qui regroupe ce(s) sous-module(s).
+                try {
+                    if (!$db->query("SHOW COLUMNS FROM modules LIKE 'content_kind'")->fetch()) {
+                        $db->exec("ALTER TABLE modules ADD COLUMN content_kind VARCHAR(16) NULL");
+                    }
+                } catch (Exception $e) { /* migration non bloquante */ }
 
-                    $roles = (string) ($module['roles'] ?? '');
+                $childRoles = (string) ($module['roles'] ?? '');
+                $madeGuide = false;
+                $madeVideo = false;
+                $vidChildId = 0;
 
-                    // Sous-module CONTENU ÉCRIT (PDF)
-                    $ecrit = null;
-                    try { $ecrit = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
-                    if ($ecrit) {
+                // Sous-module Le guide (contenu ecrit issu du document)
+                if ($hasPdf) {
+                    $guide = null;
+                    try { $guide = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+                    if ($guide) {
                         $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ?, quiz_json = ? WHERE id = ?")
-                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, (int) $ecrit['id']]);
+                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, (int) $guide['id']]);
                     } else {
                         $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, contenu_images, quiz_json, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, ?, ?, 'ecrit')")
-                           ->execute(['Contenu écrit', 'Geschreven inhoud', (int) $id, $roles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson]);
+                           ->execute(['Le guide', 'De gids', (int) $id, $childRoles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson]);
                     }
+                    $madeGuide = true;
+                }
 
-                    // Sous-module VIDÉO (pipeline de compression 720p en tâche de fond)
-                    $vidChildId = 0;
+                // Sous-module Video (compression 720p en tache de fond)
+                if ($hasVideo) {
                     $vid = null;
                     try { $vid = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'video' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
                     if ($vid) {
@@ -336,33 +343,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                            ->execute([$videoPath, $videoStatus, $videoSrc, $vidChildId]);
                     } else {
                         $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, video_path, video_status, video_src_path, content_kind) VALUES (?, ?, 0, ?, '🎬', ?, 1, ?, ?, ?, 'video')")
-                           ->execute(['Vidéo', 'Video', (int) $id, $roles, $videoPath, $videoStatus, $videoSrc]);
+                           ->execute(['Vidéo', 'Video', (int) $id, $childRoles, $videoPath, $videoStatus, $videoSrc]);
                         $vidChildId = (int) $db->lastInsertId();
                     }
-
-                    // Le module parent devient un conteneur (plus de contenu propre).
-                    $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE id = ?")->execute([$id]);
-
-                    $splitMsg = "✅ 2 sous-modules créés : « Contenu écrit » + « Vidéo ».";
-                    if ($uniformized) { $splitMsg .= " Écrit uniformisé par l'IA."; }
-                    if ($startTranscode && $vidChildId) {
-                        spawnVideoTranscode($videoSrc, $vidChildId);
-                        $splitMsg .= " Vidéo en cours de préparation (compression automatique).";
-                    }
-                    $_SESSION['module_flash'] = $splitMsg;
-                    $redirectTo = 'module.php?id=' . $id;
-                } else {
-                    // Un seul fichier : contenu IA + pipeline vidéo (compression 720p en tâche de fond).
-                    $db->prepare("UPDATE modules SET pdf_path = ?, video_path = ?, video_status = ?, video_src_path = ?, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ?, quiz_json = ? WHERE id = ?")
-                       ->execute([$pdfPath, $videoPath, $videoStatus, $videoSrc, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, $id]);
-
-                    if ($startTranscode) {
-                        spawnVideoTranscode($videoSrc, $id);
-                        $flashMsg .= " La vidéo est en cours de préparation (compression automatique) — elle apparaîtra dans une minute ou deux.";
-                    }
-                    $_SESSION['module_flash'] = $flashMsg;
-                    $redirectTo = 'module.php?id=' . $id;
+                    $madeVideo = true;
                 }
+
+                // Le module parent devient un conteneur (il ne porte plus de contenu propre).
+                $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = 0, a_evaluer = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE id = ?")->execute([$id]);
+
+                $structMsg = ($madeGuide && $madeVideo)
+                    ? "✅ 2 sous-modules : « Le guide » + « Vidéo »."
+                    : ("✅ Sous-module « " . ($madeGuide ? 'Le guide' : 'Vidéo') . " » ajouté.");
+                if ($uniformized && $madeGuide) { $structMsg .= " Le guide a été mis en forme par l'IA."; }
+                if ($startTranscode && $vidChildId) {
+                    spawnVideoTranscode($videoSrc, $vidChildId);
+                    $structMsg .= " La vidéo est en préparation (compression automatique).";
+                }
+                $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
+                $redirectTo = 'module.php?id=' . $id;
             }
         }
     } elseif ($action === 'toggle_lock') {

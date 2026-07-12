@@ -128,7 +128,7 @@ if (!function_exists('_uniCoverHtml')) {
             . '</svg>';
 
         return '<header class="cover">' . $flora . '<div class="cover__inner">'
-            . '<p class="cover__brand">Famiflora Académie</p>'
+            . '<p class="cover__brand">Famiformation</p>'
             . '<h1 class="cover__title">' . $title . '</h1>' . $sub . $meta
             . '<button type="button" class="cover__cta" onclick="uniGoto(1)">Commencer la formation <span class="arrow" aria-hidden="true">→</span></button>'
             . '</div><a class="cover__scrollhint" href="#uni-toc">Au programme</a></header>'
