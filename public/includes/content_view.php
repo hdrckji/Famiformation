@@ -76,8 +76,9 @@ if (!function_exists('_dBlockHtml')) {
                 $n = (int) $b['n'] - 1;
                 if ($n >= 0 && $n < count($ctx['images']) && empty($ctx['used'][$n])) {
                     $ctx['used'][$n] = true;
+                    $size = in_array(($b['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $b['size'] : 'm';
                     $cap = ($b['caption'] ?? '') !== '' ? '<figcaption class="image__caption">' . htmlspecialchars((string) $b['caption']) . '</figcaption>' : '';
-                    return '<figure class="image"><img class="image__real" src="' . htmlspecialchars(_uniImgUrl($ctx['images'][$n])) . '" alt="" loading="lazy">' . $cap . '</figure>';
+                    return '<figure class="image image--' . $size . '"><img class="image__real" src="' . htmlspecialchars(_uniImgUrl($ctx['images'][$n])) . '" alt="" loading="lazy">' . $cap . '</figure>';
                 }
                 return '';
             case 'quote':
@@ -274,7 +275,10 @@ if (!function_exists('renderUniformContent')) {
         .fami-doc .keyfigure__number{ display:block; font-family:var(--font-display); font-weight:800; font-size:clamp(1.9rem,4.5vw,2.5rem); letter-spacing:-.03em; line-height:1.1; color:var(--forest); }
         .fami-doc .keyfigure__label{ display:block; font-family:var(--font-label); font-size:.74rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-top:8px; }
         .fami-doc .image{ margin:30px 0 34px; text-align:center; }
-        .fami-doc .image__real{ max-width:min(100%,560px); max-height:460px; width:auto; height:auto; display:inline-block; border-radius:var(--radius); box-shadow:var(--shadow); object-fit:contain; }
+        .fami-doc .image__real{ max-width:min(100%,420px); max-height:400px; width:auto; height:auto; display:inline-block; border-radius:var(--radius); box-shadow:var(--shadow); object-fit:contain; }
+        .fami-doc .image--s .image__real{ max-width:min(100%,280px); max-height:300px; }
+        .fami-doc .image--m .image__real{ max-width:min(100%,420px); max-height:400px; }
+        .fami-doc .image--l .image__real{ max-width:min(100%,560px); max-height:480px; }
         .fami-doc .image__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:10px; padding-left:14px; border-left:3px solid var(--sprout); }
         .fami-doc .quote{ margin:36px 0; padding:8px 8px 8px 30px; border-left:4px solid var(--leaf); }
         .fami-doc .quote__text{ font-size:clamp(1.2rem,2.8vw,1.45rem); line-height:1.5; font-style:italic; color:var(--forest); margin:0; text-wrap:balance; }

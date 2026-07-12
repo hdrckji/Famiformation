@@ -299,6 +299,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $contenuIa = $res['text'];
                         $contenuImages = !empty($res['images']) ? json_encode($res['images']) : null;
                         $flashMsg = "✅ Contenu uniformisé par l'IA (≈ " . number_format($res['cost_eur'], 3) . " €). Vérifie le rendu ci-dessous.";
+                        require_once __DIR__ . '/includes/ia_usage.php';
+                        iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), 'uniformise', $res['model'], $res['in'], $res['out'], $res['cost_eur'], $id);
                     } else {
                         $uniformized = 0;
                         $flashMsg = "⚠️ Uniformisation IA échouée : " . $res['error'] . " — le PDF est enregistré tel quel.";
@@ -310,7 +312,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     require_once __DIR__ . '/includes/ia_settings.php';
                     require_once __DIR__ . '/includes/ai_uniformise.php';
                     $qz = aiGenerateQuiz($db, (string) $contenuIa);
-                    if ($qz['ok']) { $quizJson = json_encode($qz['quiz']); }
+                    if ($qz['ok']) {
+                        $quizJson = json_encode($qz['quiz']);
+                        require_once __DIR__ . '/includes/ia_usage.php';
+                        iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), 'quiz', (function_exists('iaSelectedModel') ? iaSelectedModel($db) : ''), 0, 0, $qz['cost_eur'], $id);
+                    }
                 }
 
                 $hasPdf = ($pdfPath !== null && $pdfPath !== '');

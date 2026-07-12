@@ -64,6 +64,7 @@ pdfAccessHandlePost($db);
 require_once __DIR__ . '/includes/storage_admin.php';
 storageHandlePost($db);
 require_once __DIR__ . '/includes/bulk.php';
+require_once __DIR__ . '/includes/ia_usage.php';
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 // Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
@@ -328,7 +329,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <button class="tab-btn" onclick="showTab('histagence', this)">Gestion des agences</button>
         <button class="tab-btn" onclick="showTab('widget', this)">Widget</button>
         <button class="tab-btn" onclick="showTab('contenu', this)">Stockage</button>
+        <button class="tab-btn" onclick="showTab('api', this)">API</button>
         <button class="tab-btn" onclick="showTab('prefs', this)">Préférences</button>
+    </div>
+
+    <!-- ONGLET : API (coûts IA) -->
+    <div id="tab-api" class="tab-content">
+        <?php renderApiUsageTab($db); ?>
     </div>
 
     <!-- ONGLET : Contenu (stockage) -->

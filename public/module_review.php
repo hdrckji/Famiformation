@@ -30,6 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     $blocks = [];
     foreach ((array) ($_POST['b'] ?? []) as $bi) {
         $type = is_array($bi) ? (string) ($bi['type'] ?? '') : '';
+        // « Afficher comme » : conversion entre texte simple / encadré / citation.
+        if (in_array($type, ['text', 'callout', 'quote'], true) && in_array(($bi['as'] ?? ''), ['text', 'callout', 'quote'], true)) {
+            $type = (string) $bi['as'];
+        }
         switch ($type) {
             case 'hero':
                 $blocks[] = ['type' => 'hero', 'title' => trim((string) ($bi['title'] ?? '')), 'subtitle' => trim((string) ($bi['subtitle'] ?? ''))];
@@ -72,7 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                 if (in_array((($rotate % 360) + 360) % 360, [90, 180, 270], true) && isset($images[$n - 1])) {
                     aiRotateImageFile($imgBase . '/' . $images[$n - 1], $rotate);
                 }
-                $blocks[] = ['type' => 'image', 'n' => $n, 'caption' => trim((string) ($bi['caption'] ?? ''))];
+                $size = in_array(($bi['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $bi['size'] : 'm';
+                $blocks[] = ['type' => 'image', 'n' => $n, 'caption' => trim((string) ($bi['caption'] ?? '')), 'size' => $size];
                 break;
             case 'quote':
                 if (trim((string) ($bi['text'] ?? '')) !== '') { $blocks[] = ['type' => 'quote', 'text' => trim((string) $bi['text'])]; }
@@ -114,8 +119,13 @@ $ta = function ($s) { return htmlspecialchars((string) $s); };
     .wrap { max-width:820px; margin:0 auto; padding:22px 18px 120px; }
     .intro { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:18px; line-height:1.55; }
     .intro strong { color:var(--forest); }
-    .blk { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
-    .blk-type { font-family:ui-monospace,Consolas,monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--leaf); font-weight:700; margin-bottom:8px; }
+    .blk { position:relative; background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+    .blk-lock { position:absolute; inset:0; z-index:3; background:rgba(247,248,242,.45); border-radius:12px; display:flex; align-items:flex-start; justify-content:flex-end; padding:8px; }
+    .blk:not(.locked) .blk-lock { display:none; }
+    .blk-lock button { background:var(--forest); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-weight:700; cursor:pointer; font:inherit; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+    .as-select { max-width:220px; }
+    .blk-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+    .blk-type { font-family:ui-monospace,Consolas,monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--leaf); font-weight:700; }
     label.mini { display:block; font-size:.78rem; color:#5a6b60; font-weight:700; margin:8px 0 3px; }
     input[type=text], textarea, select { width:100%; padding:9px 10px; border:1px solid #ccd6cf; border-radius:8px; font:inherit; background:#fdfefb; }
     textarea { min-height:70px; resize:vertical; line-height:1.5; }
@@ -163,9 +173,20 @@ $ta = function ($s) { return htmlspecialchars((string) $s); };
         <div class="pdf-panel" id="pdfPanel"><iframe src="<?= $ta($pdfUrl) ?>" title="PDF original"></iframe></div>
         <?php endif; ?>
 
-        <?php foreach ($blocks as $i => $b): $type = (string) ($b['type'] ?? ''); ?>
-        <div class="blk">
-            <div class="blk-type"><?= $ta($type) ?></div>
+        <?php foreach ($blocks as $i => $b): $type = (string) ($b['type'] ?? ''); $switchable = in_array($type, ['text', 'callout', 'quote'], true); ?>
+        <div class="blk locked">
+            <div class="blk-lock"><button type="button" onclick="unlockBlk(this)">✏️ Modifier ce bloc</button></div>
+            <div class="blk-head">
+                <span class="blk-type"><?= $ta($type) ?></span>
+                <?php if ($switchable): ?>
+                <span><label class="mini" style="display:inline; margin:0 6px 0 0;">Afficher comme</label>
+                <select class="as-select" name="b[<?= $i ?>][as]" style="display:inline-block; width:auto;">
+                    <option value="text" <?= $type === 'text' ? 'selected' : '' ?>>Texte simple</option>
+                    <option value="callout" <?= $type === 'callout' ? 'selected' : '' ?>>Encadré</option>
+                    <option value="quote" <?= $type === 'quote' ? 'selected' : '' ?>>Citation</option>
+                </select></span>
+                <?php endif; ?>
+            </div>
             <input type="hidden" name="b[<?= $i ?>][type]" value="<?= $ta($type) ?>">
             <?php if ($type === 'hero'): ?>
                 <label class="mini">Titre</label>
@@ -233,15 +254,23 @@ $ta = function ($s) { return htmlspecialchars((string) $s); };
 
             <?php elseif ($type === 'image'): ?>
                 <?php $n = (int) ($b['n'] ?? 0); $imgUrl = isset($images[$n - 1]) ? moduleFileUrl($images[$n - 1]) : ''; ?>
+                <?php $curSize = in_array(($b['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $b['size'] : 'm'; $prevW = ['s' => 160, 'm' => 220, 'l' => 280][$curSize]; ?>
                 <input type="hidden" name="b[<?= $i ?>][n]" value="<?= $n ?>">
                 <input type="hidden" name="b[<?= $i ?>][rotate]" id="b_<?= $i ?>_rot" value="0">
+                <input type="hidden" name="b[<?= $i ?>][size]" id="b_<?= $i ?>_size" value="<?= $curSize ?>">
                 <?php if ($imgUrl !== ''): ?>
-                    <img class="img-prev" id="b_<?= $i ?>_img" src="<?= $ta($imgUrl) ?>" alt="">
+                    <img class="img-prev" id="b_<?= $i ?>_img" src="<?= $ta($imgUrl) ?>" alt="" style="max-width:<?= (int) $prevW ?>px;">
                     <div class="rot">
                         <span class="mini" style="margin:0;">Pivoter :</span>
                         <?php foreach ([0, 90, 180, 270] as $deg): ?>
                         <button type="button" class="<?= $deg === 0 ? 'on' : '' ?>" onclick="setRot(<?= $i ?>,<?= $deg ?>,this)"><?= $deg ?>°</button>
                         <?php endforeach; ?>
+                    </div>
+                    <div class="rot">
+                        <span class="mini" style="margin:0;">Taille :</span>
+                        <button type="button" class="<?= $curSize === 's' ? 'on' : '' ?>" onclick="setSize(<?= $i ?>,'s',this)">Petite</button>
+                        <button type="button" class="<?= $curSize === 'm' ? 'on' : '' ?>" onclick="setSize(<?= $i ?>,'m',this)">Moyenne</button>
+                        <button type="button" class="<?= $curSize === 'l' ? 'on' : '' ?>" onclick="setSize(<?= $i ?>,'l',this)">Grande</button>
                     </div>
                 <?php endif; ?>
                 <label class="mini">Légende</label>
@@ -271,6 +300,18 @@ function applyFix(btn, taId) {
 function ignoreFix(btn) {
     var box = btn.closest('.fix-box');
     if (box) { box.style.display = 'none'; }
+}
+function unlockBlk(btn) {
+    var blk = btn.closest('.blk');
+    if (blk) { blk.classList.remove('locked'); }
+}
+function setSize(i, val, btn) {
+    document.getElementById('b_' + i + '_size').value = val;
+    var w = { s: 160, m: 220, l: 280 }[val] || 220;
+    var img = document.getElementById('b_' + i + '_img');
+    if (img) { img.style.maxWidth = w + 'px'; }
+    btn.parentNode.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
+    btn.classList.add('on');
 }
 function setRot(i, deg, btn) {
     document.getElementById('b_' + i + '_rot').value = deg;

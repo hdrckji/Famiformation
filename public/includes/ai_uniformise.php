@@ -76,7 +76,8 @@ if (!function_exists('aiSanitizeBlocks')) {
                 case 'image':
                     $rot = ((int) ($b['rotate'] ?? 0) % 360 + 360) % 360;
                     if (!in_array($rot, [0, 90, 180, 270], true)) { $rot = 0; }
-                    $ok[] = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? ''), 'rotate' => $rot];
+                    $size = in_array(($b['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $b['size'] : 'm';
+                    $ok[] = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? ''), 'rotate' => $rot, 'size' => $size];
                     break;
                 case 'quote':
                     if (trim((string) ($b['text'] ?? '')) !== '') { $ok[] = ['type' => 'quote', 'text' => (string) $b['text']]; }
