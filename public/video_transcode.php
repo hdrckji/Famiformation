@@ -12,6 +12,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/storage_stats.php';
 
 $rawKey = isset($argv[1]) ? (string) $argv[1] : '';
 $moduleId = isset($argv[2]) ? (int) $argv[2] : 0;
@@ -62,6 +63,9 @@ if ($code === 0 && is_file($outFull) && filesize($outFull) > 0) {
         $db->prepare("UPDATE modules SET video_path = ?, video_status = 'ready', video_src_path = NULL WHERE id = ?")
            ->execute([$outKey, $moduleId]);
         @unlink($rawFull); // on jette la vidéo brute (économie de stockage)
+        // Le volume vient de changer (brute supprimée, version compressée ajoutée) :
+        // on enregistre un point d'historique pour la facturation au pro rata.
+        storageRecordSample($db);
     } catch (Exception $e) {
         // si l'update échoue, on garde tout pour un éventuel retry
     }

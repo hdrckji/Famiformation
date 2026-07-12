@@ -803,14 +803,23 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 $onVolume = (defined('FAMI_STORAGE_BASE') && FAMI_STORAGE_BASE !== (__DIR__ . '/uploads'));
                 require_once __DIR__ . '/includes/storage_stats.php';
                 $stUse   = famiStorageUsage();
+                storageRecordSample($db, $stUse['total']); // point d'historique (facturation au pro rata)
+                $stMonth = storageMonthUsage($db);
                 $egBytes = egressMonth($db);
                 $priceSt = (float) widgetGet($db, 'price_storage_gb', '0');
                 $priceEg = (float) widgetGet($db, 'price_egress_gb', '0');
-                $goSt    = famiBytesToGo($stUse['total']);
-                $goEg    = famiBytesToGo($egBytes);
-                $costSt  = $goSt * $priceSt;
-                $costEg  = $goEg * $priceEg;
-                $costTot = $costSt + $costEg;
+
+                $goNow = famiBytesToGo($stUse['total']);   // volume à l'instant T
+                $goEg  = famiBytesToGo($egBytes);
+
+                // Stockage : on facture des « Go-mois » = volume MOYEN × durée écoulée.
+                $costStSoFar = $stMonth['gb_month'] * $priceSt;
+                // Projection fin de mois si le volume actuel est conservé jusqu'au bout.
+                $costStProj  = $costStSoFar + ($goNow * $priceSt * max(0, 1 - $stMonth['elapsed']));
+
+                $costEg      = $goEg * $priceEg;
+                $costTot     = $costStSoFar + $costEg;   // accumulé à ce jour
+                $costTotProj = $costStProj + $costEg;    // projection fin de mois
                 $catLabels = ['video' => '🎬 Vidéos', 'video_raw' => '🎬 Vidéos (sources en attente)', 'pdf' => '📄 PDF', 'icons' => '🖼️ Icônes'];
             ?>
             <div style="border:1px solid <?= $onVolume ? '#cfe6d5' : '#f0d9a8' ?>; background:<?= $onVolume ? '#f2f9f4' : '#fdf6e6' ?>; border-radius:10px; padding:10px 14px; margin-bottom:6px; font-size:.9rem;">
@@ -846,9 +855,9 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <table style="margin:0;">
                     <tbody>
                         <tr>
-                            <td style="font-weight:700; color:#244230;">📦 Stockage utilisé</td>
+                            <td style="font-weight:700; color:#244230;">📦 Stockage actuel</td>
                             <td><?= famiFormatSize($stUse['total']) ?> <span class="muted">(<?= (int) $stUse['files'] ?> fichier<?= $stUse['files'] > 1 ? 's' : '' ?>)</span></td>
-                            <td style="text-align:right; font-weight:700;"><?= number_format($costSt, 3, ',', ' ') ?> $ <span class="muted" style="font-weight:400;">/ mois</span></td>
+                            <td></td>
                         </tr>
                         <?php foreach ($stUse['by'] as $cat => $b): ?>
                         <tr>
@@ -858,18 +867,31 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                         </tr>
                         <?php endforeach; ?>
                         <tr>
+                            <td style="font-weight:700; color:#244230;">⏳ Stockage facturé <span class="muted" style="font-weight:400;">(pro rata : volume moyen × durée)</span></td>
+                            <td><?= famiFormatSize($stMonth['avg_bytes']) ?> <span class="muted">en moyenne · <?= number_format($stMonth['gb_month'], 3, ',', ' ') ?> Go-mois</span></td>
+                            <td style="text-align:right; font-weight:700;"><?= number_format($costStSoFar, 3, ',', ' ') ?> $</td>
+                        </tr>
+                        <tr>
                             <td style="font-weight:700; color:#244230;">📡 Trafic envoyé (ce mois-ci)</td>
                             <td><?= famiFormatSize($egBytes) ?></td>
                             <td style="text-align:right; font-weight:700;"><?= number_format($costEg, 3, ',', ' ') ?> $</td>
                         </tr>
                         <tr style="border-top:2px solid #dde3e0;">
-                            <td style="font-weight:800; color:#2d5a37;">TOTAL estimé ce mois</td>
-                            <td></td>
+                            <td style="font-weight:800; color:#2d5a37;">TOTAL accumulé à ce jour</td>
+                            <td class="muted" style="font-size:.85rem;"><?= number_format($stMonth['elapsed'] * 100, 0) ?> % du mois écoulé</td>
                             <td style="text-align:right; font-weight:800; color:#2d5a37; font-size:1.05rem;"><?= number_format($costTot, 2, ',', ' ') ?> $</td>
+                        </tr>
+                        <tr>
+                            <td class="muted">🔮 Projection fin de mois <span style="font-size:.82rem;">(si tu gardes le stockage actuel)</span></td>
+                            <td></td>
+                            <td style="text-align:right; font-weight:700; color:#54606b;"><?= number_format($costTotProj, 2, ',', ' ') ?> $</td>
                         </tr>
                     </tbody>
                 </table>
-                <p class="muted" style="margin:10px 0 0; font-size:.8rem;">ℹ️ Le trafic ne compte que ce qui <strong>sort réellement</strong> du serveur : un fichier relu depuis le cache du navigateur n'est <strong>ni envoyé ni facturé</strong>. Le compteur repart à zéro chaque mois (comme la facture). Il a démarré à la mise en place de cette fonction.</p>
+                <p class="muted" style="margin:10px 0 0; font-size:.8rem;">
+                    ℹ️ <strong>Stockage = facturé au pro rata</strong> (Go × durée) : si tu stockes 10 Go pendant 20 jours puis que tu supprimes tout, ces 20 jours restent facturés. Le site historise donc le volume et l'intègre dans le temps — supprimer des fichiers <strong>arrête</strong> le compteur, mais n'efface pas ce qui est déjà consommé.<br>
+                    ℹ️ <strong>Trafic</strong> = uniquement ce qui <strong>sort réellement</strong> du serveur : un fichier relu depuis le cache du navigateur n'est <strong>ni envoyé ni facturé</strong>. Tout repart à zéro chaque mois (comme la facture). Le suivi a démarré à la mise en place de cette fonction.
+                </p>
             </div>
 
             <?php iaSettingsCard($db); ?>

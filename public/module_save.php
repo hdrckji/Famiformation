@@ -3,6 +3,7 @@ require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
 require_once 'includes/contrib_settings.php';
+require_once 'includes/storage_stats.php';
 
 $actorRole = (string) ($_SESSION['role'] ?? '');
 $isAdminActor = ($actorRole === 'admin');
@@ -424,6 +425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu déposé, en attente de validation.');
                     $structMsg .= " En attente de validation par un admin.";
                 }
+                storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
                 $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;
                 // Étape de relecture : si le guide a été uniformisé, l'uploadeur relit/corrige avant publication.
@@ -469,6 +471,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $toDelete = array_values(array_unique($toDelete));
                     $ph = implode(',', array_fill(0, count($toDelete), '?'));
                     $db->prepare("DELETE FROM modules WHERE id IN ($ph)")->execute($toDelete);
+                    storageRecordSample($db); // le volume a changé → point d'historique (pro rata)
                     $nbSub = count($toDelete) - 1;
                     $_SESSION['module_flash'] = "✅ Module supprimé" . ($nbSub > 0 ? " (et $nbSub sous-module" . ($nbSub > 1 ? 's' : '') . ")" : "") . ".";
                     if (!empty($module['parent_id'])) {
