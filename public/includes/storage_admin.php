@@ -241,6 +241,8 @@ if (!function_exists('renderStorageTab')) {
                         $when = $f['mtime'] ? date('d/m/Y H:i', (int) $f['mtime']) : '—';
                         $icon = $f['type'] === 'video' ? '🎬' : '📄';
                         $isRaw = ($f['cat'] === 'video_raw');
+                        $url = function_exists('moduleFileUrl') ? moduleFileUrl($f['key']) : ('media.php?f=' . rawurlencode($f['key']));
+                        $rowLabel = ($modName !== '' ? $modName . ' — ' : '') . basename($f['key']);
                     ?>
                     <tr>
                         <td>
@@ -256,9 +258,12 @@ if (!function_exists('renderStorageTab')) {
                         <td style="text-align:right; white-space:nowrap;"><?= htmlspecialchars(storageHumanSize($f['size'])) ?></td>
                         <td style="white-space:nowrap;"><?= htmlspecialchars($when) ?></td>
                         <td><?= htmlspecialchars($uploader) ?></td>
-                        <td style="text-align:center;">
-                            <button type="button" class="btn btn-danger" style="padding:6px 12px;"
-                                onclick="askDeleteMedia('<?= htmlspecialchars($f['key'], ENT_QUOTES) ?>', '<?= htmlspecialchars(($modName !== '' ? $modName . ' — ' : '') . basename($f['key']), ENT_QUOTES) ?>')">🗑</button>
+                        <td style="text-align:center; white-space:nowrap;">
+                            <button type="button" class="btn btn-light" style="padding:6px 10px;" title="Aperçu"
+                                onclick="previewMedia('<?= htmlspecialchars($url, ENT_QUOTES) ?>', '<?= htmlspecialchars($f['type'], ENT_QUOTES) ?>', '<?= htmlspecialchars($rowLabel, ENT_QUOTES) ?>')">👁</button>
+                            <a class="btn btn-light" style="padding:6px 10px;" title="Télécharger" href="<?= htmlspecialchars($url) ?>" download>⬇</a>
+                            <button type="button" class="btn btn-danger" style="padding:6px 10px;" title="Supprimer"
+                                onclick="askDeleteMedia('<?= htmlspecialchars($f['key'], ENT_QUOTES) ?>', '<?= htmlspecialchars($rowLabel, ENT_QUOTES) ?>')">🗑</button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -289,10 +294,21 @@ if (!function_exists('renderStorageTab')) {
                 </form>
             </div>
         </div>
+        <!-- Modale d'aperçu (PDF / vidéo) -->
+        <div id="previewMediaModal" class="sa-modal">
+            <div class="sa-modal-box" style="max-width:860px; text-align:left;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
+                    <strong id="saPrevTitle" style="color:#2d5a37; word-break:break-all;"></strong>
+                    <button type="button" class="btn btn-light" onclick="closePreviewMedia()">✕ Fermer</button>
+                </div>
+                <div id="saPrevBody" style="min-height:200px;"></div>
+            </div>
+        </div>
+
         <style>
         .sa-modal { position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:20px; }
         .sa-modal.open { display:flex; }
-        .sa-modal-box { background:#fff; border-radius:16px; padding:28px; max-width:440px; width:100%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.35); }
+        .sa-modal-box { background:#fff; border-radius:16px; padding:28px; max-width:440px; width:100%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.35); max-height:92vh; overflow:auto; }
         .btn-danger { background:#c94a42; color:#fff; }
         </style>
         <script>
@@ -303,6 +319,22 @@ if (!function_exists('renderStorageTab')) {
         }
         function closeDeleteMedia() {
             document.getElementById('deleteMediaModal').classList.remove('open');
+        }
+        function previewMedia(url, type, label) {
+            document.getElementById('saPrevTitle').textContent = label;
+            var body = document.getElementById('saPrevBody');
+            if (type === 'video') {
+                body.innerHTML = '<video controls playsinline style="width:100%; max-height:72vh; border-radius:10px; background:#000;" src="' + url + '"></video>';
+            } else if (type === 'image') {
+                body.innerHTML = '<img src="' + url + '" alt="" style="max-width:100%; max-height:72vh; display:block; margin:0 auto; border-radius:10px;">';
+            } else {
+                body.innerHTML = '<iframe src="' + url + '" style="width:100%; height:72vh; border:none; border-radius:10px; background:#f4f7f6;"></iframe>';
+            }
+            document.getElementById('previewMediaModal').classList.add('open');
+        }
+        function closePreviewMedia() {
+            document.getElementById('previewMediaModal').classList.remove('open');
+            document.getElementById('saPrevBody').innerHTML = '';
         }
         </script>
         <?php
