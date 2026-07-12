@@ -392,11 +392,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     try { $vid = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'video' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
                     if ($vid) {
                         $vidChildId = (int) $vid['id'];
-                        $db->prepare("UPDATE modules SET video_path = ?, video_status = ?, video_src_path = ?, pdf_path = NULL WHERE id = ?")
-                           ->execute([$videoPath, $videoStatus, $videoSrc, $vidChildId]);
+                        $db->prepare("UPDATE modules SET video_path = ?, video_status = ?, video_src_path = ?, pdf_path = NULL, contenu_by = COALESCE(contenu_by, ?) WHERE id = ?")
+                           ->execute([$videoPath, $videoStatus, $videoSrc, $contenuBy, $vidChildId]);
                     } else {
-                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, video_path, video_status, video_src_path, content_kind) VALUES (?, ?, 0, ?, '🎬', ?, 1, ?, ?, ?, 'video')")
-                           ->execute(['Vidéo', 'Video', (int) $id, $childRoles, $videoPath, $videoStatus, $videoSrc]);
+                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, video_path, video_status, video_src_path, contenu_by, content_kind) VALUES (?, ?, 0, ?, '🎬', ?, 1, ?, ?, ?, ?, 'video')")
+                           ->execute(['Vidéo', 'Video', (int) $id, $childRoles, $videoPath, $videoStatus, $videoSrc, $contenuBy]);
                         $vidChildId = (int) $db->lastInsertId();
                     }
                     $madeVideo = true;

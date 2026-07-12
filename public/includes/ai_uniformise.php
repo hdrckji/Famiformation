@@ -358,7 +358,7 @@ if (!function_exists('aiGenerateQuiz')) {
      * Génère un quiz QCM à partir du contenu de formation (texte uniformisé).
      * @return array ['ok'=>bool, 'quiz'=>['questions'=>[...]]|null, 'error'=>string, 'cost_eur'=>float]
      */
-    function aiGenerateQuiz($db, $contentText, $nb = 75)
+    function aiGenerateQuiz($db, $contentText, $nbMultiple = 55, $nbSingle = 20)
     {
         $contentText = trim((string) $contentText);
         if ($contentText === '') {
@@ -371,13 +371,15 @@ if (!function_exists('aiGenerateQuiz')) {
         }
         $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
 
-        $system = "Tu es formateur. À partir du CONTENU DE FORMATION fourni, crée un quiz d'évaluation de $nb questions à choix multiples (QCM), en français.\n"
+        $nbTotal = (int) $nbMultiple + (int) $nbSingle;
+        $system = "Tu es formateur. À partir du CONTENU DE FORMATION fourni, crée un quiz d'évaluation de $nbTotal questions, en français.\n"
             . "Règles STRICTES :\n"
             . "- Base-toi UNIQUEMENT sur le contenu fourni (aucune connaissance externe).\n"
+            . "- Répartition VISÉE : environ $nbMultiple questions à réponses MULTIPLES (type \"multiple\") et $nbSingle questions à réponse UNIQUE (type \"single\"). Privilégie les questions à réponses multiples.\n"
+            . "- Une question \"multiple\" a PLUSIEURS bonnes réponses (au moins 2) ; une \"single\" en a exactement UNE.\n"
             . "- Chaque question a 3 à 5 options claires et distinctes.\n"
-            . "- \"type\" vaut \"single\" (une seule bonne réponse) ou \"multiple\" (plusieurs bonnes réponses) — sois exact.\n"
-            . "- \"correct\" est la liste des indices 0-based des bonnes options.\n"
-            . "- Si le contenu ne permet pas $nb questions de qualité, fais-en le maximum SANS inventer.\n"
+            . "- \"correct\" est la liste des indices 0-based des bonnes options (une seule pour single, au moins deux pour multiple).\n"
+            . "- Si le contenu ne permet pas $nbTotal questions de qualité, fais-en le maximum SANS inventer, en gardant la proportion.\n"
             . "- Réponds UNIQUEMENT en JSON valide, sans aucun texte autour :\n"
             . '{"questions":[{"q":"...","type":"single","options":["...","..."],"correct":[0]}]}';
 
