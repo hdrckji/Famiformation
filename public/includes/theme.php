@@ -282,6 +282,37 @@ if (!function_exists('famiScrollRestoreScript')) {
 
 if (!function_exists('famiInjectPageTheme')) {
     /** Callback ob_start : injecte (toujours) la restauration du scroll + le fond du thème si actif. Uniquement en HTML. */
+    /**
+     * Fond VECTORIEL par défaut du site (net à toute résolution, sans photo floue).
+     * Motif botanique léger (feuillages Famiflora) sur dégradé papier vert très clair.
+     * Rendu en SVG inline (data-URI) : parfaitement net, ~1 Ko, thème « nature ».
+     */
+    function famiDefaultVectorBg()
+    {
+        $svg = "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>"
+            . "<g fill='none' stroke='#2f6b3c' stroke-opacity='0.09' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'>"
+            . "<path d='M26 196 C 40 150, 40 116, 60 78'/>"
+            . "<path d='M40 150 q 30 -16 36 -50 q -36 10 -36 50'/>"
+            . "<path d='M38 120 q -30 -14 -38 -46 q 34 6 38 46'/>"
+            . "<path d='M170 210 C 182 164, 178 130, 196 92'/>"
+            . "<path d='M182 168 q 28 -16 34 -48 q -34 10 -34 48'/>"
+            . "<path d='M176 138 q -30 -12 -40 -42 q 36 4 40 42'/>"
+            . "<path d='M128 40 q 26 -32 62 -32 q -6 36 -46 42 q -12 2 -16 -10 z'/>"
+            . "<path d='M104 46 q -26 -30 -60 -26 q 6 34 44 40 q 12 2 16 -14 z'/>"
+            . "</g>"
+            . "<g fill='#3E8E4E' fill-opacity='0.07'>"
+            . "<circle cx='96' cy='170' r='3.2'/><circle cx='210' cy='120' r='2.6'/>"
+            . "<circle cx='56' cy='28' r='2.6'/><circle cx='150' cy='96' r='2.2'/>"
+            . "</g></svg>";
+        $uri = 'data:image/svg+xml,' . rawurlencode($svg);
+        return 'html,body{background-color:#EEF4E8 !important;'
+            . 'background-image:url("' . $uri . '"),linear-gradient(170deg,#F5F9F2 0%,#EAF2E4 55%,#E3EDDA 100%) !important;'
+            . 'background-repeat:repeat,no-repeat !important;'
+            . 'background-attachment:fixed,fixed !important;'
+            . 'background-size:220px 220px,cover !important;'
+            . 'background-position:top left,center !important;}';
+    }
+
     function famiInjectPageTheme($buffer)
     {
         foreach (headers_list() as $h) {
@@ -315,9 +346,13 @@ if (!function_exists('famiInjectPageTheme')) {
                 . '<a href="' . htmlspecialchars($pvPath . '?theme=off', ENT_QUOTES) . '" style="background:#fff; color:#1f1f1f; text-decoration:none; border-radius:999px; padding:5px 14px; font-weight:800;">↩ Revenir à la normale</a>'
                 . '</div><div style="height:38px;"></div>';
         }
-        // + fond du thème si un thème est actif.
-        if (!empty($GLOBALS['__fami_page_theme']) && is_array($GLOBALS['__fami_page_theme'])) {
-            $inject .= renderPageThemeBackground($GLOBALS['__fami_page_theme']);
+        // Fond de page : le fond du thème si un thème événementiel est actif,
+        // SINON le fond vectoriel par défaut (net, pas de photo floue).
+        $th = $GLOBALS['__fami_page_theme'] ?? null;
+        if (is_array($th) && ($th['page_bg'] ?? '') !== '') {
+            $inject .= renderPageThemeBackground($th);
+        } else {
+            $inject .= '<style id="fami-vec-bg">' . famiDefaultVectorBg() . '</style>';
         }
         if ($inject === '') {
             return $buffer;

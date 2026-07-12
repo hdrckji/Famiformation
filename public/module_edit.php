@@ -157,7 +157,9 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
             <option value="callout">Encadré</option>
             <option value="keyfigures">Chiffres clés</option>
             <option value="quote">Citation</option>
+            <option value="image">🖼 Image (importer…)</option>
         </select>
+        <input type="file" id="veImgFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;">
         <span class="lbl" style="color:#7a8a80; font-weight:400;">Le bloc s'ajoute où ton curseur se trouve.</span>
     </div>
     <?php if ($pdfUrl !== ''): ?><div class="pdfp" id="pdfp"><iframe src="<?= htmlspecialchars($pdfUrl) ?>"></iframe></div><?php endif; ?>
@@ -242,8 +244,8 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
                 </div>
             </div>
         <?php elseif ($type === 'image'): ?>
-            <?php $n = (int) ($b['n'] ?? 0); $imgUrl = isset($images[$n - 1]) ? moduleFileUrl($images[$n - 1]) : ''; $sz = in_array(($b['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $b['size'] : 'm'; ?>
-            <div class="ve-blk" data-type="image" data-n="<?= $n ?>" data-rotate="0" data-size="<?= $sz ?>">
+            <?php $n = (int) ($b['n'] ?? 0); $bsrc = trim((string) ($b['src'] ?? '')); $imgUrl = $bsrc !== '' ? moduleFileUrl($bsrc) : (isset($images[$n - 1]) ? moduleFileUrl($images[$n - 1]) : ''); $sz = in_array(($b['size'] ?? 'm'), ['s', 'm', 'l'], true) ? $b['size'] : 'm'; ?>
+            <div class="ve-blk" data-type="image" data-n="<?= $n ?>" data-src="<?= htmlspecialchars($bsrc) ?>" data-rotate="0" data-size="<?= $sz ?>">
                 <?php if ($imgUrl !== ''): ?>
                 <figure class="ve-img">
                     <img class="ve-imgel" src="<?= htmlspecialchars($imgUrl) ?>" alt="" style="max-width:<?= (int) ($sizePx[$sz]) ?>px;">
@@ -281,6 +283,8 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     </form>
 
 <script>
+var VE_MODULE_ID = <?= (int) $id ?>;
+var VE_CSRF = <?= json_encode(getCSRFToken()) ?>;
 // Lit un élément éditable et retranscrit le gras (**...**).
 function veMd(el) {
     var out = '';
@@ -374,7 +378,10 @@ function veBuild() {
             if (items.length) { blocks.push({ type: 'keyfigures', items: items }); }
         } else if (t === 'image') {
             var capEl = blk.querySelector('[data-f="caption"]');
-            blocks.push({ type: 'image', n: parseInt(blk.getAttribute('data-n'), 10) || 0, caption: capEl ? veMd(capEl) : '', rotate: parseInt(blk.getAttribute('data-rotate'), 10) || 0, size: blk.getAttribute('data-size') || 'm' });
+            var imgB = { type: 'image', n: parseInt(blk.getAttribute('data-n'), 10) || 0, caption: capEl ? veMd(capEl) : '', rotate: parseInt(blk.getAttribute('data-rotate'), 10) || 0, size: blk.getAttribute('data-size') || 'm' };
+            var iSrc = blk.getAttribute('data-src') || '';
+            if (iSrc) { imgB.src = iSrc; } // image importée dans l'éditeur
+            blocks.push(imgB);
         }
     });
     return blocks;
@@ -434,18 +441,74 @@ function veNewBlock(type) {
     return d;
 }
 function veAddBlk(type) {
+    if (type === 'image') { veAddImage(); return; } // l'image passe par un import de fichier
     var blk = veNewBlock(type);
+    veInsertBlk(blk);
+    var first = blk.querySelector('[data-f]'); if (first) { first.focus(); }
+}
+// Insère un bloc à l'endroit du curseur (après le dernier bloc cliqué), sinon à la fin.
+function veInsertBlk(blk) {
     var doc = document.getElementById('veDoc');
     var ref = window._veLastBlk;
     if (ref && ref.parentNode === doc && !ref.classList.contains('ve-hero')) {
-        doc.insertBefore(blk, ref.nextSibling); // à l'endroit du curseur
+        doc.insertBefore(blk, ref.nextSibling);
     } else {
         doc.appendChild(blk);
     }
-    var first = blk.querySelector('[data-f]'); if (first) { first.focus(); }
     window._veLastBlk = blk;
     blk.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
+// Construit le DOM d'un bloc image importé (clé volume directe via data-src).
+function veImageBlock(url, key) {
+    var d = document.createElement('div');
+    d.className = 've-blk'; d.setAttribute('data-type', 'image');
+    d.setAttribute('data-n', '0'); d.setAttribute('data-src', key);
+    d.setAttribute('data-rotate', '0'); d.setAttribute('data-size', 'm');
+    d.innerHTML = '<figure class="ve-img">'
+        + '<img class="ve-imgel" src="' + url + '" alt="" style="max-width:320px;">'
+        + '<figcaption contenteditable="true" data-f="caption">Légende (facultatif)…</figcaption>'
+        + '<div class="ve-tools">'
+        + '<button type="button" onclick="veRot(this)">↻ Pivoter</button><span class="sep"></span>'
+        + '<button type="button" onclick="veSize(this,\'s\')">Petite</button>'
+        + '<button type="button" class="on" onclick="veSize(this,\'m\')">Moyenne</button>'
+        + '<button type="button" onclick="veSize(this,\'l\')">Grande</button>'
+        + '</div></figure>';
+    d.insertAdjacentHTML('beforeend', veCtrlHtml());
+    return d;
+}
+// Ouvre le sélecteur de fichier puis téléverse l'image sur le volume.
+function veAddImage() {
+    if (!window._veEditing) { veSetEdit(true); }
+    window._veImgRef = window._veLastBlk; // on retient l'endroit d'insertion
+    var inp = document.getElementById('veImgFile');
+    inp.value = '';
+    inp.click();
+}
+(function () {
+    var inp = document.getElementById('veImgFile');
+    if (!inp) { return; }
+    inp.addEventListener('change', function () {
+        var file = inp.files && inp.files[0];
+        if (!file) { return; }
+        if (file.size > 8 * 1024 * 1024) { alert('Image trop lourde (8 Mo maximum).'); return; }
+        var fd = new FormData();
+        fd.append('image', file);
+        fd.append('id', String(VE_MODULE_ID));
+        fd.append('csrf_token', VE_CSRF);
+        var sel = document.getElementById('veAddSel');
+        if (sel) { sel.disabled = true; }
+        window._veLastBlk = window._veImgRef || window._veLastBlk;
+        fetch('image_upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (sel) { sel.disabled = false; }
+                if (!j || !j.ok) { alert('Import impossible : ' + ((j && j.error) || 'erreur inconnue')); return; }
+                var blk = veImageBlock(j.url, j.key);
+                veInsertBlk(blk);
+            })
+            .catch(function () { if (sel) { sel.disabled = false; } alert('Import impossible (réseau).'); });
+    });
+})();
 // Alignement du bloc courant (gauche / centre / droite).
 function veAlign(a) {
     var blk = window._veLastBlk || (document.activeElement && document.activeElement.closest ? document.activeElement.closest('.ve-blk') : null);

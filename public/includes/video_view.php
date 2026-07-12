@@ -117,7 +117,12 @@ if (!function_exists('renderVideoPage')) {
                     var v = document.getElementById('famiVideo');
                     if (!v) { return; }
                     var maxT = 0;
-                    v.addEventListener('timeupdate', function () { if (!v.seeking) { maxT = Math.max(maxT, v.currentTime); } });
+                    v.addEventListener('timeupdate', function () {
+                        if (!v.seeking) { maxT = Math.max(maxT, v.currentTime); }
+                        // Vidéo considérée « vue » à partir de 95 % (ou fin atteinte).
+                        if (v.duration && v.duration > 0 && v.currentTime >= v.duration * 0.95) { window._famiVideoDone = true; }
+                    });
+                    v.addEventListener('ended', function () { window._famiVideoDone = true; });
                     v.addEventListener('seeking', function () { if (v.currentTime > maxT + 1) { v.currentTime = maxT; } });
                 })();
                 </script>
@@ -144,9 +149,36 @@ if (!function_exists('renderVideoPage')) {
                 <section class="quizcta" aria-label="Passer au quiz">
                     <hr class="quizcta__rule">
                     <p class="quizcta__lead">Vidéo terminée&nbsp;? Vérifiez que tout est bien en place avec <strong>quelques questions rapides</strong>.</p>
-                    <a class="quizcta__button" href="<?= htmlspecialchars($quizHref) ?>">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>
+                    <a class="quizcta__button" href="<?= htmlspecialchars($quizHref) ?>" onclick="return famiVideoQuizGuard(event, this.href);">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>
                     <p class="quizcta__hint">Résultat immédiat</p>
                 </section>
+                <div id="famiVideoModal" style="display:none; position:fixed; inset:0; z-index:100000; background:rgba(18,32,20,.55); align-items:center; justify-content:center; padding:20px;">
+                    <div style="background:#fff; border-radius:20px; max-width:460px; width:100%; padding:30px 28px; box-shadow:0 24px 60px rgba(0,0,0,.35); text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+                        <div style="font-size:2.4rem; line-height:1; margin-bottom:12px;">🎬</div>
+                        <h3 style="margin:0 0 10px; color:#1E4D2B; font-size:1.3rem;">Vidéo pas encore terminée</h3>
+                        <p style="margin:0 0 22px; color:#46543F; line-height:1.55;">Nous vous recommandons fortement de <strong>regarder la vidéo jusqu'au bout</strong> avant de passer le quiz&nbsp;: les réponses s'y trouvent. 🙂</p>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+                            <button type="button" onclick="famiVideoModalClose()" style="background:#1E4D2B; color:#fff; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:1rem;">↩ Regarder la vidéo</button>
+                            <button type="button" onclick="famiVideoModalProceed()" style="background:#eef1e6; color:#46543F; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:.95rem;">Passer quand même</button>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                (function () {
+                    var pendingHref = '';
+                    window.famiVideoQuizGuard = function (ev, href) {
+                        var v = document.getElementById('famiVideo');
+                        // Pas de vidéo lisible (en préparation / échec) : rien à regarder, on laisse passer.
+                        if (!v || window._famiVideoDone) { return true; }
+                        if (ev) { ev.preventDefault(); }
+                        pendingHref = href;
+                        var m = document.getElementById('famiVideoModal'); if (m) { m.style.display = 'flex'; }
+                        return false;
+                    };
+                    window.famiVideoModalClose = function () { var m = document.getElementById('famiVideoModal'); if (m) { m.style.display = 'none'; } var v = document.getElementById('famiVideo'); if (v && v.scrollIntoView) { v.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
+                    window.famiVideoModalProceed = function () { if (pendingHref) { window.location.href = pendingHref; } };
+                })();
+                </script>
             <?php endif; ?>
 
             <p class="vid-footer">Famiformation · Document interne</p>

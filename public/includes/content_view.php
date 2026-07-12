@@ -76,11 +76,16 @@ if (!function_exists('_dBlockHtml')) {
                 }
                 return '<div class="keyfigures">' . $t . '</div>';
             case 'image':
-                $n = (int) $b['n'] - 1;
+                $size = ($b['size'] ?? 'm'); if (!in_array($size, ['s', 'm', 'l'], true)) { $size = 'm'; }
+                $cap = ($b['caption'] ?? '') !== '' ? '<figcaption class="image__caption">' . htmlspecialchars((string) $b['caption']) . '</figcaption>' : '';
+                $src = trim((string) ($b['src'] ?? ''));
+                if ($src !== '') {
+                    // Image ajoutée depuis l'éditeur visuel (clé directe sur le volume).
+                    return '<figure class="image image--' . $size . '"><img class="image__real" src="' . htmlspecialchars(_uniImgUrl($src)) . '" alt="" loading="lazy">' . $cap . '</figure>';
+                }
+                $n = (int) ($b['n'] ?? 0) - 1;
                 if ($n >= 0 && $n < count($ctx['images']) && empty($ctx['used'][$n])) {
                     $ctx['used'][$n] = true;
-                    $size = ($b['size'] ?? 'm'); if (!in_array($size, ['s', 'm', 'l'], true)) { $size = 'm'; }
-                    $cap = ($b['caption'] ?? '') !== '' ? '<figcaption class="image__caption">' . htmlspecialchars((string) $b['caption']) . '</figcaption>' : '';
                     return '<figure class="image image--' . $size . '"><img class="image__real" src="' . htmlspecialchars(_uniImgUrl($ctx['images'][$n])) . '" alt="" loading="lazy">' . $cap . '</figure>';
                 }
                 return '';
@@ -232,7 +237,7 @@ if (!function_exists('renderUniformContent')) {
         $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
         // Page de fin AUTOMATIQUE sur CHAQUE guide (ne dépend pas du PDF d'origine).
         $outroCta = ($quizHref !== '')
-            ? '<a class="outro__cta" href="' . htmlspecialchars($quizHref) . '">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>'
+            ? '<a class="outro__cta" href="' . htmlspecialchars($quizHref) . '" onclick="return famiGuideQuizGuard(event, this.href);">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>'
             : '';
         $pages[] = '<main class="page"><section class="outro"><div class="outro__card">'
             . '<div class="outro__leaf">🌿</div>'
@@ -370,9 +375,37 @@ if (!function_exists('renderUniformContent')) {
             <?php endif; ?>
         </div>
 
+        <div id="famiDoneModal" style="display:none; position:fixed; inset:0; z-index:100000; background:rgba(18,32,20,.55); align-items:center; justify-content:center; padding:20px;">
+            <div style="background:#fff; border-radius:20px; max-width:460px; width:100%; padding:30px 28px; box-shadow:0 24px 60px rgba(0,0,0,.35); text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+                <div style="font-size:2.4rem; line-height:1; margin-bottom:12px;">🌿</div>
+                <h3 style="margin:0 0 10px; color:#1E4D2B; font-size:1.3rem;">Vous n'avez pas tout parcouru</h3>
+                <p style="margin:0 0 22px; color:#46543F; line-height:1.55;">Nous vous recommandons fortement de <strong>terminer la lecture du guide</strong> avant de passer le quiz&nbsp;: vous y trouverez les réponses. 🙂</p>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+                    <button type="button" onclick="famiDoneClose()" style="background:#1E4D2B; color:#fff; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:1rem;">↩ Terminer la lecture</button>
+                    <button type="button" onclick="famiDoneProceed()" style="background:#eef1e6; color:#46543F; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:.95rem;">Passer quand même</button>
+                </div>
+            </div>
+        </div>
+
         <script>
         (function () {
             var idx = 0, total = <?= (int) $n ?>;
+            // --- Suivi de complétion : le guide est « lu » quand toutes les pages ont été vues ---
+            var visited = {}, pendingHref = '';
+            function guideComplete() {
+                for (var p = 0; p < total; p++) { if (!visited[p]) { return false; } }
+                return true;
+            }
+            window.famiGuideQuizGuard = function (ev, href) {
+                if (guideComplete()) { return true; }
+                if (ev) { ev.preventDefault(); }
+                pendingHref = href;
+                var m = document.getElementById('famiDoneModal');
+                if (m) { m.style.display = 'flex'; }
+                return false;
+            };
+            window.famiDoneClose = function () { var m = document.getElementById('famiDoneModal'); if (m) { m.style.display = 'none'; } };
+            window.famiDoneProceed = function () { if (pendingHref) { window.location.href = pendingHref; } };
             window.uniTogglePdf = function () {
                 var read = document.querySelector('.doc-read'), pdf = document.querySelector('.doc-pdf'), eye = document.getElementById('uniEye');
                 if (!pdf) { return; }
@@ -384,6 +417,7 @@ if (!function_exists('renderUniformContent')) {
             };
             function show(i) {
                 idx = Math.max(0, Math.min(total - 1, i));
+                visited[idx] = true; // page vue (pour le suivi de lecture)
                 document.querySelectorAll('.doc-page').forEach(function (p) {
                     p.style.display = (parseInt(p.getAttribute('data-page'), 10) === idx) ? '' : 'none';
                 });

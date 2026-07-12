@@ -83,7 +83,10 @@ if (!function_exists('aiSanitizeBlocks')) {
                     $rot = ((int) ($b['rotate'] ?? 0) % 360 + 360) % 360;
                     if (!in_array($rot, [0, 90, 180, 270], true)) { $rot = 0; }
                     $size = ($b['size'] ?? 'm'); if (!in_array($size, ['s', 'm', 'l'], true)) { $size = 'm'; }
-                    $ok[] = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? ''), 'rotate' => $rot, 'size' => $size];
+                    $img = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? ''), 'rotate' => $rot, 'size' => $size];
+                    $src = trim((string) ($b['src'] ?? ''));
+                    if ($src !== '') { $img['src'] = $src; } // image ajoutée depuis l'éditeur (clé volume directe)
+                    $ok[] = $img;
                     break;
                 case 'quote':
                     if (trim((string) ($b['text'] ?? '')) !== '') {

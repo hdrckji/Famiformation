@@ -33,10 +33,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         $arr = json_decode((string) $_POST['blocks_json'], true);
         $blocksIn = (is_array($arr) && isset($arr['blocks']) && is_array($arr['blocks'])) ? $arr['blocks'] : (is_array($arr) ? $arr : []);
         foreach ($blocksIn as &$bl) {
-            if (is_array($bl) && ($bl['type'] ?? '') === 'image' && !empty($bl['rotate'])) {
-                $idx = (int) ($bl['n'] ?? 0) - 1;
-                if ($idx >= 0 && isset($images[$idx]) && function_exists('aiRotateImageFile')) {
-                    aiRotateImageFile($imgBase . '/' . $images[$idx], (int) $bl['rotate']);
+            if (is_array($bl) && ($bl['type'] ?? '') === 'image' && !empty($bl['rotate']) && function_exists('aiRotateImageFile')) {
+                $src = trim((string) ($bl['src'] ?? ''));
+                if ($src !== '') {
+                    // Image ajoutée depuis l'éditeur : on pivote son propre fichier (clé volume directe).
+                    $abs = realpath($imgBase . '/' . $src);
+                    $baseReal = realpath($imgBase);
+                    if ($abs !== false && $baseReal !== false && strpos($abs, $baseReal) === 0) {
+                        aiRotateImageFile($abs, (int) $bl['rotate']);
+                    }
+                } else {
+                    $idx = (int) ($bl['n'] ?? 0) - 1;
+                    if ($idx >= 0 && isset($images[$idx])) {
+                        aiRotateImageFile($imgBase . '/' . $images[$idx], (int) $bl['rotate']);
+                    }
                 }
                 $bl['rotate'] = 0;
             }
