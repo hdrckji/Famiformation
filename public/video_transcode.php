@@ -13,6 +13,9 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/storage_stats.php';
+require_once __DIR__ . '/includes/ia_settings.php';   // modèle IA (traduction des sous-titres)
+require_once __DIR__ . '/includes/i18n_nl.php';       // traducteur en lot FR -> NL
+require_once __DIR__ . '/includes/transcription.php'; // sous-titres : .srt fourni ou Whisper
 
 $rawKey = isset($argv[1]) ? (string) $argv[1] : '';
 $moduleId = isset($argv[2]) ? (int) $argv[2] : 0;
@@ -70,9 +73,149 @@ if ($code === 0 && is_file($outFull) && filesize($outFull) > 0) {
     } catch (Exception $e) {
         // si l'update échoue, on garde tout pour un éventuel retry
     }
+
+    // ---------------------------------------------------------------
+    // SOUS-TITRES : on enchaîne ICI, dans la même tâche de fond.
+    // C'est le bon endroit : on est déjà hors requête web, ffmpeg est là, et la
+    // vidéo compressée vient d'être produite. L'utilisateur n'attend rien.
+    // Non bloquant : si ça échoue, la vidéo reste parfaitement lisible.
+    // ---------------------------------------------------------------
+    famiBuildSubtitles($db, $moduleId, $outFull, $outKey);
+
     exit(0);
 }
 
 @unlink($outFull);
 $markFailed();
 exit(1);
+
+/**
+ * Produit les sous-titres FR + NL d'une vidéo et le transcript (qui servira au quiz).
+ *  - un .srt déposé par l'utilisateur est prioritaire (gratuit, exact) ;
+ *  - sinon transcription automatique (audio extrait par ffmpeg → Whisper).
+ * Les fichiers WebVTT sont écrits sur le volume et servis par media.php.
+ */
+function famiBuildSubtitles(PDO $db, $moduleId, $videoAbs, $videoKey)
+{
+    $base = defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads');
+
+    // Le .srt éventuellement déposé avec la vidéo.
+    $srtAbs = '';
+    try {
+        $st = $db->prepare("SELECT sub_src_path FROM modules WHERE id = ? LIMIT 1");
+        $st->execute([$moduleId]);
+        $k = trim((string) $st->fetchColumn());
+        if ($k !== '' && is_file($base . '/' . $k)) {
+            $srtAbs = $base . '/' . $k;
+        }
+    } catch (Exception $e) {
+        // colonne absente : on continuera sans .srt
+    }
+
+    try {
+        $db->prepare("UPDATE modules SET sub_status = 'processing' WHERE id = ?")->execute([$moduleId]);
+    } catch (Exception $e) {
+        return; // colonnes pas encore créées : on abandonne proprement
+    }
+
+    $res = famiVideoSubtitles($db, $videoAbs, $srtAbs);
+    if (!$res['ok'] || trim((string) $res['srt_fr']) === '') {
+        try {
+            $db->prepare("UPDATE modules SET sub_status = 'failed' WHERE id = ?")->execute([$moduleId]);
+        } catch (Exception $e) {
+        }
+        return;
+    }
+
+    // Écriture des pistes WebVTT sur le volume (seul format lu par les navigateurs).
+    $dir = $base . '/modules/subs';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $stem = 'sub_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4));
+
+    $frKey = '';
+    $nlKey = '';
+    if (@file_put_contents($dir . '/' . $stem . '_fr.vtt', famiSrtToVtt($res['srt_fr'])) !== false) {
+        $frKey = 'modules/subs/' . $stem . '_fr.vtt';
+    }
+    if (trim((string) $res['srt_nl']) !== ''
+        && @file_put_contents($dir . '/' . $stem . '_nl.vtt', famiSrtToVtt($res['srt_nl'])) !== false) {
+        $nlKey = 'modules/subs/' . $stem . '_nl.vtt';
+    }
+
+    try {
+        $db->prepare(
+            "UPDATE modules SET sub_fr_path = ?, sub_nl_path = ?, transcript = ?, sub_status = 'ready' WHERE id = ?"
+        )->execute([
+            $frKey !== '' ? $frKey : null,
+            $nlKey !== '' ? $nlKey : null,
+            $res['text'] !== '' ? $res['text'] : null,
+            $moduleId,
+        ]);
+        storageRecordSample($db); // les .vtt occupent (un peu) de place
+    } catch (Exception $e) {
+        // non critique
+    }
+
+    // Le contenu de la vidéo est maintenant exploitable → on enrichit le quiz.
+    if (trim((string) $res['text']) !== '') {
+        famiEnrichQuizWithVideo($db, $moduleId, $res['text']);
+    }
+}
+
+/**
+ * Régénère le quiz du GUIDE en y intégrant le contenu de la VIDÉO.
+ *
+ * Pourquoi ici : quand le contenu est importé, le quiz est généré depuis le PDF
+ * SEUL — la vidéo n'est pas encore transcrite. Maintenant qu'on a le transcript,
+ * le quiz peut porter sur les DEUX supports, comme demandé.
+ *
+ * Garde-fou : on ne le fait qu'UNE FOIS (drapeau quiz_from_video). Sans ça, un
+ * ré-upload de vidéo écraserait un quiz que l'admin aurait corrigé à la main.
+ */
+function famiEnrichQuizWithVideo(PDO $db, $videoModuleId, $transcript)
+{
+    try {
+        // Le guide est le frère du module vidéo (même parent).
+        $st = $db->prepare("SELECT parent_id FROM modules WHERE id = ? LIMIT 1");
+        $st->execute([$videoModuleId]);
+        $parentId = (int) $st->fetchColumn();
+        if ($parentId <= 0) {
+            return;
+        }
+        $st = $db->prepare(
+            "SELECT id, contenu_ia, a_evaluer, quiz_from_video FROM modules
+             WHERE parent_id = ? AND content_kind = 'ecrit' LIMIT 1"
+        );
+        $st->execute([$parentId]);
+        $guide = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$guide) {
+            return;
+        }
+        if (empty($guide['a_evaluer']) || !empty($guide['quiz_from_video'])) {
+            return; // pas de quiz demandé, ou déjà enrichi : on ne touche à rien
+        }
+
+        $guideText = trim((string) ($guide['contenu_ia'] ?? ''));
+        $source = "CONTENU ÉCRIT (le guide) :\n" . $guideText
+            . "\n\n---\n\nCONTENU DE LA VIDÉO (transcription) :\n" . trim((string) $transcript);
+
+        if (!function_exists('aiGenerateQuiz')) {
+            require_once __DIR__ . '/includes/ai_uniformise.php';
+        }
+        $qz = aiGenerateQuiz($db, $source);
+        if (empty($qz['ok']) || empty($qz['quiz'])) {
+            return; // échec : on garde le quiz existant (issu du PDF), pas de régression
+        }
+        $db->prepare("UPDATE modules SET quiz_json = ?, quiz_from_video = 1 WHERE id = ?")
+           ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), (int) $guide['id']]);
+
+        // Le quiz FR a changé → sa version NL doit suivre.
+        if (function_exists('nlSyncModule')) {
+            nlSyncModule($db, (int) $guide['id'], true);
+        }
+    } catch (Exception $e) {
+        // non critique : le quiz issu du PDF reste en place
+    }
+}

@@ -43,6 +43,17 @@ if (!function_exists('ensureModulesTable')) {
                 // video_status : '' | 'processing' | 'ready' | 'failed'.
                 'video_status'   => "ALTER TABLE modules ADD COLUMN video_status VARCHAR(16) NULL",
                 'video_src_path' => "ALTER TABLE modules ADD COLUMN video_src_path VARCHAR(255) NULL",
+                // Sous-titres de la vidéo (WebVTT sur le volume) + transcript texte.
+                // Le transcript sert à générer des questions de quiz À PARTIR de la vidéo.
+                // sub_status : '' | 'processing' | 'ready' | 'failed'
+                'sub_fr_path'    => "ALTER TABLE modules ADD COLUMN sub_fr_path VARCHAR(255) NULL",
+                'sub_nl_path'    => "ALTER TABLE modules ADD COLUMN sub_nl_path VARCHAR(255) NULL",
+                'sub_src_path'   => "ALTER TABLE modules ADD COLUMN sub_src_path VARCHAR(255) NULL",
+                'sub_status'     => "ALTER TABLE modules ADD COLUMN sub_status VARCHAR(16) NULL",
+                'transcript'     => "ALTER TABLE modules ADD COLUMN transcript MEDIUMTEXT NULL",
+                // Drapeau : le quiz a déjà été enrichi avec le contenu de la vidéo.
+                // Évite qu'un ré-upload de vidéo n'écrase un quiz corrigé à la main.
+                'quiz_from_video' => "ALTER TABLE modules ADD COLUMN quiz_from_video TINYINT(1) NOT NULL DEFAULT 0",
             ];
             foreach ($extraColumns as $col => $ddl) {
                 $check = $db->query("SHOW COLUMNS FROM modules LIKE " . $db->quote($col));

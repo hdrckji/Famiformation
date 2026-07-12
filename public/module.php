@@ -474,6 +474,29 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">N'importe quel format · jusqu'à 1 Go · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
                             <div class="dz-file" hidden></div>
                         </div>
+
+                        <?php
+                            // SOUS-TITRES — volontairement DISCRET et FACULTATIF.
+                            // Le site transcrit la vidéo tout seul : personne n'a besoin de
+                            // fabriquer un .srt. Ce champ n'est là que pour ceux qui EN ONT
+                            // DÉJÀ un (export CapCut, etc.) : c'est gratuit et plus exact.
+                        ?>
+                        <details style="margin-top:8px;">
+                            <summary style="cursor:pointer; color:#6c7a70; font-size:.84rem;">💬 J'ai déjà un fichier de sous-titres (.srt) — facultatif</summary>
+                            <div style="padding:8px 2px 2px;">
+                                <div style="color:#6c7a70; font-size:.82rem; margin-bottom:6px;">
+                                    Inutile dans la plupart des cas : <strong>le site génère les sous-titres tout seul</strong>
+                                    (et les traduit en néerlandais). Ne déposez un <code>.srt</code> que si vous en avez déjà
+                                    un — il sera utilisé tel quel, c'est plus exact et gratuit.
+                                </div>
+                                <input type="file" name="srt_file" accept=".srt,.vtt,text/plain" style="font-size:.85rem;">
+                                <?php if (!empty($module['sub_src_path'])): ?>
+                                    <div class="dz-existing" style="margin-top:6px;">💬 Sous-titres fournis
+                                        <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_srt" value="1"> Supprimer</label>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </details>
                         <?php if ($existVideo): ?>
                             <div class="dz-existing">
                                 🎬 <a href="<?= htmlspecialchars(moduleFileUrl($existVideo)) ?>" download>Vidéo actuelle</a>

@@ -62,6 +62,9 @@ $types = [
     'pdf' => 'application/pdf',
     'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogv' => 'video/ogg', 'mov' => 'video/quicktime',
     'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp',
+    // Pistes de sous-titres : le navigateur REFUSE un <track> qui n'est pas servi
+    // en text/vtt. Le .srt est gardé pour référence (téléchargement).
+    'vtt' => 'text/vtt', 'srt' => 'application/x-subrip',
 ];
 $ctype = $types[$ext] ?? 'application/octet-stream';
 

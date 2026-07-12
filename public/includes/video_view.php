@@ -104,8 +104,27 @@ if (!function_exists('renderVideoPage')) {
                 <main class="player">
                     <figure style="margin:0;">
                         <div class="player__frame">
-                            <video id="famiVideo" class="player__video" controls controlsList="nodownload" playsinline preload="metadata">
+                            <?php
+                                // SOUS-TITRES BILINGUES. Les navigateurs ne lisent que le WebVTT
+                                // (d'où la conversion faite par le worker). La piste de la langue
+                                // courante est activée par défaut : un néerlandophone voit du NL
+                                // sans rien régler.
+                                $subFr = trim((string) ($module['sub_fr_path'] ?? ''));
+                                $subNl = trim((string) ($module['sub_nl_path'] ?? ''));
+                                $isNl = (function_exists('currentLang') && currentLang() === 'nl');
+                            ?>
+                            <video id="famiVideo" class="player__video" controls controlsList="nodownload" playsinline preload="metadata"<?= ($subFr !== '' || $subNl !== '') ? ' crossorigin="anonymous"' : '' ?>>
                                 <source src="<?= htmlspecialchars($videoUrl) ?>">
+                                <?php if ($subFr !== ''): ?>
+                                    <track kind="subtitles" srclang="fr" label="Français"
+                                           src="<?= htmlspecialchars(moduleFileUrl($subFr)) ?>"
+                                           <?= $isNl ? '' : 'default' ?>>
+                                <?php endif; ?>
+                                <?php if ($subNl !== ''): ?>
+                                    <track kind="subtitles" srclang="nl" label="Nederlands"
+                                           src="<?= htmlspecialchars(moduleFileUrl($subNl)) ?>"
+                                           <?= $isNl ? 'default' : '' ?>>
+                                <?php endif; ?>
                                 Votre navigateur ne peut pas lire cette vidéo.
                             </video>
                         </div>

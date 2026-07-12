@@ -343,6 +343,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $startTranscode = true;
             }
 
+            // Sous-titres FACULTATIFS : un .srt déjà en possession de l'utilisateur.
+            // S'il n'y en a pas, le worker transcrit la vidéo tout seul (Whisper) →
+            // personne n'a besoin de fabriquer un fichier de sous-titres.
+            $newSrt = handleModuleFileUpload('srt_file', [
+                'text/plain' => 'srt', 'application/x-subrip' => 'srt', 'text/vtt' => 'vtt',
+            ], 2 * 1024 * 1024, 'subs_src', $fSlug . '-srt');
+            if ($newSrt !== null) {
+                $srtSrc = $newSrt;
+            } elseif (!empty($_POST['remove_srt'])) {
+                $srtSrc = null;
+            } else {
+                $srtSrc = false; // false = ne pas toucher à l'existant
+            }
+
             // Au moins 1 contenu : PDF, vidéo déjà prête, OU vidéo en cours de préparation.
             $hasVideo = (!empty($videoPath) || $videoStatus === 'processing');
             if (empty($pdfPath) && !$hasVideo) {
@@ -453,6 +467,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, video_path, video_status, video_src_path, contenu_by, content_kind) VALUES (?, ?, 0, ?, '🎬', ?, 1, ?, ?, ?, ?, 'video')")
                            ->execute(['Vidéo', 'Video', (int) $id, $childRoles, $videoPath, $videoStatus, $videoSrc, $contenuBy]);
                         $vidChildId = (int) $db->lastInsertId();
+                    }
+                    // Sous-titres fournis : on les attache au sous-module vidéo AVANT que le
+                    // worker ne tourne — il les préférera à la transcription automatique.
+                    if ($vidChildId && $srtSrc !== false) {
+                        try {
+                            $db->prepare("UPDATE modules SET sub_src_path = ? WHERE id = ?")
+                               ->execute([$srtSrc !== null ? $srtSrc : null, $vidChildId]);
+                        } catch (Exception $e) {
+                            // colonne pas encore créée : sans gravité, la transcription auto prendra le relais
+                        }
                     }
                     $madeVideo = true;
                 }
