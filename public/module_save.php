@@ -88,7 +88,30 @@ function handleModuleIconUpload()
 }
 
 // Upload générique d'un fichier de module (pdf, vidéo) -> chemin relatif ou null
-function handleModuleFileUpload($field, array $allowedMap, $maxSize, $subdir)
+// Slug lisible à partir du nom du module (pour des noms de fichiers clairs).
+function moduleFileSlug($nom)
+{
+    $s = (string) $nom;
+    $t = @iconv('UTF-8', 'ASCII//TRANSLIT', $s);
+    if ($t !== false && $t !== '') { $s = $t; }
+    $s = strtolower($s);
+    $s = preg_replace('/[^a-z0-9]+/', '-', $s);
+    $s = trim((string) $s, '-');
+    return $s !== '' ? substr($s, 0, 40) : 'fichier';
+}
+
+// Efface un fichier du volume en toute sécurité (dans FAMI_STORAGE_BASE).
+function volumeUnlink($key)
+{
+    $key = (string) $key;
+    if ($key === '') { return; }
+    $base = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/uploads');
+    $abs = realpath($base . '/' . $key);
+    $baseReal = realpath($base);
+    if ($abs !== false && $baseReal !== false && strpos($abs, $baseReal) === 0 && is_file($abs)) { @unlink($abs); }
+}
+
+function handleModuleFileUpload($field, array $allowedMap, $maxSize, $subdir, $namePrefix = '')
 {
     if (empty($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
         return null;
@@ -110,7 +133,8 @@ function handleModuleFileUpload($field, array $allowedMap, $maxSize, $subdir)
     $storeBase = defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads');
     $dir = $storeBase . '/modules/' . $subdir;
     if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
-    $name = $subdir . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    $prefix = ($namePrefix !== '') ? $namePrefix : $subdir;
+    $name = $prefix . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(4)), 0, 6) . '.' . $ext;
     if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
         return null;
     }
@@ -271,12 +295,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $videoStatus = $module['video_status'] ?? null;
             $videoSrc    = $module['video_src_path'] ?? null;
 
-            if (!empty($_POST['remove_pdf']))   { $pdfPath = null; }
-            if (!empty($_POST['remove_video'])) { $videoPath = null; $videoStatus = null; $videoSrc = null; }
+            // Nom de fichier lisible basé sur le module.
+            $fSlug = moduleFileSlug($module['nom'] ?? 'contenu');
+
+            // Suppression demandée : on efface aussi le fichier du volume.
+            if (!empty($_POST['remove_pdf']))   { volumeUnlink($pdfPath); $pdfPath = null; }
+            if (!empty($_POST['remove_video'])) { volumeUnlink($videoPath); volumeUnlink($videoSrc); $videoPath = null; $videoStatus = null; $videoSrc = null; }
 
             // PDF : limite alignée sur Claude (30 Mo) pour l'uniformisation par l'IA.
-            $newPdf = handleModuleFileUpload('pdf_file', ['application/pdf' => 'pdf'], 30 * 1024 * 1024, 'pdf');
-            if ($newPdf !== null) { $pdfPath = $newPdf; }
+            $newPdf = handleModuleFileUpload('pdf_file', ['application/pdf' => 'pdf'], 30 * 1024 * 1024, 'pdf', $fSlug . '-guide');
+            if ($newPdf !== null) {
+                // Remplacement : on efface l'ancien PDF (guide) + ses images extraites.
+                foreach ([$pdfPath, $module['pdf_path'] ?? null] as $oldp) { if ($oldp && $oldp !== $newPdf) { volumeUnlink($oldp); } }
+                try {
+                    $og = $db->prepare("SELECT pdf_path, contenu_images FROM modules WHERE parent_id = ? AND content_kind = 'ecrit' LIMIT 1");
+                    $og->execute([(int) $id]);
+                    if ($or = $og->fetch(PDO::FETCH_ASSOC)) {
+                        if (!empty($or['pdf_path']) && $or['pdf_path'] !== $newPdf) { volumeUnlink($or['pdf_path']); }
+                        $oimg = json_decode((string) ($or['contenu_images'] ?? '[]'), true);
+                        if (is_array($oimg)) { foreach ($oimg as $ik) { volumeUnlink($ik); } }
+                    }
+                } catch (Exception $e) {}
+                $pdfPath = $newPdf;
+            }
 
             // Vidéo : on range la source brute (jusqu'à 1 Go), puis on lance la compression
             // 720p faststart EN TÂCHE DE FOND. Le teamcoach n'attend pas.
@@ -284,9 +325,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newVideoRaw = handleModuleFileUpload('video_file', [
                 'video/mp4' => 'mp4', 'video/webm' => 'webm', 'video/ogg' => 'ogv', 'video/quicktime' => 'mov',
                 'video/x-msvideo' => 'avi', 'video/x-matroska' => 'mkv', 'video/3gpp' => '3gp', 'video/x-m4v' => 'm4v',
-            ], 1024 * 1024 * 1024, 'video_raw');
+            ], 1024 * 1024 * 1024, 'video_raw', $fSlug . '-video');
             if ($newVideoRaw !== null) {
+                // Remplacement : on efface l'ancienne vidéo (720p) + l'ancienne source.
+                try {
+                    $ov = $db->prepare("SELECT video_path, video_src_path FROM modules WHERE parent_id = ? AND content_kind = 'video' LIMIT 1");
+                    $ov->execute([(int) $id]);
+                    if ($vr = $ov->fetch(PDO::FETCH_ASSOC)) { volumeUnlink($vr['video_path'] ?? ''); volumeUnlink($vr['video_src_path'] ?? ''); }
+                } catch (Exception $e) {}
+                volumeUnlink($videoPath); volumeUnlink($videoSrc);
                 $videoSrc = $newVideoRaw;
+                $videoPath = null; // le transcodage fournira la nouvelle version 720p
                 $videoStatus = 'processing';
                 $startTranscode = true;
             }

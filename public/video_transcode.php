@@ -41,7 +41,8 @@ $outDir = $base . '/modules/video';
 if (!is_dir($outDir)) {
     @mkdir($outDir, 0775, true);
 }
-$outName = 'video_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.mp4';
+$rawBase = preg_replace('/[^A-Za-z0-9_-]/', '', pathinfo($rawKey, PATHINFO_FILENAME));
+$outName = ($rawBase !== '' ? $rawBase : ('video_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)))) . '.mp4';
 $outFull = $outDir . '/' . $outName;
 $outKey = 'modules/video/' . $outName;
 
