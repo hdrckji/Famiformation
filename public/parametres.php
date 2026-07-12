@@ -62,6 +62,8 @@ iaSettingsHandlePost($db);
 require_once __DIR__ . '/includes/pdf_access.php';
 pdfAccessHandlePost($db);
 require_once __DIR__ . '/includes/storage_admin.php';
+require_once __DIR__ . '/includes/transcription.php'; // état de Whisper pour l'onglet Outils
+require_once __DIR__ . '/includes/outils_tab.php';    // onglet Outils (informatif)
 storageHandlePost($db);
 require_once __DIR__ . '/includes/bulk.php';
 require_once __DIR__ . '/includes/ia_usage.php';
@@ -353,6 +355,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <button class="tab-btn" onclick="showTab('widget', this)">Widget</button>
         <button class="tab-btn" onclick="showTab('contenu', this)">Stockage</button>
         <button class="tab-btn" onclick="showTab('api', this)">API</button>
+        <button class="tab-btn" onclick="showTab('outils', this)">Outils</button>
         <button class="tab-btn" onclick="showTab('prefs', this)">Préférences</button>
     </div>
 
@@ -364,6 +367,11 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     <!-- ONGLET : Contenu (stockage) -->
     <div id="tab-contenu" class="tab-content">
         <?php renderStorageTab($db); ?>
+    </div>
+
+    <!-- ONGLET : Outils (informatif) -->
+    <div id="tab-outils" class="tab-content">
+        <?php renderOutilsTab($db); ?>
     </div>
 
     <!-- ONGLET : Gestion des modules -->
