@@ -378,7 +378,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     <div id="tab-modules" class="tab-content active">
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                <h2 style="margin:0; color:#2d5a37;">Modules</h2>
+                <h2 style="margin:0; color:#2d5a37;">Modules (<?= count($allModules) ?>)</h2>
                 <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer un module</button>
             </div>
             <div style="display:flex; align-items:center; gap:8px; margin:12px 0 6px; font-size:0.85rem; flex-wrap:wrap;">
@@ -511,7 +511,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     <!-- ONGLET : Gestion des profils -->
     <div id="tab-histprofil" class="tab-content">
         <div class="card">
-            <h2 style="margin-top:0; color:#2d5a37;">Profils</h2>
+            <h2 style="margin-top:0; color:#2d5a37;">Profils (<?= count($profilsRows) ?>)</h2>
             <p class="muted">Ajoutez ou supprimez des profils. Un nouveau profil apparaît automatiquement dans la liste d'accès des modules.</p>
 
             <form method="POST" action="module_save.php" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">
@@ -640,7 +640,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <!-- Phrases qui défilent -->
         <?php $wPhrases = widgetPhrases($db, false); ?>
         <div class="card" style="margin-top:20px;">
-            <h2 style="margin-top:0; color:#2d5a37;">Phrases qui défilent</h2>
+            <h2 style="margin-top:0; color:#2d5a37;">Phrases qui défilent (<?= count($wPhrases) ?>)</h2>
             <p class="muted">Blagues et infos jardinerie affichées au centre du widget (défilement infini). Elles seront rejointes plus tard par les questions de quiz déjà faites.</p>
 
             <form method="POST" action="widget_save.php" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">

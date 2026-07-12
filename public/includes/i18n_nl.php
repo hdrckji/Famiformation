@@ -9,8 +9,10 @@
 //  tout le contenu en français. C'est le trou qu'on bouche ici.
 //
 // CHOIX 1 — Qui traduit quoi :
-//  - Textes COURTS (nom, description) → MyMemory (gratuit, déjà en place, suffisant).
-//  - Contenu STRUCTURÉ (blocs du guide, quiz) → Claude (qualité + contexte métier).
+//  - TOUT est traduit par Claude (titre, description, blocs du guide, quiz).
+//    100 % automatique, aucune saisie manuelle, aucun service de traduction tiers.
+//    (MyMemory abandonné : bridé, capricieux, qualité moyenne. Un titre coûte
+//     une fraction de centime en tokens Claude — négligeable.)
 //
 // CHOIX 2 — Comment (le point important) :
 //  On n'envoie PAS le JSON brut à l'IA : elle pourrait renommer une clé, réordonner
@@ -350,38 +352,42 @@ if (!function_exists('nlSyncModule')) {
         $done = [];
         $errors = [];
 
-        // --- 1) Titre / description : MyMemory (gratuit), seulement si le NL manque.
+        // Empreinte du FR : titre + description + guide + quiz.
+        // Toute modification côté français (y compris le titre) => resynchro NL automatique.
         $nom = trim((string) ($m['nom'] ?? ''));
         $desc = trim((string) ($m['description'] ?? ''));
+        $frContent = (string) ($m['contenu_ia'] ?? '');
+        $frQuiz = (string) ($m['quiz_json'] ?? '');
+        $hash = hash('sha256', $nom . '|' . $desc . '|' . $frContent . '|' . $frQuiz);
+        $needSync = $force || ($hash !== (string) ($m['nl_hash'] ?? ''));
+
         $nomNl = trim((string) ($m['nom_nl'] ?? ''));
         $descNl = trim((string) ($m['description_nl'] ?? ''));
-        if (function_exists('mymemoryTranslateFrToNl')) {
-            if ($nom !== '' && ($nomNl === '' || $force)) {
-                $t = trim((string) mymemoryTranslateFrToNl($nom));
-                if ($t !== '') {
-                    $nomNl = mb_substr($t, 0, 150);
-                    $done[] = 'titre';
+        $contenuNl = (string) ($m['contenu_ia_nl'] ?? '');
+        $quizNl = (string) ($m['quiz_json_nl'] ?? '');
+
+        // --- 1) Titre + description : Claude (automatique, fiable, néerlandais de Belgique).
+        // On (re)traduit si le FR a changé, ou si la version NL manque encore.
+        $needTitle = ($nom !== '') && ($needSync || $nomNl === '');
+        $needDesc = ($desc !== '') && ($needSync || $descNl === '');
+        if ($needTitle || $needDesc) {
+            $tr = aiTranslateStringsToNl($db, [$nom, $desc]);
+            if ($tr['ok'] && count($tr['items']) === 2) {
+                if ($nom !== '') {
+                    $t = mb_substr(trim((string) $tr['items'][0]), 0, 150);
+                    if ($t !== '') { $nomNl = $t; $done[] = 'titre'; }
                 }
-            }
-            if ($desc !== '' && ($descNl === '' || $force)) {
-                $t = trim((string) mymemoryTranslateFrToNl($desc));
-                if ($t !== '') {
-                    $descNl = mb_substr($t, 0, 500);
-                    $done[] = 'description';
+                if ($desc !== '') {
+                    $t = mb_substr(trim((string) $tr['items'][1]), 0, 500);
+                    if ($t !== '') { $descNl = $t; $done[] = 'description'; }
                 }
+            } elseif (!$tr['ok']) {
+                $errors[] = 'titre/description : ' . $tr['error'];
             }
         }
 
         // --- 2) Guide + quiz : Claude, seulement si le FR a changé depuis la dernière fois.
-        $frContent = (string) ($m['contenu_ia'] ?? '');
-        $frQuiz = (string) ($m['quiz_json'] ?? '');
-        $hash = hash('sha256', $frContent . '|' . $frQuiz);
-        $needAi = $force || ($hash !== (string) ($m['nl_hash'] ?? ''));
-
-        $contenuNl = (string) ($m['contenu_ia_nl'] ?? '');
-        $quizNl = (string) ($m['quiz_json_nl'] ?? '');
-
-        if ($needAi) {
+        if ($needSync) {
             if (trim($frContent) !== '') {
                 $r = nlTranslateBlocksJson($db, $frContent);
                 if ($r['ok']) {

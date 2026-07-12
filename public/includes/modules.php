@@ -975,25 +975,12 @@ if (!function_exists('ensureModulesTable')) {
         <textarea name="description" rows="2" maxlength="500"><?= $desc ?></textarea>
 
         <?php
-            // 🌐 NÉERLANDAIS — le site est bilingue : l'admin doit pouvoir VOIR et CORRIGER
-            // la version NL (avant, elle était traduite en douce sans être ni visible ni
-            // modifiable). Laisser vide = traduction automatique depuis le français.
-            $nomNl  = htmlspecialchars($module['nom_nl'] ?? '');
-            $descNl = htmlspecialchars($module['description_nl'] ?? '');
+            // 🌐 NÉERLANDAIS : aucune saisie manuelle. Le site traduit TOUT automatiquement
+            // (titre, description, guide, quiz) via Claude à chaque enregistrement.
         ?>
-        <details class="access-drop" <?= ($nomNl !== '' || $descNl !== '') ? 'open' : '' ?>>
-            <summary>🌐 Néerlandais (facultatif)</summary>
-            <div style="padding:6px 2px;">
-                <div class="muted" style="font-size:.84rem; margin-bottom:8px;">
-                    Laissez vide : le site <strong>traduit automatiquement</strong> depuis le français.
-                    Remplissez seulement si vous voulez <strong>corriger</strong> la traduction.
-                </div>
-                <label>Nom (NL)</label>
-                <input type="text" name="nom_nl" maxlength="150" value="<?= $nomNl ?>" placeholder="(traduit automatiquement si vide)">
-                <label>Description (NL)</label>
-                <textarea name="description_nl" rows="2" maxlength="500" placeholder="(traduit automatiquement si vide)"><?= $descNl ?></textarea>
-            </div>
-        </details>
+        <p class="muted" style="font-size:.82rem; margin:2px 0 10px; color:#6c7a70;">
+            🌐 La version <strong>néerlandaise</strong> est générée <strong>automatiquement</strong> — rien à saisir.
+        </p>
 
         <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
 

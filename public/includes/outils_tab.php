@@ -191,7 +191,7 @@ if (!function_exists('renderOutilsTab')) {
         ?>
         <?php $bg = outilsBackgroundCheck(); ?>
         <div class="card">
-            <h2 style="margin-top:0; color:#2d5a37;">🧰 Outils utilisés par le site</h2>
+            <h2 style="margin-top:0; color:#2d5a37;">🧰 Outils utilisés par le site (<?= count($tools) ?>)</h2>
             <p class="muted" style="margin-top:-6px;">
                 Page <strong>informative</strong> : rien à régler ici. Elle liste de quoi le site dépend,
                 à quoi sert chaque brique, et <strong>où se configure sa clé</strong>.

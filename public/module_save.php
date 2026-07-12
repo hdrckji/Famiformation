@@ -186,8 +186,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['module_flash'] = "❌ Le nom du module est obligatoire.";
         } else {
             $iconImage = handleModuleIconUpload();
-            // Bilingue : respecte un NL saisi à la main, traduit automatiquement sinon.
-            $nl = moduleNlFromPost($nom, $description);
             // Nouveau module placé EN DERNIER parmi ses frères (sort_order = max + 1),
             // sinon il hérite de 0 et remonte tout en haut de la liste.
             if ($parentId === null) {
@@ -197,8 +195,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ss->execute([$parentId]);
                 $nextSort = (int) $ss->fetchColumn();
             }
+            // Bilingue : on enregistre le FR. Le NL (titre + description) est généré
+            // AUTOMATIQUEMENT par Claude en tâche de fond juste après (spawnNlSync).
             $stmt = $db->prepare(
-                "INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, icon_image, nom_nl, description_nl, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, icon_image, nom_nl, description_nl, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)"
             );
             $stmt->execute([
                 mb_substr($nom, 0, 150),
@@ -208,23 +208,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mb_substr($icon, 0, 16),
                 $roles,
                 $iconImage,
-                $nl['nom'] !== '' ? $nl['nom'] : null,
-                $nl['desc'] !== '' ? $nl['desc'] : null,
                 $nextSort,
             ]);
-            $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé.";
+            $newId = (int) $db->lastInsertId();
+            $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé. 🌐 Version néerlandaise en cours.";
 
             // Contributeur : le module reste EN ATTENTE (caché) jusqu'à validation admin.
             if (!$isAdminActor) {
                 require_once __DIR__ . '/includes/events.php';
                 eventsEnsureTables($db);
-                $newId = (int) $db->lastInsertId();
                 $uid = ((int) ($_SESSION['user_id'] ?? 0)) ?: null;
                 try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id = ?")->execute([$newId]); } catch (Exception $e) {}
                 try { $db->prepare("UPDATE modules SET contenu_by = ? WHERE id = ?")->execute([$uid, $newId]); } catch (Exception $e) {}
                 logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $newId, 'Nouveau module proposé : ' . $nom);
                 $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé — en attente de validation par un admin.";
             }
+            if (function_exists('spawnNlSync')) { spawnNlSync($newId); } // titre/description → NL auto (Claude, fond)
         }
 
         if ($parentId) {
@@ -248,10 +247,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $uploaded = handleModuleIconUpload();
                 if ($uploaded !== null) { $iconImage = $uploaded; }
 
-                // Bilingue : respecte un NL saisi à la main, traduit automatiquement sinon.
-                $nl = moduleNlFromPost($nom, $description);
+                // Bilingue : on met à jour le FR. Le NL (titre + description) est régénéré
+                // AUTOMATIQUEMENT par Claude en tâche de fond (spawnNlSync) si le FR a changé.
                 $stmt = $db->prepare(
-                    "UPDATE modules SET nom = ?, description = ?, is_container = ?, icon = ?, roles = ?, icon_image = ?, nom_nl = ?, description_nl = ? WHERE id = ?"
+                    "UPDATE modules SET nom = ?, description = ?, is_container = ?, icon = ?, roles = ?, icon_image = ? WHERE id = ?"
                 );
                 $stmt->execute([
                     mb_substr($nom, 0, 150),
@@ -260,11 +259,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     mb_substr($icon, 0, 16),
                     $roles,
                     $iconImage,
-                    $nl['nom'] !== '' ? $nl['nom'] : null,
-                    $nl['desc'] !== '' ? $nl['desc'] : null,
                     $id,
                 ]);
-                $_SESSION['module_flash'] = "✅ Module « " . $nom . " » modifié.";
+                if (function_exists('spawnNlSync')) { spawnNlSync((int) $id); } // titre/description → NL auto (Claude, fond)
+                $_SESSION['module_flash'] = "✅ Module « " . $nom . " » modifié. 🌐 Version néerlandaise mise à jour.";
             }
         } else {
             $_SESSION['module_flash'] = "❌ Modification impossible (nom obligatoire).";
