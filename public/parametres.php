@@ -280,7 +280,11 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .child-count { display:inline-block; margin-left:8px; font-size:0.72rem; font-weight:700; color:#2d5a37; background:#e8f5e9; padding:2px 9px; border-radius:999px; vertical-align:middle; }
         .type-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:0.76rem; font-weight:700; white-space:nowrap; }
         .type-container { background:#e8f5e9; color:#2d5a37; }
-        .type-content { background:#eef1f4; color:#54606b; }
+        /* Sous-types d'Élément : C = affiche du contenu (PDF/vidéo) · S = fonction spéciale dédiée */
+        .type-content { background:#e3f0fb; color:#1f5c8c; }
+        .type-special { background:#fff3e0; color:#8a5a00; }
+        .type-empty   { background:#f1f1f1; color:#8f9a94; }
+        .type-badge .tb-letter { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:4px; background:rgba(0,0,0,.12); font-size:0.7rem; font-weight:800; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
         th, td { padding: 10px 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 0.92rem; vertical-align: middle; }
         th { background: #e8f5e9; color: #1d6f42; }
@@ -344,6 +348,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <a href="parametres.php?msort=alpha#modules" class="btn <?= $moduleSort === 'alpha' ? 'btn-primary' : 'btn-light' ?>" style="padding:5px 12px;">🔤 A → Z</a>
                 <span class="muted" style="font-size:0.8rem;">(la hiérarchie est conservée : on trie les modules d'un même niveau)</span>
             </div>
+            <div style="display:flex; align-items:center; gap:8px; margin:0 0 10px; font-size:0.8rem; flex-wrap:wrap;">
+                <span class="muted" style="font-weight:700;">Types :</span>
+                <span class="type-badge type-container">📁 Conteneur</span><span class="muted">contient d'autres modules</span>
+                <span class="type-badge type-content">📄 Élément <span class="tb-letter">C</span></span><span class="muted">affiche du <strong>contenu</strong> (PDF / vidéo)</span>
+                <span class="type-badge type-special">⚙️ Élément <span class="tb-letter">S</span></span><span class="muted">fonction <strong>spéciale</strong> (ex. Formation présentiel, Classement)</span>
+            </div>
             <table>
                 <thead>
                     <tr><th>Icône</th><th>Nom</th><th>Type</th><th>Organiser</th><th>Accès</th><th>Statut</th><th>Actions</th><th style="text-align:right;">Verrou</th></tr>
@@ -360,7 +370,23 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                                 <?php if (!empty($m['link'])): ?><div class="muted" style="font-size:0.76rem;">🔗 module de base → <?= htmlspecialchars($m['link']) ?></div><?php endif; ?>
                             </div>
                         </td>
-                        <td><?php if (!empty($m['is_container']) || $hasChildren): ?><span class="type-badge type-container">📁 Conteneur</span><?php else: ?><span class="type-badge type-content">📄 Élément</span><?php endif; ?></td>
+                        <td>
+                            <?php if (!empty($m['is_container']) || $hasChildren): ?>
+                                <span class="type-badge type-container">📁 Conteneur</span>
+                            <?php else:
+                                // Sous-type d'Élément : C = contenu (PDF/vidéo), S = fonction spéciale (page dédiée).
+                                $elHasContent = !empty($m['pdf_path']) || !empty($m['video_path']) || !empty($m['contenu_ia']);
+                                $elHasLink = trim((string) ($m['link'] ?? '')) !== '';
+                            ?>
+                                <?php if ($elHasContent): ?>
+                                    <span class="type-badge type-content" title="Élément CONTENU — affiche un PDF et/ou une vidéo">📄 Élément <span class="tb-letter">C</span></span>
+                                <?php elseif ($elHasLink): ?>
+                                    <span class="type-badge type-special" title="Élément SPÉCIAL — fonction dédiée (ex. Formation présentiel, Classement)">⚙️ Élément <span class="tb-letter">S</span></span>
+                                <?php else: ?>
+                                    <span class="type-badge type-empty" title="Élément vide — en attente de contenu">📄 Élément</span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <form method="POST" action="module_save.php" style="display:flex; gap:4px;">
                                 <?= csrfField() ?>
