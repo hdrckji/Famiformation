@@ -190,30 +190,41 @@ function famiEnrichQuizWithVideo(PDO $db, $videoModuleId, $transcript)
         );
         $st->execute([$parentId]);
         $guide = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$guide) {
-            return;
-        }
-        if (empty($guide['a_evaluer']) || !empty($guide['quiz_from_video'])) {
-            return; // pas de quiz demandé, ou déjà enrichi : on ne touche à rien
-        }
 
-        $guideText = trim((string) ($guide['contenu_ia'] ?? ''));
-        $source = "CONTENU ÉCRIT (le guide) :\n" . $guideText
-            . "\n\n---\n\nCONTENU DE LA VIDÉO (transcription) :\n" . trim((string) $transcript);
+        $transcript = trim((string) $transcript);
+        if ($guide) {
+            // Cas GUIDE + VIDÉO : quiz sur les deux supports, stocké sur le guide.
+            if (empty($guide['a_evaluer']) || !empty($guide['quiz_from_video'])) {
+                return; // pas de quiz demandé, ou déjà généré : on ne touche à rien
+            }
+            $targetId = (int) $guide['id'];
+            $source = "CONTENU ÉCRIT (le guide) :\n" . trim((string) ($guide['contenu_ia'] ?? ''))
+                . "\n\n---\n\nCONTENU DE LA VIDÉO (transcription) :\n" . $transcript;
+        } else {
+            // Cas VIDÉO SEULE (pas de guide) : quiz depuis la transcription, stocké sur la vidéo.
+            $vs = $db->prepare("SELECT a_evaluer, quiz_from_video FROM modules WHERE id = ? LIMIT 1");
+            $vs->execute([$videoModuleId]);
+            $v = $vs->fetch(PDO::FETCH_ASSOC);
+            if (!$v || empty($v['a_evaluer']) || !empty($v['quiz_from_video'])) {
+                return;
+            }
+            $targetId = (int) $videoModuleId;
+            $source = "CONTENU DE LA VIDÉO (transcription) :\n" . $transcript;
+        }
 
         if (!function_exists('aiGenerateQuiz')) {
             require_once __DIR__ . '/includes/ai_uniformise.php';
         }
         $qz = aiGenerateQuiz($db, $source);
         if (empty($qz['ok']) || empty($qz['quiz'])) {
-            return; // échec : on garde le quiz existant (issu du PDF), pas de régression
+            return; // échec : pas de régression (un éventuel quiz existant reste en place)
         }
         $db->prepare("UPDATE modules SET quiz_json = ?, quiz_from_video = 1 WHERE id = ?")
-           ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), (int) $guide['id']]);
+           ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), $targetId]);
 
         // Le quiz FR a changé → sa version NL doit suivre.
         if (function_exists('nlSyncModule')) {
-            nlSyncModule($db, (int) $guide['id'], true);
+            nlSyncModule($db, $targetId, true);
         }
     } catch (Exception $e) {
         // non critique : le quiz issu du PDF reste en place

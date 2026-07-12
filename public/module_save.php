@@ -405,8 +405,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                // Quiz : si le contenu est « à évaluer » et qu'on a le texte uniformisé, on génère le QCM.
-                if ($aEvaluer && $uniformized === 1 && $contenuIa) {
+                // Quiz : on ne le génère MAINTENANT que si le support est COMPLET, c.-à-d.
+                // un PDF SANS vidéo. S'il y a une vidéo, on ATTEND sa transcription pour
+                // générer le quiz UNE SEULE FOIS sur le guide + la vidéo (famiEnrichQuizWithVideo).
+                // -> plus sûr (l'IA a tout le contenu) et pas de génération payée pour rien.
+                if ($aEvaluer && $uniformized === 1 && $contenuIa && !$hasVideo) {
                     require_once __DIR__ . '/includes/ia_settings.php';
                     require_once __DIR__ . '/includes/ai_uniformise.php';
                     $qz = aiGenerateQuiz($db, (string) $contenuIa);
@@ -418,6 +421,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $flashMsg .= " ⚠️ Quiz NON généré : " . $qz['error'] . ".";
                     }
+                } elseif ($aEvaluer && $hasVideo) {
+                    $flashMsg .= " 📝 Le quiz sera généré après la transcription de la vidéo (guide + vidéo).";
                 }
 
                 $hasPdf = ($pdfPath !== null && $pdfPath !== '');
@@ -459,11 +464,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     try { $vid = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'video' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
                     if ($vid) {
                         $vidChildId = (int) $vid['id'];
-                        $db->prepare("UPDATE modules SET video_path = ?, video_status = ?, video_src_path = ?, pdf_path = NULL, contenu_by = COALESCE(contenu_by, ?) WHERE id = ?")
-                           ->execute([$videoPath, $videoStatus, $videoSrc, $contenuBy, $vidChildId]);
+                        // a_evaluer aussi sur la vidéo : permet de générer le quiz depuis la
+                        // transcription même s'il n'y a PAS de guide (module vidéo seule).
+                        $db->prepare("UPDATE modules SET video_path = ?, video_status = ?, video_src_path = ?, pdf_path = NULL, a_evaluer = ?, contenu_by = COALESCE(contenu_by, ?) WHERE id = ?")
+                           ->execute([$videoPath, $videoStatus, $videoSrc, $aEvaluer, $contenuBy, $vidChildId]);
                     } else {
-                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, video_path, video_status, video_src_path, contenu_by, content_kind) VALUES (?, ?, 0, ?, '🎬', ?, 1, ?, ?, ?, ?, 'video')")
-                           ->execute(['Vidéo', 'Video', (int) $id, $childRoles, $videoPath, $videoStatus, $videoSrc, $contenuBy]);
+                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, video_path, video_status, video_src_path, a_evaluer, contenu_by, content_kind) VALUES (?, ?, 0, ?, '🎬', ?, 1, ?, ?, ?, ?, ?, 'video')")
+                           ->execute(['Vidéo', 'Video', (int) $id, $childRoles, $videoPath, $videoStatus, $videoSrc, $aEvaluer, $contenuBy]);
                         $vidChildId = (int) $db->lastInsertId();
                     }
                     // Sous-titres fournis : on les attache au sous-module vidéo AVANT que le
