@@ -68,7 +68,9 @@ if (!function_exists('aiSanitizeBlocks')) {
                     if (!empty($items)) { $ok[] = ['type' => 'keyfigures', 'items' => $items]; }
                     break;
                 case 'image':
-                    $ok[] = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? '')];
+                    $rot = ((int) ($b['rotate'] ?? 0) % 360 + 360) % 360;
+                    if (!in_array($rot, [0, 90, 180, 270], true)) { $rot = 0; }
+                    $ok[] = ['type' => 'image', 'n' => (int) ($b['n'] ?? 0), 'caption' => (string) ($b['caption'] ?? ''), 'rotate' => $rot];
                     break;
                 case 'quote':
                     if (trim((string) ($b['text'] ?? '')) !== '') { $ok[] = ['type' => 'quote', 'text' => (string) $b['text']]; }
@@ -129,14 +131,15 @@ if (!function_exists('aiUniformisePdf')) {
             . "- {\"type\":\"steps\",\"items\":[{\"title\":\"titre court de l'étape\",\"desc\":\"détail de l'étape\"}]} : procédure ordonnée.\n"
             . "- {\"type\":\"callout\",\"style\":\"info|tip|warning\",\"title\":\"court\",\"text\":\"information importante à mettre en avant\"}\n"
             . "- {\"type\":\"keyfigures\",\"items\":[{\"value\":\"24/7\",\"label\":\"court\"}]} : chiffres/points clés.\n"
-            . "- {\"type\":\"image\",\"n\":2,\"caption\":\"légende courte\"} : place UNE image pertinente (n = son numéro fourni).\n"
+            . "- {\"type\":\"image\",\"n\":2,\"caption\":\"légende courte\",\"rotate\":0} : place UNE image pertinente (n = son numéro fourni). \"rotate\" = angle HORAIRE (0, 90, 180 ou 270) à appliquer pour remettre l'image DROITE si elle est de travers.\n"
             . "- {\"type\":\"quote\",\"text\":\"consigne ou phrase forte à mettre en avant\"}\n"
             . "RÈGLES DE QUALITÉ (essentielles) :\n"
             . "  - Commence TOUJOURS par un bloc hero (titre + sous-titre accrocheur).\n"
             . "  - Découpe en PLUSIEURS sections claires, chacune avec un vrai contenu.\n"
             . "  - Rends la fiche VIVANTE et riche : n'utilise PAS que des blocs text. Emploie réellement : callout (pour chaque info importante / consigne / point d'attention), steps (pour toute procédure ou étapes), keyfigures (pour les chiffres, horaires, repères), quote (pour une consigne forte). Vise un bon mélange de blocs.\n"
-            . "  - Fidélité TOTALE : n'invente rien, ne garde que ce qui est dans le document ; supprime numéros de page et en-têtes répétés.\n"
-            . "IMAGES : les images fournies sont déjà filtrées (pas de logos répétés). Place CHAQUE image de contenu fournie avec un bloc image ({\"type\":\"image\",\"n\":numéro,\"caption\":\"légende courte\"}), à l'endroit du texte où elle a du sens. N'ignore une image que si elle est vraiment décorative. Jamais deux fois la même.";
+            . "  - Fidélité au fond : n'invente aucune donnée absente, ne garde que ce qui est dans le document ; supprime numéros de page et en-têtes répétés.\n"
+            . "  - CORRECTION : corrige les fautes d'orthographe, de grammaire, de ponctuation et de casse. Si une information est manifestement incohérente ou erronée (faute de frappe sur un mot/chiffre clé, contradiction évidente), corrige-la de façon logique en restant fidèle au sens du document. Ne modifie JAMAIS une information métier volontaire (procédure, montant, règle) juste parce qu'elle te surprend, et n'invente rien.\n"
+            . "IMAGES : les images fournies sont déjà filtrées (pas de logos répétés). Place CHAQUE image de contenu fournie avec un bloc image, à l'endroit du texte où elle a du sens. N'ignore une image que si elle est vraiment décorative. Jamais deux fois la même. Pour CHAQUE image, regarde son orientation : si elle est pivotée/de travers, renseigne \"rotate\" (angle horaire) pour la redresser.";
 
         $userContent = [
             ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($bytes)]],
@@ -209,7 +212,21 @@ if (!function_exists('aiUniformisePdf')) {
             $parsed = json_decode(substr($text, $js, $je - $js + 1), true);
             if (is_array($parsed) && !empty($parsed['blocks']) && is_array($parsed['blocks']) && function_exists('aiSanitizeBlocks')) {
                 $blocks = aiSanitizeBlocks($parsed['blocks']);
-                if (!empty($blocks)) { $text = json_encode(['blocks' => $blocks], JSON_UNESCAPED_UNICODE); }
+                if (!empty($blocks)) {
+                    // Orientation : on pivote réellement les fichiers image selon l'IA, puis on retire le champ.
+                    $imgBase = rtrim((defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads')), '/');
+                    foreach ($blocks as &$bl) {
+                        if (($bl['type'] ?? '') === 'image' && !empty($bl['rotate'])) {
+                            $idx = (int) $bl['n'] - 1;
+                            if ($idx >= 0 && isset($images[$idx]) && function_exists('aiRotateImageFile')) {
+                                aiRotateImageFile($imgBase . '/' . $images[$idx], (int) $bl['rotate']);
+                            }
+                        }
+                        unset($bl['rotate']);
+                    }
+                    unset($bl);
+                    $text = json_encode(['blocks' => $blocks], JSON_UNESCAPED_UNICODE);
+                }
             }
         }
 
@@ -242,6 +259,33 @@ if (!function_exists('aiMarkdownToHtml')) {
         }
         if ($inList) { $out[] = '</ul>'; }
         return implode("\n", $out);
+    }
+}
+
+if (!function_exists('aiRotateImageFile')) {
+    /** Pivote un fichier image de $deg degrés HORAIRE (0/90/180/270) via GD. Repli propre si GD absent. */
+    function aiRotateImageFile($absPath, $deg)
+    {
+        $deg = ((int) $deg % 360 + 360) % 360;
+        if ($deg === 0 || !function_exists('imagerotate') || !is_file($absPath)) { return false; }
+        $ext = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
+        $src = null;
+        if (($ext === 'jpg' || $ext === 'jpeg') && function_exists('imagecreatefromjpeg')) { $src = @imagecreatefromjpeg($absPath); }
+        elseif ($ext === 'png' && function_exists('imagecreatefrompng')) { $src = @imagecreatefrompng($absPath); }
+        elseif ($ext === 'webp' && function_exists('imagecreatefromwebp')) { $src = @imagecreatefromwebp($absPath); }
+        elseif ($ext === 'gif' && function_exists('imagecreatefromgif')) { $src = @imagecreatefromgif($absPath); }
+        if (!$src) { return false; }
+        // imagerotate tourne dans le sens ANTI-horaire -> pour un angle horaire, on passe (360 - deg).
+        $rot = @imagerotate($src, 360 - $deg, 0);
+        if (!$rot) { @imagedestroy($src); return false; }
+        $ok = false;
+        if ($ext === 'jpg' || $ext === 'jpeg') { $ok = @imagejpeg($rot, $absPath, 88); }
+        elseif ($ext === 'png') { $ok = @imagepng($rot, $absPath); }
+        elseif ($ext === 'webp' && function_exists('imagewebp')) { $ok = @imagewebp($rot, $absPath); }
+        elseif ($ext === 'gif') { $ok = @imagegif($rot, $absPath); }
+        @imagedestroy($src);
+        @imagedestroy($rot);
+        return $ok;
     }
 }
 
