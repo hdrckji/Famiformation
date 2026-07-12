@@ -391,18 +391,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                                     <input type="hidden" name="return" value="parametres.php">
                                     <button type="submit" class="btn btn-light" title="<?= $lk ? 'Module verrouillé — déverrouillez-le pour changer le statut' : 'Activer / Désactiver' ?>" <?= $lk ? 'disabled' : '' ?>><?= (int) $m['is_active'] === 1 ? '⏸' : '▶' ?></button>
                                 </form>
-                                <?php
-                                    $delMsg = $hasLockedDesc
-                                        ? "⚠️ ATTENTION : ce module contient des sous-modules VERROUILLÉS.\n\nLes supprimer avec est IRRÉVERSIBLE. Es-tu vraiment sûr de vouloir tout supprimer ?"
-                                        : ('Supprimer définitivement ce module' . ($hasChildren ? ' (et ses sous-modules)' : '') . ' ?');
-                                ?>
-                                <form method="POST" action="module_save.php" style="display:inline;" onsubmit="return confirm(<?= htmlspecialchars(json_encode($delMsg, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>);">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
-                                    <input type="hidden" name="return" value="parametres.php">
-                                    <button type="submit" class="btn btn-danger" style="<?= $hasLockedDesc ? 'background:#9b1c1c; box-shadow:0 0 0 2px #ffb3b3;' : '' ?>" title="<?= $lk ? 'Module verrouillé — déverrouillez-le pour supprimer' : ($hasLockedDesc ? 'Contient des sous-modules VERROUILLÉS — suppression irréversible' : 'Supprimer') ?>" <?= $lk ? 'disabled' : '' ?>><?= $hasLockedDesc ? '⚠️🗑' : '🗑' ?></button>
-                                </form>
+                                <button type="button" class="btn btn-danger" style="<?= $hasLockedDesc ? 'background:#9b1c1c; box-shadow:0 0 0 2px #ffb3b3;' : '' ?>" title="<?= $lk ? 'Module verrouillé — déverrouillez-le pour supprimer' : ($hasLockedDesc ? 'Contient des sous-modules VERROUILLÉS — suppression irréversible' : 'Supprimer') ?>" <?= $lk ? 'disabled' : '' ?> onclick="askDeleteModule(<?= (int) $m['id'] ?>, <?= htmlspecialchars(json_encode((string) $m['nom'], JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>, <?= $hasLockedDesc ? 'true' : 'false' ?>, <?= $hasChildren ? 'true' : 'false' ?>)"><?= $hasLockedDesc ? '⚠️🗑' : '🗑' ?></button>
                             </div>
                         </td>
                         <td style="text-align:right;">
@@ -1046,7 +1035,54 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     </div>
 </div>
 
+<!-- Modale : confirmation de suppression d'un module (remplace le confirm() du navigateur) -->
+<div id="delModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width:520px;">
+        <div style="text-align:center;">
+            <div id="delIcon" style="font-size:3rem; line-height:1;">🗑</div>
+            <h3 id="delTitle" style="margin:8px 0 6px;">Supprimer ce module ?</h3>
+            <p id="delMsg" style="color:#555; line-height:1.55; margin:0;"></p>
+            <p id="delWarn" style="display:none; background:#fdecec; border:1px solid #f5b5b5; color:#8a1f1f; font-weight:700; padding:11px 13px; border-radius:10px; margin:14px 0 0; text-align:left; line-height:1.5;"></p>
+        </div>
+        <form method="POST" action="module_save.php" style="margin-top:20px;">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" id="delId" value="">
+            <input type="hidden" name="return" value="parametres.php">
+            <div class="modal-actions">
+                <button type="button" class="btn btn-light" onclick="closeModal('delModal')">Annuler</button>
+                <button type="submit" id="delConfirmBtn" class="btn btn-danger">🗑 Supprimer définitivement</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+    // Ouvre la modale de suppression, adaptée au module (et alerte si sous-modules verrouillés).
+    function askDeleteModule(id, nom, hasLocked, hasChildren) {
+        document.getElementById('delId').value = id;
+        document.getElementById('delTitle').textContent = 'Supprimer « ' + nom + ' » ?';
+        var msg = document.getElementById('delMsg');
+        var warn = document.getElementById('delWarn');
+        var icon = document.getElementById('delIcon');
+        var btn = document.getElementById('delConfirmBtn');
+        msg.textContent = hasChildren
+            ? 'Ce module et TOUS ses sous-modules seront supprimés définitivement.'
+            : 'Ce module sera supprimé définitivement.';
+        if (hasLocked) {
+            icon.textContent = '⚠️';
+            warn.style.display = 'block';
+            warn.textContent = '⚠️ ATTENTION : ce module contient des sous-modules VERROUILLÉS. Ils seront supprimés eux aussi. Cette action est IRRÉVERSIBLE.';
+            btn.style.background = '#9b1c1c';
+            btn.style.boxShadow = '0 0 0 2px #ffb3b3';
+        } else {
+            icon.textContent = '🗑';
+            warn.style.display = 'none';
+            btn.style.background = '';
+            btn.style.boxShadow = '';
+        }
+        openModal('delModal');
+    }
     function askPassword(action, id) {
         document.getElementById('pwdAction').value = action;
         document.getElementById('pwdId').value = id;
