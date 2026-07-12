@@ -701,12 +701,22 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </table>
             </div>
             <script>
-            function famiTogglePhrases() {
-                var w = document.getElementById('phrasesList'), b = document.getElementById('phrasesToggle');
-                var open = w.style.display !== 'none';
-                w.style.display = open ? 'none' : 'block';
-                b.textContent = (open ? '▸ Voir' : '▾ Masquer') + ' les phrases (<?= count($wPhrases) ?>)';
-            }
+            (function () {
+                var N = <?= count($wPhrases) ?>;
+                function setPh(open) {
+                    var w = document.getElementById('phrasesList'), b = document.getElementById('phrasesToggle');
+                    if (!w || !b) { return; }
+                    w.style.display = open ? 'block' : 'none';
+                    b.textContent = (open ? '▾ Masquer' : '▸ Voir') + ' les phrases (' + N + ')';
+                    try { sessionStorage.setItem('famiPhOpen', open ? '1' : '0'); } catch (e) {}
+                }
+                window.famiTogglePhrases = function () {
+                    var w = document.getElementById('phrasesList');
+                    setPh(w && w.style.display === 'none');
+                };
+                // Reste dépliée après un rechargement (ajout/modif d'une phrase).
+                try { if (sessionStorage.getItem('famiPhOpen') === '1') { setPh(true); } } catch (e) {}
+            })();
             </script>
         </div>
 

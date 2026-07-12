@@ -224,12 +224,23 @@ if (!function_exists('renderEventThemeCards')) {
         <?php endforeach; ?>
         </div>
         <script>
-        function famiToggleEvents() {
-            var w = document.getElementById('evList'), b = document.getElementById('evToggle');
-            var open = w.style.display !== 'none';
-            w.style.display = open ? 'none' : 'block';
-            b.textContent = (open ? '▸ Voir les ' : '▾ Masquer les ') + <?= count($events) ?> + ' événements (thème · effets · animation)';
-        }
+        (function () {
+            var N = <?= count($events) ?>;
+            function setEv(open) {
+                var w = document.getElementById('evList'), b = document.getElementById('evToggle');
+                if (!w || !b) { return; }
+                w.style.display = open ? 'block' : 'none';
+                b.textContent = (open ? '▾ Masquer les ' : '▸ Voir les ') + N + ' événements (thème · effets · animation)';
+                try { sessionStorage.setItem('famiEvOpen', open ? '1' : '0'); } catch (e) {}
+            }
+            window.famiToggleEvents = function () {
+                var w = document.getElementById('evList');
+                setEv(w && w.style.display === 'none');
+            };
+            // Après une bascule d'interrupteur, la page se recharge : on ré-ouvre la liste
+            // TOUT DE SUITE (avant que le scroll ne se replace) → on retrouve exactement sa place.
+            try { if (sessionStorage.getItem('famiEvOpen') === '1') { setEv(true); } } catch (e) {}
+        })();
         </script>
         <?php
     }

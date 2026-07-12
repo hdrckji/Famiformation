@@ -127,7 +127,15 @@ if (!function_exists('storageScan')) {
         $total += $dBytes; $count += $dCount;
         $byCat['divers'] = ['label' => 'Divers (photos de profil, images de thèmes…)', 'bytes' => $dBytes, 'count' => $dCount];
 
-        usort($files, function ($a, $b) { return ($b['mtime'] ?? 0) <=> ($a['mtime'] ?? 0); });
+        // Ordre d'affichage demandé : PDF → Vidéos → Images extraites → Divers.
+        // (à catégorie égale : le plus récent d'abord)
+        $catRank = ['pdf' => 1, 'video' => 2, 'video_raw' => 3, 'images' => 4, 'divers' => 5];
+        usort($files, function ($a, $b) use ($catRank) {
+            $ra = $catRank[$a['cat']] ?? 99;
+            $rb = $catRank[$b['cat']] ?? 99;
+            if ($ra !== $rb) { return $ra <=> $rb; }
+            return ($b['mtime'] ?? 0) <=> ($a['mtime'] ?? 0);
+        });
         return ['base' => $base, 'total' => $total, 'count' => $count, 'byCat' => $byCat, 'files' => $files];
     }
 }
@@ -333,7 +341,7 @@ if (!function_exists('renderStorageTab')) {
                         $url = function_exists('moduleFileUrl') ? moduleFileUrl($f['key']) : ('media.php?f=' . rawurlencode($f['key']));
                         $rowLabel = ($modName !== '' ? $modName . ' — ' : '') . basename($f['key']);
                     ?>
-                    <tr data-type="<?= htmlspecialchars($f['type']) ?>"<?= in_array($f['type'], ['image', 'autre'], true) ? ' style="display:none;"' : '' ?>>
+                    <tr data-type="<?= htmlspecialchars($f['type']) ?>">
                         <td style="text-align:center;"><input type="checkbox" class="sa-check" value="<?= htmlspecialchars($f['key'], ENT_QUOTES) ?>" onchange="saUpdateCount()"></td>
                         <td>
                             <div style="font-weight:700; color:#244230; word-break:break-all;"><?= htmlspecialchars(basename($f['key'])) ?></div>
@@ -478,8 +486,9 @@ if (!function_exists('renderStorageTab')) {
             if (btn) { btn.classList.remove('btn-light'); btn.classList.add('btn-primary'); }
             document.querySelectorAll('#saFileTable tbody tr').forEach(function (tr) {
                 var t = tr.getAttribute('data-type');
-                // « Tous » = PDF + vidéos (les images extraites restent à part, via leur propre filtre).
-                var show = (type === 'all') ? (t !== 'image') : (t === type);
+                // « Tous » = VRAIMENT tout (PDF, vidéos, images extraites, divers),
+                // affiché dans l'ordre : PDF → Vidéos → Images → Divers.
+                var show = (type === 'all') ? true : (t === type);
                 tr.style.display = show ? '' : 'none';
                 if (!show) { var c = tr.querySelector('.sa-check'); if (c) { c.checked = false; } } // on décoche ce qui est masqué
             });
