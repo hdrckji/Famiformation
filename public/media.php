@@ -68,7 +68,10 @@ header('Content-Type: ' . $ctype);
 header('Accept-Ranges: bytes');
 header('Content-Disposition: inline; filename="' . basename($real) . '"');
 header('X-Content-Type-Options: nosniff');
-header('Cache-Control: private, max-age=3600');
+// Fichiers à noms uniques (jamais réécrits) -> cache navigateur maximal (1 an, sans revalidation).
+// « private » : cache par utilisateur (le contenu reste soumis au contrôle d'accès à la 1re requête).
+header('Cache-Control: private, max-age=31536000, immutable');
+header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 31536000) . ' GMT');
 
 // 6) Support Range (lecture partielle / navigation vidéo).
 $start = 0;
