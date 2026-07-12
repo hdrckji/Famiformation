@@ -50,7 +50,7 @@ if (!function_exists('storageCategories')) {
     {
         // listable = affiché dans la liste des fichiers ; sinon seulement compté dans le total.
         return [
-            'pdf'       => ['dir' => 'modules/pdf',        'label' => 'Documents (Le guide)',     'listable' => true,  'type' => 'pdf'],
+            'pdf'       => ['dir' => 'modules/pdf',        'label' => 'PDF',                       'listable' => true,  'type' => 'pdf'],
             'video'     => ['dir' => 'modules/video',      'label' => 'Vidéos',                    'listable' => true,  'type' => 'video'],
             'video_raw' => ['dir' => 'modules/video_raw',  'label' => 'Vidéos (sources en attente)', 'listable' => true, 'type' => 'video'],
             'images'    => ['dir' => 'modules/pdf_images', 'label' => 'Images extraites des PDF',  'listable' => false, 'type' => 'image'],
@@ -256,7 +256,7 @@ if (!function_exists('renderStorageTab')) {
                                 <?php if ($isRaw): ?> · source en attente<?php endif; ?>
                             </div>
                         </td>
-                        <td><?= $icon ?> <?= $f['type'] === 'video' ? 'Vidéo' : 'Document' ?></td>
+                        <td><?= $icon ?> <?= $f['type'] === 'video' ? 'Vidéo' : 'PDF' ?></td>
                         <td style="text-align:right; white-space:nowrap;"><?= htmlspecialchars(storageHumanSize($f['size'])) ?></td>
                         <td style="white-space:nowrap;"><?= htmlspecialchars($when) ?></td>
                         <td><?= htmlspecialchars($uploader) ?></td>
