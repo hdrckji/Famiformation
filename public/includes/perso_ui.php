@@ -238,7 +238,12 @@ if (!function_exists('renderEventThemeCards')) {
                 <div class="ev-row">
                     <div class="ev-lbl">🎨 Thème <span class="muted" style="font-weight:400;">(fond + couleurs)</span></div>
                     <div class="ev-ctrl">
-                        <button type="button" class="ev-eye" onclick="famiPrevTemplate(this)">👁 Aperçu</button>
+                        <?php $pvActive = ((string) ($_SESSION['theme_preview'] ?? '') === $k); ?>
+                        <?php if ($pvActive): ?>
+                            <a class="ev-eye" href="parametres.php?theme=off#prefs" style="text-decoration:none; background:#2d5a37; color:#fff; border-color:#2d5a37;" title="Arrêter l'aperçu et revenir au normal">↩ Revenir</a>
+                        <?php else: ?>
+                            <a class="ev-eye" href="index.php?theme=<?= urlencode($k) ?>" style="text-decoration:none;" title="Applique ce thème sur TOUT le site et t'emmène à l'accueil — il reste actif jusqu'à ce que tu l'arrêtes">👁 Aperçu sur le site</a>
+                        <?php endif; ?>
                         <?php persoSwitch('theme_' . $k . '_on', $on, '🎨 Thème — ' . $ev['nom']); ?>
                     </div>
                 </div>

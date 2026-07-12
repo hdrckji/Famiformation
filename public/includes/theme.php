@@ -225,6 +225,9 @@ if (!function_exists('activePageTheme')) {
             if ($pv === 'anniversaire') {
                 return birthdayTheme();
             }
+            if ($pv === 'bienvenue' && function_exists('welcomeTheme')) {
+                return welcomeTheme();
+            }
             $catalog = siteThemeCatalog();
             if (isset($catalog[$pv])) {
                 return ['key' => $pv] + $catalog[$pv];
@@ -296,6 +299,22 @@ if (!function_exists('famiInjectPageTheme')) {
         }
         // Toujours : restauration de la position de scroll.
         $inject = famiScrollRestoreScript();
+
+        // Aperçu de thème actif (admin) : bandeau visible sur TOUTES les pages,
+        // avec un bouton pour revenir à la normale d'où qu'on soit.
+        if (!empty($_SESSION['theme_preview']) && (($_SESSION['role'] ?? '') === 'admin')) {
+            $pvKey = (string) $_SESSION['theme_preview'];
+            $pvTh = $GLOBALS['__fami_page_theme'] ?? null;
+            $pvNom = (is_array($pvTh) && !empty($pvTh['nom']))
+                ? (is_array($pvTh['nom']) ? $pvTh['nom'][0] : $pvTh['nom'])
+                : $pvKey;
+            $pvPath = strtok((string) ($_SERVER['REQUEST_URI'] ?? '/'), '?');
+            $inject .= '<div style="position:fixed; top:0; left:0; right:0; z-index:99998; background:#1f1f1f; color:#fff; '
+                . 'padding:8px 14px; font-size:.86rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; box-shadow:0 2px 12px rgba(0,0,0,.35);">'
+                . '<span>🎨 Aperçu du thème « ' . htmlspecialchars($pvNom) . ' » — visible sur tout le site</span>'
+                . '<a href="' . htmlspecialchars($pvPath . '?theme=off', ENT_QUOTES) . '" style="background:#fff; color:#1f1f1f; text-decoration:none; border-radius:999px; padding:5px 14px; font-weight:800;">↩ Revenir à la normale</a>'
+                . '</div><div style="height:38px;"></div>';
+        }
         // + fond du thème si un thème est actif.
         if (!empty($GLOBALS['__fami_page_theme']) && is_array($GLOBALS['__fami_page_theme'])) {
             $inject .= renderPageThemeBackground($GLOBALS['__fami_page_theme']);
