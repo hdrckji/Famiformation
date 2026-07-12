@@ -14,14 +14,14 @@ if (!function_exists('_vidUrl')) {
 
 if (!function_exists('renderVideoPage')) {
     /** Affiche la page vidéo d'un sous-module (ou d'un module vidéo). */
-    function renderVideoPage(array $module, $isAdmin = false)
+    function renderVideoPage(array $module, $isAdmin = false, $quizHref = '')
     {
         $title = function_exists('moduleNom') ? moduleNom($module) : (string) ($module['nom'] ?? 'Formation');
         $descRaw = function_exists('moduleDesc') ? moduleDesc($module) : (string) ($module['description'] ?? '');
         $status = (string) ($module['video_status'] ?? '');
         $hasVideo = !empty($module['video_path']);
         $videoUrl = $hasVideo ? _vidUrl($module['video_path']) : '';
-        $quizAvailable = !empty($module['a_evaluer']) && !empty($module['quiz_json']);
+        $quizAvailable = ($quizHref !== '');
 
         // Sous-titre : seulement si une description existe (jamais de texte par défaut).
         $subtitle = trim($descRaw) !== ''
@@ -144,7 +144,7 @@ if (!function_exists('renderVideoPage')) {
                 <section class="quizcta" aria-label="Passer au quiz">
                     <hr class="quizcta__rule">
                     <p class="quizcta__lead">Vidéo terminée&nbsp;? Vérifiez que tout est bien en place avec <strong>quelques questions rapides</strong>.</p>
-                    <a class="quizcta__button" href="#famiformation-quiz">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>
+                    <a class="quizcta__button" href="<?= htmlspecialchars($quizHref) ?>">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>
                     <p class="quizcta__hint">Résultat immédiat</p>
                 </section>
             <?php endif; ?>

@@ -184,9 +184,20 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
     <?php else: ?>
         <?php $isUni = !empty($module['uniformized']); ?>
         <?php $vStatus = (string) ($module['video_status'] ?? ''); ?>
+        <?php
+            // Quiz associé — JAMAIS affiché dans le guide/la vidéo. Bouton dédié vers quiz.php.
+            $quizModuleId = 0;
+            if (!empty($module['quiz_json'])) { $quizModuleId = (int) $module['id']; }
+            elseif (!empty($module['parent_id'])) {
+                try { $qst = $db->prepare("SELECT id FROM modules WHERE parent_id = ? AND quiz_json IS NOT NULL AND quiz_json <> '' LIMIT 1"); $qst->execute([(int) $module['parent_id']]); $qm = $qst->fetchColumn(); if ($qm) { $quizModuleId = (int) $qm; } } catch (Exception $e) {}
+            }
+            $quizHref = $quizModuleId > 0 ? ('quiz.php?id=' . $quizModuleId) : '';
+            $canEditContent = ($isAdmin || !empty($canContribHere) || (int) ($module['contenu_by'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0));
+            $isGuide = (!empty($module['uniformized']) && !empty($module['contenu_ia']));
+        ?>
         <?php if ($isVideoPage): ?>
             <?php require_once __DIR__ . '/includes/video_view.php'; ?>
-            <?php renderVideoPage($module, $isAdmin); ?>
+            <?php renderVideoPage($module, $isAdmin, $quizHref); ?>
         <?php elseif ($vStatus === 'processing'): ?>
             <div class="content-card" style="text-align:center;">
                 <div style="font-size:2.4rem;">🎬</div>
@@ -238,13 +249,16 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === ''): ?>
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
         <?php endif; ?>
-        <?php if (!$isContainer && !empty($module['a_evaluer']) && !empty($module['quiz_json'])): ?>
-            <div id="famiformation-quiz"></div>
-            <?php require_once __DIR__ . '/includes/quiz_view.php'; ?>
-            <?php renderQuizForm(json_decode((string) $module['quiz_json'], true), (int) $module['id']); ?>
+        <?php if ($quizModuleId > 0 && !$isVideoPage): ?>
+            <div style="text-align:center; margin:22px 0;">
+                <a href="quiz.php?id=<?= $quizModuleId ?>" class="btn btn-create" style="text-decoration:none; background:linear-gradient(180deg,#2A6339,#1E4D2B); color:#fff; padding:14px 30px; font-size:1.05rem; border-radius:999px;">📝 <?= t('Passer le quiz', 'Naar de quiz') ?> →</a>
+            </div>
         <?php endif; ?>
-        <?php if (!$isContainer && !empty($module['quiz_json']) && ($isAdmin || !empty($canContribHere) || (int) ($module['contenu_by'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0))): ?>
-            <div style="text-align:center; margin:14px 0;"><a href="module_quiz.php?id=<?= (int) $module['id'] ?>" class="btn btn-create" style="text-decoration:none; background:#2d5a37; color:#fff;">📝 Contrôler le quiz</a></div>
+        <?php if ($canEditContent && ($isGuide || $quizModuleId > 0)): ?>
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:10px 0 4px;">
+                <?php if ($isGuide): ?><a href="module_edit.php?id=<?= (int) $module['id'] ?>" class="btn btn-create" style="text-decoration:none;">✏️ Modifier le guide</a><?php endif; ?>
+                <?php if ($quizModuleId > 0): ?><a href="module_quiz.php?id=<?= $quizModuleId ?>" class="btn btn-create" style="text-decoration:none; background:#2d5a37; color:#fff;">📝 Contrôler le quiz</a><?php endif; ?>
+            </div>
         <?php endif; ?>
     <?php endif; ?>
 

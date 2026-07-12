@@ -84,6 +84,9 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
     .addq { display:block; width:100%; background:#eef7f0; color:var(--forest); border:1px dashed var(--moss,#74975b); border-radius:12px; padding:12px; cursor:pointer; font-weight:800; font-size:1rem; }
     .savebar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); padding:12px; display:flex; justify-content:center; gap:12px; box-shadow:0 -6px 18px rgba(0,0,0,.06); }
     .pill { display:inline-block; background:#eef7f0; border:1px solid #cfe3d5; color:var(--forest); border-radius:999px; padding:3px 10px; font-size:.82rem; font-weight:700; }
+    /* Verrou d'édition : tant qu'on n'a pas cliqué « Modifier », on ne peut rien changer. */
+    body:not(.qedit) #qlist input, body:not(.qedit) #qlist select, body:not(.qedit) #qlist .okbox { pointer-events:none; }
+    body:not(.qedit) .addopt, body:not(.qedit) .delq, body:not(.qedit) .del, body:not(.qedit) .addq { display:none; }
 </style>
 </head>
 <body>
@@ -94,7 +97,10 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
     <div class="topbar">
         <a href="module.php?id=<?= (int) $id ?>" class="btn btn-back">⬅ Quitter</a>
         <strong style="color:#1E4D2B;">📝 Contrôle du quiz</strong>
-        <button type="submit" class="btn btn-save">✅ Valider le quiz</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" id="qeditToggle" class="btn" style="background:#fff3d6; color:#8a5a00; border:1px solid #f0d089;" onclick="qSetEdit(!window._qedit)">✏️ Modifier</button>
+            <button type="submit" class="btn btn-save">✅ Valider le quiz</button>
+        </div>
     </div>
     <div class="wrap">
         <div class="intro">
@@ -173,6 +179,13 @@ function addQ() {
     var qs = document.querySelectorAll('#qlist > .q');
     qs.forEach(function (q, idx) { q.setAttribute('data-qi', idx); q.setAttribute('data-jc', String(q.querySelectorAll('.opt').length)); });
 })();
+function qSetEdit(on) {
+    window._qedit = !!on;
+    document.body.classList.toggle('qedit', !!on);
+    var b = document.getElementById('qeditToggle');
+    if (b) { b.textContent = on ? '🔒 Terminer' : '✏️ Modifier'; b.style.background = on ? '#e8f5e9' : '#fff3d6'; b.style.color = on ? '#2d5a37' : '#8a5a00'; }
+}
+qSetEdit(false);
 </script>
 </body>
 </html>

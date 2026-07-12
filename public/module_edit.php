@@ -115,7 +115,6 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
         <a href="module.php?id=<?= (int) $id ?>" class="btn btn-back">⬅ Quitter</a>
         <strong style="color:#1E4D2B;">✍️ Relecture — édite directement sur la page</strong>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <a href="module_review.php?id=<?= (int) $id ?>" class="btn btn-adv">⚙️ Mode avancé</a>
             <?php if ($pdfUrl !== ''): ?><button type="button" class="btn btn-pdf" onclick="document.getElementById('pdfp').classList.toggle('open')">📄 PDF original</button><?php endif; ?>
             <button type="button" id="editToggle" class="btn" style="background:#fff3d6; color:#8a5a00; border:1px solid #f0d089;" onclick="veSetEdit(!window._veEditing)">✏️ Modifier</button>
             <button type="button" class="btn btn-save" onclick="veSubmit()">✅ Valider</button>
