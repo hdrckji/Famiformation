@@ -61,6 +61,8 @@ require_once __DIR__ . '/includes/perso_ui.php';
 iaSettingsHandlePost($db);
 require_once __DIR__ . '/includes/pdf_access.php';
 pdfAccessHandlePost($db);
+require_once __DIR__ . '/includes/storage_admin.php';
+storageHandlePost($db);
 
 // Enregistrement des préférences (ex : souhait d'anniversaire)
 // Personnalisation : bascule d'UNE option (bouton + confirmation, ou clic droit sur un thème).
@@ -320,7 +322,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <button class="tab-btn" onclick="showTab('histprofil', this)">Gestion des profils</button>
         <button class="tab-btn" onclick="showTab('histagence', this)">Gestion des agences</button>
         <button class="tab-btn" onclick="showTab('widget', this)">Widget</button>
+        <button class="tab-btn" onclick="showTab('contenu', this)">Contenu</button>
         <button class="tab-btn" onclick="showTab('prefs', this)">Préférences</button>
+    </div>
+
+    <!-- ONGLET : Contenu (stockage) -->
+    <div id="tab-contenu" class="tab-content">
+        <?php renderStorageTab($db); ?>
     </div>
 
     <!-- ONGLET : Gestion des modules -->
