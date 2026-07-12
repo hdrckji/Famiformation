@@ -76,20 +76,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_perso'])) {
     requireValidCSRF();
     $key = (string) ($_POST['perso_key'] ?? '');
     $allowed = ['perso_enabled', 'anim_enabled', 'themes_enabled', 'welcome_enabled'];
+    // Chaque événement a 4 clés : _event (l'événement lui-même) + _on (thème),
+    // _anim (effets), _intro (animation de 1ère connexion).
+    $evKeys = ['anniversaire', 'bienvenue'];
     if (function_exists('siteThemeCatalog')) {
-        foreach (array_keys(siteThemeCatalog()) as $tk) {
-            $allowed[] = 'theme_' . $tk . '_on';
-            $allowed[] = 'theme_' . $tk . '_anim';
-            $allowed[] = 'theme_' . $tk . '_intro';
-        }
+        $evKeys = array_merge($evKeys, array_keys(siteThemeCatalog()));
     }
-    $allowed[] = 'theme_anniversaire_on';
-    $allowed[] = 'theme_anniversaire_anim';
-    $allowed[] = 'theme_anniversaire_intro';
-    // « Bienvenue » est un événement à part entière (thème vert/doré + effets + animation).
-    $allowed[] = 'theme_bienvenue_on';
-    $allowed[] = 'theme_bienvenue_anim';
-    $allowed[] = 'theme_bienvenue_intro';
+    foreach ($evKeys as $tk) {
+        $allowed[] = 'theme_' . $tk . '_event';
+        $allowed[] = 'theme_' . $tk . '_on';
+        $allowed[] = 'theme_' . $tk . '_anim';
+        $allowed[] = 'theme_' . $tk . '_intro';
+    }
     if (in_array($key, $allowed, true)) {
         $cur = widgetGet($db, $key, '1');
         widgetSet($db, $key, $cur === '1' ? '0' : '1');
@@ -945,18 +943,6 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 <!-- Sous-catégories (grisées si le maître est coupé) -->
                 <div style="<?= $persoOn ? '' : 'opacity:.45; pointer-events:none;' ?> transition:opacity .2s; margin-top:6px;">
 
-                    <!-- 🎬 ANIMATIONS -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-top:1px solid #eee; padding-top:16px; margin-top:14px;">
-                        <h3 style="margin:0; color:#2d5a37; font-size:1.2rem;">🎬 Animations</h3>
-                        <?php $btnToggle('anim_enabled', $animOn, 'Désactiver toute la catégorie Animations ?'); ?>
-                    </div>
-                    <div style="<?= $animOn ? '' : 'opacity:.5;' ?> border-left:3px solid #e3ece5; padding-left:14px; margin:12px 0 6px;">
-                        <p class="muted" style="margin:0; font-size:.87rem;">
-                            Interrupteur général des animations de 1ère connexion. Chaque animation se règle
-                            <strong>événement par événement</strong> dans la liste ci-dessous (ligne <strong>🎬 Animation</strong>) —
-                            y compris <strong>🌿 Bienvenue</strong>, qui est désormais un événement à part entière avec son thème et ses effets.
-                        </p>
-                    </div>
 
                     <!-- 🎨 THÈMES -->
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-top:1px solid #eee; padding-top:16px; margin-top:16px;">

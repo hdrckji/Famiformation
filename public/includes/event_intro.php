@@ -58,8 +58,10 @@ if (!function_exists('detectEventIntro')) {
         $easter = function_exists('easterSunday') ? easterSunday((int) date('Y')) : $today;
 
         foreach (siteThemeCatalog() as $ek => $et) {
+            // L'événement doit être activé en entier, ET son animation activée.
+            $evOn = !function_exists('eventEnabled') || eventEnabled($db, $ek);
             $introOn = !function_exists('widgetGet') || widgetGet($db, 'theme_' . $ek . '_intro', '1') === '1';
-            if ($introOn && themeMatchesToday($et, $today, $md, $easter)) {
+            if ($evOn && $introOn && themeMatchesToday($et, $today, $md, $easter)) {
                 $occId = $ek . ':' . date('Y');
                 // Déjà vu cette occurrence (ce navigateur ou cette session) ?
                 if (($_COOKIE['fami_intro'] ?? '') === $occId || ($_SESSION['fami_intro'] ?? '') === $occId) {

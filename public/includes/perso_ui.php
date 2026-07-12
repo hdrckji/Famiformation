@@ -169,6 +169,8 @@ if (!function_exists('renderEventThemeCards')) {
         <button type="button" id="evToggle" class="btn btn-light" style="margin-bottom:8px;" onclick="famiToggleEvents()">▸ Voir les <?= count($events) ?> événements (thème · effets · animation)</button>
         <div id="evList" style="display:none;">
         <?php foreach ($events as $k => $ev):
+            // Interrupteur de l'ÉVÉNEMENT lui-même : coupé = l'événement ne se produit pas du tout.
+            $evOn  = (widgetGet($db, 'theme_' . $k . '_event', '1') === '1');
             $on    = (widgetGet($db, 'theme_' . $k . '_on', '1') === '1');
             $fx    = (widgetGet($db, 'theme_' . $k . '_anim', '1') === '1');
             $intro = (widgetGet($db, 'theme_' . $k . '_intro', '1') === '1');
@@ -180,8 +182,13 @@ if (!function_exists('renderEventThemeCards')) {
                  data-accent="<?= htmlspecialchars($ev['accent'], ENT_QUOTES) ?>"
                  data-pagebg="<?= htmlspecialchars($ev['page_bg'], ENT_QUOTES) ?>"
                  data-particles="<?= htmlspecialchars(json_encode($ev['particles'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES) ?>">
-                <div class="ev-head"><?= htmlspecialchars($ev['nom']) ?> <span class="muted" style="font-weight:600; font-size:.82rem;">(<?= htmlspecialchars($ev['date']) ?>)</span></div>
+                <div class="ev-head" style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                    <span><?= htmlspecialchars($ev['nom']) ?> <span class="muted" style="font-weight:600; font-size:.82rem;">(<?= htmlspecialchars($ev['date']) ?>)</span></span>
+                    <?php persoSwitch('theme_' . $k . '_event', $evOn, 'L\'événement « ' . $ev['nom'] .' » en entier'); ?>
+                </div>
 
+                <!-- Détails : grisés si l'événement lui-même est coupé -->
+                <div style="<?= $evOn ? '' : 'opacity:.42;' ?>">
                 <div class="ev-row">
                     <div class="ev-lbl">🎨 Thème <span class="muted" style="font-weight:400;">(fond + couleurs)</span></div>
                     <div class="ev-ctrl">
@@ -201,10 +208,18 @@ if (!function_exists('renderEventThemeCards')) {
                 <div class="ev-row">
                     <div class="ev-lbl">🎬 Animation <span class="muted" style="font-weight:400;">(1ère connexion)</span></div>
                     <div class="ev-ctrl">
-                        <button type="button" class="ev-eye" onclick="famiPrevIntro(this)">👁 Aperçu</button>
+                        <?php
+                            // Aperçu RÉEL : on ouvre la vraie animation, celle que l'utilisateur verra,
+                            // avec le nom du compte connecté (plus d'imitation approximative).
+                            $introUrl = ($k === 'bienvenue')
+                                ? 'index.php?welcome=preview'
+                                : (($k === 'anniversaire') ? 'index.php?bday=preview' : 'index.php?intro=' . urlencode($k));
+                        ?>
+                        <a class="ev-eye" href="<?= htmlspecialchars($introUrl) ?>" target="_blank" rel="noopener" style="text-decoration:none;" title="Ouvre la VRAIE animation, telle que l'utilisateur la verra">👁 Aperçu réel</a>
                         <?php persoSwitch('theme_' . $k . '_intro', $intro, '🎬 Animation — ' . $ev['nom']); ?>
                     </div>
                 </div>
+                </div><!-- /détails -->
             </div>
         <?php endforeach; ?>
         </div>

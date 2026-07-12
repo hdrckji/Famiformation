@@ -130,6 +130,15 @@ if (!function_exists('themesEnabled')) {
     }
 }
 
+if (!function_exists('eventEnabled')) {
+    /** L'ÉVÉNEMENT lui-même est-il activé ? (interrupteur global de l'événement :
+     *  coupé = ni thème, ni effets, ni animation — l'événement n'existe pas.) */
+    function eventEnabled($db, $key)
+    {
+        return !function_exists('widgetGet') || widgetGet($db, 'theme_' . $key . '_event', '1') === '1';
+    }
+}
+
 if (!function_exists('themeMatchesToday')) {
     function themeMatchesToday(array $t, $today, $md, $easter)
     {
@@ -161,7 +170,10 @@ if (!function_exists('activeSiteTheme')) {
                 continue;
             }
             if (themeMatchesToday($t, $today, $md, $easter)) {
-                // Thème désactivé individuellement (clé theme_<clé>_on) : on l'ignore.
+                // Événement coupé en entier, ou thème de l'événement coupé : on l'ignore.
+                if (!eventEnabled($db, $key)) {
+                    continue;
+                }
                 if (function_exists('widgetGet') && widgetGet($db, 'theme_' . $key . '_on', '1') !== '1') {
                     continue;
                 }
@@ -222,6 +234,7 @@ if (!function_exists('activePageTheme')) {
         // à la catégorie Thèmes, et à son interrupteur individuel theme_anniversaire_on.
         if (($_SESSION['is_birthday_today'] ?? '') === '1'
             && themesEnabled($db)
+            && eventEnabled($db, 'anniversaire')
             && (!function_exists('widgetGet') || widgetGet($db, 'theme_anniversaire_on', '1') === '1')) {
             return birthdayTheme();
         }

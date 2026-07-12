@@ -47,7 +47,9 @@ try {
 // Anniversaire = thème événementiel : soumis au maître + catégorie Thèmes + son
 // interrupteur individuel. Son animation (overlay festif + particules) a sa propre clé.
 $birthdayEnabled = function_exists('themesEnabled')
-    ? (themesEnabled($db) && (!function_exists('widgetGet') || widgetGet($db, 'theme_anniversaire_on', '1') === '1'))
+    ? (themesEnabled($db)
+        && (!function_exists('eventEnabled') || eventEnabled($db, 'anniversaire'))
+        && (!function_exists('widgetGet') || widgetGet($db, 'theme_anniversaire_on', '1') === '1'))
     : true;
 $birthdayAnim = !function_exists('widgetGet') || widgetGet($db, 'theme_anniversaire_anim', '1') === '1';
 $isBirthday = false;
@@ -68,6 +70,15 @@ if ($birthdayEnabled && !empty($user_data['date_naissance'])) {
             }
         }
     }
+}
+
+// Aperçu admin de l'animation d'anniversaire : ?bday=preview rejoue la VRAIE animation
+// (avec le prénom du compte connecté), sans toucher au statut de l'utilisateur.
+if ((($_SESSION['role'] ?? '') === 'admin') && (($_GET['bday'] ?? '') === 'preview')) {
+    $isBirthday = true;
+    $birthdayFirstOpen = true;
+    $birthdayAnim = true;
+    $birthdayName = ucfirst(strtolower((string) ($user_data['prenom'] ?? '')));
 }
 
 // --- Message de bienvenue (toute première connexion de l'utilisateur) ---

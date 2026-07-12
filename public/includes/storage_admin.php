@@ -114,6 +114,15 @@ if (!function_exists('storageScan')) {
         foreach (storageWalkFiles($base) as $p => $sz) {
             if (isset($seen[$p])) { continue; }
             $dBytes += $sz; $dCount++;
+            $rel = str_replace('\\', '/', substr($p, strlen($base) + 1));
+            $files[] = [
+                'key'    => $rel,
+                'size'   => $sz,
+                'mtime'  => @filemtime($p),
+                'type'   => 'autre',
+                'cat'    => 'divers',
+                'module' => null,
+            ];
         }
         $total += $dBytes; $count += $dCount;
         $byCat['divers'] = ['label' => 'Divers (photos de profil, images de thèmes…)', 'bytes' => $dBytes, 'count' => $dCount];
@@ -294,6 +303,7 @@ if (!function_exists('renderStorageTab')) {
                 <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('pdf', this)">📄 PDF</button>
                 <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('video', this)">🎬 Vidéos</button>
                 <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('image', this)">🖼 Images extraites</button>
+                <button type="button" class="btn btn-light sa-filter" onclick="filterMedia('autre', this)">🗂 Divers</button>
                 <button type="button" id="saBulkBtn" class="btn btn-danger" style="margin-left:auto;" disabled onclick="askDeleteSelected()">🗑 Supprimer la sélection (<span id="saBulkN">0</span>)</button>
             </div>
             <div style="overflow-x:auto;">
@@ -317,13 +327,13 @@ if (!function_exists('renderStorageTab')) {
                         $uploaderId = $mod ? (int) ($mod['contenu_by'] ?? 0) : 0;
                         $uploader = $uploaderId && isset($names[$uploaderId]) && $names[$uploaderId] !== '' ? $names[$uploaderId] : '—';
                         $when = $f['mtime'] ? date('d/m/Y H:i', (int) $f['mtime']) : '—';
-                        $icon = $f['type'] === 'video' ? '🎬' : ($f['type'] === 'image' ? '🖼' : '📄');
-                        $typeLabel = $f['type'] === 'video' ? 'Vidéo' : ($f['type'] === 'image' ? 'Image' : 'PDF');
+                        $icon = $f['type'] === 'video' ? '🎬' : ($f['type'] === 'image' ? '🖼' : ($f['type'] === 'autre' ? '🗂' : '📄'));
+                        $typeLabel = $f['type'] === 'video' ? 'Vidéo' : ($f['type'] === 'image' ? 'Image' : ($f['type'] === 'autre' ? 'Divers' : 'PDF'));
                         $isRaw = ($f['cat'] === 'video_raw');
                         $url = function_exists('moduleFileUrl') ? moduleFileUrl($f['key']) : ('media.php?f=' . rawurlencode($f['key']));
                         $rowLabel = ($modName !== '' ? $modName . ' — ' : '') . basename($f['key']);
                     ?>
-                    <tr data-type="<?= htmlspecialchars($f['type']) ?>"<?= $f['type'] === 'image' ? ' style="display:none;"' : '' ?>>
+                    <tr data-type="<?= htmlspecialchars($f['type']) ?>"<?= in_array($f['type'], ['image', 'autre'], true) ? ' style="display:none;"' : '' ?>>
                         <td style="text-align:center;"><input type="checkbox" class="sa-check" value="<?= htmlspecialchars($f['key'], ENT_QUOTES) ?>" onchange="saUpdateCount()"></td>
                         <td>
                             <div style="font-weight:700; color:#244230; word-break:break-all;"><?= htmlspecialchars(basename($f['key'])) ?></div>
