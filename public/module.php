@@ -154,14 +154,19 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         $uniPdfUrl = $uniHasPdf ? moduleFileUrl($module['pdf_path']) : '';
         $canViewPdf = $uniHasContent && pdfCanView($db, $uniRole, !empty($isAdmin));
         $canDlPdf = $uniHasPdf && pdfCanDownload($db, $uniRole, !empty($isAdmin));
+        // Vidéo : téléchargement réglable dans Paramètres → Préférences (désactivé par défaut).
+        $uniHasVideo = !empty($module['video_path']);
+        $uniVideoUrl = $uniHasVideo ? moduleFileUrl($module['video_path']) : '';
+        $canDlVideo = $uniHasVideo && function_exists('videoCanDownload') && videoCanDownload($db, $uniRole, !empty($isAdmin));
     ?>
     <div class="topbar">
         <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
         <div style="display:flex; align-items:center; gap:10px;">
-            <?php if ($canViewPdf || $canDlPdf): ?>
+            <?php if ($canViewPdf || $canDlPdf || $canDlVideo): ?>
                 <div class="uni-actions">
                     <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="Voir le PDF original" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
                     <?php if ($canDlPdf): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF original">⤓</a><?php endif; ?>
+                    <?php if ($canDlVideo): ?><a class="uni-ico" href="<?= htmlspecialchars($uniVideoUrl) ?>" download title="<?= t('Télécharger la vidéo', 'De video downloaden') ?>">🎬⤓</a><?php endif; ?>
                 </div>
             <?php endif; ?>
             <?php
