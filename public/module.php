@@ -160,12 +160,12 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         $canDlVideo = $uniHasVideo && function_exists('videoCanDownload') && videoCanDownload($db, $uniRole, !empty($isAdmin));
     ?>
     <div class="topbar">
-        <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ Retour</a>
+        <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ <?= t('Retour', 'Terug') ?></a>
         <div style="display:flex; align-items:center; gap:10px;">
             <?php if ($canViewPdf || $canDlPdf || $canDlVideo): ?>
                 <div class="uni-actions">
-                    <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="Voir le PDF original" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
-                    <?php if ($canDlPdf): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF original">⤓</a><?php endif; ?>
+                    <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="<?= t('Voir le PDF original', 'Originele PDF bekijken') ?>" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
+                    <?php if ($canDlPdf): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="<?= t('Télécharger le PDF original', 'Originele PDF downloaden') ?>">⤓</a><?php endif; ?>
                     <?php if ($canDlVideo): ?><a class="uni-ico" href="<?= htmlspecialchars($uniVideoUrl) ?>" download title="<?= t('Télécharger la vidéo', 'De video downloaden') ?>">🎬⤓</a><?php endif; ?>
                 </div>
             <?php endif; ?>
@@ -218,8 +218,8 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
                 </a>
                 <?php else: ?>
-                <div class="tile inactive<?= $isAdmin ? ' mod-tile' : '' ?>"<?= $isAdmin ? ' data-mod-id="' . (int) $child['id'] . '"' : '' ?> title="<?= $isAdmin ? 'Module inactif — clic droit pour modifier' : 'Module inactif — réactive-le dans Gestion des modules' ?>" style="cursor:<?= $isAdmin ? 'context-menu' : 'not-allowed' ?>;">
-                    <span class="badge-eval" style="background:#999;">Inactif</span>
+                <div class="tile inactive<?= $isAdmin ? ' mod-tile' : '' ?>"<?= $isAdmin ? ' data-mod-id="' . (int) $child['id'] . '"' : '' ?> title="<?= $isAdmin ? 'Module inactif — clic droit pour modifier' : t('Module inactif — réactive-le dans Gestion des modules', 'Module niet actief — heractiveer hem in Modulebeheer') ?>" style="cursor:<?= $isAdmin ? 'context-menu' : 'not-allowed' ?>;">
+                    <span class="badge-eval" style="background:#999;"><?= t('Inactif', 'Niet actief') ?></span>
                     <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
                     <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
                     <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
@@ -227,7 +227,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 <?php endif; ?>
             <?php endforeach; ?>
             <?php if (empty($children)): ?>
-                <div class="content-card" style="text-align:center;">Aucun sous-module pour l'instant.</div>
+                <div class="content-card" style="text-align:center;"><?= t("Aucun sous-module pour l'instant.", 'Nog geen submodules.') ?></div>
             <?php endif; ?>
         </div>
         <?php if ($isAdmin && !empty($children)): ?>
@@ -752,7 +752,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     })(i);
                 }
                 return chain;
-            }).catch(function () { box.innerHTML = '<div style="text-align:center"><a href="' + url + '">Ouvrir le document</a></div>'; });
+            }).catch(function () { box.innerHTML = '<div style="text-align:center"><a href="' + url + '">' + <?= json_encode(t('Ouvrir le document', 'Document openen')) ?> + '</a></div>'; });
         })();
         </script>
         <?php else: ?>

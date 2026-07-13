@@ -165,7 +165,7 @@ if (!function_exists('renderVideoPage')) {
             <?php endif; ?>
 
             <?php if ($quizAvailable): ?>
-                <section class="quizcta" aria-label="Passer au quiz">
+                <section class="quizcta" aria-label="<?= t('Passer au quiz', 'Naar de quiz') ?>">
                     <hr class="quizcta__rule">
                     <p class="quizcta__lead"><?= t('Vidéo terminée&nbsp;? Vérifiez que tout est bien en place avec <strong>quelques questions rapides</strong>.', 'Video bekeken&nbsp;? Controleer of alles duidelijk is met <strong>een paar snelle vragen</strong>.') ?></p>
                     <a class="quizcta__button" href="<?= htmlspecialchars($quizHref) ?>" onclick="return famiVideoQuizGuard(event, this.href);"><?= t('Passer le quiz', 'Naar de quiz') ?> <span class="arrow" aria-hidden="true">→</span></a>

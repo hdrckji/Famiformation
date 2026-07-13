@@ -79,15 +79,15 @@ if (!function_exists('renderQuizForm')) {
         .qz-btn:hover { background:#244a2d; }
         </style>
         <div class="qz-wrap">
-            <h2 class="qz-title">📝 Quiz d'évaluation <span class="qz-sub">(<?= (int) $n ?> question<?= $n > 1 ? 's' : '' ?>)</span></h2>
-            <p class="qz-intro">Réponds à toutes les questions puis valide. La correction s'affichera avec ton score.</p>
+            <h2 class="qz-title">📝 <?= t('Quiz d\'évaluation', 'Evaluatiequiz') ?> <span class="qz-sub">(<?= (int) $n ?> <?= t($n > 1 ? 'questions' : 'question', $n > 1 ? 'vragen' : 'vraag') ?>)</span></h2>
+            <p class="qz-intro"><?= t('Réponds à toutes les questions puis valide. La correction s\'affichera avec ton score.', 'Beantwoord alle vragen en bevestig daarna. De verbetering verschijnt met je score.') ?></p>
             <form method="POST" action="quiz_check.php" class="qz-form">
                 <?= csrfField() ?>
                 <input type="hidden" name="module_id" value="<?= (int) $moduleId ?>">
                 <?php foreach ($qs as $i => $q): $multi = (($q['type'] ?? 'single') === 'multiple'); $num++; ?>
                     <input type="hidden" name="sel[]" value="<?= (int) $i ?>">
                     <div class="qz-q">
-                        <div class="qz-qh"><?= (int) $num ?>. <?= htmlspecialchars((string) $q['q']) ?><?php if ($multi): ?><span class="qz-multi">plusieurs réponses</span><?php endif; ?></div>
+                        <div class="qz-qh"><?= (int) $num ?>. <?= htmlspecialchars((string) $q['q']) ?><?php if ($multi): ?><span class="qz-multi"><?= t('plusieurs réponses', 'meerdere antwoorden') ?></span><?php endif; ?></div>
                         <?php foreach (($q['options'] ?? []) as $j => $opt): ?>
                             <label class="qz-opt">
                                 <input type="<?= $multi ? 'checkbox' : 'radio' ?>" name="a[<?= (int) $i ?>]<?= $multi ? '[]' : '' ?>" value="<?= (int) $j ?>">
@@ -96,7 +96,7 @@ if (!function_exists('renderQuizForm')) {
                         <?php endforeach; ?>
                     </div>
                 <?php endforeach; ?>
-                <div class="qz-actions"><button type="submit" class="qz-btn">Valider mes réponses</button></div>
+                <div class="qz-actions"><button type="submit" class="qz-btn"><?= t('Valider mes réponses', 'Mijn antwoorden bevestigen') ?></button></div>
             </form>
         </div>
         <?php

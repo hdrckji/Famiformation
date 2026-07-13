@@ -66,7 +66,7 @@ $pct = $total > 0 ? round($score * 100 / $total) : 0;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Résultat du quiz - FamiFormation</title>
+    <title><?= t('Résultat du quiz', 'Resultaat van de quiz') ?> — FamiFormation</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Open Sans', sans-serif; background: #f4f7f6; margin: 0; padding: 24px; }
@@ -90,17 +90,17 @@ $pct = $total > 0 ? round($score * 100 / $total) : 0;
 </head>
 <body>
 <div class="container">
-    <a class="back" href="module.php?id=<?= (int) $id ?>">⬅ Retour au module</a>
+    <a class="back" href="module.php?id=<?= (int) $id ?>">⬅ <?= t('Retour au module', 'Terug naar de module') ?></a>
     <div class="scorecard">
         <div class="score-big"><?= (int) $score ?> / <?= (int) $total ?></div>
-        <div style="color:#5a6b60; font-weight:700; margin-top:4px;"><?= (int) $pct ?>% de bonnes réponses</div>
+        <div style="color:#5a6b60; font-weight:700; margin-top:4px;"><?= (int) $pct ?>% <?= t('de bonnes réponses', 'juiste antwoorden') ?></div>
         <div class="bar"><span></span></div>
     </div>
 
     <?php foreach ($results as $k => $r): $q = $r['q']; ?>
         <div class="q <?= $r['ok'] ? 'ok' : 'no' ?>">
             <div class="qh"><?= ($k + 1) ?>. <?= htmlspecialchars((string) $q['q']) ?>
-                <span class="tag <?= $r['ok'] ? 'ok' : 'no' ?>"><?= $r['ok'] ? '✓ Juste' : '✗ Faux' ?></span>
+                <span class="tag <?= $r['ok'] ? 'ok' : 'no' ?>"><?= $r['ok'] ? '✓ ' . t('Juste', 'Juist') : '✗ ' . t('Faux', 'Fout') ?></span>
             </div>
             <?php foreach (($q['options'] ?? []) as $j => $opt):
                 $isCorrect = in_array((int) $j, $r['cor'], true);
@@ -116,7 +116,7 @@ $pct = $total > 0 ? round($score * 100 / $total) : 0;
     <?php endforeach; ?>
 
     <div style="text-align:center; margin:20px 0;">
-        <a class="btn btn-primary" href="module.php?id=<?= (int) $id ?>">Refaire le quiz</a>
+        <a class="btn btn-primary" href="quiz.php?id=<?= (int) $id ?>"><?= t('Refaire le quiz', 'Quiz opnieuw doen') ?></a>
     </div>
 </div>
 </body>

@@ -24,10 +24,12 @@ if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($modul
 $quiz = json_decode((string) moduleQuizJson($module), true);
 $backId = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) $id;
 
-// TIRAGE : la banque compte jusqu'à 75 questions, on n'en pose que 10
-// (7 à réponses multiples + 3 à réponse unique), tirées au hasard à chaque passage.
+// TIRAGE : on ne pose qu'une partie de la banque, tirée au hasard à chaque passage.
+// Nombre et ratio multiples/uniques réglables dans Paramètres → Préférences.
+require_once 'includes/quiz_config.php';
+list($askMul, $askSin) = quizCfgAskedSplit($db);
 $allQs = (isset($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
-$sel = quizPickRandom($allQs, 7, 3);
+$sel = quizPickRandom($allQs, $askMul, $askSin);
 ?>
 <!DOCTYPE html>
 <html lang="fr">

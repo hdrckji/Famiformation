@@ -13,7 +13,7 @@ if (getCurrentRole() === 'etudiant' && !hasUnlockedOnboarding(getCurrentUserId()
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Onboarding - FamiFormation</title>
+    <title>Onboarding — FamiFormation</title>
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -105,24 +105,24 @@ if (getCurrentRole() === 'etudiant' && !hasUnlockedOnboarding(getCurrentUserId()
 
     <div class="header">
         <img src="logo.png" alt="FamiFormation" class="logo">
-        <h1>Intégration : Bienvenue chez Famiflora</h1>
+        <h1><?= t('Intégration : Bienvenue chez Famiflora', 'Onthaal: welkom bij Famiflora') ?></h1>
     </div>
 
     <div class="tiles-container">
         <a href="view-pdf-onboarding.php" class="tile">
             <span class="tile-icon">📖</span>
-            <div class="tile-title">Livret d'accueil</div>
-            <div class="tile-desc">Consulter le guide de bienvenue (PDF)</div>
+            <div class="tile-title"><?= t("Livret d'accueil", 'Onthaalbrochure') ?></div>
+            <div class="tile-desc"><?= t('Consulter le guide de bienvenue (PDF)', 'De welkomstgids bekijken (PDF)') ?></div>
         </a>
 
         <a href="video-onboarding.php" class="tile">
             <span class="tile-icon">🎥</span>
-            <div class="tile-title">Vidéo </div>
-            <div class="tile-desc">Découvrir  l'entreprise</div>
+            <div class="tile-title"><?= t('Vidéo', 'Video') ?></div>
+            <div class="tile-desc"><?= t("Découvrir l'entreprise", 'Het bedrijf ontdekken') ?></div>
         </a>
     </div>
 
-    <a href="index.php" class="back-link">← Retour à l'accueil</a>
+    <a href="index.php" class="back-link">← <?= t("Retour à l'accueil", 'Terug naar de startpagina') ?></a>
 
 </body>
 </html>

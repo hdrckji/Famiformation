@@ -143,7 +143,7 @@ if (!function_exists('_uniCoverHtml')) {
             . '<h1 class="cover__title">' . $title . '</h1>' . $sub . $meta
             . '<button type="button" class="cover__cta" onclick="uniGoto(1)">' . t('Commencer la formation', 'De opleiding starten') . ' <span class="arrow" aria-hidden="true">→</span></button>'
             . '</div><a class="cover__scrollhint" href="#uni-toc">' . t('Au programme', 'Op het programma') . '</a></header>'
-            . '<nav class="toc" id="uni-toc" aria-label="Sommaire de la formation"><p class="toc__eyebrow">' . t('Au programme', 'Op het programma') . '</p>'
+            . '<nav class="toc" id="uni-toc" aria-label="' . t('Sommaire de la formation', 'Inhoudsopgave van de opleiding') . '"><p class="toc__eyebrow">' . t('Au programme', 'Op het programma') . '</p>'
             . '<h2 class="toc__title">' . t('Sommaire', 'Inhoud') . '</h2><hr class="toc__rule"><ol class="toc__list">' . $items . '</ol></nav>';
     }
 }
@@ -171,7 +171,7 @@ if (!function_exists('_designedPages')) {
         $pageIndex = 1;
         foreach ($groups as $g) {
             $isSection = (($g[0]['type'] ?? '') === 'section');
-            $title = 'Introduction';
+            $title = t('Introduction', 'Inleiding');
             if ($isSection) { $secNum++; $title = (string) $g[0]['title']; }
             $desc = '';
             foreach ($g as $bb) { if (($bb['type'] ?? '') === 'text') { $desc = _uniShort((string) $bb['text'], 90); break; } }
@@ -365,7 +365,7 @@ if (!function_exists('renderUniformContent')) {
                     <div class="doc-page" data-page="<?= (int) $i ?>" <?= $i === 0 ? '' : 'style="display:none;"' ?>><?= $html ?></div>
                 <?php endforeach; ?>
                 <?php if ($n > 1): ?>
-                    <nav class="pagenav" aria-label="Navigation entre les pages">
+                    <nav class="pagenav" aria-label="<?= t('Navigation entre les pages', 'Paginanavigatie') ?>">
                         <button type="button" class="pagenav__link pagenav__link--prev" id="uniPrev" onclick="uniPage(-1)"><span aria-hidden="true">←</span> <?= t('Précédent', 'Vorige') ?></button>
                         <p class="pagenav__counter"><?= t('Page', 'Pagina') ?> <strong id="uniCur">1</strong> / <?= (int) $n ?></p>
                         <button type="button" class="pagenav__link pagenav__link--next" id="uniNext" onclick="uniPage(1)"><?= t('Suivant', 'Volgende') ?> <span aria-hidden="true">→</span></button>
@@ -373,7 +373,7 @@ if (!function_exists('renderUniformContent')) {
                 <?php endif; ?>
             </div>
             <?php if ($withPdf): ?>
-                <div class="doc-view doc-pdf" style="display:none;"><iframe src="<?= htmlspecialchars($pdfUrl) ?>" title="PDF original"></iframe></div>
+                <div class="doc-view doc-pdf" style="display:none;"><iframe src="<?= htmlspecialchars($pdfUrl) ?>" title="<?= t('PDF original', 'Originele PDF') ?>"></iframe></div>
             <?php endif; ?>
         </div>
 
@@ -414,7 +414,7 @@ if (!function_exists('renderUniformContent')) {
                 var showPdf = (pdf.style.display === 'none');
                 pdf.style.display = showPdf ? '' : 'none';
                 if (read) { read.style.display = showPdf ? 'none' : ''; }
-                if (eye) { eye.textContent = showPdf ? '📖' : '👁'; eye.title = showPdf ? 'Revenir à la lecture' : 'Voir le PDF original'; }
+                if (eye) { eye.textContent = showPdf ? '📖' : '👁'; eye.title = showPdf ? <?= json_encode(t('Revenir à la lecture', 'Terug naar het lezen')) ?> : <?= json_encode(t('Voir le PDF original', 'Originele PDF bekijken')) ?>; }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
             function show(i) {

@@ -140,7 +140,7 @@ if (!empty($_SESSION['module_flash'])) {
 ?>
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?= currentLang() ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -418,7 +418,7 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
         ?>
         <a href="profil.php" class="user-info">
             <?php if ($userPhoto && is_file(__DIR__ . '/' . $userPhoto)): ?>
-                <img src="<?= htmlspecialchars($userPhoto) ?>" alt="Photo de profil" class="user-avatar">
+                <img src="<?= htmlspecialchars($userPhoto) ?>" alt="<?= t('Photo de profil', 'Profielfoto') ?>" class="user-avatar">
             <?php else: ?>
                 <span class="user-avatar-placeholder">👤</span>
             <?php endif; ?>
@@ -600,7 +600,7 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
             <div class="tile-desc"><?= htmlspecialchars(moduleDesc($mod)) ?></div>
         </a>
         <?php else: ?>
-        <div class="tile tile-inactive" title="Module inactif — réactive-le dans Gestion des modules" style="cursor:not-allowed;">
+        <div class="tile tile-inactive" title="<?= t('Module inactif — réactive-le dans Gestion des modules', 'Module niet actief — heractiveer hem in Modulebeheer') ?>" style="cursor:not-allowed;">
             <div class="tile-media"><?= moduleIconHtml($mod) ?></div>
             <div class="tile-title"><?= htmlspecialchars(moduleNom($mod)) ?></div>
             <div class="tile-desc"><?= htmlspecialchars(moduleDesc($mod)) ?></div>

@@ -74,7 +74,7 @@ $evIcon = function ($t) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Notifications — FamiFormation</title>
+<title><?= t('Notifications', 'Meldingen') ?> — FamiFormation</title>
 <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 <style>
     :root { --forest:#1E4D2B; --leaf:#3E8E4E; --line:#d9e3dc; }
@@ -105,8 +105,8 @@ $evIcon = function ($t) {
 </head>
 <body>
     <div class="topbar">
-        <a href="index.php">⬅ Accueil</a>
-        <strong>🔔 Notifications</strong>
+        <a href="index.php">⬅ <?= t('Accueil', 'Start') ?></a>
+        <strong>🔔 <?= t('Notifications', 'Meldingen') ?></strong>
         <span></span>
     </div>
     <div class="wrap">
@@ -145,9 +145,9 @@ $evIcon = function ($t) {
         <?php endif; ?>
 
         <div class="card">
-            <h1 style="margin:0 0 10px;">🔔 Événements récents</h1>
+            <h1 style="margin:0 0 10px;">🔔 <?= t('Événements récents', 'Recente gebeurtenissen') ?></h1>
             <?php if (empty($recent)): ?>
-                <p class="muted">Aucun événement pour l'instant.</p>
+                <p class="muted"><?= t("Aucun événement pour l'instant.", 'Nog geen gebeurtenissen.') ?></p>
             <?php else: ?>
                 <?php foreach ($recent as $e):
                     $who = trim((string) (($e['prenom'] ?? '') . ' ' . ($e['unom'] ?? '')));

@@ -26,7 +26,7 @@ function formatNom($u) {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Classement - FamiFormation</title>
+    <title><?= t('Classement', 'Klassement') ?> — FamiFormation</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Open Sans', sans-serif; background: url('background.jpg') no-repeat center center fixed; background-size: cover; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
@@ -55,8 +55,8 @@ function formatNom($u) {
 </head>
 <body>
     <div class="container">
-        <h1>🏆 Classement FamiFlora</h1>
-        <p class="subtitle">Seuls les collaborateurs ayant des points apparaissent ici.</p>
+        <h1>🏆 <?= t('Classement FamiFlora', 'FamiFlora-klassement') ?></h1>
+        <p class="subtitle"><?= t('Seuls les collaborateurs ayant des points apparaissent ici.', 'Alleen medewerkers met punten verschijnen hier.') ?></p>
         
         <?php if (count($users) > 0): ?>
             <div class="podium">
@@ -99,11 +99,11 @@ function formatNom($u) {
 
         <?php else: ?>
             <div class="empty-msg">
-                <p>Le classement est vide pour le moment.<br>Revenez plus tard !</p>
+                <p><?= t('Le classement est vide pour le moment.', 'Het klassement is voorlopig leeg.') ?><br><?= t('Revenez plus tard !', 'Kom later terug!') ?></p>
             </div>
         <?php endif; ?>
 
-        <a href="index.php" class="btn-back">Retour à l'accueil</a>
+        <a href="index.php" class="btn-back"><?= t("Retour à l'accueil", 'Terug naar de startpagina') ?></a>
     </div>
 </body>
 </html>

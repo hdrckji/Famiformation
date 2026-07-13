@@ -82,7 +82,7 @@ $currentPhoto = $currentUser['photo_profil'] ?? null;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon profil - FamiFormation</title>
+    <title><?= t('Mon profil', 'Mijn profiel') ?> — FamiFormation</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Open Sans', sans-serif; background: url('background.jpg') no-repeat center center fixed; background-size: cover; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
@@ -109,7 +109,7 @@ $currentPhoto = $currentUser['photo_profil'] ?? null;
 </head>
 <body>
 <div class="top-nav">
-    <a href="index.php" class="btn-back">← Retour accueil</a>
+    <a href="index.php" class="btn-back">← <?= t('Retour accueil', 'Terug naar start') ?></a>
 </div>
 <div class="card">
     <h1>Mon profil</h1>
@@ -117,7 +117,7 @@ $currentPhoto = $currentUser['photo_profil'] ?? null;
     <?= $message ?>
 
     <?php if ($currentPhoto && is_file(__DIR__ . '/' . $currentPhoto)): ?>
-        <img src="<?= htmlspecialchars($currentPhoto) ?>?v=<?= time() ?>" alt="Photo de profil" class="photo-preview">
+        <img src="<?= htmlspecialchars($currentPhoto) ?>?v=<?= time() ?>" alt="<?= t('Photo de profil', 'Profielfoto') ?>" class="photo-preview">
     <?php else: ?>
         <div class="photo-placeholder">👤</div>
     <?php endif; ?>
@@ -129,18 +129,18 @@ $currentPhoto = $currentUser['photo_profil'] ?? null;
     <form method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
         <div class="form-group">
-            <label for="photo_profil">Choisir une nouvelle photo</label>
+            <label for="photo_profil"><?= t('Choisir une nouvelle photo', 'Een nieuwe foto kiezen') ?></label>
             <input type="file" id="photo_profil" name="photo_profil" accept="image/jpeg,image/png,image/gif,image/webp" required>
-            <p class="hint">JPEG, PNG, GIF ou WebP — max 5 Mo</p>
+            <p class="hint"><?= t('JPEG, PNG, GIF ou WebP — max 5 Mo', 'JPEG, PNG, GIF of WebP — max. 5 MB') ?></p>
         </div>
-        <button type="submit" class="btn-submit">📷 Mettre à jour la photo</button>
+        <button type="submit" class="btn-submit">📷 <?= t('Mettre à jour la photo', 'Foto bijwerken') ?></button>
     </form>
 
     <?php if ($currentPhoto): ?>
-    <form method="POST" onsubmit="return confirm('Supprimer la photo de profil ?');">
+    <form method="POST" onsubmit="return confirm('<?= t('Supprimer la photo de profil ?', 'Profielfoto verwijderen?') ?>');">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
         <input type="hidden" name="supprimer_photo" value="1">
-        <button type="submit" class="btn-delete">🗑️ Supprimer la photo</button>
+        <button type="submit" class="btn-delete">🗑️ <?= t('Supprimer la photo', 'Foto verwijderen') ?></button>
     </form>
     <?php endif; ?>
 </div>

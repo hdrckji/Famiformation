@@ -375,14 +375,22 @@ function veAddStep(a) {
 }
 function veDelStep(x) { if (!confirm('Supprimer cette étape ?')) { return; } var s = x.closest('.ve-step'); if (s) { s.remove(); } }
 
+// Doute de l'IA encore en suspens sur ce bloc ? On le RENVOIE tel quel : tant que l'humain
+// ne l'a pas « appliqué » ou « ignoré », il doit rester visible (guide + éditeur).
+function veFix(blk) {
+    var f = blk.querySelector('.fix');
+    if (!f || f.style.display === 'none') { return ''; }
+    return f.getAttribute('data-fix') || '';
+}
 function veBuild() {
     var blocks = [];
     document.querySelectorAll('#veDoc > .ve-blk').forEach(function (blk) {
         var t = blk.getAttribute('data-type');
         var al = blk.getAttribute('data-align') || '';
+        var fx = veFix(blk);
         if (t === 'hero') { blocks.push({ type: 'hero', title: fld(blk, 'title'), subtitle: fld(blk, 'subtitle') }); }
         else if (t === 'section') { var x = fld(blk, 'title'); if (x) { blocks.push({ type: 'section', title: x, align: al }); } }
-        else if (t === 'text') { var x = fld(blk, 'text'); if (x) { blocks.push({ type: 'text', text: x, align: al }); } }
+        else if (t === 'text') { var x = fld(blk, 'text'); if (x) { var b = { type: 'text', text: x, align: al }; if (fx) { b.fix = fx; } blocks.push(b); } }
         else if (t === 'quote') { var x = fld(blk, 'text'); if (x) { blocks.push({ type: 'quote', text: x, align: al }); } }
         else if (t === 'list') {
             var items = []; blk.querySelectorAll('[data-f="item"]').forEach(function (e) { var v = veMd(e); if (v) { items.push(v); } });
@@ -395,7 +403,11 @@ function veBuild() {
             if (items.length) { blocks.push({ type: 'steps', items: items }); }
         } else if (t === 'callout') {
             var tx = fld(blk, 'text'); var ti = fld(blk, 'title');
-            if (tx || ti) { blocks.push({ type: 'callout', style: blk.getAttribute('data-style') || 'info', title: ti, text: tx, align: al }); }
+            if (tx || ti) {
+                var cb = { type: 'callout', style: blk.getAttribute('data-style') || 'info', title: ti, text: tx, align: al };
+                if (fx) { cb.fix = fx; }
+                blocks.push(cb);
+            }
         } else if (t === 'keyfigures') {
             var items = []; blk.querySelectorAll('.kf').forEach(function (k) {
                 var v = veMd(k.querySelector('[data-f="value"]')); var l = veMd(k.querySelector('[data-f="label"]'));
