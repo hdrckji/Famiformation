@@ -612,6 +612,74 @@ if (!function_exists('nlSyncModule')) {
     }
 }
 
+if (!function_exists('famiFinalValidation')) {
+    /**
+     * VALIDATION FINALE d'un contenu — la DERNIÈRE étape de la relecture.
+     *
+     * C'est ICI, et SEULEMENT ici, que l'IA repasse sur tout :
+     *   1) orthographe du GUIDE (forme uniquement),
+     *   2) orthographe du QUIZ (forme uniquement, jamais les bonnes réponses),
+     *   3) traduction NÉERLANDAISE (guide + quiz),
+     *   4) PUBLICATION : le contenu devient enfin VISIBLE par les utilisateurs.
+     *
+     * Tant qu'on n'est pas passé par ici, le contenu reste caché (non validé).
+     * S'il y a un quiz à relire, cette fonction n'est appelée qu'APRÈS sa validation.
+     *
+     * @return string message à afficher à l'utilisateur
+     */
+    function famiFinalValidation(PDO $db, $guideId, $actorId, $isAdmin = false)
+    {
+        @set_time_limit(0);
+        $guideId = (int) $guideId;
+        $st = $db->prepare("SELECT id, parent_id, contenu_ia, quiz_json FROM modules WHERE id = ? LIMIT 1");
+        $st->execute([$guideId]);
+        $m = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$m) { return ''; }
+
+        $msg = '';
+
+        // 1) Orthographe du guide.
+        $fr = (string) ($m['contenu_ia'] ?? '');
+        if (trim($fr) !== '' && function_exists('nlProofreadBlocksJson')) {
+            $pr = nlProofreadBlocksJson($db, $fr);
+            if (!empty($pr['ok']) && trim((string) $pr['json']) !== '') {
+                $db->prepare("UPDATE modules SET contenu_ia = ? WHERE id = ?")->execute([$pr['json'], $guideId]);
+                $msg .= ' ✍️ Orthographe du guide vérifiée.';
+            }
+        }
+
+        // 2) Orthographe du quiz.
+        $qz = (string) ($m['quiz_json'] ?? '');
+        if (trim($qz) !== '' && function_exists('nlProofreadQuizJson')) {
+            $pr = nlProofreadQuizJson($db, $qz);
+            if (!empty($pr['ok']) && trim((string) $pr['json']) !== '') {
+                $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$pr['json'], $guideId]);
+                $msg .= ' 📝 Orthographe du quiz vérifiée.';
+            }
+        }
+
+        // 3) Traduction néerlandaise (guide + quiz), en direct : ensuite tout est instantané.
+        if (function_exists('nlSyncModule')) {
+            nlSyncModule($db, $guideId, true);
+            $msg .= ' 🌐 Version néerlandaise générée.';
+        }
+
+        // 4) PUBLICATION : jusqu'ici le contenu était caché car non validé.
+        $pid = (int) ($m['parent_id'] ?? 0);
+        if ($isAdmin && $pid > 0) {
+            require_once __DIR__ . '/events.php';
+            if (function_exists('publishSubmission')) {
+                publishSubmission($db, $pid, (int) $actorId);
+                $msg .= ' ✅ Contenu publié — il est maintenant visible.';
+            }
+        } else {
+            $msg .= ' ⏳ En attente de validation par un admin (contenu encore caché).';
+        }
+
+        return $msg;
+    }
+}
+
 if (!function_exists('spawnNlSync')) {
     /**
      * Lance la synchronisation NL EN TÂCHE DE FOND (l'utilisateur n'attend pas :

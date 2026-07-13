@@ -86,61 +86,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
         $frJson = json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE);
 
-        // ÉCONOMIE — si RIEN n'a changé depuis la dernière fois, on ne rappelle NI l'IA
-        // (orthographe) NI la traduction NL. On sort tout de suite.
-        if (trim($frJson) === trim((string) ($module['contenu_ia'] ?? ''))) {
-            $_SESSION['module_flash'] = "✅ Aucun changement — rien à revérifier.";
-            header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
-            exit();
-        }
-
-        $proofed = false;
-        $willGenQuiz = (!empty($module['a_evaluer']) && trim((string) ($module['quiz_json'] ?? '')) === '');
-        $oldNl = (string) ($module['contenu_ia_nl'] ?? '');
-        $quizNlReady = trim((string) ($module['quiz_json'] ?? '')) === '' || trim((string) ($module['quiz_json_nl'] ?? '')) !== '';
-
-        // PASSAGE 2 INCRÉMENTAL — relecture d'un contenu déjà traduit, sans quiz à générer :
-        // on ne re-corrige/re-traduit QUE les phrases modifiées (économie d'appels IA).
-        if (!$willGenQuiz && trim($oldNl) !== '' && $quizNlReady && function_exists('nlApplyIncremental')) {
-            $inc = nlApplyIncremental($db, $frJson, (string) ($module['contenu_ia'] ?? ''), $oldNl);
-            if ($inc !== null) {
-                $frHash = hash('sha256',
-                    trim((string) ($module['nom'] ?? '')) . '|' .
-                    trim((string) ($module['description'] ?? '')) . '|' .
-                    $inc['fr'] . '|' .
-                    (string) ($module['quiz_json'] ?? ''));
-                $db->prepare("UPDATE modules SET contenu_ia = ?, contenu_ia_nl = ?, uniformized = 1, nl_hash = ? WHERE id = ?")
-                   ->execute([$inc['fr'], $inc['nl'], $frHash, $id]);
-                $_SESSION['module_flash'] = "✅ Contenu relu — orthographe et néerlandais mis à jour (phrases modifiées).";
-                header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
-                exit();
-            }
-        }
-
-        // MODE PLEIN — première traduction, structure changée, ou quiz à générer.
-        // PASSAGE 2 : re-vérification orthographe du FR (forme uniquement). Sans risque.
-        if (function_exists('nlProofreadBlocksJson')) {
-            $pr = nlProofreadBlocksJson($db, $frJson);
-            if ($pr['ok'] && trim((string) $pr['json']) !== '') {
-                $frJson = $pr['json'];
-                $proofed = true;
-            }
-        }
-
+        // 1) On ENREGISTRE le guide relu. AUCUN appel IA à ce stade.
         $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")
            ->execute([$frJson, $id]);
 
-        // GUIDE RÉDIGÉ DE ZÉRO (ou quiz jamais généré) : si « à évaluer » et pas encore de quiz,
-        // on génère le quiz MAINTENANT à partir du contenu rédigé.
+        // 2) Guide « à évaluer » sans quiz (ex. rédigé de zéro) : on génère le quiz maintenant,
+        //    puisqu'il faudra le relire avant la validation finale.
         $quizMsg = '';
-        if (!empty($module['a_evaluer']) && trim((string) ($module['quiz_json'] ?? '')) === '') {
+        $hasQuiz = trim((string) ($module['quiz_json'] ?? '')) !== '';
+        if (!$hasQuiz && !empty($module['a_evaluer'])) {
             require_once 'includes/ai_uniformise.php';
             if (function_exists('aiGenerateQuiz')) {
+                @set_time_limit(0);
                 $qz = aiGenerateQuiz($db, $frJson);
                 if (!empty($qz['ok']) && !empty($qz['quiz'])) {
                     $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")
                        ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), $id]);
-                    $module['quiz_json'] = '1'; // pour la redirection vers le quiz
+                    $hasQuiz = true;
                     $quizMsg = ' 📝 Quiz généré (' . count($qz['quiz']['questions'] ?? []) . ').';
                 } else {
                     $quizMsg = ' ⚠️ Quiz non généré : ' . ($qz['error'] ?? 'erreur') . '.';
@@ -148,10 +110,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
             }
         }
 
-        @set_time_limit(0);
-        nlSyncModule($db, $id, true); // FR corrigé + quiz éventuel → NL traduit EN DIRECT (prêt tout de suite)
-        $_SESSION['module_flash'] = ($proofed ? "✅ Contenu relu, orthographe vérifiée et enregistré." : "✅ Contenu relu et enregistré.") . $quizMsg . " 🌐 La version néerlandaise se met à jour.";
-        header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
+        // 3) S'IL Y A UN QUIZ À RELIRE : on s'arrête ici. Pas d'IA, pas de traduction, pas de
+        //    publication. La VÉRIFICATION FINALE se fait APRÈS la relecture du quiz — c'est là
+        //    que l'IA repasse sur TOUT (guide + quiz) et que le contenu devient visible.
+        if ($hasQuiz) {
+            $_SESSION['module_flash'] = "✅ Guide enregistré." . $quizMsg
+                . " 👉 Relis maintenant le quiz : la vérification finale et la publication se feront à SA validation.";
+            header('Location: module_quiz.php?id=' . $id);
+            exit();
+        }
+
+        // 4) PAS DE QUIZ → cette validation EST l'étape finale : l'IA revérifie tout, traduit en
+        //    néerlandais, et publie le contenu (jusqu'ici il était caché).
+        $final = famiFinalValidation($db, $id, (int) ($_SESSION['user_id'] ?? 0), $isAdmin);
+        $_SESSION['module_flash'] = "✅ Relecture validée." . $final;
+        header('Location: module.php?id=' . $id);
         exit();
     }
 

@@ -62,22 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         header('Location: module_quiz.php?id=' . $id . '&lang=nl');
         exit();
     }
-    // ÉCONOMIE — si le quiz FR n'a pas changé, on ne rappelle NI l'IA NI la traduction NL.
-    if ((string) $json === (string) ($module['quiz_json'] ?? '')) {
-        $_SESSION['module_flash'] = "✅ Aucun changement — rien à revérifier.";
-        header('Location: module.php?id=' . $id);
-        exit();
-    }
-    // PASSAGE 2 — re-vérification orthographe du quiz FR (forme uniquement, jamais le sens
-    // ni les bonnes réponses). Sans risque : en cas d'échec, on garde le texte tel quel.
-    if ($json !== null && function_exists('nlProofreadQuizJson')) {
-        $pr = nlProofreadQuizJson($db, $json);
-        if ($pr['ok'] && trim((string) $pr['json']) !== '') { $json = $pr['json']; }
-    }
+    // On enregistre le quiz relu.
     $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$json, $id]);
-    @set_time_limit(0);
-    nlSyncModule($db, $id, true); // quiz FR corrigé → quiz NL traduit EN DIRECT (prêt tout de suite)
-    $_SESSION['module_flash'] = $questions ? ("✅ Quiz enregistré (" . count($questions) . " question" . (count($questions) > 1 ? 's' : '') . "). 🌐 La version néerlandaise se met à jour.") : "✅ Quiz vidé.";
+
+    // VALIDATION FINALE — c'est la DERNIÈRE étape de la relecture (guide déjà relu, quiz relu).
+    // C'est ICI que l'IA repasse sur TOUT : orthographe du guide + du quiz, traduction NL,
+    // puis PUBLICATION (jusqu'ici le contenu était caché car non validé).
+    $final = famiFinalValidation($db, $id, (int) ($_SESSION['user_id'] ?? 0), $isAdmin);
+    $_SESSION['module_flash'] = ($questions
+        ? "✅ Quiz validé (" . count($questions) . " question" . (count($questions) > 1 ? 's' : '') . ")."
+        : "✅ Quiz vidé.") . $final;
     header('Location: module.php?id=' . $id);
     exit();
 }

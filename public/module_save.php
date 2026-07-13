@@ -499,18 +499,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 eventsEnsureTables($db);
                 $ajout = ($madeGuide && $madeVideo) ? 'guide + vidéo' : ($madeGuide ? 'guide' : 'vidéo');
                 $modNom = (string) ($module['nom'] ?? 'Module');
+                // Le contenu vient d'être déposé : il n'est PAS encore validé (relecture à faire).
+                // On le CACHE donc pour tout le monde, même pour un admin — personne ne doit voir
+                // une formation non relue. Il sera PUBLIÉ à la validation finale de la relecture
+                // (famiFinalValidation), c.-à-d. après le quiz s'il y en a un.
+                $subIds = array_values(array_filter([(int) $guideChildId, (int) $vidChildId]));
+                if ($subIds) {
+                    $ph = implode(',', array_fill(0, count($subIds), '?'));
+                    try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id IN ($ph)")->execute($subIds); } catch (Exception $e) {}
+                }
                 if (!$isAdminActor) {
-                    // Contributeur : le contenu déposé reste EN ATTENTE (caché) jusqu'à validation admin.
-                    $subIds = array_values(array_filter([(int) $guideChildId, (int) $vidChildId]));
-                    if ($subIds) {
-                        $ph = implode(',', array_fill(0, count($subIds), '?'));
-                        try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id IN ($ph)")->execute($subIds); } catch (Exception $e) {}
-                    }
                     logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu proposé (' . $ajout . ') : ' . $modNom);
                     $structMsg .= " En attente de validation par un admin.";
                 } else {
-                    // Admin : le contenu est publié immédiatement → on notifie les utilisateurs concernés.
-                    logEvent($db, 'content_published', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu publié (' . $ajout . ') : ' . $modNom);
+                    $structMsg .= " ⚠️ Non visible tant que tu n'as pas terminé la relecture.";
                 }
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
 
@@ -613,10 +615,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // Le module courant devient le conteneur qui regroupe le guide.
             $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, uniformized = 0, a_evaluer = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE id = ?")->execute([$id]);
-            if (!$isAdminActor) {
-                try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id = ?")->execute([$guideChildId]); } catch (Exception $e) {}
-            }
-            $_SESSION['module_flash'] = "✍️ Guide créé — rédige ta formation puis clique sur « Valider ».";
+            // Pas encore relu → caché pour tout le monde jusqu'à la validation finale.
+            try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id = ?")->execute([$guideChildId]); } catch (Exception $e) {}
+            $_SESSION['module_flash'] = "✍️ Guide créé (non visible tant qu'il n'est pas validé) — rédige ta formation puis clique sur « Valider ».";
             header('Location: module_edit.php?id=' . $guideChildId);
             exit();
         }
