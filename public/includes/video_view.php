@@ -28,7 +28,7 @@ if (!function_exists('renderVideoPage')) {
             ? '<p class="videohero__subtitle">' . htmlspecialchars($descRaw) . '</p>'
             : '';
         // Méta : on n'affiche que ce que l'on sait réellement.
-        $meta = $quizAvailable ? '<ul class="videohero__meta"><li>Quiz en fin de vidéo</li></ul>' : '';
+        $meta = $quizAvailable ? '<ul class="videohero__meta"><li>' . t('Quiz en fin de vidéo', 'Quiz na de video') . '</li></ul>' : '';
 
         $flora = '<svg class="videohero__flora" viewBox="0 0 1200 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'
             . '<path class="flora--soft flora--draw" d="M -30 520 C 110 400, 140 290, 170 160 C 184 100, 214 50, 270 20"/>'
@@ -125,10 +125,10 @@ if (!function_exists('renderVideoPage')) {
                                            src="<?= htmlspecialchars(moduleFileUrl($subNl)) ?>"
                                            <?= $isNl ? 'default' : '' ?>>
                                 <?php endif; ?>
-                                Votre navigateur ne peut pas lire cette vidéo.
+                                <?= t('Votre navigateur ne peut pas lire cette vidéo.', 'Uw browser kan deze video niet afspelen.') ?>
                             </video>
                         </div>
-                        <p class="player__note">⏱️ Avance rapide désactivée — le retour en arrière reste possible.</p>
+                        <p class="player__note">⏱️ <?= t('Avance rapide désactivée — le retour en arrière reste possible.', 'Vooruitspoelen uitgeschakeld — terugspoelen blijft mogelijk.') ?></p>
                     </figure>
                 </main>
                 <script>
@@ -149,8 +149,8 @@ if (!function_exists('renderVideoPage')) {
                 <section class="videostate">
                     <div class="videostate__card">
                         <div class="videostate__icon">🎬</div>
-                        <div class="videostate__title">Vidéo en cours de préparation…</div>
-                        <p class="videostate__text">Compression automatique en 720p pour une lecture fluide. La vidéo apparaîtra ici toute seule.</p>
+                        <div class="videostate__title"><?= t('Vidéo en cours de préparation…', 'Video wordt voorbereid…') ?></div>
+                        <p class="videostate__text"><?= t('Compression automatique en 720p pour une lecture fluide. La vidéo apparaîtra ici toute seule.', 'Automatische compressie naar 720p voor een vlotte weergave. De video verschijnt hier vanzelf.') ?></p>
                     </div>
                 </section>
                 <script>setTimeout(function () { location.reload(); }, 15000);</script>
@@ -158,8 +158,8 @@ if (!function_exists('renderVideoPage')) {
                 <section class="videostate">
                     <div class="videostate__card">
                         <div class="videostate__icon">⚠️</div>
-                        <div class="videostate__title" style="color:#b3261e;">La préparation de la vidéo a échoué.</div>
-                        <?php if ($isAdmin): ?><p class="videostate__text">Réessaie en redéposant la vidéo via « Ajout de contenu ».</p><?php endif; ?>
+                        <div class="videostate__title" style="color:#b3261e;"><?= t('La préparation de la vidéo a échoué.', 'De voorbereiding van de video is mislukt.') ?></div>
+                        <?php if ($isAdmin): ?><p class="videostate__text"><?= t('Réessaie en redéposant la vidéo via « Ajout de contenu ».', 'Probeer opnieuw door de video opnieuw toe te voegen via « Inhoud toevoegen ».') ?></p><?php endif; ?>
                     </div>
                 </section>
             <?php endif; ?>
@@ -167,18 +167,18 @@ if (!function_exists('renderVideoPage')) {
             <?php if ($quizAvailable): ?>
                 <section class="quizcta" aria-label="Passer au quiz">
                     <hr class="quizcta__rule">
-                    <p class="quizcta__lead">Vidéo terminée&nbsp;? Vérifiez que tout est bien en place avec <strong>quelques questions rapides</strong>.</p>
-                    <a class="quizcta__button" href="<?= htmlspecialchars($quizHref) ?>" onclick="return famiVideoQuizGuard(event, this.href);">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>
-                    <p class="quizcta__hint">Résultat immédiat</p>
+                    <p class="quizcta__lead"><?= t('Vidéo terminée&nbsp;? Vérifiez que tout est bien en place avec <strong>quelques questions rapides</strong>.', 'Video bekeken&nbsp;? Controleer of alles duidelijk is met <strong>een paar snelle vragen</strong>.') ?></p>
+                    <a class="quizcta__button" href="<?= htmlspecialchars($quizHref) ?>" onclick="return famiVideoQuizGuard(event, this.href);"><?= t('Passer le quiz', 'Naar de quiz') ?> <span class="arrow" aria-hidden="true">→</span></a>
+                    <p class="quizcta__hint"><?= t('Résultat immédiat', 'Onmiddellijk resultaat') ?></p>
                 </section>
                 <div id="famiVideoModal" style="display:none; position:fixed; inset:0; z-index:100000; background:rgba(18,32,20,.55); align-items:center; justify-content:center; padding:20px;">
                     <div style="background:#fff; border-radius:20px; max-width:460px; width:100%; padding:30px 28px; box-shadow:0 24px 60px rgba(0,0,0,.35); text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
                         <div style="font-size:2.4rem; line-height:1; margin-bottom:12px;">🎬</div>
-                        <h3 style="margin:0 0 10px; color:#1E4D2B; font-size:1.3rem;">Vidéo pas encore terminée</h3>
-                        <p style="margin:0 0 22px; color:#46543F; line-height:1.55;">Nous vous recommandons fortement de <strong>regarder la vidéo jusqu'au bout</strong> avant de passer le quiz&nbsp;: les réponses s'y trouvent. 🙂</p>
+                        <h3 style="margin:0 0 10px; color:#1E4D2B; font-size:1.3rem;"><?= t('Vidéo pas encore terminée', 'Video nog niet bekeken') ?></h3>
+                        <p style="margin:0 0 22px; color:#46543F; line-height:1.55;"><?= t('Nous vous recommandons fortement de <strong>regarder la vidéo jusqu\'au bout</strong> avant de passer le quiz&nbsp;: les réponses s\'y trouvent. 🙂', 'We raden je sterk aan om <strong>de video volledig te bekijken</strong> voordat je de quiz maakt&nbsp;: de antwoorden staan erin. 🙂') ?></p>
                         <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-                            <button type="button" onclick="famiVideoModalClose()" style="background:#1E4D2B; color:#fff; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:1rem;">↩ Regarder la vidéo</button>
-                            <button type="button" onclick="famiVideoModalProceed()" style="background:#eef1e6; color:#46543F; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:.95rem;">Passer quand même</button>
+                            <button type="button" onclick="famiVideoModalClose()" style="background:#1E4D2B; color:#fff; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:1rem;">↩ <?= t('Regarder la vidéo', 'De video bekijken') ?></button>
+                            <button type="button" onclick="famiVideoModalProceed()" style="background:#eef1e6; color:#46543F; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:.95rem;"><?= t('Passer quand même', 'Toch doorgaan') ?></button>
                         </div>
                     </div>
                 </div>
@@ -200,7 +200,7 @@ if (!function_exists('renderVideoPage')) {
                 </script>
             <?php endif; ?>
 
-            <p class="vid-footer">Famiformation · Document interne</p>
+            <p class="vid-footer"><?= t('Famiformation · Document interne', 'Famiformation · Intern document') ?></p>
         </div>
         <?php
     }

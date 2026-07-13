@@ -45,7 +45,7 @@ if (!function_exists('_dBlockHtml')) {
         switch ($b['type']) {
             case 'section':
                 $ctx['sec']++;
-                $eye = 'Partie ' . $ctx['sec'];
+                $eye = t('Partie', 'Deel') . ' ' . $ctx['sec'];
                 return '<section class="section"' . $alStyle . '><p class="section__eyebrow">' . htmlspecialchars($eye) . '</p>'
                     . '<h2 class="section__title">' . $esc($b['title']) . '</h2><hr class="section__rule"></section>';
             case 'text':
@@ -111,8 +111,8 @@ if (!function_exists('_uniCoverHtml')) {
         $title = _uniInline(htmlspecialchars($hero['title'] ?? 'Formation'));
         $sub = ($hero && ($hero['subtitle'] ?? '') !== '') ? '<p class="cover__subtitle">' . _uniInline(htmlspecialchars($hero['subtitle'])) . '</p>' : '';
         $meta = '<ul class="cover__meta">';
-        if ($secNum > 0) { $meta .= '<li>' . $secNum . ' partie' . ($secNum > 1 ? 's' : '') . '</li>'; }
-        $meta .= '<li>Lecture ~' . (int) $minutes . ' min</li></ul>';
+        if ($secNum > 0) { $meta .= '<li>' . $secNum . ' ' . ($secNum > 1 ? t('parties', 'delen') : t('partie', 'deel')) . '</li>'; }
+        $meta .= '<li>' . t('Lecture ~', 'Leestijd ~') . (int) $minutes . ' min</li></ul>';
 
         $items = '';
         foreach ($toc as $t) {
@@ -139,10 +139,10 @@ if (!function_exists('_uniCoverHtml')) {
         return '<header class="cover">' . $flora . '<div class="cover__inner">'
             . '<p class="cover__brand">Famiformation</p>'
             . '<h1 class="cover__title">' . $title . '</h1>' . $sub . $meta
-            . '<button type="button" class="cover__cta" onclick="uniGoto(1)">Commencer la formation <span class="arrow" aria-hidden="true">→</span></button>'
-            . '</div><a class="cover__scrollhint" href="#uni-toc">Au programme</a></header>'
-            . '<nav class="toc" id="uni-toc" aria-label="Sommaire de la formation"><p class="toc__eyebrow">Au programme</p>'
-            . '<h2 class="toc__title">Sommaire</h2><hr class="toc__rule"><ol class="toc__list">' . $items . '</ol></nav>';
+            . '<button type="button" class="cover__cta" onclick="uniGoto(1)">' . t('Commencer la formation', 'De opleiding starten') . ' <span class="arrow" aria-hidden="true">→</span></button>'
+            . '</div><a class="cover__scrollhint" href="#uni-toc">' . t('Au programme', 'Op het programma') . '</a></header>'
+            . '<nav class="toc" id="uni-toc" aria-label="Sommaire de la formation"><p class="toc__eyebrow">' . t('Au programme', 'Op het programma') . '</p>'
+            . '<h2 class="toc__title">' . t('Sommaire', 'Inhoud') . '</h2><hr class="toc__rule"><ol class="toc__list">' . $items . '</ol></nav>';
     }
 }
 
@@ -237,14 +237,14 @@ if (!function_exists('renderUniformContent')) {
         $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
         // Page de fin AUTOMATIQUE sur CHAQUE guide (ne dépend pas du PDF d'origine).
         $outroCta = ($quizHref !== '')
-            ? '<a class="outro__cta" href="' . htmlspecialchars($quizHref) . '" onclick="return famiGuideQuizGuard(event, this.href);">Passer le quiz <span class="arrow" aria-hidden="true">→</span></a>'
+            ? '<a class="outro__cta" href="' . htmlspecialchars($quizHref) . '" onclick="return famiGuideQuizGuard(event, this.href);">' . t('Passer le quiz', 'Naar de quiz') . ' <span class="arrow" aria-hidden="true">→</span></a>'
             : '';
         $pages[] = '<main class="page"><section class="outro"><div class="outro__card">'
             . '<div class="outro__leaf">🌿</div>'
-            . '<p class="outro__eyebrow">Formation terminée</p>'
-            . '<h2 class="outro__title">Bravo, vous avez tout parcouru&nbsp;!</h2>'
-            . '<p class="outro__message">Une question&nbsp;? N\'hésitez pas à demander au personnel.</p>'
-            . '<p class="outro__thanks">Merci pour votre écoute 🌿</p>'
+            . '<p class="outro__eyebrow">' . t('Formation terminée', 'Opleiding voltooid') . '</p>'
+            . '<h2 class="outro__title">' . t('Bravo, vous avez tout parcouru&nbsp;!', 'Proficiat, je hebt alles doorlopen&nbsp;!') . '</h2>'
+            . '<p class="outro__message">' . t('Une question&nbsp;? N\'hésitez pas à demander au personnel.', 'Een vraag&nbsp;? Aarzel niet om het personeel te vragen.') . '</p>'
+            . '<p class="outro__thanks">' . t('Merci pour votre écoute 🌿', 'Bedankt voor je aandacht 🌿') . '</p>'
             . $outroCta
             . '</div></section></main>';
         $n = count($pages);
@@ -364,9 +364,9 @@ if (!function_exists('renderUniformContent')) {
                 <?php endforeach; ?>
                 <?php if ($n > 1): ?>
                     <nav class="pagenav" aria-label="Navigation entre les pages">
-                        <button type="button" class="pagenav__link pagenav__link--prev" id="uniPrev" onclick="uniPage(-1)"><span aria-hidden="true">←</span> Précédent</button>
-                        <p class="pagenav__counter">Page <strong id="uniCur">1</strong> / <?= (int) $n ?></p>
-                        <button type="button" class="pagenav__link pagenav__link--next" id="uniNext" onclick="uniPage(1)">Suivant <span aria-hidden="true">→</span></button>
+                        <button type="button" class="pagenav__link pagenav__link--prev" id="uniPrev" onclick="uniPage(-1)"><span aria-hidden="true">←</span> <?= t('Précédent', 'Vorige') ?></button>
+                        <p class="pagenav__counter"><?= t('Page', 'Pagina') ?> <strong id="uniCur">1</strong> / <?= (int) $n ?></p>
+                        <button type="button" class="pagenav__link pagenav__link--next" id="uniNext" onclick="uniPage(1)"><?= t('Suivant', 'Volgende') ?> <span aria-hidden="true">→</span></button>
                     </nav>
                 <?php endif; ?>
             </div>
@@ -378,11 +378,11 @@ if (!function_exists('renderUniformContent')) {
         <div id="famiDoneModal" style="display:none; position:fixed; inset:0; z-index:100000; background:rgba(18,32,20,.55); align-items:center; justify-content:center; padding:20px;">
             <div style="background:#fff; border-radius:20px; max-width:460px; width:100%; padding:30px 28px; box-shadow:0 24px 60px rgba(0,0,0,.35); text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
                 <div style="font-size:2.4rem; line-height:1; margin-bottom:12px;">🌿</div>
-                <h3 style="margin:0 0 10px; color:#1E4D2B; font-size:1.3rem;">Vous n'avez pas tout parcouru</h3>
-                <p style="margin:0 0 22px; color:#46543F; line-height:1.55;">Nous vous recommandons fortement de <strong>terminer la lecture du guide</strong> avant de passer le quiz&nbsp;: vous y trouverez les réponses. 🙂</p>
+                <h3 style="margin:0 0 10px; color:#1E4D2B; font-size:1.3rem;"><?= t('Vous n\'avez pas tout parcouru', 'Je hebt niet alles doorlopen') ?></h3>
+                <p style="margin:0 0 22px; color:#46543F; line-height:1.55;"><?= t('Nous vous recommandons fortement de <strong>terminer la lecture du guide</strong> avant de passer le quiz&nbsp;: vous y trouverez les réponses. 🙂', 'We raden je sterk aan om <strong>de gids volledig te lezen</strong> voordat je de quiz maakt&nbsp;: je vindt er de antwoorden. 🙂') ?></p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-                    <button type="button" onclick="famiDoneClose()" style="background:#1E4D2B; color:#fff; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:1rem;">↩ Terminer la lecture</button>
-                    <button type="button" onclick="famiDoneProceed()" style="background:#eef1e6; color:#46543F; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:.95rem;">Passer quand même</button>
+                    <button type="button" onclick="famiDoneClose()" style="background:#1E4D2B; color:#fff; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:1rem;">↩ <?= t('Terminer la lecture', 'Verder lezen') ?></button>
+                    <button type="button" onclick="famiDoneProceed()" style="background:#eef1e6; color:#46543F; border:none; border-radius:999px; padding:13px 22px; font-weight:700; cursor:pointer; font-size:.95rem;"><?= t('Passer quand même', 'Toch doorgaan') ?></button>
                 </div>
             </div>
         </div>
