@@ -86,6 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
         $frJson = json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE);
 
+        // ÉCONOMIE — si RIEN n'a changé depuis la dernière fois, on ne rappelle NI l'IA
+        // (orthographe) NI la traduction NL. On sort tout de suite.
+        if (trim($frJson) === trim((string) ($module['contenu_ia'] ?? ''))) {
+            $_SESSION['module_flash'] = "✅ Aucun changement — rien à revérifier.";
+            header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
+            exit();
+        }
+
         // PASSAGE 2 — re-vérification orthographe du FR (forme uniquement) APRÈS tes
         // corrections manuelles. Silencieux et sans risque : en cas d'échec, on garde ton texte.
         $proofed = false;

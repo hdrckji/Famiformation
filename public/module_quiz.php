@@ -62,6 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         header('Location: module_quiz.php?id=' . $id . '&lang=nl');
         exit();
     }
+    // ÉCONOMIE — si le quiz FR n'a pas changé, on ne rappelle NI l'IA NI la traduction NL.
+    if ((string) $json === (string) ($module['quiz_json'] ?? '')) {
+        $_SESSION['module_flash'] = "✅ Aucun changement — rien à revérifier.";
+        header('Location: module.php?id=' . $id);
+        exit();
+    }
     // PASSAGE 2 — re-vérification orthographe du quiz FR (forme uniquement, jamais le sens
     // ni les bonnes réponses). Sans risque : en cas d'échec, on garde le texte tel quel.
     if ($json !== null && function_exists('nlProofreadQuizJson')) {
