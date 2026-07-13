@@ -497,17 +497,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     spawnVideoTranscode($videoSrc, $vidChildId);
                     $structMsg .= " La vidéo est en préparation (compression automatique).";
                 }
-                // Contributeur : le contenu déposé reste EN ATTENTE (caché) jusqu'à validation admin.
+                require_once __DIR__ . '/includes/events.php';
+                eventsEnsureTables($db);
+                $ajout = ($madeGuide && $madeVideo) ? 'guide + vidéo' : ($madeGuide ? 'guide' : 'vidéo');
+                $modNom = (string) ($module['nom'] ?? 'Module');
                 if (!$isAdminActor) {
-                    require_once __DIR__ . '/includes/events.php';
-                    eventsEnsureTables($db);
+                    // Contributeur : le contenu déposé reste EN ATTENTE (caché) jusqu'à validation admin.
                     $subIds = array_values(array_filter([(int) $guideChildId, (int) $vidChildId]));
                     if ($subIds) {
                         $ph = implode(',', array_fill(0, count($subIds), '?'));
                         try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id IN ($ph)")->execute($subIds); } catch (Exception $e) {}
                     }
-                    logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu déposé, en attente de validation.');
+                    logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu proposé (' . $ajout . ') : ' . $modNom);
                     $structMsg .= " En attente de validation par un admin.";
+                } else {
+                    // Admin : le contenu est publié immédiatement → on notifie les utilisateurs concernés.
+                    logEvent($db, 'content_published', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu publié (' . $ajout . ') : ' . $modNom);
                 }
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
 
