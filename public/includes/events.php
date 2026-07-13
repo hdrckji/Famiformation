@@ -133,27 +133,73 @@ if (!function_exists('eventsMarkSeen')) {
 }
 
 if (!function_exists('eventsUnseenCount')) {
-    /** Nb de contenus PUBLIÉS depuis la dernière visite des notifs, que CET utilisateur peut voir. */
+    /**
+     * Nb de notifications NON VUES par cet utilisateur — quelle que soit leur nature
+     * (contenu publié, contenu proposé, rejet…). Le rond rouge doit s'allumer pour TOUT.
+     * Seul filtre : un non-admin ne compte pas un événement portant sur un module
+     * qu'il n'a pas le droit de voir (contenu encore caché, profil non autorisé).
+     */
     function eventsUnseenCount($db, $userId, $role)
     {
         eventsEnsureUserSeen($db);
+        $isAdmin = ($role === 'admin');
         $seen = '2000-01-01 00:00:00';
-        try { $st = $db->prepare("SELECT events_seen_at FROM utilisateurs WHERE id = ?"); $st->execute([(int) $userId]); $s = $st->fetchColumn(); if ($s) { $seen = (string) $s; } } catch (Exception $e) {}
         try {
-            $st = $db->prepare("SELECT DISTINCT module_id FROM site_events WHERE type = 'content_published' AND created_at > ? ORDER BY created_at DESC LIMIT 100");
+            $st = $db->prepare("SELECT events_seen_at FROM utilisateurs WHERE id = ?");
+            $st->execute([(int) $userId]);
+            $s = $st->fetchColumn();
+            if ($s) { $seen = (string) $s; }
+        } catch (Exception $e) {}
+
+        try {
+            $st = $db->prepare("SELECT id, module_id FROM site_events WHERE created_at > ? ORDER BY created_at DESC LIMIT 100");
             $st->execute([$seen]);
-            $mods = $st->fetchAll(PDO::FETCH_COLUMN);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) { return 0; }
+
+        if ($isAdmin) { return count($rows); }
+
         $n = 0;
-        foreach ($mods as $mid) {
-            $mid = (int) $mid;
-            if ($mid <= 0) { continue; }
-            try {
-                $m = getModuleById($db, $mid);
-                if ($m && (int) ($m['is_active'] ?? 0) === 1 && (!function_exists('userCanSeeModule') || userCanSeeModule($m, $role))) { $n++; }
-            } catch (Exception $e) {}
+        $cache = [];
+        foreach ($rows as $r) {
+            $mid = (int) ($r['module_id'] ?? 0);
+            if ($mid <= 0) { $n++; continue; } // événement général : visible par tous
+            if (!array_key_exists($mid, $cache)) {
+                $ok = false;
+                try {
+                    $m = getModuleById($db, $mid);
+                    $ok = ($m && (int) ($m['is_active'] ?? 0) === 1
+                        && (!function_exists('userCanSeeModule') || userCanSeeModule($m, $role)));
+                } catch (Exception $e) {}
+                $cache[$mid] = $ok;
+            }
+            if ($cache[$mid]) { $n++; }
         }
         return $n;
+    }
+}
+
+if (!function_exists('eventsDelete')) {
+    /** Supprime les notifications dont l'id est dans $ids. */
+    function eventsDelete($db, array $ids)
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), function ($n) { return $n > 0; }));
+        if (empty($ids)) { return 0; }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $st = $db->prepare("DELETE FROM site_events WHERE id IN ($ph)");
+            $st->execute($ids);
+            return $st->rowCount();
+        } catch (Exception $e) { return 0; }
+    }
+
+    /** Vide entièrement le fil de notifications. */
+    function eventsDeleteAll($db)
+    {
+        try {
+            $st = $db->query("DELETE FROM site_events");
+            return $st ? $st->rowCount() : 0;
+        } catch (Exception $e) { return 0; }
     }
 }
 

@@ -23,6 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($mid > 0 && $act === 'reject_submission') {
         rejectSubmission($db, $mid, $uid);
         $_SESSION['module_flash'] = "↩ Contenu renvoyé en brouillon.";
+    } elseif ($act === 'delete_events') {
+        $n = eventsDelete($db, (array) ($_POST['ev'] ?? []));
+        $_SESSION['module_flash'] = $n > 0
+            ? "🗑️ " . $n . " notification" . ($n > 1 ? 's' : '') . " supprimée" . ($n > 1 ? 's' : '') . "."
+            : "❌ Aucune notification sélectionnée.";
+    } elseif ($act === 'delete_all_events') {
+        $n = eventsDeleteAll($db);
+        $_SESSION['module_flash'] = "🗑️ Fil vidé (" . $n . " notification" . ($n > 1 ? 's' : '') . ").";
     }
     header('Location: events.php');
     exit();
@@ -148,7 +156,7 @@ $evIcon = function ($t) {
             <h1 style="margin:0 0 10px;">🔔 <?= t('Événements récents', 'Recente gebeurtenissen') ?></h1>
             <?php if (empty($recent)): ?>
                 <p class="muted"><?= t("Aucun événement pour l'instant.", 'Nog geen gebeurtenissen.') ?></p>
-            <?php else: ?>
+            <?php elseif (!$isAdmin): ?>
                 <?php foreach ($recent as $e):
                     $who = trim((string) (($e['prenom'] ?? '') . ' ' . ($e['unom'] ?? '')));
                     $when = !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '';
@@ -163,6 +171,83 @@ $evIcon = function ($t) {
                     <span class="when"><?= htmlspecialchars($when) ?></span>
                 </div>
                 <?php endforeach; ?>
+            <?php else: ?>
+                <!-- ADMIN : sélection (clic, ou Maj+clic pour une plage) et suppression. -->
+                <form method="POST" action="events.php" id="evForm">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" id="evAction" value="delete_events">
+                    <div class="evbar">
+                        <label class="evchk"><input type="checkbox" id="evAll"> <span>Tout sélectionner</span></label>
+                        <span class="muted" id="evCount">0 sélectionnée</span>
+                        <span class="muted" style="margin-left:auto; font-size:.8rem;">💡 Maj+clic pour sélectionner une plage</span>
+                        <button type="submit" class="btn btn-rej" id="evDel" disabled onclick="return confirm('Supprimer les notifications sélectionnées ?');">🗑️ Supprimer la sélection</button>
+                        <button type="submit" class="btn btn-rej" onclick="if (!confirm('Vider TOUT le fil de notifications ? Cette action est définitive.')) { return false; } document.getElementById('evAction').value = 'delete_all_events'; return true;">🗑️ Tout supprimer</button>
+                    </div>
+
+                    <?php foreach ($recent as $e):
+                        $who = trim((string) (($e['prenom'] ?? '') . ' ' . ($e['unom'] ?? '')));
+                        $when = !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '';
+                    ?>
+                    <div class="ev">
+                        <input type="checkbox" class="evbox" name="ev[]" value="<?= (int) $e['id'] ?>">
+                        <span class="ic"><?= $evIcon($e['type'] ?? '') ?></span>
+                        <div class="txt">
+                            <?= htmlspecialchars((string) ($e['message'] ?? '')) ?>
+                            <?php if (!empty($e['module_id'])): ?> — <a href="module.php?id=<?= (int) $e['module_id'] ?>" style="color:#2d5a37; font-weight:700; text-decoration:none;"><?= htmlspecialchars((string) ($e['module_nom'] ?? 'voir')) ?></a><?php endif; ?>
+                            <?php if ($who !== ''): ?><span class="muted"> · <?= htmlspecialchars($who) ?></span><?php endif; ?>
+                        </div>
+                        <span class="when"><?= htmlspecialchars($when) ?></span>
+                    </div>
+                    <?php endforeach; ?>
+                </form>
+
+                <style>
+                .evbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:#f4f7f5; border:1px solid #dde5e0; border-radius:12px; padding:10px 14px; margin-bottom:12px; }
+                .evchk { display:flex; align-items:center; gap:7px; font-weight:700; color:#244230; cursor:pointer; }
+                .ev .evbox { margin-right:2px; cursor:pointer; }
+                .ev.sel { background:#eef7f0; border-radius:8px; }
+                #evDel[disabled] { opacity:.45; cursor:not-allowed; }
+                </style>
+                <script>
+                (function () {
+                    var boxes = Array.prototype.slice.call(document.querySelectorAll('.evbox'));
+                    var all = document.getElementById('evAll');
+                    var del = document.getElementById('evDel');
+                    var cnt = document.getElementById('evCount');
+                    var last = -1; // dernière case cochée, pour la plage Maj+clic
+
+                    function refresh() {
+                        var n = 0;
+                        boxes.forEach(function (b) {
+                            b.closest('.ev').classList.toggle('sel', b.checked);
+                            if (b.checked) { n++; }
+                        });
+                        del.disabled = (n === 0);
+                        cnt.textContent = n + ' sélectionnée' + (n > 1 ? 's' : '');
+                        all.checked = (n === boxes.length && n > 0);
+                    }
+
+                    boxes.forEach(function (b, i) {
+                        b.addEventListener('click', function (e) {
+                            // Maj+clic : coche (ou décoche) toute la plage depuis la dernière case touchée.
+                            if (e.shiftKey && last > -1 && last !== i) {
+                                var a = Math.min(last, i), z = Math.max(last, i);
+                                for (var k = a; k <= z; k++) { boxes[k].checked = b.checked; }
+                            }
+                            last = i;
+                            refresh();
+                        });
+                    });
+
+                    all.addEventListener('change', function () {
+                        boxes.forEach(function (b) { b.checked = all.checked; });
+                        last = -1;
+                        refresh();
+                    });
+
+                    refresh();
+                }());
+                </script>
             <?php endif; ?>
         </div>
     </div>

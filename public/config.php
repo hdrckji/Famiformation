@@ -3,6 +3,11 @@
 // CONFIGURATION CENTRALE - FamiFormation
 // ========================================
 
+// 0. FUSEAU HORAIRE — le serveur (Railway) tourne en UTC : sans ça, toutes les dates
+// écrites en base (notifications, événements, historique) sont décalées de 1 à 2 heures.
+// On force l'heure belge, avec passage à l'heure d'été automatique.
+date_default_timezone_set('Europe/Brussels');
+
 // 1. CHARGEMENT DES FONCTIONS ET CSRF
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/csrf.php';
