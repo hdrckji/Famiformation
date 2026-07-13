@@ -129,6 +129,9 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .dz-existing { font-size:0.85rem; color:#555; margin:4px 0 2px; }
         /* Variante FINE (sous-titres .srt) : compacte, sur une ligne, moitié moins haute */
         .drop-zone--slim { padding:7px 12px; border-width:2px; margin:6px 0 2px; display:flex; align-items:center; gap:8px; text-align:left; }
+        /* `display:flex` ci-dessus écrase l'attribut [hidden] : on le rétablit explicitement,
+           sinon la zone .srt (masquée par défaut, révélée en tapant « srt ») resterait visible. */
+        .drop-zone[hidden] { display:none !important; }
         .drop-zone--slim .dz-icon { font-size:1.05rem; margin:0; }
         .drop-zone--slim .dz-title { font-size:0.85rem; margin:0; }
         .drop-zone--slim .dz-hint { font-size:0.72rem; margin:0; color:#8a968f; }
