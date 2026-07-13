@@ -92,7 +92,7 @@ if (!function_exists('quizConfigCard')) {
         list($askMul, $askSin) = quizCfgAskedSplit($db);
         $inp = 'padding:9px 11px; border:1px solid #ccd6cf; border-radius:9px; font:inherit; width:110px;';
         ?>
-        <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
+        <div class="pref-block">
             <h3 style="margin:0 0 6px; color:#244230;">📝 Quiz — génération &amp; tirage</h3>
             <p class="muted">L'IA génère une <strong>banque</strong> de questions à la validation du guide. À chaque passage, l'apprenant n'en reçoit qu'une <strong>partie, tirée au hasard</strong> : deux passages ne tombent pas sur les mêmes questions. Plus la banque est grande, plus la génération coûte du temps et des jetons.</p>
 

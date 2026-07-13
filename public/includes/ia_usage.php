@@ -102,11 +102,15 @@ if (!function_exists('renderApiUsageTab')) {
             return htmlspecialchars((string) $k);
         };
         $eur = function ($v) { return number_format((float) $v, 4, ',', ' ') . ' €'; };
+
+        // Inventaire des clés RÉELLEMENT configurées (Railway → Variables) : ajouter une clé
+        // doit se voir ici tout de suite, sans attendre qu'elle ait servi.
+        require_once __DIR__ . '/api_services.php';
+        famiApiServicesPanel();
         ?>
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-                <?php $nbServices = 0; foreach ($byProvider as $bp) { if (($bp['p'] ?? '—') !== '—') { $nbServices++; } } ?>
-                <h2 style="margin:0; color:#2d5a37;">💶 Coûts API (<?= (int) $nbServices ?> service<?= $nbServices > 1 ? 's' : '' ?>)</h2>
+                <h2 style="margin:0; color:#2d5a37;">💶 Coûts API</h2>
                 <button type="button" class="btn btn-danger" onclick="document.getElementById('iaResetModal').classList.add('open')">↺ Remise à zéro</button>
             </div>
             <p class="muted" style="margin-top:6px;">Chaque appel à une API (mise en forme, quiz) est enregistré ici. Le total est cumulé par fournisseur.</p>

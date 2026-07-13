@@ -89,7 +89,7 @@ if (!function_exists('pdfAccessCard')) {
             echo '</div>';
         };
         ?>
-        <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
+        <div class="pref-block">
             <h3 style="margin:0 0 6px; color:#244230;">📄 Accès aux fichiers (PDF &amp; vidéo)</h3>
             <p class="muted">Voir ou télécharger le fichier d'origine consomme de la <strong>bande passante</strong> (payante chez certains hébergeurs, gratuite chez d'autres). Active/désactive chaque option et choisis les profils autorisés. <strong>Les admins ont toujours accès.</strong> (La lecture du guide et la lecture de la vidéo en streaming restent gratuites pour tous.)</p>
 

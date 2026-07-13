@@ -26,6 +26,11 @@ if (!$isAdmin) {
             .topbar a { color: #2d5a37; text-decoration: none; font-weight: bold; }
             h1 { color: #2d5a37; margin: 0; }
             .card { background: #fff; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 24px; }
+        /* Chaque reglage de l'onglet Preferences vit dans SON bloc : plus lisible qu'une
+           longue page separee par des filets. Liseré vert a gauche = repere visuel. */
+        .pref-block { background:#fff; border:1px solid #e3eae5; border-left:5px solid #3E8E4E; border-radius:14px;
+                      padding:20px 22px; margin:18px 0; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+        .pref-block > h3:first-child, .pref-block > h2:first-child { margin-top:0; }
             .btn { border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
             .btn-primary { background: #2d5a37; color: #fff; }
             .btn-light { background: #e9ecef; color: #333; }
@@ -874,7 +879,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 $costTotProj = $costStProj + $costEg;    // projection fin de mois
                 $catLabels = ['video' => '🎬 Vidéos', 'video_raw' => '🎬 Vidéos (sources en attente)', 'pdf' => '📄 PDF', 'icons' => '🖼️ Icônes'];
             ?>
-            <div style="border:1px solid <?= $onVolume ? '#cfe6d5' : '#f0d9a8' ?>; background:<?= $onVolume ? '#f2f9f4' : '#fdf6e6' ?>; border-radius:10px; padding:10px 14px; margin-bottom:6px; font-size:.9rem;">
+            <div class="pref-block" style="border-left-color:<?= $onVolume ? '#3E8E4E' : '#e8a13a' ?>; font-size:.92rem;">
                 🗄️ <strong>Stockage des fichiers :</strong>
                 <?php if ($onVolume): ?>
                     <span style="color:#256b39; font-weight:700;">Volume persistant ✓</span>
@@ -886,7 +891,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </div>
 
             <!-- 💰 Coût d'hébergement des contenus = stockage + trafic (egress) -->
-            <div style="border:1px solid #e2e6ea; background:#fbfcfc; border-radius:10px; padding:14px 16px; margin-bottom:16px;">
+            <div class="pref-block">
                 <h3 style="margin:0 0 4px; color:#244230; font-size:1.05rem;">💰 Coût d'hébergement des contenus</h3>
                 <p class="muted" style="margin:0 0 12px; font-size:.85rem;">Renseigne les prix de ton hébergeur, le site calcule le coût réel. <em>(Chez OVH l'egress est gratuit → mets 0.)</em></p>
 
@@ -972,7 +977,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                     $themeChips[$tk] = ['nom' => (is_array($tv['nom']) ? $tv['nom'][0] : $tv['nom']), 'accent' => $tv['accent']];
                 }
             ?>
-            <div style="border-top:1px solid #eee; padding-top:14px; margin-top:6px;">
+            <div class="pref-block">
                 <h3 style="margin:0 0 4px; color:#244230; font-size:1.35rem;">🎨 Personnalisation</h3>
                 <p class="muted" style="margin:0 0 14px;">Options qui rendent le site attractif. Chaque bascule se fait par un <strong>bouton</strong> (confirmation à la désactivation). Une catégorie coupée est grisée.</p>
 
@@ -1054,7 +1059,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             </div>
 
             <!-- Sites Famiflora (source unique : fiche collaborateur + widget) -->
-            <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
+            <div class="pref-block">
                 <h3 style="margin:0 0 6px; color:#244230;">📍 Sites Famiflora</h3>
                 <p class="muted">Cette liste sert à la fois au menu « Lieu de travail » de la fiche collaborateur et à la météo du widget. Ajoute un site avec sa ville (coordonnées météo trouvées automatiquement, Open-Meteo).</p>
                 <?php $wSitesAdmin = widgetSites($db); ?>
@@ -1117,7 +1122,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             } catch (Exception $e) {
             }
             ?>
-            <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
+            <div class="pref-block">
                 <h3 style="margin:0 0 6px; color:#244230;">🌍 Traduction néerlandaise</h3>
                 <?php $mmEmail = getenv('MYMEMORY_EMAIL'); $mmHasEmail = ($mmEmail !== false && trim((string) $mmEmail) !== ''); ?>
                 <p class="muted">Les nouvelles phrases et questions sont traduites automatiquement à l'enregistrement. Ces boutons traduisent l'<strong>existant</strong> en <strong>enchaînant les lots tout seuls</strong> jusqu'au bout (ou jusqu'à la limite quotidienne gratuite). Un seul clic suffit.</p>

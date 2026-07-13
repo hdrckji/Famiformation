@@ -73,7 +73,7 @@ function iaSettingsCard($db)
     $cur = iaSelectedModel($db);
     $cat = iaModelCatalog();
     ?>
-    <div style="border-top:1px solid #eee; padding-top:14px; margin-top:16px;">
+    <div class="pref-block">
         <h3 style="margin:0 0 6px; color:#244230;">🤖 Intelligence artificielle</h3>
         <p class="muted">Modèle utilisé pour <strong>lire les PDF</strong>, uniformiser le contenu, traduire en néerlandais et générer les quiz. Prix indicatif par contenu (document d'environ 10 pages).</p>
 

@@ -508,18 +508,43 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                         </div>
 
                         <?php
-                            // SOUS-TITRES — volontairement DISCRET et FACULTATIF.
-                            // Le site transcrit la vidéo tout seul : personne n'a besoin de
-                            // fabriquer un .srt. Ce champ n'est là que pour ceux qui EN ONT
-                            // DÉJÀ un (export CapCut, etc.) : c'est gratuit et plus exact.
+                            // SOUS-TITRES — CACHÉS par défaut.
+                            // Le site transcrit la vidéo tout seul (Whisper) : personne n'a besoin de
+                            // fabriquer un .srt, et afficher ce champ ne fait qu'embrouiller.
+                            // Il reste accessible à ceux qui EN ONT DÉJÀ un : il suffit de taper
+                            // « srt » au clavier dans le formulaire pour le faire apparaître.
+                            // (Il se montre aussi tout seul si un .srt est déjà attaché au module.)
                         ?>
-                        <div class="drop-zone drop-zone--slim" id="dz_srt" data-has-existing="<?= !empty($module['sub_src_path']) ? '1' : '0' ?>" data-remove="remove_srt" title="Facultatif : le site génère et traduit les sous-titres tout seul. Déposez un .srt seulement si vous en avez déjà un.">
+                        <div class="drop-zone drop-zone--slim" id="dz_srt" hidden data-has-existing="<?= !empty($module['sub_src_path']) ? '1' : '0' ?>" data-remove="remove_srt" title="Facultatif : le site génère et traduit les sous-titres tout seul. Déposez un .srt seulement si vous en avez déjà un.">
                             <input type="file" name="srt_file" accept=".srt,.vtt,text/plain" class="dz-input">
                             <div class="dz-icon">💬</div>
                             <div class="dz-title">Sous-titres <span style="font-weight:400; color:#8a968f;">.srt · facultatif</span></div>
                             <div class="dz-hint">générés tout seuls sinon</div>
                             <div class="dz-file" hidden></div>
                         </div>
+                        <script>
+                        // Raccourci caché : taper « srt » (hors champ de saisie) révèle la zone de dépôt.
+                        (function () {
+                            var dz = document.getElementById('dz_srt');
+                            if (!dz) { return; }
+                            if (dz.getAttribute('data-has-existing') === '1') { dz.hidden = false; return; }
+                            var buf = '';
+                            document.addEventListener('keydown', function (e) {
+                                var t = e.target;
+                                if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) { return; }
+                                if (!e.key || e.key.length !== 1) { return; }
+                                buf = (buf + e.key.toLowerCase()).slice(-3);
+                                if (buf === 'srt' && dz.hidden) {
+                                    dz.hidden = false;
+                                    dz.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                                    dz.animate(
+                                        [{ boxShadow: '0 0 0 0 rgba(62,142,78,.6)' }, { boxShadow: '0 0 0 12px rgba(62,142,78,0)' }],
+                                        { duration: 700, iterations: 2 }
+                                    );
+                                }
+                            });
+                        }());
+                        </script>
                         <?php if (!empty($module['sub_src_path'])): ?>
                             <div class="dz-existing">💬 Sous-titres fournis
                                 <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_srt" value="1"> Supprimer</label>

@@ -104,7 +104,7 @@ if (!function_exists('contribSettingsCard')) {
             $containers = $db->query("SELECT id, nom, parent_id FROM modules WHERE is_container = 1 ORDER BY nom ASC")->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {}
         ?>
-        <div class="card" style="margin-top:18px;">
+        <div class="pref-block">
             <h2 style="margin-top:0; color:#2d5a37;">🤝 Droits de contribution</h2>
             <p class="muted" style="margin-top:-6px;">Qui peut <strong>créer un module</strong> ou <strong>ajouter du contenu</strong>, et <strong>où</strong>. L'admin n'est jamais limité.</p>
             <form method="POST" action="parametres.php">
