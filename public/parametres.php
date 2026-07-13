@@ -991,7 +991,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 
                     <!-- 🎨 THÈMES -->
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-top:1px solid #eee; padding-top:16px; margin-top:16px;">
-                        <h3 style="margin:0; color:#2d5a37; font-size:1.2rem;">🎨 Thèmes</h3>
+                        <h3 style="margin:0; color:#2d5a37; font-size:1.2rem;">🎉 Événements</h3>
                         <?php $btnToggle('themes_enabled', $themesOn, 'Désactiver toute la catégorie Thèmes ?'); ?>
                     </div>
                     <div style="<?= $themesOn ? '' : 'opacity:.5; pointer-events:none;' ?> border-left:3px solid #e3ece5; padding-left:14px; margin:12px 0 6px;">
