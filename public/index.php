@@ -432,7 +432,6 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
                 <a href="events.php" class="btn-param" title="<?= t('Notifications', 'Meldingen') ?>" style="position:relative;">🔔<?php $pc = $isAdmin ? eventsPendingCount($db) : eventsUnseenCount($db, (int) ($_SESSION['user_id'] ?? 0), $role); if ($pc > 0): ?><span style="position:absolute; top:-6px; right:-6px; background:#c0392b; color:#fff; border-radius:999px; font-size:0.7rem; font-weight:800; padding:1px 6px; line-height:1.4;"><?= (int) $pc ?></span><?php endif; ?></a>
-                <?php if ($isAdmin): ?><a href="gestion_quiz.php" class="btn-param" title="Gestion Quiz">🧩</a><?php endif; ?>
                 <a href="parametres.php" class="btn-param" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                 <a href="logout.php" class="btn-logout" onclick="return confirm('<?= t('Êtes-vous sûr de vouloir vous déconnecter ?', 'Weet je zeker dat je je wilt afmelden?') ?>');"><?= t('Déconnexion', 'Afmelden') ?></a>
             </div>
@@ -579,10 +578,10 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
             <div class="tile-desc"><?= t('Vue par semaine et par secteur des disponibilités étudiantes.', 'Overzicht per week en per sector van de beschikbaarheid van studenten.') ?></div>
         </a>
         <?php endif; ?>
-        <a href="admin_questions.php" class="tile tile-admin">
-            <div class="tile-media"><span class="tile-icon">⚙️</span></div>
-            <div class="tile-title"><?= t('Gestion Questions', 'Beheer vragen') ?></div>
-            <div class="tile-desc"><?= t('Ajouter/Modifier les quiz.', 'Quizvragen toevoegen/wijzigen.') ?></div>
+        <a href="gestion_quiz.php" class="tile tile-admin">
+            <div class="tile-media"><span class="tile-icon">🧩</span></div>
+            <div class="tile-title"><?= t('Gestion Quiz', 'Quizbeheer') ?></div>
+            <div class="tile-desc"><?= t('Contrôler et corriger tous les quiz.', 'Alle quizzen nakijken en corrigeren.') ?></div>
         </a>
         <?php endif; ?>
 
