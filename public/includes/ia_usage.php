@@ -105,7 +105,7 @@ if (!function_exists('renderApiUsageTab')) {
         ?>
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-                <h2 style="margin:0; color:#2d5a37;">💶 Coûts API</h2>
+                <h2 style="margin:0; color:#2d5a37;">💶 Coûts API (<?= (int) $count ?> appel<?= $count > 1 ? 's' : '' ?>)</h2>
                 <button type="button" class="btn btn-danger" onclick="document.getElementById('iaResetModal').classList.add('open')">↺ Remise à zéro</button>
             </div>
             <p class="muted" style="margin-top:6px;">Chaque appel à une API (mise en forme, quiz) est enregistré ici. Le total est cumulé par fournisseur.</p>
