@@ -482,6 +482,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         } catch (Exception $e) {
                             // colonne pas encore créée : sans gravité, la transcription auto prendra le relais
                         }
+                        // .srt FOURNI : on génère les pistes VTT (FR + NL) TOUT DE SUITE, sans
+                        // dépendre du worker de fond → les sous-titres s'affichent immédiatement.
+                        if ($srtSrc) {
+                            try {
+                                require_once __DIR__ . '/includes/transcription.php';
+                                $srtAbs = function_exists('moduleFileAbsPath') ? moduleFileAbsPath($srtSrc) : '';
+                                if ($srtAbs && is_file($srtAbs) && function_exists('famiVideoSubtitles') && function_exists('famiPersistSubtitles')) {
+                                    $subs = famiVideoSubtitles($db, '', $srtAbs); // vidéo inutile si .srt fourni
+                                    if (!empty($subs['ok'])) {
+                                        famiPersistSubtitles($db, $vidChildId, $subs);
+                                    }
+                                }
+                            } catch (Exception $e) { /* le worker prendra le relais */ }
+                        }
                     }
                     $madeVideo = true;
                 }

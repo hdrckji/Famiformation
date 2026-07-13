@@ -371,6 +371,44 @@ if (!function_exists('famiVideoSubtitles')) {
     }
 }
 
+if (!function_exists('famiPersistSubtitles')) {
+    /**
+     * Écrit les pistes VTT (FR + NL) sur le volume et met à jour le module.
+     * Réutilisable par le worker de fond ET par le traitement SYNCHRONE d'un .srt fourni.
+     * @return bool true si au moins la piste FR a été écrite.
+     */
+    function famiPersistSubtitles(PDO $db, $moduleId, array $subs)
+    {
+        if (empty($subs['ok'])) { return false; }
+        $base = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/../uploads');
+        $dir = $base . '/modules/subs';
+        if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+        $stem = 'sub_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4));
+        $frKey = '';
+        $nlKey = '';
+        if (trim((string) ($subs['srt_fr'] ?? '')) !== ''
+            && @file_put_contents($dir . '/' . $stem . '_fr.vtt', famiSrtToVtt($subs['srt_fr'])) !== false) {
+            $frKey = 'modules/subs/' . $stem . '_fr.vtt';
+        }
+        if (trim((string) ($subs['srt_nl'] ?? '')) !== ''
+            && @file_put_contents($dir . '/' . $stem . '_nl.vtt', famiSrtToVtt($subs['srt_nl'])) !== false) {
+            $nlKey = 'modules/subs/' . $stem . '_nl.vtt';
+        }
+        try {
+            $db->prepare("UPDATE modules SET sub_fr_path = ?, sub_nl_path = ?, transcript = ?, sub_status = 'ready' WHERE id = ?")
+               ->execute([
+                   $frKey !== '' ? $frKey : null,
+                   $nlKey !== '' ? $nlKey : null,
+                   trim((string) ($subs['text'] ?? '')) !== '' ? $subs['text'] : null,
+                   (int) $moduleId,
+               ]);
+        } catch (Exception $e) {
+            return false;
+        }
+        return $frKey !== '';
+    }
+}
+
 // --- Compatibilité : ancienne API, conservée pour ne rien casser. ---
 if (!function_exists('fami_parse_srt')) {
     function fami_parse_srt($srt)
