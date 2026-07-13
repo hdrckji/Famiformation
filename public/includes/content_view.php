@@ -106,13 +106,15 @@ if (!function_exists('_uniShort')) {
 
 if (!function_exists('_uniCoverHtml')) {
     /** Couverture plein écran + sommaire (page 0). */
-    function _uniCoverHtml($hero, $secNum, $minutes, $toc)
+    function _uniCoverHtml($hero, $secNum, $minutes, $toc, $docDate = '')
     {
         $title = _uniInline(htmlspecialchars($hero['title'] ?? 'Formation'));
         $sub = ($hero && ($hero['subtitle'] ?? '') !== '') ? '<p class="cover__subtitle">' . _uniInline(htmlspecialchars($hero['subtitle'])) . '</p>' : '';
         $meta = '<ul class="cover__meta">';
         if ($secNum > 0) { $meta .= '<li>' . $secNum . ' ' . ($secNum > 1 ? t('parties', 'delen') : t('partie', 'deel')) . '</li>'; }
-        $meta .= '<li>' . t('Lecture ~', 'Leestijd ~') . (int) $minutes . ' min</li></ul>';
+        $meta .= '<li>' . t('Lecture ~', 'Leestijd ~') . (int) $minutes . ' min</li>';
+        if (trim((string) $docDate) !== '') { $meta .= '<li>' . htmlspecialchars((string) $docDate) . '</li>'; }
+        $meta .= '</ul>';
 
         $items = '';
         foreach ($toc as $t) {
@@ -148,7 +150,7 @@ if (!function_exists('_uniCoverHtml')) {
 
 if (!function_exists('_designedPages')) {
     /** Page 0 = couverture + sommaire ; pages 1..N = une par section. */
-    function _designedPages($blocks, $images, &$used)
+    function _designedPages($blocks, $images, &$used, $docDate = '')
     {
         $ctx = ['sec' => 0, 'images' => $images, 'used' => &$used];
 
@@ -192,7 +194,7 @@ if (!function_exists('_designedPages')) {
         $minutes = max(1, (int) round(str_word_count(strip_tags($allText)) / 180));
 
         if (empty($contentPages)) { $contentPages = ['<main class="page"></main>']; }
-        return array_merge([_uniCoverHtml($hero, $secNum, $minutes, $toc)], $contentPages);
+        return array_merge([_uniCoverHtml($hero, $secNum, $minutes, $toc, $docDate)], $contentPages);
     }
 }
 
@@ -228,13 +230,13 @@ if (!function_exists('_mdPages')) {
 }
 
 if (!function_exists('renderUniformContent')) {
-    function renderUniformContent($md, $pdfUrl = '', $showPdfView = false, $images = [], $quizHref = '')
+    function renderUniformContent($md, $pdfUrl = '', $showPdfView = false, $images = [], $quizHref = '', $docDate = '')
     {
         $images = array_values((array) $images);
         $used = [];
         $data = json_decode((string) $md, true);
         $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
-        $pages = $blocks ? _designedPages($blocks, $images, $used) : _mdPages($md, $images, $used);
+        $pages = $blocks ? _designedPages($blocks, $images, $used, $docDate) : _mdPages($md, $images, $used);
         // Page de fin AUTOMATIQUE sur CHAQUE guide (ne dépend pas du PDF d'origine).
         $outroCta = ($quizHref !== '')
             ? '<a class="outro__cta" href="' . htmlspecialchars($quizHref) . '" onclick="return famiGuideQuizGuard(event, this.href);">' . t('Passer le quiz', 'Naar de quiz') . ' <span class="arrow" aria-hidden="true">→</span></a>'

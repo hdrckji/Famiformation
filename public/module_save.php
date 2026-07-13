@@ -405,26 +405,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                // Quiz : on ne le génère MAINTENANT que si le support est COMPLET, c.-à-d.
-                // un PDF SANS vidéo. S'il y a une vidéo, on ATTEND sa transcription pour
-                // générer le quiz UNE SEULE FOIS sur le guide + la vidéo (famiEnrichQuizWithVideo).
-                // -> plus sûr (l'IA a tout le contenu) et pas de génération payée pour rien.
-                if ($aEvaluer && $uniformized === 1 && $contenuIa && !$hasVideo) {
-                    require_once __DIR__ . '/includes/ia_settings.php';
-                    require_once __DIR__ . '/includes/ai_uniformise.php';
-                    $qz = aiGenerateQuiz($db, (string) $contenuIa);
-                    if ($qz['ok']) {
-                        $quizJson = json_encode($qz['quiz']);
-                        require_once __DIR__ . '/includes/ia_usage.php';
-                        iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), 'quiz', (function_exists('iaSelectedModel') ? iaSelectedModel($db) : ''), 0, 0, $qz['cost_eur'], $id);
-                        $flashMsg .= " 📝 Quiz généré (" . count($qz['quiz']['questions'] ?? []) . " questions).";
-                    } else {
-                        $flashMsg .= " ⚠️ Quiz NON généré : " . $qz['error'] . ".";
-                    }
-                } elseif ($aEvaluer && $hasVideo) {
-                    $flashMsg .= " 📝 Le quiz sera généré après la transcription de la vidéo (guide + vidéo).";
-                }
-
+                // Quiz : généré PLUS BAS, une seule fois, APRÈS la création des sous-modules et
+                // le traitement des sous-titres — pour qu'il porte sur le guide + la vidéo si un
+                // transcript est disponible. Il est TOUJOURS généré si « à évaluer » (jamais
+                // dépendant d'une tâche de fond, sinon il ne serait jamais créé).
                 $hasPdf = ($pdfPath !== null && $pdfPath !== '');
 
                 // --- Structuration systematique en sous-modules ---
@@ -529,6 +513,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     logEvent($db, 'content_published', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu publié (' . $ajout . ') : ' . $modNom);
                 }
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
+
+                // QUIZ — généré ICI, une seule fois, quand tout le support est prêt.
+                // Il porte sur le guide + la VIDÉO si un transcript est déjà disponible (sous-titres
+                // fournis / déjà transcrits) ; sinon sur le guide seul. L'essentiel : il est TOUJOURS
+                // créé quand « à évaluer » est coché — il ne dépend plus d'une tâche de fond.
+                if ($aEvaluer && $guideChildId && trim((string) $contenuIa) !== '') {
+                    @set_time_limit(0);
+                    require_once __DIR__ . '/includes/ia_settings.php';
+                    require_once __DIR__ . '/includes/ai_uniformise.php';
+
+                    $transcript = '';
+                    if ($vidChildId) {
+                        try {
+                            $ts = $db->prepare("SELECT transcript FROM modules WHERE id = ? LIMIT 1");
+                            $ts->execute([(int) $vidChildId]);
+                            $transcript = trim((string) $ts->fetchColumn());
+                        } catch (Exception $e) {}
+                    }
+                    $qSource = "CONTENU ÉCRIT (le guide) :\n" . (string) $contenuIa;
+                    if ($transcript !== '') {
+                        $qSource .= "\n\n---\n\nCONTENU DE LA VIDÉO (transcription) :\n" . $transcript;
+                    }
+                    $qz = aiGenerateQuiz($db, $qSource);
+                    if (!empty($qz['ok']) && !empty($qz['quiz'])) {
+                        $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")
+                           ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), (int) $guideChildId]);
+                        // Marque « déjà enrichi par la vidéo » seulement si le transcript a servi ;
+                        // sinon le worker pourra encore l'enrichir quand la vidéo sera transcrite.
+                        try {
+                            $db->prepare("UPDATE modules SET quiz_from_video = ? WHERE id = ?")
+                               ->execute([$transcript !== '' ? 1 : 0, (int) $guideChildId]);
+                        } catch (Exception $e) {}
+                        require_once __DIR__ . '/includes/ia_usage.php';
+                        iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), 'quiz', (function_exists('iaSelectedModel') ? iaSelectedModel($db) : ''), 0, 0, (float) ($qz['cost_eur'] ?? 0), $id);
+                        $flashMsg .= " 📝 Quiz généré (" . count($qz['quiz']['questions'] ?? []) . " questions"
+                            . ($transcript !== '' ? ", guide + vidéo" : "") . ").";
+                    } else {
+                        $flashMsg .= " ⚠️ Quiz NON généré : " . ($qz['error'] ?? 'erreur inconnue') . ".";
+                    }
+                }
 
                 // AUTONOMIE BILINGUE : dès qu'un contenu FR est enregistré, on traduit le NL
                 // (guide + quiz + titre) EN DIRECT, à la validation. On paie l'attente ICI, une
