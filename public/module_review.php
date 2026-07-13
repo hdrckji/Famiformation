@@ -29,7 +29,10 @@ $imgBase = rtrim((defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_review') {
     requireValidCSRF();
 
-    $lang = (($_POST['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
+    // La langue de travail est celle du document (source). Éditer l'AUTRE langue = éditer la traduction.
+    $srcLang = moduleSourceLang($module);
+    $lang = (($_POST['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
+    $isTranslation = ($lang !== $srcLang);
 
     // --- Mode visuel : les blocs arrivent en JSON (édition directement sur la page) ---
     if (isset($_POST['blocks_json'])) {
@@ -38,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
 
         // Édition MANUELLE de la version néerlandaise : on n'écrit QUE le NL.
         // Pas de rotation (images partagées avec le FR), pas de retraduction (le FR reste maître).
-        if ($lang === 'nl') {
+        if ($isTranslation) {
             foreach ($blocksIn as &$bln) { if (is_array($bln) && ($bln['type'] ?? '') === 'image') { $bln['rotate'] = 0; } }
             unset($bln);
             $cleanNl = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
@@ -58,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                 $db->prepare("UPDATE modules SET contenu_ia_nl = ? WHERE id = ?")
                    ->execute([json_encode(['blocks' => $cleanNl], JSON_UNESCAPED_UNICODE), $id]);
             }
-            $_SESSION['module_flash'] = "✅ Version néerlandaise corrigée et enregistrée.";
+            $_SESSION['module_flash'] = "✅ Traduction (" . langLabel($lang) . ") corrigée et enregistrée.";
             header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id . '&lang=nl' : 'module.php?id=' . $id));
             exit();
         }

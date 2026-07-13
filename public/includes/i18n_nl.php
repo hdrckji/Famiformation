@@ -41,6 +41,10 @@ if (!function_exists('nlEnsureColumns')) {
             // Empreinte du FR au moment de la dernière traduction : évite de retraduire
             // (et de repayer) un contenu qui n'a pas bougé.
             'nl_hash'       => "ALTER TABLE modules ADD COLUMN nl_hash VARCHAR(64) NULL",
+            // LANGUE SOURCE du contenu : celle du document importé (fr ou nl).
+            // C'est la langue de travail (rédaction, relecture, quiz). L'AUTRE langue est
+            // la traduction, produite à la validation finale.
+            'source_lang'   => "ALTER TABLE modules ADD COLUMN source_lang VARCHAR(2) NULL",
         ];
         foreach ($cols as $col => $ddl) {
             try {
@@ -52,6 +56,30 @@ if (!function_exists('nlEnsureColumns')) {
                 // migration non bloquante
             }
         }
+    }
+}
+
+if (!function_exists('moduleSourceLang')) {
+    /** Langue SOURCE d'un module (celle du document importé). Par défaut : fr. */
+    function moduleSourceLang($m)
+    {
+        $l = strtolower(trim((string) (is_array($m) ? ($m['source_lang'] ?? '') : $m)));
+        return ($l === 'nl') ? 'nl' : 'fr';
+    }
+    /** L'AUTRE langue (celle de la traduction). */
+    function otherLang($lang)
+    {
+        return (strtolower((string) $lang) === 'nl') ? 'fr' : 'nl';
+    }
+    /** Libellé lisible d'une langue. */
+    function langLabel($lang)
+    {
+        return (strtolower((string) $lang) === 'nl') ? 'néerlandais' : 'français';
+    }
+    /** Le contenu ORIGINAL est toujours dans contenu_ia ; la TRADUCTION dans contenu_ia_nl. */
+    function langIsSource($m, $lang)
+    {
+        return moduleSourceLang($m) === strtolower((string) $lang);
     }
 }
 
@@ -154,11 +182,15 @@ if (!function_exists('aiTranslateStringsToNl')) {
      * MÊME LONGUEUR et MÊME ORDRE. Découpé en lots pour rester dans les limites.
      * @return array ['ok'=>bool, 'items'=>string[], 'error'=>string]
      */
-    function aiTranslateStringsToNl($db, array $strings)
+    function aiTranslateStringsToNl($db, array $strings, $from = 'fr', $to = 'nl')
     {
         if (empty($strings)) {
             return ['ok' => true, 'items' => [], 'error' => ''];
         }
+        $from = (strtolower((string) $from) === 'nl') ? 'nl' : 'fr';
+        $to = (strtolower((string) $to) === 'nl') ? 'nl' : 'fr';
+        $fromLbl = ($from === 'nl') ? 'néerlandais' : 'français';
+        $toLbl = ($to === 'nl') ? 'néerlandais (de Belgique)' : 'français';
         $apiKey = getenv('ANTHROPIC_API_KEY');
         if (!$apiKey && isset($_SERVER['ANTHROPIC_API_KEY'])) {
             $apiKey = $_SERVER['ANTHROPIC_API_KEY'];
@@ -168,9 +200,9 @@ if (!function_exists('aiTranslateStringsToNl')) {
         }
         $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
 
-        $system = "Tu es traducteur professionnel français → néerlandais (néerlandais de Belgique), "
+        $system = "Tu es traducteur professionnel $fromLbl → $toLbl, "
             . "domaine : jardinerie et formation interne d'entreprise.\n"
-            . "Tu reçois un TABLEAU JSON de chaînes en français.\n"
+            . "Tu reçois un TABLEAU JSON de chaînes en $fromLbl.\n"
             . "Règles STRICTES :\n"
             . "- Renvoie UNIQUEMENT un tableau JSON de MÊME LONGUEUR et dans le MÊME ORDRE.\n"
             . "- Traduis chaque élément, un pour un. N'en fusionne, n'en supprime, n'en ajoute AUCUN.\n"
@@ -221,7 +253,7 @@ if (!function_exists('aiTranslateStringsToNl')) {
 
 if (!function_exists('nlTranslateBlocksJson')) {
     /** Guide (JSON de blocs) FR → NL, structure préservée. @return array ['ok','json','error'] */
-    function nlTranslateBlocksJson($db, $blocksJson)
+    function nlTranslateBlocksJson($db, $blocksJson, $from = 'fr', $to = 'nl')
     {
         $decoded = json_decode((string) $blocksJson, true);
         if (!is_array($decoded) || empty($decoded)) {
@@ -242,8 +274,8 @@ if (!function_exists('nlTranslateBlocksJson')) {
             return ['ok' => false, 'json' => '', 'error' => 'Aucun texte à traduire'];
         }
 
-        // 2) Traduction en lot
-        $tr = aiTranslateStringsToNl($db, $src);
+        // 2) Traduction en lot (dans le sens demandé : source → autre langue)
+        $tr = aiTranslateStringsToNl($db, $src, $from, $to);
         if (!$tr['ok']) {
             return ['ok' => false, 'json' => '', 'error' => $tr['error']];
         }
@@ -273,11 +305,13 @@ if (!function_exists('aiProofreadStringsFr')) {
      * Même mécanisme sûr que la traduction (même longueur, même ordre, refus si écart).
      * @return array ['ok','items','error']
      */
-    function aiProofreadStringsFr($db, array $strings)
+    function aiProofreadStringsFr($db, array $strings, $lang = 'fr')
     {
         if (empty($strings)) {
             return ['ok' => true, 'items' => [], 'error' => ''];
         }
+        $lang = (strtolower((string) $lang) === 'nl') ? 'nl' : 'fr';
+        $langLbl = ($lang === 'nl') ? 'néerlandais' : 'français';
         $apiKey = getenv('ANTHROPIC_API_KEY');
         if (!$apiKey && isset($_SERVER['ANTHROPIC_API_KEY'])) {
             $apiKey = $_SERVER['ANTHROPIC_API_KEY'];
@@ -287,8 +321,8 @@ if (!function_exists('aiProofreadStringsFr')) {
         }
         $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
 
-        $system = "Tu es correcteur orthographique professionnel en français.\n"
-            . "Tu reçois un TABLEAU JSON de chaînes en français.\n"
+        $system = "Tu es correcteur orthographique professionnel en $langLbl.\n"
+            . "Tu reçois un TABLEAU JSON de chaînes en $langLbl.\n"
             . "Règles STRICTES :\n"
             . "- Renvoie UNIQUEMENT un tableau JSON de MÊME LONGUEUR et dans le MÊME ORDRE.\n"
             . "- Corrige SEULEMENT l'orthographe, les accents, la conjugaison, les accords et la ponctuation évidente.\n"
@@ -337,7 +371,7 @@ if (!function_exists('aiProofreadStringsFr')) {
 
 if (!function_exists('nlProofreadBlocksJson')) {
     /** Guide (JSON de blocs) : corrige l'orthographe FR, structure préservée. @return ['ok','json','error'] */
-    function nlProofreadBlocksJson($db, $blocksJson)
+    function nlProofreadBlocksJson($db, $blocksJson, $lang = 'fr')
     {
         $decoded = json_decode((string) $blocksJson, true);
         if (!is_array($decoded) || empty($decoded)) {
@@ -351,7 +385,7 @@ if (!function_exists('nlProofreadBlocksJson')) {
         if (empty($src)) {
             return ['ok' => false, 'json' => '', 'error' => 'Aucun texte à corriger'];
         }
-        $pr = aiProofreadStringsFr($db, $src);
+        $pr = aiProofreadStringsFr($db, $src, $lang);
         if (!$pr['ok']) {
             return ['ok' => false, 'json' => '', 'error' => $pr['error']];
         }
@@ -429,7 +463,7 @@ if (!function_exists('nlApplyIncremental')) {
 
 if (!function_exists('nlTranslateQuizJson')) {
     /** Quiz FR → NL : énoncés + options. Type et bonnes réponses INTACTS. */
-    function nlTranslateQuizJson($db, $quizJson)
+    function nlTranslateQuizJson($db, $quizJson, $from = 'fr', $to = 'nl')
     {
         $quiz = json_decode((string) $quizJson, true);
         if (!is_array($quiz) || empty($quiz['questions'])) {
@@ -445,7 +479,7 @@ if (!function_exists('nlTranslateQuizJson')) {
             return ['ok' => false, 'json' => '', 'error' => 'Aucun texte à traduire'];
         }
 
-        $tr = aiTranslateStringsToNl($db, $src);
+        $tr = aiTranslateStringsToNl($db, $src, $from, $to);
         if (!$tr['ok']) {
             return ['ok' => false, 'json' => '', 'error' => $tr['error']];
         }
@@ -469,7 +503,7 @@ if (!function_exists('nlTranslateQuizJson')) {
 
 if (!function_exists('nlProofreadQuizJson')) {
     /** PASSAGE 2 — corrige l'orthographe FR du quiz (énoncés + options). Type/correct INTACTS. */
-    function nlProofreadQuizJson($db, $quizJson)
+    function nlProofreadQuizJson($db, $quizJson, $lang = 'fr')
     {
         $quiz = json_decode((string) $quizJson, true);
         if (!is_array($quiz) || empty($quiz['questions'])) {
@@ -529,8 +563,13 @@ if (!function_exists('nlSyncModule')) {
         $done = [];
         $errors = [];
 
-        // Empreinte du FR : titre + description + guide + quiz.
-        // Toute modification côté français (y compris le titre) => resynchro NL automatique.
+        // LANGUE SOURCE (celle du document importé) → on traduit vers L'AUTRE langue.
+        // Les colonnes ne changent pas : contenu_ia = ORIGINAL, contenu_ia_nl = TRADUCTION.
+        $srcLang = moduleSourceLang($m);
+        $dstLang = otherLang($srcLang);
+
+        // Empreinte de l'ORIGINAL : titre + description + guide + quiz.
+        // Toute modification de l'original => retraduction automatique.
         $nom = trim((string) ($m['nom'] ?? ''));
         $desc = trim((string) ($m['description'] ?? ''));
         $frContent = (string) ($m['contenu_ia'] ?? '');
@@ -548,7 +587,7 @@ if (!function_exists('nlSyncModule')) {
         $needTitle = ($nom !== '') && ($needSync || $nomNl === '');
         $needDesc = ($desc !== '') && ($needSync || $descNl === '');
         if ($needTitle || $needDesc) {
-            $tr = aiTranslateStringsToNl($db, [$nom, $desc]);
+            $tr = aiTranslateStringsToNl($db, [$nom, $desc], $srcLang, $dstLang);
             if ($tr['ok'] && count($tr['items']) === 2) {
                 if ($nom !== '') {
                     $t = mb_substr(trim((string) $tr['items'][0]), 0, 150);
@@ -566,7 +605,7 @@ if (!function_exists('nlSyncModule')) {
         // --- 2) Guide + quiz : Claude, seulement si le FR a changé depuis la dernière fois.
         if ($needSync) {
             if (trim($frContent) !== '') {
-                $r = nlTranslateBlocksJson($db, $frContent);
+                $r = nlTranslateBlocksJson($db, $frContent, $srcLang, $dstLang);
                 if ($r['ok']) {
                     $contenuNl = $r['json'];
                     $done[] = 'guide';
@@ -575,7 +614,7 @@ if (!function_exists('nlSyncModule')) {
                 }
             }
             if (trim($frQuiz) !== '') {
-                $r = nlTranslateQuizJson($db, $frQuiz);
+                $r = nlTranslateQuizJson($db, $frQuiz, $srcLang, $dstLang);
                 if ($r['ok']) {
                     $quizNl = $r['json'];
                     $done[] = 'quiz';
@@ -631,37 +670,40 @@ if (!function_exists('famiFinalValidation')) {
     {
         @set_time_limit(0);
         $guideId = (int) $guideId;
-        $st = $db->prepare("SELECT id, parent_id, contenu_ia, quiz_json FROM modules WHERE id = ? LIMIT 1");
+        $st = $db->prepare("SELECT id, parent_id, contenu_ia, quiz_json, source_lang FROM modules WHERE id = ? LIMIT 1");
         $st->execute([$guideId]);
         $m = $st->fetch(PDO::FETCH_ASSOC);
         if (!$m) { return ''; }
 
+        // On corrige DANS LA LANGUE DU DOCUMENT, et on traduit vers l'autre.
+        $srcLang = moduleSourceLang($m);
+        $dstLang = otherLang($srcLang);
         $msg = '';
 
-        // 1) Orthographe du guide.
+        // 1) Orthographe du guide (dans sa langue).
         $fr = (string) ($m['contenu_ia'] ?? '');
         if (trim($fr) !== '' && function_exists('nlProofreadBlocksJson')) {
-            $pr = nlProofreadBlocksJson($db, $fr);
+            $pr = nlProofreadBlocksJson($db, $fr, $srcLang);
             if (!empty($pr['ok']) && trim((string) $pr['json']) !== '') {
                 $db->prepare("UPDATE modules SET contenu_ia = ? WHERE id = ?")->execute([$pr['json'], $guideId]);
                 $msg .= ' ✍️ Orthographe du guide vérifiée.';
             }
         }
 
-        // 2) Orthographe du quiz.
+        // 2) Orthographe du quiz (dans sa langue).
         $qz = (string) ($m['quiz_json'] ?? '');
         if (trim($qz) !== '' && function_exists('nlProofreadQuizJson')) {
-            $pr = nlProofreadQuizJson($db, $qz);
+            $pr = nlProofreadQuizJson($db, $qz, $srcLang);
             if (!empty($pr['ok']) && trim((string) $pr['json']) !== '') {
                 $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$pr['json'], $guideId]);
                 $msg .= ' 📝 Orthographe du quiz vérifiée.';
             }
         }
 
-        // 3) Traduction néerlandaise (guide + quiz), en direct : ensuite tout est instantané.
+        // 3) Traduction vers l'AUTRE langue (guide + quiz), en direct.
         if (function_exists('nlSyncModule')) {
             nlSyncModule($db, $guideId, true);
-            $msg .= ' 🌐 Version néerlandaise générée.';
+            $msg .= ' 🌐 Traduction en ' . langLabel($dstLang) . ' générée.';
         }
 
         // 3bis) Sous-titres NL de la vidéo (frère du guide) — pas faits à l'import pour ne pas
@@ -725,10 +767,13 @@ if (!function_exists('moduleContenu')) {
     /** Blocs du guide dans la langue courante (NL si dispo, sinon FR). */
     function moduleContenu(array $m)
     {
-        if (function_exists('currentLang') && currentLang() === 'nl') {
-            $nl = trim((string) ($m['contenu_ia_nl'] ?? ''));
-            if ($nl !== '') {
-                return $nl;
+        // contenu_ia = ORIGINAL (dans la langue du document) ; contenu_ia_nl = TRADUCTION.
+        // On sert l'original si l'utilisateur est déjà dans la langue source, sinon la traduction.
+        $cur = (function_exists('currentLang') ? currentLang() : 'fr');
+        if (!langIsSource($m, $cur)) {
+            $tr = trim((string) ($m['contenu_ia_nl'] ?? ''));
+            if ($tr !== '') {
+                return $tr;
             }
         }
         return (string) ($m['contenu_ia'] ?? '');
@@ -739,10 +784,11 @@ if (!function_exists('moduleQuizJson')) {
     /** Quiz dans la langue courante (NL si dispo, sinon FR). */
     function moduleQuizJson(array $m)
     {
-        if (function_exists('currentLang') && currentLang() === 'nl') {
-            $nl = trim((string) ($m['quiz_json_nl'] ?? ''));
-            if ($nl !== '') {
-                return $nl;
+        $cur = (function_exists('currentLang') ? currentLang() : 'fr');
+        if (!langIsSource($m, $cur)) {
+            $tr = trim((string) ($m['quiz_json_nl'] ?? ''));
+            if ($tr !== '') {
+                return $tr;
             }
         }
         return (string) ($m['quiz_json'] ?? '');

@@ -19,18 +19,22 @@ if (!$module) { header('Location: index.php'); exit(); }
 $canReview = $isAdmin || ((int) ($module['contenu_by'] ?? 0) === $uid && $uid > 0);
 if (!$canReview) { header('Location: module.php?id=' . $id); exit(); }
 
-// Langue éditée : FR (original) ou NL (version néerlandaise, pour corriger la traduction auto).
-$lang = (($_GET['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
-$srcCol = ($lang === 'nl') ? 'contenu_ia_nl' : 'contenu_ia';
+// LANGUE DE TRAVAIL = celle du document importé (source). On l'ouvre par défaut dans CETTE
+// langue : un PDF néerlandais se relit en néerlandais. L'autre langue est la TRADUCTION.
+require_once 'includes/i18n_nl.php';
+$srcLang = moduleSourceLang($module);
+$lang = (($_GET['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
+$isTranslation = ($lang !== $srcLang);          // édite-t-on la traduction ?
+$srcCol = $isTranslation ? 'contenu_ia_nl' : 'contenu_ia';
 $data = json_decode((string) ($module[$srcCol] ?? ''), true);
 $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
 $nlFromFr = false;
-if (!$blocks && $lang === 'nl') {
-    // NL pas encore généré : on le génère MAINTENANT (synchrone), sans dépendre du worker de fond.
-    require_once 'includes/i18n_nl.php';
-    $frJson = (string) ($module['contenu_ia'] ?? '');
-    if (function_exists('nlTranslateBlocksJson') && trim($frJson) !== '') {
-        $tr = nlTranslateBlocksJson($db, $frJson);
+if (!$blocks && $isTranslation) {
+    // Traduction pas encore générée : on la produit à la volée (elle n'existe qu'après la
+    // validation finale, mais on ne laisse pas l'écran vide si on l'ouvre avant).
+    $origJson = (string) ($module['contenu_ia'] ?? '');
+    if (function_exists('nlTranslateBlocksJson') && trim($origJson) !== '') {
+        $tr = nlTranslateBlocksJson($db, $origJson, $srcLang, $lang);
         if (!empty($tr['ok']) && trim((string) $tr['json']) !== '') {
             try { $db->prepare("UPDATE modules SET contenu_ia_nl = ? WHERE id = ?")->execute([$tr['json'], $id]); } catch (Exception $e) {}
             $module['contenu_ia_nl'] = $tr['json'];
@@ -39,8 +43,8 @@ if (!$blocks && $lang === 'nl') {
         }
     }
     if (!$blocks) {
-        // Échec (clé API absente / réseau) : on part de la version FR comme base à corriger.
-        $data = json_decode($frJson, true);
+        // Échec (clé API absente / réseau) : on part de l'original comme base à corriger.
+        $data = json_decode($origJson, true);
         $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
         $nlFromFr = true;
     }

@@ -43,8 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         $questions[] = ['q' => $text, 'type' => $type, 'options' => $opts, 'correct' => array_values($correct)];
     }
     $json = $questions ? json_encode(['questions' => $questions], JSON_UNESCAPED_UNICODE) : null;
-    $saveLang = (($_POST['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
-    if ($saveLang === 'nl') {
+    $srcLang = moduleSourceLang($module);
+    $saveLang = (($_POST['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
+    if ($saveLang !== $srcLang) { // on édite la TRADUCTION
         // Édition MANUELLE du quiz néerlandais : on n'écrit QUE le NL, pas de retraduction.
         // On marque le NL « à jour » avec le FR actuel seulement si le guide NL n'est pas en attente.
         $frHash = hash('sha256',
@@ -58,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         } else {
             $db->prepare("UPDATE modules SET quiz_json_nl = ? WHERE id = ?")->execute([$json, $id]);
         }
-        $_SESSION['module_flash'] = "✅ Quiz néerlandais corrigé et enregistré.";
+        $_SESSION['module_flash'] = "✅ Quiz (" . langLabel($saveLang) . ") corrigé et enregistré.";
         header('Location: module_quiz.php?id=' . $id . '&lang=nl');
         exit();
     }
@@ -77,15 +78,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
 }
 
 // Langue éditée : FR (original) ou NL (pour corriger la traduction auto).
-$lang = (($_GET['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
-$quizCol = ($lang === 'nl') ? 'quiz_json_nl' : 'quiz_json';
+$srcLang = moduleSourceLang($module);
+$lang = (($_GET['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
+$isTranslation = ($lang !== $srcLang);
+$quizCol = $isTranslation ? 'quiz_json_nl' : 'quiz_json';
 $quiz = json_decode((string) ($module[$quizCol] ?? ''), true);
 $quizNlFromFr = false;
-if ((!is_array($quiz) || empty($quiz['questions'])) && $lang === 'nl') {
+if ((!is_array($quiz) || empty($quiz['questions'])) && $isTranslation) {
     // NL pas encore généré : on le génère MAINTENANT (synchrone), sans dépendre du worker.
     $frQuiz = (string) ($module['quiz_json'] ?? '');
     if (function_exists('nlTranslateQuizJson') && trim($frQuiz) !== '') {
-        $tr = nlTranslateQuizJson($db, $frQuiz);
+        $tr = nlTranslateQuizJson($db, $frQuiz, $srcLang, $lang);
         if (!empty($tr['ok']) && trim((string) $tr['json']) !== '') {
             try { $db->prepare("UPDATE modules SET quiz_json_nl = ? WHERE id = ?")->execute([$tr['json'], $id]); } catch (Exception $e) {}
             $quiz = json_decode($tr['json'], true);

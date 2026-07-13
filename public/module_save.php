@@ -389,6 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $quizJson = $module['quiz_json'] ?? null;
 
                 // « Valider et uniformiser » : l'IA lit le PDF et réécrit le contenu.
+                $guideLang = 'fr'; // langue du document (détectée par l'IA)
                 if ($uniformized === 1 && $pdfPath !== null && $pdfPath !== '') {
                     require_once __DIR__ . '/includes/ia_settings.php';
                     require_once __DIR__ . '/includes/ai_uniformise.php';
@@ -396,7 +397,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($res['ok']) {
                         $contenuIa = $res['text'];
                         $contenuImages = !empty($res['images']) ? json_encode($res['images']) : null;
-                        $flashMsg = "✅ Contenu uniformisé par l'IA (≈ " . number_format($res['cost_eur'], 3) . " €). Vérifie le rendu ci-dessous.";
+                        // LANGUE DU DOCUMENT : le guide est rédigé (et se relira) dans CETTE langue.
+                        // La traduction vers l'autre langue se fera à la validation finale.
+                        $guideLang = (($res['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
+                        $flashMsg = "✅ Contenu extrait et mis en forme par l'IA en " . ($guideLang === 'nl' ? 'néerlandais' : 'français')
+                            . " (≈ " . number_format($res['cost_eur'], 3) . " €). Vérifie le rendu ci-dessous.";
                         require_once __DIR__ . '/includes/ia_usage.php';
                         iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), 'uniformise', $res['model'], $res['in'], $res['out'], $res['cost_eur'], $id);
                     } else {
@@ -432,11 +437,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     try { $guide = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
                     if ($guide) {
                         $guideChildId = (int) $guide['id'];
-                        $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ?, quiz_json = ? WHERE id = ?")
-                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, (int) $guide['id']]);
+                        $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ?, quiz_json = ?, source_lang = ? WHERE id = ?")
+                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, $guideLang, (int) $guide['id']]);
                     } else {
-                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, contenu_images, quiz_json, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, ?, ?, 'ecrit')")
-                           ->execute(['Le guide', 'De gids', (int) $id, $childRoles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson]);
+                        $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, contenu_images, quiz_json, source_lang, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'ecrit')")
+                           ->execute(['Guide', 'Gids', (int) $id, $childRoles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, $guideLang]);
                         $guideChildId = (int) $db->lastInsertId();
                     }
                     $madeGuide = true;
@@ -491,8 +496,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = 0, a_evaluer = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE id = ?")->execute([$id]);
 
                 $structMsg = ($madeGuide && $madeVideo)
-                    ? "✅ 2 sous-modules : « Le guide » + « Vidéo »."
-                    : ("✅ Sous-module « " . ($madeGuide ? 'Le guide' : 'Vidéo') . " » ajouté.");
+                    ? "✅ 2 sous-modules : « Guide » + « Vidéo »."
+                    : ("✅ Sous-module « " . ($madeGuide ? 'Guide' : 'Vidéo') . " » ajouté.");
                 if ($uniformized && $madeGuide) { $structMsg .= " Le guide a été mis en forme par l'IA."; }
                 if ($startTranscode && $vidChildId) {
                     spawnVideoTranscode($videoSrc, $vidChildId);
@@ -577,7 +582,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, uniformized, a_evaluer, contenu_ia, contenu_by, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, 1, ?, ?, ?, 'ecrit')")
-                   ->execute(['Le guide', 'De gids', (int) $id, $childRoles, $aEvaluer, $starter, $contenuBy]);
+                   ->execute(['Guide', 'Gids', (int) $id, $childRoles, $aEvaluer, $starter, $contenuBy]);
                 $guideChildId = (int) $db->lastInsertId();
             }
             // Le module courant devient le conteneur qui regroupe le guide.

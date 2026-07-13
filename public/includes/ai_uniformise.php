@@ -141,8 +141,9 @@ if (!function_exists('aiUniformisePdf')) {
         $images = function_exists('aiExtractPdfImages') ? aiExtractPdfImages($pdfPath, $relForImg) : [];
         $images = array_slice($images, 0, 12); // borne coût / taille de requête
 
-        $system = "Tu es un designer pédagogique. À partir d'un document de formation (PDF), tu produis une FICHE web moderne, claire et agréable, en français, adaptée à Famiflora (jardinerie : ton chaleureux, univers nature).\n"
-            . "Tu réponds UNIQUEMENT en JSON valide au format {\"blocks\":[ ... ]}. AUCUN texte hors du JSON.\n"
+        $system = "Tu es un designer pédagogique. À partir d'un document de formation (PDF), tu produis une FICHE web moderne, claire et agréable, adaptée à Famiflora (jardinerie : ton chaleureux, univers nature).\n"
+            . "LANGUE — RÈGLE ABSOLUE : détecte la langue du document (français ou néerlandais) et rédige TOUTE la fiche DANS CETTE MÊME LANGUE. Ne traduis JAMAIS. Un document néerlandais donne une fiche 100 % en néerlandais.\n"
+            . "Tu réponds UNIQUEMENT en JSON valide au format {\"lang\":\"fr\"|\"nl\",\"blocks\":[ ... ]} où \"lang\" est la langue détectée du document. AUCUN texte hors du JSON.\n"
             . "Types de blocs disponibles (choisis les plus adaptés, dans l'ordre de lecture) :\n"
             . "- {\"type\":\"hero\",\"title\":\"Titre principal\",\"subtitle\":\"sous-titre court\"} : une seule fois, tout au début.\n"
             . "- {\"type\":\"section\",\"title\":\"Titre de section\"}\n"
@@ -227,10 +228,12 @@ if (!function_exists('aiUniformisePdf')) {
         }
 
         // La réponse doit être un JSON de blocs de design ; on le valide/normalise (sinon on garde le brut).
+        $srcLang = 'fr'; // langue DÉTECTÉE du document : c'est la langue de travail du guide
         $js = strpos($text, '{');
         $je = strrpos($text, '}');
         if ($js !== false && $je !== false && $je > $js) {
             $parsed = json_decode(substr($text, $js, $je - $js + 1), true);
+            if (is_array($parsed) && strtolower(trim((string) ($parsed['lang'] ?? ''))) === 'nl') { $srcLang = 'nl'; }
             if (is_array($parsed) && !empty($parsed['blocks']) && is_array($parsed['blocks']) && function_exists('aiSanitizeBlocks')) {
                 $blocks = aiSanitizeBlocks($parsed['blocks']);
                 if (!empty($blocks)) {
@@ -259,7 +262,7 @@ if (!function_exists('aiUniformisePdf')) {
         $costUsd = ($in / 1e6) * $rate[0] + ($out / 1e6) * $rate[1];
         $costEur = $costUsd * 0.92;
 
-        return ['ok' => true, 'text' => $text, 'error' => '', 'model' => $model, 'in' => $in, 'out' => $out, 'cost_eur' => $costEur, 'images' => $images];
+        return ['ok' => true, 'text' => $text, 'error' => '', 'model' => $model, 'in' => $in, 'out' => $out, 'cost_eur' => $costEur, 'images' => $images, 'lang' => $srcLang];
     }
 }
 

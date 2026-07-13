@@ -464,7 +464,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 <button type="button" id="editContentBtn" onclick="toggleContentForm()" style="width:100%; border:none; background:linear-gradient(180deg,#eef7f0,#e0efe3); color:#2d5a37; font-weight:800; font-size:1.05rem; padding:16px; border-radius:12px; cursor:pointer;">✏️ Modifier le contenu <span id="editContentCaret" style="opacity:.6;">▾</span></button>
             <?php else: ?>
                 <h3 style="margin-top:0; color:#2d5a37; font-size:1.35rem;">📎 Ajout de contenu</h3>
-                <p style="color:#666; margin:-4px 0 12px;">Déposez votre <strong>document</strong> et/ou votre <strong>vidéo</strong>. À la validation : « Le guide » pour le document, « Vidéo » pour la vidéo.</p>
+                <p style="color:#666; margin:-4px 0 12px;">Déposez votre <strong>document</strong> et/ou votre <strong>vidéo</strong>. À la validation : « Guide » pour le document, « Vidéo » pour la vidéo.</p>
             <?php endif; ?>
             <div id="contentFormWrap"<?= $hasAnyContent ? ' style="display:none; margin-top:16px;"' : '' ?>>
             <?php if ($hasAnyContent): ?><p style="color:#666; margin:0 0 12px;">Fichiers actuels ci-dessous. Déposez un nouveau fichier pour <strong>remplacer</strong>, puis choisissez « Modifier » ou « Modifier et uniformiser ».</p><?php endif; ?>
@@ -486,7 +486,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                         <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
                             <input type="file" name="pdf_file" accept="application/pdf" class="dz-input">
                             <div class="dz-icon">📄</div>
-                            <div class="dz-title">Le guide</div>
+                            <div class="dz-title">Guide</div>
                             <div class="dz-hint">Glissez votre document ici ou cliquez pour parcourir</div>
                             <div class="dz-file" hidden></div>
                         </div>
@@ -541,7 +541,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz de 75 questions sera généré pour l'évaluer)</small>
                 </label>
 
-                <p style="font-size:0.82rem; color:#777; margin-top:14px;">« <?= $hasAnyContent ? 'Modifier' : 'Valider' ?> et uniformiser » : l'IA lit le document et construit la belle page « Le guide » (au lieu de l'afficher brut).</p>
+                <p style="font-size:0.82rem; color:#777; margin-top:14px;">« <?= $hasAnyContent ? 'Modifier' : 'Valider' ?> et uniformiser » : l'IA lit le document et construit la belle page « Guide » (au lieu de l'afficher brut).</p>
                 <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
                     <button type="submit" name="uniformize" value="0" class="btn" style="background:#e9ecef; color:#333;"><?= $hasAnyContent ? 'Modifier' : 'Valider' ?></button>
                     <button type="submit" name="uniformize" value="1" class="btn btn-create"><?= $hasAnyContent ? 'Modifier et uniformiser' : 'Valider et uniformiser' ?></button>
@@ -604,7 +604,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             <div class="fc-modal-box">
                 <div class="fc-modal-icon">🪄</div>
                 <div class="fc-modal-title">Uniformiser le contenu ?</div>
-                <div class="fc-modal-text">L'IA va lire le document et construire la belle page « Le guide ». Vérifie ton choix ci-dessous.</div>
+                <div class="fc-modal-text">L'IA va lire le document et construire la belle page « Guide ». Vérifie ton choix ci-dessous.</div>
                 <label class="chk" style="display:flex; align-items:center; gap:10px; justify-content:center; background:#f4f7f6; border-radius:10px; padding:12px; margin:0 0 8px; font-weight:700; color:#244230;">
                     <input type="checkbox" id="uniAEval"> 📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz sera généré)</small>
                 </label>
