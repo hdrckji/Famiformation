@@ -527,10 +527,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // On le CACHE donc pour tout le monde, même pour un admin — personne ne doit voir
                 // une formation non relue. Il sera PUBLIÉ à la validation finale de la relecture
                 // (famiFinalValidation), c.-à-d. après le quiz s'il y en a un.
+                // Statut : 'pending' = « à contrôler par un admin » (file de modération). Un ADMIN
+                // n'a personne au-dessus de lui : son contenu est en 'draft' — caché lui aussi,
+                // mais il n'encombre PAS la file « à contrôler » ni les notifications.
+                $subStatus = $isAdminActor ? 'draft' : 'pending';
                 $subIds = array_values(array_filter([(int) $guideChildId, (int) $vidChildId]));
                 if ($subIds) {
                     $ph = implode(',', array_fill(0, count($subIds), '?'));
-                    try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id IN ($ph)")->execute($subIds); } catch (Exception $e) {}
+                    try { $db->prepare("UPDATE modules SET is_active = 0, content_status = ? WHERE id IN ($ph)")->execute(array_merge([$subStatus], $subIds)); } catch (Exception $e) {}
                 }
                 if (!$isAdminActor) {
                     logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu proposé (' . $ajout . ') : ' . $modNom);
@@ -604,7 +608,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Le module courant devient le conteneur qui regroupe le guide.
             $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, uniformized = 0, a_evaluer = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE id = ?")->execute([$id]);
             // Pas encore relu → caché pour tout le monde jusqu'à la validation finale.
-            try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id = ?")->execute([$guideChildId]); } catch (Exception $e) {}
+            // 'draft' pour un admin (caché mais hors file de modération), 'pending' sinon.
+            try {
+                $db->prepare("UPDATE modules SET is_active = 0, content_status = ? WHERE id = ?")
+                   ->execute([($isAdminActor ? 'draft' : 'pending'), $guideChildId]);
+            } catch (Exception $e) {}
             $_SESSION['module_flash'] = "✍️ Guide créé (non visible tant qu'il n'est pas validé) — rédige ta formation puis clique sur « Valider ».";
             header('Location: module_edit.php?id=' . $guideChildId);
             exit();

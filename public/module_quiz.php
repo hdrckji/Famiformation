@@ -43,26 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         $questions[] = ['q' => $text, 'type' => $type, 'options' => $opts, 'correct' => array_values($correct)];
     }
     $json = $questions ? json_encode(['questions' => $questions], JSON_UNESCAPED_UNICODE) : null;
+    // Le contrôle se fait TOUJOURS dans la langue du document : la traduction n'existe pas
+    // encore, elle est produite juste après, par la validation finale.
     $srcLang = moduleSourceLang($module);
-    $saveLang = (($_POST['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
-    if ($saveLang !== $srcLang) { // on édite la TRADUCTION
-        // Édition MANUELLE du quiz néerlandais : on n'écrit QUE le NL, pas de retraduction.
-        // On marque le NL « à jour » avec le FR actuel seulement si le guide NL n'est pas en attente.
-        $frHash = hash('sha256',
-            trim((string) ($module['nom'] ?? '')) . '|' .
-            trim((string) ($module['description'] ?? '')) . '|' .
-            (string) ($module['contenu_ia'] ?? '') . '|' .
-            (string) ($module['quiz_json'] ?? ''));
-        $guideNlReady = trim((string) ($module['contenu_ia'] ?? '')) === '' || trim((string) ($module['contenu_ia_nl'] ?? '')) !== '';
-        if ($guideNlReady) {
-            $db->prepare("UPDATE modules SET quiz_json_nl = ?, nl_hash = ? WHERE id = ?")->execute([$json, $frHash, $id]);
-        } else {
-            $db->prepare("UPDATE modules SET quiz_json_nl = ? WHERE id = ?")->execute([$json, $id]);
-        }
-        $_SESSION['module_flash'] = "✅ Quiz (" . langLabel($saveLang) . ") corrigé et enregistré.";
-        header('Location: module_quiz.php?id=' . $id . '&lang=nl');
-        exit();
-    }
     // On enregistre le quiz relu.
     $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$json, $id]);
 
@@ -77,29 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     exit();
 }
 
-// Langue éditée : FR (original) ou NL (pour corriger la traduction auto).
+// Langue du contrôle = celle du document. Pas d'onglet FR/NL : la traduction vient après.
 $srcLang = moduleSourceLang($module);
-$lang = (($_GET['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
-$isTranslation = ($lang !== $srcLang);
-$quizCol = $isTranslation ? 'quiz_json_nl' : 'quiz_json';
-$quiz = json_decode((string) ($module[$quizCol] ?? ''), true);
-$quizNlFromFr = false;
-if ((!is_array($quiz) || empty($quiz['questions'])) && $isTranslation) {
-    // NL pas encore généré : on le génère MAINTENANT (synchrone), sans dépendre du worker.
-    $frQuiz = (string) ($module['quiz_json'] ?? '');
-    if (function_exists('nlTranslateQuizJson') && trim($frQuiz) !== '') {
-        $tr = nlTranslateQuizJson($db, $frQuiz, $srcLang, $lang);
-        if (!empty($tr['ok']) && trim((string) $tr['json']) !== '') {
-            try { $db->prepare("UPDATE modules SET quiz_json_nl = ? WHERE id = ?")->execute([$tr['json'], $id]); } catch (Exception $e) {}
-            $quiz = json_decode($tr['json'], true);
-        }
-    }
-    if (!is_array($quiz) || empty($quiz['questions'])) {
-        // Échec (clé API absente / réseau) : on part du quiz FR comme base à corriger.
-        $quiz = json_decode($frQuiz, true);
-        $quizNlFromFr = true;
-    }
-}
+$lang = $srcLang;
+$quiz = json_decode((string) ($module['quiz_json'] ?? ''), true);
 $questions = (is_array($quiz) && !empty($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
 $nbMul = 0; $nbSin = 0;
 foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbMul++; } else { $nbSin++; } }
@@ -148,11 +112,7 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
     <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
     <div class="topbar">
         <a href="module.php?id=<?= (int) $id ?>" class="btn btn-back">⬅ Quitter</a>
-        <strong style="color:#1E4D2B;">📝 Contrôle du quiz <?= $lang === 'nl' ? '<span style="color:#b06a00;">— NL</span>' : '' ?></strong>
-        <div style="display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden;">
-            <a href="module_quiz.php?id=<?= (int) $id ?>&lang=fr" class="btn" style="border-radius:0; <?= $lang === 'fr' ? 'background:#1E4D2B; color:#fff;' : 'background:#fff; color:#1E4D2B;' ?>">🇫🇷 FR</a>
-            <a href="module_quiz.php?id=<?= (int) $id ?>&lang=nl" class="btn" style="border-radius:0; <?= $lang === 'nl' ? 'background:#1E4D2B; color:#fff;' : 'background:#fff; color:#1E4D2B;' ?>">🇳🇱 NL</a>
-        </div>
+        <strong style="color:#1E4D2B;">📝 Contrôle du quiz <span style="color:#6b7f70; font-weight:600;">— <?= $lang === 'nl' ? 'néerlandais 🇳🇱' : 'français 🇫🇷' ?></span></strong>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button type="button" id="qeditToggle" class="btn" style="background:#fff3d6; color:#8a5a00; border:1px solid #f0d089;" onclick="qSetEdit(!window._qedit)">✏️ Modifier</button>
             <button type="submit" class="btn btn-save">✅ Valider le quiz</button>
@@ -163,13 +123,6 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
             Relis les questions générées par l'IA : corrige le texte, coche <b>la ou les bonnes réponses</b>, choisis <b>Unique</b> (1 bonne réponse) ou <b>Multiple</b> (plusieurs). Tu peux ajouter/supprimer des questions.
             <div style="margin-top:8px;"><span class="pill" id="pillSin"><?= (int) $nbSin ?> unique(s)</span> <span class="pill" id="pillMul"><?= (int) $nbMul ?> multiple(s)</span></div>
         </div>
-        <?php if ($lang === 'nl'): ?>
-        <div class="intro" style="background:#fff3e0; border:1px solid #f0d089; color:#8a5a00;">
-            🇳🇱 <b>Quiz en néerlandais.</b> Tu corriges ici la traduction. <?php if ($quizNlFromFr): ?><b>Il n'était pas encore généré : tu pars du quiz français comme base.</b> <?php endif; ?>
-            ⚠️ Si tu modifies le quiz <b>français</b>, cette version NL sera <b>régénérée automatiquement</b> (le français fait autorité).
-        </div>
-        <?php endif; ?>
-
         <div id="qlist">
             <?php foreach ($questions as $i => $q): $type = (($q['type'] ?? 'single') === 'multiple') ? 'multiple' : 'single'; $correct = array_map('intval', (array) ($q['correct'] ?? [])); ?>
             <div class="q" data-q>

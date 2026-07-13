@@ -29,42 +29,15 @@ $imgBase = rtrim((defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_review') {
     requireValidCSRF();
 
-    // La langue de travail est celle du document (source). Éditer l'AUTRE langue = éditer la traduction.
+    // La langue de travail est TOUJOURS celle du document (source) : à ce stade la traduction
+    // n'existe pas encore, elle est produite à la toute fin (après le contrôle du quiz).
     $srcLang = moduleSourceLang($module);
-    $lang = (($_POST['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
-    $isTranslation = ($lang !== $srcLang);
+    $lang = $srcLang;
 
     // --- Mode visuel : les blocs arrivent en JSON (édition directement sur la page) ---
     if (isset($_POST['blocks_json'])) {
         $arr = json_decode((string) $_POST['blocks_json'], true);
         $blocksIn = (is_array($arr) && isset($arr['blocks']) && is_array($arr['blocks'])) ? $arr['blocks'] : (is_array($arr) ? $arr : []);
-
-        // Édition MANUELLE de la version néerlandaise : on n'écrit QUE le NL.
-        // Pas de rotation (images partagées avec le FR), pas de retraduction (le FR reste maître).
-        if ($isTranslation) {
-            foreach ($blocksIn as &$bln) { if (is_array($bln) && ($bln['type'] ?? '') === 'image') { $bln['rotate'] = 0; } }
-            unset($bln);
-            $cleanNl = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocksIn) : $blocksIn;
-            // On marque le NL « à jour » avec le FR actuel : la resynchro auto ne l'écrasera pas
-            // tant que le FR ne change pas. On ne le fait QUE si le quiz NL n'est pas en attente,
-            // pour ne jamais bloquer une future traduction du quiz.
-            $frHash = hash('sha256',
-                trim((string) ($module['nom'] ?? '')) . '|' .
-                trim((string) ($module['description'] ?? '')) . '|' .
-                (string) ($module['contenu_ia'] ?? '') . '|' .
-                (string) ($module['quiz_json'] ?? ''));
-            $quizNlReady = trim((string) ($module['quiz_json'] ?? '')) === '' || trim((string) ($module['quiz_json_nl'] ?? '')) !== '';
-            if ($quizNlReady) {
-                $db->prepare("UPDATE modules SET contenu_ia_nl = ?, nl_hash = ? WHERE id = ?")
-                   ->execute([json_encode(['blocks' => $cleanNl], JSON_UNESCAPED_UNICODE), $frHash, $id]);
-            } else {
-                $db->prepare("UPDATE modules SET contenu_ia_nl = ? WHERE id = ?")
-                   ->execute([json_encode(['blocks' => $cleanNl], JSON_UNESCAPED_UNICODE), $id]);
-            }
-            $_SESSION['module_flash'] = "✅ Traduction (" . langLabel($lang) . ") corrigée et enregistrée.";
-            header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id . '&lang=nl' : 'module.php?id=' . $id));
-            exit();
-        }
 
         foreach ($blocksIn as &$bl) {
             if (is_array($bl) && ($bl['type'] ?? '') === 'image' && !empty($bl['rotate']) && function_exists('aiRotateImageFile')) {
@@ -96,8 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         // 2) Guide « à évaluer » sans quiz (ex. rédigé de zéro) : on génère le quiz maintenant,
         //    puisqu'il faudra le relire avant la validation finale.
         $quizMsg = '';
+        $quizFailed = false;
         $hasQuiz = trim((string) ($module['quiz_json'] ?? '')) !== '';
-        if (!$hasQuiz && !empty($module['a_evaluer'])) {
+        $needQuiz = !$hasQuiz && !empty($module['a_evaluer']);
+        if ($needQuiz) {
             require_once 'includes/ai_uniformise.php';
             if (function_exists('aiGenerateQuiz')) {
                 @set_time_limit(0);
@@ -119,9 +94,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                     $hasQuiz = true;
                     $quizMsg = ' 📝 Quiz généré (' . count($qz['quiz']['questions'] ?? []) . ').';
                 } else {
+                    $quizFailed = true;
                     $quizMsg = ' ⚠️ Quiz non généré : ' . ($qz['error'] ?? 'erreur') . '.';
                 }
+            } else {
+                $quizFailed = true;
+                $quizMsg = ' ⚠️ Quiz non généré : moteur IA indisponible.';
             }
+        }
+
+        // 2bis) ÉCHEC de la génération : on NE PUBLIE SURTOUT PAS et on ne saute pas l'étape quiz.
+        //       Le guide est enregistré (rien de perdu), on revient dessus pour relancer.
+        if ($quizFailed) {
+            $_SESSION['module_flash'] = "✅ Guide enregistré, mais" . $quizMsg
+                . " Le contenu reste NON publié. Reclique sur « Valider » pour relancer la génération du quiz.";
+            header('Location: module_edit.php?id=' . $id);
+            exit();
         }
 
         // 3) S'IL Y A UN QUIZ À RELIRE : on s'arrête ici. Pas d'IA, pas de traduction, pas de
@@ -134,8 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
             exit();
         }
 
-        // 4) PAS DE QUIZ → cette validation EST l'étape finale : l'IA revérifie tout, traduit en
-        //    néerlandais, et publie le contenu (jusqu'ici il était caché).
+        // 4) PAS DE QUIZ DEMANDÉ (case « à évaluer » décochée) → cette validation EST l'étape
+        //    finale : l'IA revérifie tout, traduit dans l'autre langue, et publie le contenu.
         $final = famiFinalValidation($db, $id, (int) ($_SESSION['user_id'] ?? 0), $isAdmin);
         $_SESSION['module_flash'] = "✅ Relecture validée." . $final;
         header('Location: module.php?id=' . $id);
@@ -201,10 +189,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     }
     $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocks) : $blocks;
     $json = json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE);
+    // Aucune traduction ici : elle est produite à la validation finale (après le quiz).
     $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")->execute([$json, $id]);
-    @set_time_limit(0);
-    nlSyncModule($db, $id, true); // le FR a changé → NL traduit EN DIRECT
-    $_SESSION['module_flash'] = "✅ Contenu relu et enregistré. 🌐 La version néerlandaise se met à jour.";
+    $_SESSION['module_flash'] = "✅ Contenu relu et enregistré.";
     header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
     exit();
 }

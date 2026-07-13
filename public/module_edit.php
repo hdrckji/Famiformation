@@ -19,36 +19,14 @@ if (!$module) { header('Location: index.php'); exit(); }
 $canReview = $isAdmin || ((int) ($module['contenu_by'] ?? 0) === $uid && $uid > 0);
 if (!$canReview) { header('Location: module.php?id=' . $id); exit(); }
 
-// LANGUE DE TRAVAIL = celle du document importé (source). On l'ouvre par défaut dans CETTE
-// langue : un PDF néerlandais se relit en néerlandais. L'autre langue est la TRADUCTION.
+// LANGUE DE TRAVAIL = celle du document importé (source), POINT. Un PDF néerlandais se relit
+// en néerlandais, un PDF français en français. Il n'y a PAS d'onglet FR/NL ici : la traduction
+// n'existe pas encore à ce stade, elle est produite tout à la fin (après le contrôle du quiz).
 require_once 'includes/i18n_nl.php';
 $srcLang = moduleSourceLang($module);
-$lang = (($_GET['lang'] ?? $srcLang) === 'nl') ? 'nl' : 'fr';
-$isTranslation = ($lang !== $srcLang);          // édite-t-on la traduction ?
-$srcCol = $isTranslation ? 'contenu_ia_nl' : 'contenu_ia';
-$data = json_decode((string) ($module[$srcCol] ?? ''), true);
+$lang = $srcLang;
+$data = json_decode((string) ($module['contenu_ia'] ?? ''), true);
 $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
-$nlFromFr = false;
-if (!$blocks && $isTranslation) {
-    // Traduction pas encore générée : on la produit à la volée (elle n'existe qu'après la
-    // validation finale, mais on ne laisse pas l'écran vide si on l'ouvre avant).
-    $origJson = (string) ($module['contenu_ia'] ?? '');
-    if (function_exists('nlTranslateBlocksJson') && trim($origJson) !== '') {
-        $tr = nlTranslateBlocksJson($db, $origJson, $srcLang, $lang);
-        if (!empty($tr['ok']) && trim((string) $tr['json']) !== '') {
-            try { $db->prepare("UPDATE modules SET contenu_ia_nl = ? WHERE id = ?")->execute([$tr['json'], $id]); } catch (Exception $e) {}
-            $module['contenu_ia_nl'] = $tr['json'];
-            $data = json_decode($tr['json'], true);
-            $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
-        }
-    }
-    if (!$blocks) {
-        // Échec (clé API absente / réseau) : on part de l'original comme base à corriger.
-        $data = json_decode($origJson, true);
-        $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
-        $nlFromFr = true;
-    }
-}
 if (!$blocks) { header('Location: module_review.php?id=' . $id); exit(); }
 
 $images = (array) json_decode((string) ($module['contenu_images'] ?? '[]'), true);
@@ -166,11 +144,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
 <body>
     <div class="topbar">
         <a href="module.php?id=<?= (int) $id ?>" class="btn btn-back">⬅ Quitter</a>
-        <strong style="color:#1E4D2B;">✍️ Relecture <?= $lang === 'nl' ? '<span style="color:#b06a00;">— version néerlandaise</span>' : '' ?></strong>
-        <div style="display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden;">
-            <a href="module_edit.php?id=<?= (int) $id ?>&lang=fr" class="btn" style="border-radius:0; <?= $lang === 'fr' ? 'background:#1E4D2B; color:#fff;' : 'background:#fff; color:#1E4D2B;' ?>">🇫🇷 FR</a>
-            <a href="module_edit.php?id=<?= (int) $id ?>&lang=nl" class="btn" style="border-radius:0; <?= $lang === 'nl' ? 'background:#1E4D2B; color:#fff;' : 'background:#fff; color:#1E4D2B;' ?>">🇳🇱 NL</a>
-        </div>
+        <strong style="color:#1E4D2B;">✍️ Relecture <span style="color:#6b7f70; font-weight:600;">— <?= $lang === 'nl' ? 'document néerlandais 🇳🇱' : 'document français 🇫🇷' ?></span></strong>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <?php if ($pdfUrl !== ''): ?><button type="button" class="btn btn-pdf" onclick="document.getElementById('pdfp').classList.toggle('open')">📄 PDF original</button><?php endif; ?>
             <button type="button" id="editToggle" class="btn" style="background:#fff3d6; color:#8a5a00; border:1px solid #f0d089;" onclick="veSetEdit(!window._veEditing)">✏️ Modifier</button>
@@ -188,12 +162,6 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     <div class="intro" style="background:#fdecec; border:2px solid #f3b4b4; color:#c0392b; font-weight:700;">
         ⚠ <?= (int) $nbDoutes ?> <?= $nbDoutes > 1 ? 'doutes signalés' : 'doute signalé' ?> par l'IA dans ce guide — ils sont surlignés en rouge ci-dessous.
         <span style="font-weight:400;">Vérifiez-les <strong>avant de valider</strong> : cliquez sur « ✏️ Modifier » pour appliquer ou ignorer chaque correction.</span>
-    </div>
-    <?php endif; ?>
-    <?php if ($lang === 'nl'): ?>
-    <div class="intro" style="background:#fff3e0; border:1px solid #f0d089; color:#8a5a00;">
-        🇳🇱 <b>Version néerlandaise.</b> Tu corriges ici la traduction. <?php if ($nlFromFr): ?><b>Elle n'était pas encore générée : tu pars du texte français comme base.</b> <?php endif; ?>
-        ⚠️ Si tu modifies ensuite le <b>français</b>, cette version NL sera <b>régénérée automatiquement</b> et tes corrections d'ici seront remplacées (le français fait autorité).
     </div>
     <?php endif; ?>
     <div class="ve-format" id="veFormat">
