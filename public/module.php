@@ -503,6 +503,33 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <button type="submit" name="uniformize" value="1" class="btn btn-create"><?= $hasAnyContent ? 'Modifier et uniformiser' : 'Valider et uniformiser' ?></button>
                 </div>
             </form>
+            <div style="border-top:1px dashed #cfe0d4; margin:18px 0 0; padding-top:16px; text-align:center;">
+                <p style="color:#666; margin:0 0 10px; font-size:.9rem;">Pas de PDF&nbsp;? Vous pouvez aussi <strong>rédiger la formation vous-même</strong>.</p>
+                <button type="button" class="btn btn-create" onclick="document.getElementById('createGuideModal').style.display='flex';">✍️ Créer un guide (rédiger de zéro)</button>
+            </div>
+            </div>
+        </div>
+        <!-- Modale : créer un guide de zéro (avec rappel du choix d'évaluation) -->
+        <div id="createGuideModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">✍️</div>
+                <div class="fc-modal-title">Rédiger une formation de zéro ?</div>
+                <div class="fc-modal-text">Un guide vierge sera créé : tu le rédiges directement dans l'éditeur (sections, listes, encadrés, images…). À la <strong>validation</strong>, l'IA vérifie l'orthographe, génère le quiz si demandé, puis traduit en néerlandais.</div>
+                <form method="POST" action="module_save.php">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="create_blank_guide">
+                    <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                    <?php if (!empty($module['is_locked'])): ?>
+                        <input type="password" name="admin_password" placeholder="Mot de passe de verrouillage" required style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;">
+                    <?php endif; ?>
+                    <label class="chk" style="display:flex; align-items:center; gap:10px; justify-content:center; background:#f4f7f6; border-radius:10px; padding:12px; margin:0 0 12px; font-weight:700; color:#244230;">
+                        <input type="checkbox" name="a_evaluer" value="1"> 📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz sera généré à la validation)</small>
+                    </label>
+                    <div class="fc-modal-actions">
+                        <button type="button" class="btn" style="background:#e9ecef; color:#333;" onclick="document.getElementById('createGuideModal').style.display='none';">Annuler</button>
+                        <button type="submit" class="btn btn-create">✍️ Créer et rédiger</button>
+                    </div>
+                </form>
             </div>
         </div>
         <!-- Modale : aucun fichier -->

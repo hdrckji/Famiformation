@@ -546,6 +546,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif ($action === 'create_blank_guide') {
+        // Rédiger une formation DE ZÉRO (au lieu d'importer un PDF) : on crée un guide
+        // avec une structure de départ minimale, puis on ouvre l'éditeur visuel.
+        $id = (int) ($_POST['id'] ?? 0);
+        $module = $id > 0 ? getModuleById($db, $id) : null;
+        if (!$isAdminActor && (!$module || !contribCanAddContent($db, $module, $actorRole))) {
+            $_SESSION['module_flash'] = "❌ Vous n'avez pas le droit de créer un guide ici.";
+            header('Location: index.php');
+            exit();
+        }
+        if ($module && !empty($module['is_locked']) && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+            $_SESSION['module_flash'] = "❌ Module verrouillé : mot de passe de verrouillage requis.";
+            $redirectTo = 'module.php?id=' . $id;
+        } elseif ($module) {
+            $aEvaluer = !empty($_POST['a_evaluer']) ? 1 : 0;
+            $contenuBy = ((int) ($_SESSION['user_id'] ?? 0)) ?: null;
+            $childRoles = (string) ($module['roles'] ?? '');
+            $starter = json_encode(['blocks' => [
+                ['type' => 'hero', 'title' => 'Titre de la formation', 'subtitle' => ''],
+                ['type' => 'section', 'title' => 'Introduction'],
+                ['type' => 'text', 'text' => 'Rédigez votre contenu ici. Ajoutez des sections, des listes, des encadrés…'],
+            ]], JSON_UNESCAPED_UNICODE);
+
+            $guideChildId = 0;
+            $guide = null;
+            try { $guide = $db->query("SELECT id, contenu_ia FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+            if ($guide) {
+                $guideChildId = (int) $guide['id'];
+                if (trim((string) ($guide['contenu_ia'] ?? '')) === '') {
+                    $db->prepare("UPDATE modules SET uniformized = 1, a_evaluer = ?, contenu_ia = ?, contenu_by = COALESCE(contenu_by, ?) WHERE id = ?")
+                       ->execute([$aEvaluer, $starter, $contenuBy, $guideChildId]);
+                } else {
+                    // Contenu déjà présent : on n'écrase pas, on met juste à jour le choix d'évaluation.
+                    $db->prepare("UPDATE modules SET a_evaluer = ? WHERE id = ?")->execute([$aEvaluer, $guideChildId]);
+                }
+            } else {
+                $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, uniformized, a_evaluer, contenu_ia, contenu_by, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, 1, ?, ?, ?, 'ecrit')")
+                   ->execute(['Le guide', 'De gids', (int) $id, $childRoles, $aEvaluer, $starter, $contenuBy]);
+                $guideChildId = (int) $db->lastInsertId();
+            }
+            // Le module courant devient le conteneur qui regroupe le guide.
+            $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, uniformized = 0, a_evaluer = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE id = ?")->execute([$id]);
+            if (!$isAdminActor) {
+                try { $db->prepare("UPDATE modules SET is_active = 0, content_status = 'pending' WHERE id = ?")->execute([$guideChildId]); } catch (Exception $e) {}
+            }
+            $_SESSION['module_flash'] = "✍️ Guide créé — rédige ta formation puis clique sur « Valider ».";
+            header('Location: module_edit.php?id=' . $guideChildId);
+            exit();
+        }
+        $redirectTo = 'module.php?id=' . $id;
     } elseif ($action === 'nl_sync') {
         // Secours MANUEL de la traduction néerlandaise.
         // La synchro se fait normalement toute seule en tâche de fond après chaque

@@ -107,8 +107,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
 
         $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")
            ->execute([$frJson, $id]);
-        spawnNlSync($id); // le FR (corrigé) a changé → on régénère le NL en tâche de fond
-        $_SESSION['module_flash'] = ($proofed ? "✅ Contenu relu, orthographe vérifiée et enregistré." : "✅ Contenu relu et enregistré.") . " 🌐 La version néerlandaise se met à jour.";
+
+        // GUIDE RÉDIGÉ DE ZÉRO (ou quiz jamais généré) : si « à évaluer » et pas encore de quiz,
+        // on génère le quiz MAINTENANT à partir du contenu rédigé.
+        $quizMsg = '';
+        if (!empty($module['a_evaluer']) && trim((string) ($module['quiz_json'] ?? '')) === '') {
+            require_once 'includes/ai_uniformise.php';
+            if (function_exists('aiGenerateQuiz')) {
+                $qz = aiGenerateQuiz($db, $frJson);
+                if (!empty($qz['ok']) && !empty($qz['quiz'])) {
+                    $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")
+                       ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), $id]);
+                    $module['quiz_json'] = '1'; // pour la redirection vers le quiz
+                    $quizMsg = ' 📝 Quiz généré (' . count($qz['quiz']['questions'] ?? []) . ').';
+                } else {
+                    $quizMsg = ' ⚠️ Quiz non généré : ' . ($qz['error'] ?? 'erreur') . '.';
+                }
+            }
+        }
+
+        spawnNlSync($id); // le FR (corrigé) + le quiz éventuel → on régénère le NL en tâche de fond
+        $_SESSION['module_flash'] = ($proofed ? "✅ Contenu relu, orthographe vérifiée et enregistré." : "✅ Contenu relu et enregistré.") . $quizMsg . " 🌐 La version néerlandaise se met à jour.";
         header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
         exit();
     }
