@@ -583,6 +583,11 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
             <div class="tile-title"><?= t('Gestion Quiz', 'Quizbeheer') ?></div>
             <div class="tile-desc"><?= t('Contrôler et corriger tous les quiz.', 'Alle quizzen nakijken en corrigeren.') ?></div>
         </a>
+        <a href="admin_questions.php" class="tile tile-admin">
+            <div class="tile-media"><span class="tile-icon">🗄️</span></div>
+            <div class="tile-title"><?= t('Gestion Questions', 'Beheer vragen') ?> <span style="font-size:.7rem; color:#8a968f; font-weight:600;">(<?= t('historique', 'geschiedenis') ?>)</span></div>
+            <div class="tile-desc"><?= t('Ancien système — conservé pour l\'historique.', 'Oud systeem — bewaard als geschiedenis.') ?></div>
+        </a>
         <?php endif; ?>
 
         <?php foreach ($dynamicModules as $mod): ?>

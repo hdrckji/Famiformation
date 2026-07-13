@@ -680,7 +680,14 @@ BLAGUES
             return ob_get_clean();
         }
         ?>
+        <?php
+            // Composants activables individuellement (Paramètres → Widget).
+            $showMeteo = widgetGet($db, 'show_meteo', '1') === '1';
+            $showPhrases = widgetGet($db, 'show_phrases', '1') === '1';
+            $showDate = widgetGet($db, 'show_date', '1') === '1';
+        ?>
         <div class="home-widget">
+            <?php if ($showMeteo): ?>
             <div class="hw-weather">
                 <?php if ($weather): ?>
                     <?= $weather['emoji'] ?> <?= (int) $weather['temp'] ?>°C
@@ -689,8 +696,13 @@ BLAGUES
                     🌤️ <span class="hw-soon"><?= htmlspecialchars($tt('Météo indisponible', 'Weer onbeschikbaar')) ?></span>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
+            <?php if ($showPhrases): ?>
             <div class="hw-center" id="hwCenter" data-phrases="<?= $phrasesAttr ?>"><span class="hw-phrase"><?= htmlspecialchars($phrases[0]) ?></span></div>
+            <?php endif; ?>
+            <?php if ($showDate): ?>
             <div class="hw-date"><?= htmlspecialchars(widgetDate()) ?></div>
+            <?php endif; ?>
         </div>
         <style>
         /* Bande horizontale intégrée dans le ruban du haut (météo à gauche, date à droite, infos au centre) */

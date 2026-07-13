@@ -634,7 +634,31 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                 </form>
             </div>
 
-            <p class="muted" style="margin-top:18px;">Prochaines étapes : la météo, les horaires, et la composition des sous-widgets.</p>
+            <?php
+                // Composants du widget : activables/désactivables individuellement, rapidement.
+                $wComps = [
+                    'meteo'   => ['🌤️ Météo', 'show_meteo'],
+                    'phrases' => ['💬 Phrases qui défilent', 'show_phrases'],
+                    'date'    => ['📅 Date', 'show_date'],
+                ];
+            ?>
+            <div style="margin-top:16px; border-top:1px solid #e1e8e3; padding-top:14px;">
+                <p style="font-weight:700; color:#2d5a37; margin:0 0 8px;">Composants (<?= count($wComps) ?>) — activer / désactiver</p>
+                <?php foreach ($wComps as $ck => $c): $on = widgetGet($db, $c[1], '1') === '1'; ?>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; background:#f4f7f6; border-radius:10px; margin-bottom:6px; max-width:440px;">
+                    <span style="font-weight:600;"><?= $c[0] ?> <?php if ($on): ?><span class="pill on" style="font-size:.72rem;">Activé</span><?php else: ?><span class="pill off" style="font-size:.72rem;">Désactivé</span><?php endif; ?></span>
+                    <form method="POST" action="widget_save.php" style="margin:0;">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="toggle_component">
+                        <input type="hidden" name="component" value="<?= $ck ?>">
+                        <input type="hidden" name="return" value="parametres.php#widget">
+                        <button type="submit" class="btn <?= $on ? 'btn-danger' : 'btn-primary' ?>" style="padding:6px 14px; font-size:.85rem;"><?= $on ? 'Désactiver' : 'Activer' ?></button>
+                    </form>
+                </div>
+                <?php endforeach; ?>
+            </div>
+
+            <p class="muted" style="margin-top:18px;">Prochaines étapes : les horaires et d'autres sous-widgets.</p>
         </div>
 
         <!-- Phrases qui défilent -->

@@ -26,6 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'toggle_enabled') {
         widgetSet($db, 'enabled', widgetEnabled($db) ? '0' : '1');
         $_SESSION['module_flash'] = widgetEnabled($db) ? "✅ Widget activé." : "✅ Widget désactivé.";
+    } elseif ($action === 'toggle_component') {
+        // Activer/désactiver un composant du widget : météo, phrases ou date.
+        $comp = (string) ($_POST['component'] ?? '');
+        $map = ['meteo' => 'show_meteo', 'phrases' => 'show_phrases', 'date' => 'show_date'];
+        if (isset($map[$comp])) {
+            $key = $map[$comp];
+            $cur = widgetGet($db, $key, '1');
+            widgetSet($db, $key, $cur === '1' ? '0' : '1');
+            $_SESSION['module_flash'] = "✅ Widget mis à jour.";
+        }
     } elseif ($action === 'set_access') {
         $valid = array_keys(moduleProfiles($db));
         $submitted = is_array($_POST['roles'] ?? null) ? $_POST['roles'] : [];
