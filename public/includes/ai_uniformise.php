@@ -366,6 +366,86 @@ if (!function_exists('aiExtractPdfImages')) {
     }
 }
 
+if (!function_exists('aiClaudeStreamText')) {
+    /**
+     * Appel Claude en STREAMING (SSE) — renvoie le texte complet.
+     *
+     * POURQUOI : une requête NON streamée n'envoie AUCUN octet tant que la réponse
+     * n'est pas entièrement produite. Avec un gros max_tokens, ça dépasse le délai de
+     * cURL, qui coupe « after 240000 ms with 0 bytes received » — la réponse est perdue
+     * alors qu'on l'a payée. En streaming, les octets arrivent au fur et à mesure :
+     * plus de timeout, et on peut suivre l'avancement.
+     *
+     * @return array ['ok'=>bool,'text'=>string,'error'=>string,'in'=>int,'out'=>int]
+     */
+    function aiClaudeStreamText($apiKey, array $payload)
+    {
+        $payload['stream'] = true;
+        $text = '';
+        $buf = '';   // ligne SSE incomplète en attente
+        $raw = '';   // corps brut (si HTTP != 200, ce n'est pas du SSE mais un JSON d'erreur)
+        $inTok = 0;
+        $outTok = 0;
+        $apiErr = '';
+
+        $ch = curl_init('https://api.anthropic.com/v1/messages');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'content-type: application/json',
+                'x-api-key: ' . $apiKey,
+                'anthropic-version: 2023-06-01',
+                'accept: text/event-stream',
+            ],
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_CONNECTTIMEOUT => 20,
+            CURLOPT_TIMEOUT => 0,           // pas de plafond total : le flux peut durer
+            CURLOPT_LOW_SPEED_LIMIT => 1,   // mais on abandonne si…
+            CURLOPT_LOW_SPEED_TIME => 120,  // …plus rien n'arrive pendant 120 s
+            CURLOPT_WRITEFUNCTION => function ($c, $chunk) use (&$text, &$buf, &$raw, &$inTok, &$outTok, &$apiErr) {
+                $raw .= $chunk;
+                $buf .= $chunk;
+                while (($pos = strpos($buf, "\n")) !== false) {
+                    $line = trim(substr($buf, 0, $pos));
+                    $buf = substr($buf, $pos + 1);
+                    if ($line === '' || strpos($line, 'data:') !== 0) { continue; }
+                    $json = trim(substr($line, 5));
+                    if ($json === '' || $json === '[DONE]') { continue; }
+                    $ev = json_decode($json, true);
+                    if (!is_array($ev)) { continue; }
+                    $t = (string) ($ev['type'] ?? '');
+                    if ($t === 'content_block_delta') {
+                        $d = $ev['delta'] ?? [];
+                        if (($d['type'] ?? '') === 'text_delta') { $text .= (string) ($d['text'] ?? ''); }
+                    } elseif ($t === 'message_start') {
+                        $inTok += (int) ($ev['message']['usage']['input_tokens'] ?? 0);
+                    } elseif ($t === 'message_delta') {
+                        $outTok += (int) ($ev['usage']['output_tokens'] ?? 0);
+                    } elseif ($t === 'error') {
+                        $apiErr = (string) ($ev['error']['message'] ?? 'erreur API');
+                    }
+                }
+                return strlen($chunk);
+            },
+        ]);
+        curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $cErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($code !== 200) {
+            $d = json_decode($raw, true);
+            $msg = (is_array($d) && isset($d['error']['message'])) ? $d['error']['message'] : ('HTTP ' . $code);
+            return ['ok' => false, 'text' => '', 'error' => $msg, 'in' => $inTok, 'out' => $outTok];
+        }
+        if ($cErr !== '') { return ['ok' => false, 'text' => $text, 'error' => 'Connexion API : ' . $cErr, 'in' => $inTok, 'out' => $outTok]; }
+        if ($apiErr !== '') { return ['ok' => false, 'text' => $text, 'error' => $apiErr, 'in' => $inTok, 'out' => $outTok]; }
+        if (trim($text) === '') { return ['ok' => false, 'text' => '', 'error' => 'Réponse vide de l\'IA', 'in' => $inTok, 'out' => $outTok]; }
+        return ['ok' => true, 'text' => $text, 'error' => '', 'in' => $inTok, 'out' => $outTok];
+    }
+}
+
 if (!function_exists('aiGenerateQuiz')) {
     /**
      * Génère un quiz QCM à partir du contenu de formation (texte uniformisé).
@@ -385,70 +465,97 @@ if (!function_exists('aiGenerateQuiz')) {
         $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
 
         $nbTotal = (int) $nbMultiple + (int) $nbSingle;
-        $system = "Tu es formateur. À partir du CONTENU DE FORMATION fourni, crée un quiz d'évaluation de $nbTotal questions, en français.\n"
-            . "Règles STRICTES :\n"
-            . "- Base-toi UNIQUEMENT sur le contenu fourni (aucune connaissance externe).\n"
-            . "- Répartition VISÉE : environ $nbMultiple questions à réponses MULTIPLES (type \"multiple\") et $nbSingle questions à réponse UNIQUE (type \"single\"). Privilégie les questions à réponses multiples.\n"
-            . "- Une question \"multiple\" a PLUSIEURS bonnes réponses (au moins 2) ; une \"single\" en a exactement UNE.\n"
-            . "- Chaque question a 3 à 5 options claires et distinctes.\n"
-            . "- \"correct\" est la liste des indices 0-based des bonnes options (une seule pour single, au moins deux pour multiple).\n"
-            . "- Si le contenu ne permet pas $nbTotal questions de qualité, fais-en le maximum SANS inventer, en gardant la proportion.\n"
-            . "- Réponds UNIQUEMENT en JSON valide, sans aucun texte autour :\n"
-            . '{"questions":[{"q":"...","type":"single","options":["...","..."],"correct":[0]}]}';
+        if ($nbTotal <= 0) { return ['ok' => false, 'quiz' => null, 'error' => 'Aucune question demandée', 'cost_eur' => 0.0]; }
+        $ratioMul = $nbMultiple / $nbTotal;
 
-        $payload = [
-            'model' => $model, 'max_tokens' => 32000, 'system' => $system,
-            'messages' => [['role' => 'user', 'content' => "CONTENU DE FORMATION :\n\n" . $contentText]],
-        ];
-        $ch = curl_init('https://api.anthropic.com/v1/messages');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => ['content-type: application/json', 'x-api-key: ' . $apiKey, 'anthropic-version: 2023-06-01'],
-            CURLOPT_POSTFIELDS => json_encode($payload), CURLOPT_TIMEOUT => 240,
-        ]);
-        $resp = curl_exec($ch);
-        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $cErr = curl_error($ch);
-        curl_close($ch);
-
-        if ($resp === false) { return ['ok' => false, 'quiz' => null, 'error' => 'Connexion API : ' . $cErr, 'cost_eur' => 0.0]; }
-        $data = json_decode($resp, true);
-        if ($code !== 200 || !is_array($data)) {
-            $msg = is_array($data) && isset($data['error']['message']) ? $data['error']['message'] : ('HTTP ' . $code);
-            return ['ok' => false, 'quiz' => null, 'error' => $msg, 'cost_eur' => 0.0];
-        }
-        if (($data['stop_reason'] ?? '') === 'refusal') { return ['ok' => false, 'quiz' => null, 'error' => 'IA a refusé', 'cost_eur' => 0.0]; }
-
-        $text = '';
-        foreach (($data['content'] ?? []) as $b) { if (($b['type'] ?? '') === 'text') { $text .= $b['text']; } }
-        $s = strpos($text, '{');
-        $e = strrpos($text, '}');
-        if ($s === false || $e === false || $e < $s) { return ['ok' => false, 'quiz' => null, 'error' => 'Réponse non-JSON', 'cost_eur' => 0.0]; }
-        $q = json_decode(substr($text, $s, $e - $s + 1), true);
-        if (!is_array($q) || empty($q['questions']) || !is_array($q['questions'])) {
-            return ['ok' => false, 'quiz' => null, 'error' => 'JSON quiz invalide (tronqué ?)', 'cost_eur' => 0.0];
-        }
-
+        // GÉNÉRATION PAR LOTS + STREAMING.
+        // Demander 75 questions d'un coup (max_tokens 32000, sans streaming) faisait
+        // dépasser le délai : l'API ne renvoyait rien avant la fin et cURL coupait.
+        // On génère donc par petits lots STREAMÉS : chaque appel est court, rapide et sûr,
+        // et si un lot échoue on garde quand même les questions déjà obtenues.
+        $BATCH = 15;
         $clean = [];
-        foreach ($q['questions'] as $it) {
-            if (empty($it['q']) || empty($it['options']) || !is_array($it['options'])) { continue; }
-            $opts = array_values(array_map('strval', $it['options']));
-            if (count($opts) < 2) { continue; }
-            $type = (($it['type'] ?? 'single') === 'multiple') ? 'multiple' : 'single';
-            $correct = array_values(array_filter(array_map('intval', (array) ($it['correct'] ?? [])), function ($i) use ($opts) {
-                return $i >= 0 && $i < count($opts);
-            }));
-            if (empty($correct)) { continue; }
-            if ($type === 'single') { $correct = [$correct[0]]; }
-            $clean[] = ['q' => (string) $it['q'], 'type' => $type, 'options' => $opts, 'correct' => $correct];
-        }
-        if (empty($clean)) { return ['ok' => false, 'quiz' => null, 'error' => 'Aucune question valide', 'cost_eur' => 0.0]; }
+        $seen = [];
+        $inTok = 0;
+        $outTok = 0;
+        $lastErr = '';
+        $guard = 0;
 
-        $in = (int) ($data['usage']['input_tokens'] ?? 0);
-        $out2 = (int) ($data['usage']['output_tokens'] ?? 0);
+        while (count($clean) < $nbTotal && $guard++ < 12) {
+            $remaining = $nbTotal - count($clean);
+            $n = min($BATCH, $remaining);
+            $nMul = (int) round($n * $ratioMul);
+            if ($nMul > $n) { $nMul = $n; }
+            $nSin = $n - $nMul;
+
+            $system = "Tu es formateur. À partir du CONTENU DE FORMATION fourni, crée EXACTEMENT $n questions de quiz, en français.\n"
+                . "Règles STRICTES :\n"
+                . "- Base-toi UNIQUEMENT sur le contenu fourni (aucune connaissance externe).\n"
+                . "- Répartition : $nMul questions à réponses MULTIPLES (type \"multiple\") et $nSin à réponse UNIQUE (type \"single\").\n"
+                . "- Une \"multiple\" a PLUSIEURS bonnes réponses (au moins 2) ; une \"single\" en a exactement UNE.\n"
+                . "- Chaque question a 3 à 5 options claires et distinctes.\n"
+                . "- \"correct\" = indices 0-based des bonnes options.\n"
+                . "- Si le contenu ne permet pas $n questions de qualité, fais-en MOINS plutôt que d'inventer.\n"
+                . "- Réponds UNIQUEMENT en JSON valide, sans aucun texte autour :\n"
+                . '{"questions":[{"q":"...","type":"single","options":["...","..."],"correct":[0]}]}';
+
+            $user = "CONTENU DE FORMATION :\n\n" . $contentText;
+            if (!empty($clean)) {
+                $deja = [];
+                foreach (array_slice($clean, -40) as $qq) { $deja[] = '- ' . $qq['q']; }
+                $user .= "\n\n---\nQUESTIONS DÉJÀ POSÉES — n'en repose AUCUNE, trouve d'autres angles :\n" . implode("\n", $deja);
+            }
+
+            $r = aiClaudeStreamText($apiKey, [
+                'model' => $model,
+                'max_tokens' => 8000, // largement suffisant pour 15 questions
+                'system' => $system,
+                'messages' => [['role' => 'user', 'content' => $user]],
+            ]);
+            $inTok += (int) $r['in'];
+            $outTok += (int) $r['out'];
+
+            if (empty($r['ok'])) {
+                $lastErr = (string) $r['error'];
+                break; // on garde ce qui a déjà été généré
+            }
+
+            $text = (string) $r['text'];
+            $s = strpos($text, '{');
+            $e = strrpos($text, '}');
+            if ($s === false || $e === false || $e < $s) { $lastErr = 'Réponse non-JSON'; break; }
+            $q = json_decode(substr($text, $s, $e - $s + 1), true);
+            if (!is_array($q) || empty($q['questions']) || !is_array($q['questions'])) { $lastErr = 'JSON quiz invalide'; break; }
+
+            $added = 0;
+            foreach ($q['questions'] as $it) {
+                if (empty($it['q']) || empty($it['options']) || !is_array($it['options'])) { continue; }
+                $opts = array_values(array_map('strval', $it['options']));
+                if (count($opts) < 2) { continue; }
+                $key = mb_strtolower(trim((string) $it['q']));
+                if ($key === '' || isset($seen[$key])) { continue; } // pas de doublon entre lots
+                $type = (($it['type'] ?? 'single') === 'multiple') ? 'multiple' : 'single';
+                $correct = array_values(array_filter(array_map('intval', (array) ($it['correct'] ?? [])), function ($i) use ($opts) {
+                    return $i >= 0 && $i < count($opts);
+                }));
+                if (empty($correct)) { continue; }
+                if ($type === 'single') { $correct = [$correct[0]]; }
+                $seen[$key] = true;
+                $clean[] = ['q' => (string) $it['q'], 'type' => $type, 'options' => $opts, 'correct' => $correct];
+                $added++;
+                if (count($clean) >= $nbTotal) { break; }
+            }
+            // Le contenu est épuisé : l'IA ne trouve plus de question neuve → on s'arrête là.
+            if ($added === 0) { break; }
+        }
+
+        if (empty($clean)) {
+            return ['ok' => false, 'quiz' => null, 'error' => ($lastErr !== '' ? $lastErr : 'Aucune question valide'), 'cost_eur' => 0.0];
+        }
+
         $pricing = aiModelPricing();
         $rate = $pricing[$model] ?? [3.0, 15.0];
-        $costEur = (($in / 1e6) * $rate[0] + ($out2 / 1e6) * $rate[1]) * 0.92;
+        $costEur = (($inTok / 1e6) * $rate[0] + ($outTok / 1e6) * $rate[1]) * 0.92;
 
         return ['ok' => true, 'quiz' => ['questions' => $clean], 'error' => '', 'cost_eur' => $costEur];
     }

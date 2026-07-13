@@ -191,35 +191,15 @@ if (!function_exists('aiTranslateStringsToNl')) {
                     'content' => json_encode(array_values($chunk), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 ]],
             ];
-            $ch = curl_init('https://api.anthropic.com/v1/messages');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'content-type: application/json',
-                    'x-api-key: ' . $apiKey,
-                    'anthropic-version: 2023-06-01',
-                ],
-                CURLOPT_POSTFIELDS => json_encode($payload),
-                CURLOPT_TIMEOUT => 240,
-            ]);
-            $resp = curl_exec($ch);
-            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $cErr = curl_error($ch);
-            curl_close($ch);
-
-            if ($resp === false) {
-                return ['ok' => false, 'items' => [], 'error' => 'Connexion API : ' . $cErr];
+            // STREAMING obligatoire : sans lui, l'API n'envoie rien avant d'avoir fini et
+            // cURL coupe sur timeout (0 octet reçu) — c'est ce qui rendait la relecture
+            // interminable puis échouait. Voir aiClaudeStreamText().
+            require_once __DIR__ . '/ai_uniformise.php';
+            $r = aiClaudeStreamText($apiKey, $payload);
+            if (empty($r['ok'])) {
+                return ['ok' => false, 'items' => [], 'error' => (string) $r['error']];
             }
-            $data = json_decode($resp, true);
-            if ($code !== 200 || !is_array($data)) {
-                $msg = is_array($data) && isset($data['error']['message']) ? $data['error']['message'] : ('HTTP ' . $code);
-                return ['ok' => false, 'items' => [], 'error' => $msg];
-            }
-            $text = '';
-            foreach (($data['content'] ?? []) as $blk) {
-                if (($blk['type'] ?? '') === 'text') { $text .= $blk['text']; }
-            }
+            $text = (string) $r['text'];
             $s = strpos($text, '[');
             $e = strrpos($text, ']');
             if ($s === false || $e === false || $e < $s) {
@@ -329,35 +309,15 @@ if (!function_exists('aiProofreadStringsFr')) {
                     'content' => json_encode(array_values($chunk), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 ]],
             ];
-            $ch = curl_init('https://api.anthropic.com/v1/messages');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'content-type: application/json',
-                    'x-api-key: ' . $apiKey,
-                    'anthropic-version: 2023-06-01',
-                ],
-                CURLOPT_POSTFIELDS => json_encode($payload),
-                CURLOPT_TIMEOUT => 240,
-            ]);
-            $resp = curl_exec($ch);
-            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $cErr = curl_error($ch);
-            curl_close($ch);
-
-            if ($resp === false) {
-                return ['ok' => false, 'items' => [], 'error' => 'Connexion API : ' . $cErr];
+            // STREAMING obligatoire : sans lui, l'API n'envoie rien avant d'avoir fini et
+            // cURL coupe sur timeout (0 octet reçu) — c'est ce qui rendait la relecture
+            // interminable puis échouait. Voir aiClaudeStreamText().
+            require_once __DIR__ . '/ai_uniformise.php';
+            $r = aiClaudeStreamText($apiKey, $payload);
+            if (empty($r['ok'])) {
+                return ['ok' => false, 'items' => [], 'error' => (string) $r['error']];
             }
-            $data = json_decode($resp, true);
-            if ($code !== 200 || !is_array($data)) {
-                $msg = is_array($data) && isset($data['error']['message']) ? $data['error']['message'] : ('HTTP ' . $code);
-                return ['ok' => false, 'items' => [], 'error' => $msg];
-            }
-            $text = '';
-            foreach (($data['content'] ?? []) as $blk) {
-                if (($blk['type'] ?? '') === 'text') { $text .= $blk['text']; }
-            }
+            $text = (string) $r['text'];
             $s = strpos($text, '[');
             $e = strrpos($text, ']');
             if ($s === false || $e === false || $e < $s) {
