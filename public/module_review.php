@@ -94,9 +94,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
             exit();
         }
 
-        // PASSAGE 2 — re-vérification orthographe du FR (forme uniquement) APRÈS tes
-        // corrections manuelles. Silencieux et sans risque : en cas d'échec, on garde ton texte.
         $proofed = false;
+        $willGenQuiz = (!empty($module['a_evaluer']) && trim((string) ($module['quiz_json'] ?? '')) === '');
+        $oldNl = (string) ($module['contenu_ia_nl'] ?? '');
+        $quizNlReady = trim((string) ($module['quiz_json'] ?? '')) === '' || trim((string) ($module['quiz_json_nl'] ?? '')) !== '';
+
+        // PASSAGE 2 INCRÉMENTAL — relecture d'un contenu déjà traduit, sans quiz à générer :
+        // on ne re-corrige/re-traduit QUE les phrases modifiées (économie d'appels IA).
+        if (!$willGenQuiz && trim($oldNl) !== '' && $quizNlReady && function_exists('nlApplyIncremental')) {
+            $inc = nlApplyIncremental($db, $frJson, (string) ($module['contenu_ia'] ?? ''), $oldNl);
+            if ($inc !== null) {
+                $frHash = hash('sha256',
+                    trim((string) ($module['nom'] ?? '')) . '|' .
+                    trim((string) ($module['description'] ?? '')) . '|' .
+                    $inc['fr'] . '|' .
+                    (string) ($module['quiz_json'] ?? ''));
+                $db->prepare("UPDATE modules SET contenu_ia = ?, contenu_ia_nl = ?, uniformized = 1, nl_hash = ? WHERE id = ?")
+                   ->execute([$inc['fr'], $inc['nl'], $frHash, $id]);
+                $_SESSION['module_flash'] = "✅ Contenu relu — orthographe et néerlandais mis à jour (phrases modifiées).";
+                header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
+                exit();
+            }
+        }
+
+        // MODE PLEIN — première traduction, structure changée, ou quiz à générer.
+        // PASSAGE 2 : re-vérification orthographe du FR (forme uniquement). Sans risque.
         if (function_exists('nlProofreadBlocksJson')) {
             $pr = nlProofreadBlocksJson($db, $frJson);
             if ($pr['ok'] && trim((string) $pr['json']) !== '') {

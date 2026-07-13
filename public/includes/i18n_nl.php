@@ -409,6 +409,64 @@ if (!function_exists('nlProofreadBlocksJson')) {
     }
 }
 
+if (!function_exists('nlApplyIncremental')) {
+    /**
+     * PASSAGE 2 INCRÉMENTAL — ne re-corrige (orthographe) et ne re-traduit (NL) QUE les
+     * chaînes RÉELLEMENT modifiées depuis la dernière fois. Économise les appels IA.
+     * @return array|null ['fr'=>json corrigé, 'nl'=>json NL à jour] ou NULL si impossible
+     *                    (structure changée / NL absent) → l'appelant fait le mode plein.
+     */
+    function nlApplyIncremental($db, $newFrJson, $oldFrJson, $oldNlJson)
+    {
+        $newDec = json_decode((string) $newFrJson, true);
+        $oldDec = json_decode((string) $oldFrJson, true);
+        $nlDec = json_decode((string) $oldNlJson, true);
+        if (!is_array($newDec) || !is_array($oldDec) || !is_array($nlDec)) { return null; }
+        $unwrap = function ($d) { return (isset($d['blocks']) && is_array($d['blocks'])) ? $d['blocks'] : $d; };
+        $newB = $unwrap($newDec);
+        $oldB = $unwrap($oldDec);
+        $nlB = $unwrap($nlDec);
+        $frWrapped = isset($newDec['blocks']);
+        $nlWrapped = isset($nlDec['blocks']);
+
+        $newS = []; $oldS = []; $nlS = [];
+        $c1 = $newB; nlWalkBlocks($c1, function (&$s) use (&$newS) { $newS[] = (string) $s; });
+        $c2 = $oldB; nlWalkBlocks($c2, function (&$s) use (&$oldS) { $oldS[] = (string) $s; });
+        $c3 = $nlB;  nlWalkBlocks($c3, function (&$s) use (&$nlS) { $nlS[] = (string) $s; });
+
+        // Structures identiques indispensables (sinon on ne peut pas aligner les phrases).
+        $n = count($newS);
+        if ($n === 0 || count($oldS) !== $n || count($nlS) !== $n) { return null; }
+
+        $changed = [];
+        for ($i = 0; $i < $n; $i++) { if ($newS[$i] !== $oldS[$i]) { $changed[] = $i; } }
+        if (empty($changed)) { return ['fr' => $newFrJson, 'nl' => $oldNlJson]; }
+
+        // 1) Orthographe FR sur les SEULES phrases modifiées.
+        $chFr = [];
+        foreach ($changed as $i) { $chFr[] = $newS[$i]; }
+        $pr = aiProofreadStringsFr($db, $chFr);
+        $corr = (!empty($pr['ok']) && count($pr['items']) === count($chFr)) ? $pr['items'] : $chFr;
+        foreach ($changed as $k => $i) { $newS[$i] = (string) $corr[$k]; }
+
+        // 2) Traduction NL des SEULES phrases corrigées.
+        $chCorr = [];
+        foreach ($changed as $i) { $chCorr[] = $newS[$i]; }
+        $tr = aiTranslateStringsToNl($db, $chCorr);
+        if (empty($tr['ok']) || count($tr['items']) !== count($changed)) { return null; }
+        foreach ($changed as $k => $i) { $nlS[$i] = (string) $tr['items'][$k]; }
+
+        // Réinjection FR + NL à leur place exacte.
+        $a = 0; nlWalkBlocks($newB, function (&$s) use (&$a, $newS) { if (array_key_exists($a, $newS)) { $s = $newS[$a]; } $a++; });
+        $b = 0; nlWalkBlocks($nlB, function (&$s) use (&$b, $nlS) { if (array_key_exists($b, $nlS)) { $s = $nlS[$b]; } $b++; });
+
+        return [
+            'fr' => json_encode($frWrapped ? ['blocks' => $newB] : $newB, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'nl' => json_encode($nlWrapped ? ['blocks' => $nlB] : $nlB, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ];
+    }
+}
+
 if (!function_exists('nlTranslateQuizJson')) {
     /** Quiz FR → NL : énoncés + options. Type et bonnes réponses INTACTS. */
     function nlTranslateQuizJson($db, $quizJson)
