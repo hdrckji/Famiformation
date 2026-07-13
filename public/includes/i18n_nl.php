@@ -664,6 +664,23 @@ if (!function_exists('famiFinalValidation')) {
             $msg .= ' 🌐 Version néerlandaise générée.';
         }
 
+        // 3bis) Sous-titres NL de la vidéo (frère du guide) — pas faits à l'import pour ne pas
+        //       allonger l'upload ; on les produit ici, une fois.
+        $pid = (int) ($m['parent_id'] ?? 0);
+        if ($pid > 0) {
+            try {
+                $vs = $db->prepare("SELECT id FROM modules WHERE parent_id = ? AND content_kind = 'video' LIMIT 1");
+                $vs->execute([$pid]);
+                $vidId = (int) $vs->fetchColumn();
+                if ($vidId > 0) {
+                    require_once __DIR__ . '/transcription.php';
+                    if (function_exists('famiEnsureNlSubtitles') && famiEnsureNlSubtitles($db, $vidId)) {
+                        $msg .= ' 💬 Sous-titres néerlandais générés.';
+                    }
+                }
+            } catch (Exception $e) { /* non bloquant */ }
+        }
+
         // 4) PUBLICATION : jusqu'ici le contenu était caché car non validé.
         $pid = (int) ($m['parent_id'] ?? 0);
         if ($isAdmin && $pid > 0) {

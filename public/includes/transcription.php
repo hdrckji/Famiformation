@@ -311,7 +311,7 @@ if (!function_exists('famiVideoSubtitles')) {
      *
      * @return array ['ok','srt_fr','srt_nl','text','source','error']
      */
-    function famiVideoSubtitles($db, $videoAbs, $srtAbs = '')
+    function famiVideoSubtitles($db, $videoAbs, $srtAbs = '', $withNl = true)
     {
         $srtFr = '';
         $source = '';
@@ -352,12 +352,14 @@ if (!function_exists('famiVideoSubtitles')) {
             $source = 'whisper';
         }
 
-        // 3) Version néerlandaise (sous-titres bilingues). Non bloquant : si la
-        //    traduction échoue, on garde au moins le FR.
+        // 3) Version néerlandaise (sous-titres bilingues) — appel IA, donc COÛTEUX en temps.
+        //    À l'import on passe $withNl = false : on ne produit que le FR (gratuit, instantané)
+        //    et la piste NL est générée plus tard, à la validation finale (famiEnsureNlSubtitles).
         $srtNl = '';
-        $tr = famiSrtTranslateToNl($db, $srtFr);
-        if ($tr['ok']) {
-            $srtNl = $tr['srt'];
+        $errNl = '';
+        if ($withNl) {
+            $tr = famiSrtTranslateToNl($db, $srtFr);
+            if ($tr['ok']) { $srtNl = $tr['srt']; } else { $errNl = (string) $tr['error']; }
         }
 
         return [
@@ -366,7 +368,7 @@ if (!function_exists('famiVideoSubtitles')) {
             'srt_nl' => $srtNl,
             'text' => famiSrtToText($srtFr), // alimente le quiz
             'source' => $source,
-            'error' => $srtNl === '' ? 'Sous-titres NL non générés (' . $tr['error'] . ')' : '',
+            'error' => ($withNl && $srtNl === '') ? 'Sous-titres NL non générés (' . $errNl . ')' : '',
         ];
     }
 }
@@ -406,6 +408,53 @@ if (!function_exists('famiPersistSubtitles')) {
             return false;
         }
         return $frKey !== '';
+    }
+}
+
+if (!function_exists('famiEnsureNlSubtitles')) {
+    /**
+     * Génère la piste de sous-titres NÉERLANDAISE d'une vidéo si elle manque.
+     * Appelé à la VALIDATION FINALE (pas à l'import) : la traduction est un appel IA,
+     * on ne fait donc pas attendre l'utilisateur pendant l'upload.
+     * @return bool true si la piste NL existe (déjà ou nouvellement créée)
+     */
+    function famiEnsureNlSubtitles(PDO $db, $videoModuleId)
+    {
+        $videoModuleId = (int) $videoModuleId;
+        if ($videoModuleId <= 0) { return false; }
+        try {
+            $st = $db->prepare("SELECT sub_fr_path, sub_nl_path FROM modules WHERE id = ? LIMIT 1");
+            $st->execute([$videoModuleId]);
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return false;
+        }
+        if (!$r) { return false; }
+        if (trim((string) ($r['sub_nl_path'] ?? '')) !== '') { return true; } // déjà là
+        $frKey = trim((string) ($r['sub_fr_path'] ?? ''));
+        if ($frKey === '') { return false; }
+
+        $base = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/../uploads');
+        $frAbs = $base . '/' . $frKey;
+        if (!is_file($frAbs)) { return false; }
+        $frVtt = @file_get_contents($frAbs);
+        if ($frVtt === false || trim((string) $frVtt) === '') { return false; }
+
+        // famiSrtParse gère aussi le WebVTT (il ignore l'entête et garde les timecodes).
+        $tr = famiSrtTranslateToNl($db, (string) $frVtt);
+        if (empty($tr['ok']) || trim((string) $tr['srt']) === '') { return false; }
+
+        $dir = $base . '/modules/subs';
+        if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+        $name = 'sub_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '_nl.vtt';
+        if (@file_put_contents($dir . '/' . $name, famiSrtToVtt($tr['srt'])) === false) { return false; }
+        try {
+            $db->prepare("UPDATE modules SET sub_nl_path = ? WHERE id = ?")
+               ->execute(['modules/subs/' . $name, $videoModuleId]);
+        } catch (Exception $e) {
+            return false;
+        }
+        return true;
     }
 }
 

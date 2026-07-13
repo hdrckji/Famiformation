@@ -98,7 +98,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
             require_once 'includes/ai_uniformise.php';
             if (function_exists('aiGenerateQuiz')) {
                 @set_time_limit(0);
-                $qz = aiGenerateQuiz($db, $frJson);
+                // Le quiz porte sur le guide ET la vidéo (si sa transcription est disponible).
+                $transcript = '';
+                try {
+                    $ts = $db->prepare("SELECT transcript FROM modules WHERE parent_id = ? AND content_kind = 'video' LIMIT 1");
+                    $ts->execute([(int) ($module['parent_id'] ?? 0)]);
+                    $transcript = trim((string) $ts->fetchColumn());
+                } catch (Exception $e) {}
+                $qSource = "CONTENU ÉCRIT (le guide) :\n" . $frJson;
+                if ($transcript !== '') {
+                    $qSource .= "\n\n---\n\nCONTENU DE LA VIDÉO (transcription) :\n" . $transcript;
+                }
+                $qz = aiGenerateQuiz($db, $qSource);
                 if (!empty($qz['ok']) && !empty($qz['quiz'])) {
                     $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")
                        ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), $id]);

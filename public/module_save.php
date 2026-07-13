@@ -473,7 +473,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 require_once __DIR__ . '/includes/transcription.php';
                                 $srtAbs = function_exists('moduleFileAbsPath') ? moduleFileAbsPath($srtSrc) : '';
                                 if ($srtAbs && is_file($srtAbs) && function_exists('famiVideoSubtitles') && function_exists('famiPersistSubtitles')) {
-                                    $subs = famiVideoSubtitles($db, '', $srtAbs); // vidéo inutile si .srt fourni
+                                    // withNl = false : à l'import on ne fait QUE la piste FR (gratuite,
+                                    // instantanée). La piste NL (appel IA) est générée à la validation
+                                    // finale — inutile de faire attendre l'utilisateur maintenant.
+                                    $subs = famiVideoSubtitles($db, '', $srtAbs, false);
                                     if (!empty($subs['ok'])) {
                                         famiPersistSubtitles($db, $vidChildId, $subs);
                                     }
@@ -516,52 +519,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
 
-                // QUIZ — généré ICI, une seule fois, quand tout le support est prêt.
-                // Il porte sur le guide + la VIDÉO si un transcript est déjà disponible (sous-titres
-                // fournis / déjà transcrits) ; sinon sur le guide seul. L'essentiel : il est TOUJOURS
-                // créé quand « à évaluer » est coché — il ne dépend plus d'une tâche de fond.
-                if ($aEvaluer && $guideChildId && trim((string) $contenuIa) !== '') {
-                    @set_time_limit(0);
-                    require_once __DIR__ . '/includes/ia_settings.php';
-                    require_once __DIR__ . '/includes/ai_uniformise.php';
-
-                    $transcript = '';
-                    if ($vidChildId) {
-                        try {
-                            $ts = $db->prepare("SELECT transcript FROM modules WHERE id = ? LIMIT 1");
-                            $ts->execute([(int) $vidChildId]);
-                            $transcript = trim((string) $ts->fetchColumn());
-                        } catch (Exception $e) {}
-                    }
-                    $qSource = "CONTENU ÉCRIT (le guide) :\n" . (string) $contenuIa;
-                    if ($transcript !== '') {
-                        $qSource .= "\n\n---\n\nCONTENU DE LA VIDÉO (transcription) :\n" . $transcript;
-                    }
-                    $qz = aiGenerateQuiz($db, $qSource);
-                    if (!empty($qz['ok']) && !empty($qz['quiz'])) {
-                        $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")
-                           ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), (int) $guideChildId]);
-                        // Marque « déjà enrichi par la vidéo » seulement si le transcript a servi ;
-                        // sinon le worker pourra encore l'enrichir quand la vidéo sera transcrite.
-                        try {
-                            $db->prepare("UPDATE modules SET quiz_from_video = ? WHERE id = ?")
-                               ->execute([$transcript !== '' ? 1 : 0, (int) $guideChildId]);
-                        } catch (Exception $e) {}
-                        require_once __DIR__ . '/includes/ia_usage.php';
-                        iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), 'quiz', (function_exists('iaSelectedModel') ? iaSelectedModel($db) : ''), 0, 0, (float) ($qz['cost_eur'] ?? 0), $id);
-                        $flashMsg .= " 📝 Quiz généré (" . count($qz['quiz']['questions'] ?? []) . " questions"
-                            . ($transcript !== '' ? ", guide + vidéo" : "") . ").";
-                    } else {
-                        $flashMsg .= " ⚠️ Quiz NON généré : " . ($qz['error'] ?? 'erreur inconnue') . ".";
-                    }
+                // QUIZ : PAS généré ici. Il n'est utile qu'APRÈS ta relecture du guide — le
+                // produire maintenant allongeait l'import de plusieurs minutes pour rien.
+                // Il est généré à la VALIDATION DU GUIDE (module_review), sur guide + vidéo.
+                if ($aEvaluer) {
+                    $flashMsg .= " 📝 Le quiz sera généré quand tu valideras la relecture du guide.";
                 }
 
-                // BILINGUE : on NE traduit PAS le guide/quiz ICI. L'import fait déjà beaucoup
-                // (uniformisation IA + sous-titres + quiz) : y ajouter la traduction complète
-                // faisait dépasser le délai de la requête (erreur affichée alors que tout était
-                // pourtant enregistré). La traduction NL du guide + quiz se fait à la VALIDATION
-                // DE LA RELECTURE (module_review), qui est une requête courte et dédiée.
-                // Ici on ne traduit que le titre/description du module : 1 appel très court.
+                // BILINGUE : la traduction NL (guide + quiz) ne se fait PAS ici non plus, mais à
+                // la VALIDATION FINALE de la relecture. On ne traduit ici que le titre/description
+                // du module : 1 appel très court.
                 @set_time_limit(0);
                 nlSyncModule($db, (int) $id, true); // module parent : titre/description seulement
 
