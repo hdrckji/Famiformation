@@ -81,9 +81,20 @@ $quizCol = ($lang === 'nl') ? 'quiz_json_nl' : 'quiz_json';
 $quiz = json_decode((string) ($module[$quizCol] ?? ''), true);
 $quizNlFromFr = false;
 if ((!is_array($quiz) || empty($quiz['questions'])) && $lang === 'nl') {
-    // NL pas encore généré : on part du quiz FR comme base à corriger.
-    $quiz = json_decode((string) ($module['quiz_json'] ?? ''), true);
-    $quizNlFromFr = true;
+    // NL pas encore généré : on le génère MAINTENANT (synchrone), sans dépendre du worker.
+    $frQuiz = (string) ($module['quiz_json'] ?? '');
+    if (function_exists('nlTranslateQuizJson') && trim($frQuiz) !== '') {
+        $tr = nlTranslateQuizJson($db, $frQuiz);
+        if (!empty($tr['ok']) && trim((string) $tr['json']) !== '') {
+            try { $db->prepare("UPDATE modules SET quiz_json_nl = ? WHERE id = ?")->execute([$tr['json'], $id]); } catch (Exception $e) {}
+            $quiz = json_decode($tr['json'], true);
+        }
+    }
+    if (!is_array($quiz) || empty($quiz['questions'])) {
+        // Échec (clé API absente / réseau) : on part du quiz FR comme base à corriger.
+        $quiz = json_decode($frQuiz, true);
+        $quizNlFromFr = true;
+    }
 }
 $questions = (is_array($quiz) && !empty($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
 $nbMul = 0; $nbSin = 0;

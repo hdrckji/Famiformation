@@ -26,10 +26,24 @@ $data = json_decode((string) ($module[$srcCol] ?? ''), true);
 $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
 $nlFromFr = false;
 if (!$blocks && $lang === 'nl') {
-    // NL pas encore généré : on part de la version FR comme base à corriger.
-    $data = json_decode((string) ($module['contenu_ia'] ?? ''), true);
-    $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
-    $nlFromFr = true;
+    // NL pas encore généré : on le génère MAINTENANT (synchrone), sans dépendre du worker de fond.
+    require_once 'includes/i18n_nl.php';
+    $frJson = (string) ($module['contenu_ia'] ?? '');
+    if (function_exists('nlTranslateBlocksJson') && trim($frJson) !== '') {
+        $tr = nlTranslateBlocksJson($db, $frJson);
+        if (!empty($tr['ok']) && trim((string) $tr['json']) !== '') {
+            try { $db->prepare("UPDATE modules SET contenu_ia_nl = ? WHERE id = ?")->execute([$tr['json'], $id]); } catch (Exception $e) {}
+            $module['contenu_ia_nl'] = $tr['json'];
+            $data = json_decode($tr['json'], true);
+            $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
+        }
+    }
+    if (!$blocks) {
+        // Échec (clé API absente / réseau) : on part de la version FR comme base à corriger.
+        $data = json_decode($frJson, true);
+        $blocks = (is_array($data) && !empty($data['blocks']) && is_array($data['blocks'])) ? $data['blocks'] : null;
+        $nlFromFr = true;
+    }
 }
 if (!$blocks) { header('Location: module_review.php?id=' . $id); exit(); }
 
