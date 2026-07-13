@@ -233,7 +233,32 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             $quizHref = $quizModuleId > 0 ? ('quiz.php?id=' . $quizModuleId) : '';
             $canEditContent = ($isAdmin || !empty($canContribHere) || (int) ($module['contenu_by'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0));
             $isGuide = (!empty($module['uniformized']) && !empty($module['contenu_ia']));
+            // Doutes de l'IA (champ "fix") : comptés pour les éditeurs, signalés bien visiblement.
+            $aiDoubts = 0;
+            if ($canEditContent && $isGuide) {
+                $dData = json_decode((string) ($module['contenu_ia'] ?? ''), true);
+                foreach ((is_array($dData) && !empty($dData['blocks']) ? $dData['blocks'] : []) as $db_) {
+                    if (is_array($db_) && trim((string) ($db_['fix'] ?? '')) !== '') { $aiDoubts++; }
+                }
+            }
         ?>
+        <?php if ($aiDoubts > 0): ?>
+        <a href="module_edit.php?id=<?= (int) $module['id'] ?>" class="ai-doubt-banner">
+            <span class="ai-doubt-ico">⚠️</span>
+            <span><strong><?= (int) $aiDoubts ?> <?= $aiDoubts > 1 ? 'points signalés' : 'point signalé' ?> par l'IA</strong> — à vérifier. Cliquez pour voir le détail et corriger.</span>
+            <span class="ai-doubt-cta">Voir →</span>
+        </a>
+        <style>
+        .ai-doubt-banner { display:flex; align-items:center; gap:12px; max-width:820px; width:92%; margin:14px auto 0; text-decoration:none;
+            background:linear-gradient(180deg,#fff3e0,#ffe6c7); border:2px solid #e8a13a; color:#7a4b00; padding:14px 18px; border-radius:14px;
+            font-size:0.98rem; font-weight:600; box-shadow:0 8px 22px rgba(200,120,20,.28); animation:aiDoubtPulse 1.8s ease-in-out infinite; }
+        .ai-doubt-banner:hover { background:linear-gradient(180deg,#ffe6c7,#ffdcae); }
+        .ai-doubt-ico { font-size:1.6rem; line-height:1; flex:none; }
+        .ai-doubt-cta { margin-left:auto; background:#8a5a00; color:#fff; border-radius:999px; padding:7px 16px; font-weight:800; white-space:nowrap; flex:none; }
+        @keyframes aiDoubtPulse { 0%,100%{ box-shadow:0 8px 22px rgba(200,120,20,.28); } 50%{ box-shadow:0 8px 30px rgba(200,120,20,.5); } }
+        @media (prefers-reduced-motion: reduce) { .ai-doubt-banner { animation:none; } }
+        </style>
+        <?php endif; ?>
         <?php if ($isVideoPage): ?>
             <?php require_once __DIR__ . '/includes/video_view.php'; ?>
             <?php renderVideoPage($module, $isAdmin, $quizHref); ?>
@@ -288,22 +313,6 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php endif; ?>
         <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === '' && !$emptyContentFocus): ?>
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
-        <?php endif; ?>
-        <?php
-            // Doutes de l'IA (champ "fix") : invisibles en lecture. On les signale aux personnes
-            // qui peuvent éditer, avec un lien vers l'éditeur où le détail s'affiche en rouge.
-            $aiDoubts = 0;
-            if ($canEditContent && $isGuide) {
-                $dData = json_decode((string) ($module['contenu_ia'] ?? ''), true);
-                foreach ((is_array($dData) && !empty($dData['blocks']) ? $dData['blocks'] : []) as $db_) {
-                    if (is_array($db_) && trim((string) ($db_['fix'] ?? '')) !== '') { $aiDoubts++; }
-                }
-            }
-        ?>
-        <?php if ($aiDoubts > 0): ?>
-            <a href="module_edit.php?id=<?= (int) $module['id'] ?>" style="display:flex; align-items:center; justify-content:center; gap:10px; max-width:600px; margin:12px auto 0; text-decoration:none; background:#fff3e0; border:1px solid #f0c98a; color:#8a5a00; padding:12px 16px; border-radius:12px; font-weight:700; font-size:0.9rem;">
-                ⚠️ <?= (int) $aiDoubts ?> <?= $aiDoubts > 1 ? 'points signalés' : 'point signalé' ?> par l'IA à vérifier — <span style="text-decoration:underline;">cliquez pour voir le détail</span>
-            </a>
         <?php endif; ?>
         <?php if ($canEditContent && ($isGuide || $quizModuleId > 0)): ?>
             <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:10px 0 4px;">
