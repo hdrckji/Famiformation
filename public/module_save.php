@@ -505,6 +505,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             } catch (Exception $e) { /* le worker prendra le relais */ }
                         }
                     }
+
+                    // AUCUN .srt fourni → TRANSCRIPTION AUTOMATIQUE (ffmpeg + Whisper) TOUT DE SUITE.
+                    // Avant, on comptait sur le worker de fond : s'il ne partait pas (cas fréquent),
+                    // la vidéo restait à vie sans sous-titres et sans transcription pour le quiz.
+                    // Whisper est rapide (quelques secondes pour une vidéo de 5 min), on l'assume ici.
+                    if ($vidChildId && empty($srtSrc)) {
+                        try {
+                            require_once __DIR__ . '/includes/transcription.php';
+                            $vKey = $videoSrc ? $videoSrc : $videoPath;
+                            $vAbs = ($vKey && function_exists('moduleFileAbsPath')) ? moduleFileAbsPath($vKey) : '';
+                            if ($vAbs && is_file($vAbs) && function_exists('famiSttReady') && famiSttReady()) {
+                                @set_time_limit(0);
+                                $subs = famiVideoSubtitles($db, $vAbs, '', false); // FR seul ; le NL vient à la validation finale
+                                if (!empty($subs['ok']) && function_exists('famiPersistSubtitles')) {
+                                    famiPersistSubtitles($db, $vidChildId, $subs);
+                                    $flashMsg .= " 💬 Sous-titres générés automatiquement (Whisper).";
+                                } else {
+                                    $flashMsg .= " ⚠️ Sous-titres non générés : " . ($subs['error'] ?? 'erreur') . ".";
+                                }
+                            } elseif (function_exists('famiSttReady') && !famiSttReady()) {
+                                $flashMsg .= " ⚠️ Sous-titres non générés : aucune clé de transcription (Groq/OpenAI) configurée.";
+                            }
+                        } catch (Exception $e) {
+                            $flashMsg .= " ⚠️ Sous-titres non générés : " . $e->getMessage();
+                        }
+                    }
                     $madeVideo = true;
                 }
 
