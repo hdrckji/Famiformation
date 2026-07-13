@@ -164,6 +164,14 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <?php if ($canDlPdf): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="Télécharger le PDF original">⤓</a><?php endif; ?>
                 </div>
             <?php endif; ?>
+            <?php
+                // Cloche de notifications avec pastille rouge : visible aussi hors de l'accueil.
+                require_once __DIR__ . '/includes/events.php';
+                $notifCount = $isAdmin
+                    ? eventsPendingCount($db)
+                    : eventsUnseenCount($db, (int) ($_SESSION['user_id'] ?? 0), $actorRole);
+            ?>
+            <a href="events.php" class="uni-ico" title="<?= t('Notifications', 'Meldingen') ?>" style="position:relative;">🔔<?php if ($notifCount > 0): ?><span style="position:absolute; top:-4px; right:-4px; background:#c0392b; color:#fff; border-radius:999px; font-size:0.68rem; font-weight:800; min-width:18px; height:18px; display:flex; align-items:center; justify-content:center; padding:0 5px; box-shadow:0 0 0 2px #fff;"><?= (int) $notifCount ?></span><?php endif; ?></a>
             <div class="lang-switch">
                 <a href="module.php?id=<?= (int) $module['id'] ?>&lang=fr" class="lang-btn<?= currentLang() === 'fr' ? ' active' : '' ?>">FR</a>
                 <a href="module.php?id=<?= (int) $module['id'] ?>&lang=nl" class="lang-btn<?= currentLang() === 'nl' ? ' active' : '' ?>">NL</a>
