@@ -289,6 +289,22 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php if (empty($module['video_path']) && empty($module['pdf_path']) && $vStatus === '' && !$emptyContentFocus): ?>
             <div class="content-card" style="text-align:center; color:#666;"><?= t("Ce module n'a pas encore de contenu.", 'Deze module heeft nog geen inhoud.') ?></div>
         <?php endif; ?>
+        <?php
+            // Doutes de l'IA (champ "fix") : invisibles en lecture. On les signale aux personnes
+            // qui peuvent éditer, avec un lien vers l'éditeur où le détail s'affiche en rouge.
+            $aiDoubts = 0;
+            if ($canEditContent && $isGuide) {
+                $dData = json_decode((string) ($module['contenu_ia'] ?? ''), true);
+                foreach ((is_array($dData) && !empty($dData['blocks']) ? $dData['blocks'] : []) as $db_) {
+                    if (is_array($db_) && trim((string) ($db_['fix'] ?? '')) !== '') { $aiDoubts++; }
+                }
+            }
+        ?>
+        <?php if ($aiDoubts > 0): ?>
+            <a href="module_edit.php?id=<?= (int) $module['id'] ?>" style="display:flex; align-items:center; justify-content:center; gap:10px; max-width:600px; margin:12px auto 0; text-decoration:none; background:#fff3e0; border:1px solid #f0c98a; color:#8a5a00; padding:12px 16px; border-radius:12px; font-weight:700; font-size:0.9rem;">
+                ⚠️ <?= (int) $aiDoubts ?> <?= $aiDoubts > 1 ? 'points signalés' : 'point signalé' ?> par l'IA à vérifier — <span style="text-decoration:underline;">cliquez pour voir le détail</span>
+            </a>
+        <?php endif; ?>
         <?php if ($canEditContent && ($isGuide || $quizModuleId > 0)): ?>
             <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:10px 0 4px;">
                 <?php if ($isGuide): ?><a href="module_edit.php?id=<?= (int) $module['id'] ?>" class="btn btn-create" style="text-decoration:none;">✏️ Modifier le guide</a><?php endif; ?>
