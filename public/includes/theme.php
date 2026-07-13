@@ -65,11 +65,25 @@ if (!function_exists('siteThemeCatalog')) {
                 'page_bg' => 'linear-gradient(160deg, #fbf7e6, #eaf6e2)', 'dark' => false,
             ],
             'fete_nationale' => [
-                'nom' => ['Bonne fête nationale 🇧🇪', 'Fijne nationale feestdag 🇧🇪'],
+                // ⚠️ PAS d'emoji drapeau ici : Windows ne dessine pas 🇧🇪, il affiche
+                //    les deux lettres « BE » — c'est moche. Le drapeau est DESSINÉ
+                //    (SVG tricolore) dans l'habillage : ornement + confettis.
+                'nom' => ['Bonne fête nationale', 'Fijne nationale feestdag'],
                 'pays' => ['BE'], 'md_range' => ['07-21', '07-21'],
                 'accent' => '#1a1a1a', 'accent2' => '#e30613',
-                'particles' => ['🇧🇪', '🎆'],
+                'particles' => ['🎆'],
                 'page_bg' => 'linear-gradient(160deg, #fffef0, #fff5cf)', 'dark' => false,
+            ],
+            // 🥞 CRÊPES (Chandeleur) — événement « pour le kiff », demandé par Jimmy.
+            //    Facile à retirer : supprimer cette entrée + son habillage. Rien d'autre
+            //    n'en dépend (la liste des événements et les réglages se construisent
+            //    automatiquement à partir de ce catalogue).
+            'crepes' => [
+                'nom' => ['C\'est la Chandeleur 🥞', 'Het is Lichtmis 🥞'],
+                'pays' => ['BE'], 'md_range' => ['02-01', '02-03'],
+                'accent' => '#C98A2B', 'accent2' => '#7A4A1E',
+                'particles' => ['🥞', '🍫', '🍋'],
+                'page_bg' => 'linear-gradient(160deg, #FFF6E2, #F3DFB8)', 'dark' => false,
             ],
             'halloween' => [
                 'nom' => ['Joyeux Halloween 🎃', 'Happy Halloween 🎃'],
@@ -260,22 +274,30 @@ if (!function_exists('renderPageThemeBackground')) {
 
 if (!function_exists('famiScrollRestoreScript')) {
     /**
-     * Script global : mémorise la position de scroll avant un envoi de formulaire /
-     * une navigation, et la restaure après le rechargement de la MÊME page (PRG).
-     * Évite de « remonter en haut » après un clic (verrouiller, traduire, etc.).
+     * Garde la position de scroll après un ENVOI DE FORMULAIRE (verrouiller, traduire,
+     * basculer un interrupteur...) : la page se recharge, on revient exactement où on était.
+     *
+     * ⚠️ CORRECTIF : on ne sauvegarde QUE sur "submit", plus sur "beforeunload".
+     * Avant, TOUTE navigation sauvegardait la position → en revenant sur Paramètres par un
+     * simple lien, on était renvoyé là où on s'était arrêté la dernière fois (souvent tout
+     * en bas). Une arrivée par un lien doit commencer EN HAUT ; seul un rechargement provoqué
+     * par un formulaire doit restaurer la position.
+     *
+     * La marque de temps (10 s) garantit en plus qu'un vieil enregistrement ne s'applique pas.
      */
     function famiScrollRestoreScript()
     {
         return '<script>(function(){try{'
             . 'var k="fscroll:"+location.pathname+location.search;'
             . 'var s=sessionStorage.getItem(k);'
-            . 'if(s){sessionStorage.removeItem(k);var d=null;try{d=JSON.parse(s);}catch(e){}'
-            . 'if(d&&(Date.now()-d.t)<20000&&d.y>0){var y=d.y;var go=function(){window.scrollTo(0,y);};'
+            . 'sessionStorage.removeItem(k);' // à usage unique : jamais réutilisé plus tard
+            . 'if(s){var d=null;try{d=JSON.parse(s);}catch(e){}'
+            . 'if(d&&d.submit&&(Date.now()-d.t)<10000&&d.y>0){var y=d.y;var go=function(){window.scrollTo(0,y);};'
             . 'go();document.addEventListener("DOMContentLoaded",go);window.addEventListener("load",go);'
             . 'setTimeout(go,120);setTimeout(go,400);}}'
-            . 'function save(){try{sessionStorage.setItem(k,JSON.stringify({y:window.scrollY||window.pageYOffset||0,t:Date.now()}));}catch(e){}}'
-            . 'document.addEventListener("submit",save,true);'
-            . 'window.addEventListener("beforeunload",save);'
+            . 'document.addEventListener("submit",function(){try{'
+            . 'sessionStorage.setItem(k,JSON.stringify({y:window.scrollY||window.pageYOffset||0,t:Date.now(),submit:1}));'
+            . '}catch(e){}},true);'
             . '}catch(e){}})();</script>';
     }
 }
@@ -339,11 +361,14 @@ if (!function_exists('famiInjectPageTheme')) {
             $pvNom = (is_array($pvTh) && !empty($pvTh['nom']))
                 ? (is_array($pvTh['nom']) ? $pvTh['nom'][0] : $pvTh['nom'])
                 : $pvKey;
-            $pvPath = strtok((string) ($_SERVER['REQUEST_URI'] ?? '/'), '?');
+            // « Revenir à la normale » ramène AUX RÉGLAGES DES ÉVÉNEMENTS (et non sur la page
+            // où l'on se trouve) : on vient de là, on veut y retourner pour enchaîner sur un
+            // autre événement. La liste se rouvre toute seule (état mémorisé), donc on retombe
+            // pile où on était.
             $inject .= '<div style="position:fixed; top:0; left:0; right:0; z-index:99998; background:#1f1f1f; color:#fff; '
                 . 'padding:8px 14px; font-size:.86rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; box-shadow:0 2px 12px rgba(0,0,0,.35);">'
-                . '<span>🎨 Aperçu du thème « ' . htmlspecialchars($pvNom) . ' » — visible sur tout le site</span>'
-                . '<a href="' . htmlspecialchars($pvPath . '?theme=off', ENT_QUOTES) . '" style="background:#fff; color:#1f1f1f; text-decoration:none; border-radius:999px; padding:5px 14px; font-weight:800;">↩ Revenir à la normale</a>'
+                . '<span>🎨 Aperçu de « ' . htmlspecialchars($pvNom) . ' » — visible sur tout le site</span>'
+                . '<a href="parametres.php?theme=off#prefs" style="background:#fff; color:#1f1f1f; text-decoration:none; border-radius:999px; padding:5px 14px; font-weight:800;">↩ Revenir aux réglages</a>'
                 . '</div><div style="height:38px;"></div>';
         }
         // Fond de page :

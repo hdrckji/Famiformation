@@ -47,7 +47,18 @@ if (!function_exists('skinParticles')) {
             $drift = mt_rand(-80, 80);
             $delay = mt_rand(0, 280) / 10;
 
-            if ($type === 'confetti') {
+            if ($type === 'flags') {
+                // Vrais petits DRAPEAUX (bandes verticales), pas l'emoji 🇧🇪 que Windows
+                // affiche bêtement en lettres « BE ». Ici c'est dessiné : ça marche partout.
+                $w = mt_rand(13, 20);
+                $hg = (int) round($w * 0.68); // proportions d'un drapeau
+                $h .= '<span class="sk-conf" style="left:' . $left . '%;'
+                    . 'width:' . $w . 'px;height:' . $hg . 'px;background:' . $c . ';'
+                    . 'border-radius:1px;box-shadow:0 1px 3px rgba(0,0,0,.28);'
+                    . 'animation-duration:' . (mt_rand(110, 210) / 10) . 's;'
+                    . 'animation-delay:-' . $delay . 's;'
+                    . '--spin:' . mt_rand(180, 620) . 'deg;--drift:' . $drift . 'px;"></span>';
+            } elseif ($type === 'confetti') {
                 $w = mt_rand(4, 9);
                 $isDisc = ($i % 4 === 0);
                 $hg = $isDisc ? $w : mt_rand(9, 16);
@@ -263,62 +274,68 @@ if (!function_exists('themeSkinCatalog')) {
                 'heroBrand' => '#F6E3A4',
             ],
 
-            // 🎄 NOËL — Nuit bleutée, givre, or. Pas un flocon emoji.
+            // 🎄 NOËL — ROUGE dominant (retour de Jimmy : la nuit bleue faisait « sombre et nul »).
+            //    Rouge chaud + vert sapin + or. La neige BLANCHE ressort magnifiquement sur le rouge.
             'noel' => [
-                'fx' => ['drift', ['#FFFFFF', '#DCEBFA', '#F3E3A6'], 34],
-                'bg' => 'radial-gradient(1000px 560px at 50% -10%, rgba(212,175,55,.14), transparent 60%),'
-                    . 'radial-gradient(800px 620px at 12% 104%, rgba(46,110,80,.26), transparent 66%),'
-                    . 'linear-gradient(170deg,#07131F 0%,#0D2233 45%,#123243 100%)',
-                'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23BFE0F2' stroke-opacity='0.10' stroke-width='1.1'%3E%3Cpath d='M60 20 v80 M20 60 h80 M32 32 l56 56 M88 32 l-56 56'/%3E%3Cpath d='M180 140 v70 M145 175 h70 M156 151 l48 48 M204 151 l-48 48'/%3E%3C/g%3E%3C/svg%3E\") 0 0/240px 240px",
-                'patternOpacity' => '.45', 'vignette' => 'rgba(2,8,14,.5)',
-                'ink' => '#E6EFF6',
-                'foil' => 'linear-gradient(100deg,#9C7A16 0%,#F3E3A6 30%,#D4AF37 52%,#F3E3A6 72%,#9C7A16 100%)',
-                'tilePaper' => 'linear-gradient(180deg,#FBFDFF 0%,#EDF3F8 100%)',
-                'tileBorder' => 'rgba(168,124,21,.26)',
-                'tileBar' => 'linear-gradient(90deg,#1E6B3A,#F3E3A6 45%,#C0392B 55%,#1E6B3A)',
+                'fx' => ['drift', ['#FFFFFF', '#FFF3D6', '#EAF6EC'], 38],
+                'bg' => 'radial-gradient(1000px 560px at 50% -10%, rgba(255,225,150,.34), transparent 60%),'
+                    . 'radial-gradient(820px 620px at 10% 106%, rgba(30,107,58,.40), transparent 66%),'
+                    . 'linear-gradient(168deg,#E4574A 0%,#C0392B 46%,#96241C 100%)',
+                'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23FFFFFF' stroke-opacity='0.13' stroke-width='1.2'%3E%3Cpath d='M60 20 v80 M20 60 h80 M32 32 l56 56 M88 32 l-56 56'/%3E%3Cpath d='M180 140 v70 M145 175 h70 M156 151 l48 48 M204 151 l-48 48'/%3E%3C/g%3E%3C/svg%3E\") 0 0/240px 240px",
+                'patternOpacity' => '.6', 'vignette' => 'rgba(90,16,12,.35)',
+                'ink' => '#FFF2E8',
+                'foil' => 'linear-gradient(100deg,#9C7A16 0%,#FFF3C4 28%,#F0CE55 50%,#FFF3C4 72%,#9C7A16 100%)',
+                'tilePaper' => 'linear-gradient(180deg,#FFFDF6 0%,#F7EEDC 100%)',
+                'tileBorder' => 'rgba(30,107,58,.30)',
+                'tileBar' => 'linear-gradient(90deg,#1E6B3A,#F0CE55 45%,#C0392B 55%,#1E6B3A)',
                 'tileOrnament' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%231E6B3A' stroke-width='2'%3E%3Cpath d='M46 8 L26 40 h12 L20 66 h20 v18 h12 V66 h20 L54 40 h12 z'/%3E%3C/g%3E%3C/svg%3E\")",
-                'tileShadow' => '0 2px 4px rgba(2,10,18,.22), 0 16px 40px rgba(2,10,18,.32)',
-                'tileShadowHover' => '0 6px 10px rgba(2,10,18,.24), 0 26px 58px rgba(212,175,55,.22)',
-                'tileTitle' => '#123243', 'tileDesc' => '#5A6B76',
-                'cardBg' => 'rgba(251,253,255,.97)', 'cardBorder' => 'rgba(168,124,21,.2)',
-                'cardShadow' => '0 18px 48px rgba(2,10,18,.34)',
+                'ornamentOpacity' => '.18', 'ornamentHover' => '.32',
+                'tileShadow' => '0 2px 4px rgba(90,16,12,.20), 0 16px 40px rgba(90,16,12,.26)',
+                'tileShadowHover' => '0 6px 10px rgba(90,16,12,.22), 0 26px 58px rgba(240,206,85,.34)',
+                'tileTitle' => '#1E6B3A', 'tileDesc' => '#6B5B4A',
+                'cardBg' => 'rgba(255,253,246,.97)', 'cardBorder' => 'rgba(30,107,58,.24)',
+                'cardShadow' => '0 18px 48px rgba(90,16,12,.28)',
                 'btn' => 'linear-gradient(180deg,#26783F,#1A5730)',
-                'doc' => ['paper' => '#F7FAFD', 'paper-deep' => '#E9F1F7', 'line' => '#CFDEE9',
-                    'forest' => '#123243', 'leaf' => '#1E6B3A', 'moss' => '#6C8494',
-                    'pollen' => '#A87C15', 'pollen-bg' => '#FAF1DA',
-                    'ink' => '#16242E', 'ink-soft' => '#4E606C'],
-                'heroBg' => 'linear-gradient(155deg,#07131F 0%,#0D2233 55%,#154257 100%)',
-                'heroRule' => 'linear-gradient(90deg,#1E6B3A,#F3E3A6 50%,#C0392B)',
-                'heroBrand' => '#F3E3A6',
+                'doc' => ['paper' => '#FFFAF0', 'paper-deep' => '#F8EEDA', 'line' => '#E7D8BE',
+                    'forest' => '#1E6B3A', 'leaf' => '#C0392B', 'moss' => '#8A7A5F',
+                    'pollen' => '#B8901F', 'pollen-bg' => '#FBF2DA',
+                    'ink' => '#3A2A22', 'ink-soft' => '#6B5B4A'],
+                'heroBg' => 'linear-gradient(155deg,#96241C 0%,#C0392B 50%,#1E6B3A 100%)',
+                'heroRule' => 'linear-gradient(90deg,#1E6B3A,#F0CE55 50%,#C0392B)',
+                'heroBrand' => '#FFF3C4',
             ],
 
-            // 🎃 HALLOWEEN — Violet profond, lueur de citrouille. Aucun fantôme emoji.
+            // 🎃 HALLOWEEN — ORANGE dominant (retour de Jimmy : le violet nuit faisait « nul »).
+            //    Lueur de citrouille. Le violet ne sert plus que d'accent, et les cendres
+            //    sombres qui tombent ressortent parfaitement sur l'orange.
             'halloween' => [
-                'fx' => ['motes', ['#E8710A', '#8A4FBF'], 24],
-                'bg' => 'radial-gradient(900px 520px at 50% -8%, rgba(232,113,10,.22), transparent 58%),'
-                    . 'radial-gradient(760px 620px at 90% 106%, rgba(138,79,191,.24), transparent 64%),'
-                    . 'linear-gradient(170deg,#150A1F 0%,#241134 48%,#160D22 100%)',
-                'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Cg fill='none' stroke='%23E8710A' stroke-opacity='0.09' stroke-width='1.2'%3E%3Cpath d='M20 260 C 60 190, 40 130, 90 60'/%3E%3Cpath d='M60 180 q 40 -20 46 -70'/%3E%3Cpath d='M230 270 C 250 200, 230 150, 260 90'/%3E%3Cpath d='M120 40 q 40 -24 78 -8'/%3E%3C/g%3E%3C/svg%3E\") 0 0/280px 280px",
-                'patternOpacity' => '.55', 'vignette' => 'rgba(8,3,14,.55)',
-                'ink' => '#F0E6F7',
-                'foil' => 'linear-gradient(100deg,#B4560A 0%,#FFC98A 30%,#E8710A 52%,#FFC98A 72%,#B4560A 100%)',
-                'tilePaper' => 'linear-gradient(180deg,#FFF6ED 0%,#F6E7D6 100%)',
-                'tileBorder' => 'rgba(180,86,10,.3)',
-                'tileBar' => 'linear-gradient(90deg,#8A4FBF,#E8710A 50%,#8A4FBF)',
-                'tileOrnament' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%23241134' stroke-width='2'%3E%3Cpath d='M46 18 c-18 0 -30 14 -30 32 s12 30 30 30 s30 -12 30 -30 s-12 -32 -30 -32 z'/%3E%3Cpath d='M46 18 v-8 M38 26 q8 -10 16 0'/%3E%3C/g%3E%3C/svg%3E\")",
-                'tileShadow' => '0 2px 4px rgba(10,4,18,.26), 0 16px 40px rgba(10,4,18,.36)',
-                'tileShadowHover' => '0 6px 10px rgba(10,4,18,.28), 0 26px 58px rgba(232,113,10,.26)',
-                'tileTitle' => '#3B1D52', 'tileDesc' => '#6B5670',
-                'cardBg' => 'rgba(255,246,237,.97)', 'cardBorder' => 'rgba(180,86,10,.22)',
-                'cardShadow' => '0 18px 48px rgba(10,4,18,.38)',
-                'btn' => 'linear-gradient(180deg,#E8710A,#B4560A)', 'btnInk' => '#1E0E2B',
-                'doc' => ['paper' => '#FFF7EF', 'paper-deep' => '#F7E9DA', 'line' => '#E4CDB6',
-                    'forest' => '#3B1D52', 'leaf' => '#8A4FBF', 'moss' => '#8A6E96',
-                    'pollen' => '#B4560A', 'pollen-bg' => '#FDEBD8',
-                    'ink' => '#2A1A33', 'ink-soft' => '#5E4B67'],
-                'heroBg' => 'linear-gradient(155deg,#150A1F 0%,#3B1D52 52%,#7A3D18 100%)',
-                'heroRule' => 'linear-gradient(90deg,#8A4FBF,#E8710A 50%,#8A4FBF)',
-                'heroBrand' => '#FFC98A',
+                'fx' => ['drift', ['#5B2A73', '#3B1D52', '#7A3D0A'], 30],
+                'bg' => 'radial-gradient(1000px 560px at 50% -10%, rgba(255,214,120,.45), transparent 60%),'
+                    . 'radial-gradient(800px 620px at 88% 106%, rgba(138,79,191,.30), transparent 64%),'
+                    . 'linear-gradient(168deg,#FFA23A 0%,#F07C1A 45%,#D45F0A 100%)',
+                'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Cg fill='none' stroke='%233B1D52' stroke-opacity='0.14' stroke-width='1.4'%3E%3Cpath d='M20 260 C 60 190, 40 130, 90 60'/%3E%3Cpath d='M60 180 q 40 -20 46 -70'/%3E%3Cpath d='M230 270 C 250 200, 230 150, 260 90'/%3E%3Cpath d='M120 40 q 40 -24 78 -8'/%3E%3C/g%3E%3C/svg%3E\") 0 0/280px 280px",
+                'patternOpacity' => '.6', 'vignette' => 'rgba(90,32,4,.30)',
+                'ink' => '#3B1D52',
+                // Titre en aubergine miroitante : très lisible et graphique sur l'orange.
+                'foil' => 'linear-gradient(100deg,#2A1230 0%,#A96BD4 30%,#3B1D52 52%,#A96BD4 72%,#2A1230 100%)',
+                'tilePaper' => 'linear-gradient(180deg,#FFF8EE 0%,#F8E7D2 100%)',
+                'tileBorder' => 'rgba(59,29,82,.28)',
+                'tileBar' => 'linear-gradient(90deg,#3B1D52,#E8710A 50%,#3B1D52)',
+                'tileOrnament' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%233B1D52' stroke-width='2'%3E%3Cpath d='M46 18 c-18 0 -30 14 -30 32 s12 30 30 30 s30 -12 30 -30 s-12 -32 -30 -32 z'/%3E%3Cpath d='M46 18 v-8 M38 26 q8 -10 16 0'/%3E%3Cpath d='M30 44 l8 8 M62 44 l-8 8'/%3E%3C/g%3E%3C/svg%3E\")",
+                'ornamentOpacity' => '.16', 'ornamentHover' => '.3',
+                'tileShadow' => '0 2px 4px rgba(90,32,4,.18), 0 16px 40px rgba(90,32,4,.24)',
+                'tileShadowHover' => '0 6px 10px rgba(90,32,4,.2), 0 26px 58px rgba(59,29,82,.28)',
+                'tileTitle' => '#3B1D52', 'tileDesc' => '#7A5A52',
+                'cardBg' => 'rgba(255,248,238,.97)', 'cardBorder' => 'rgba(59,29,82,.22)',
+                'cardShadow' => '0 18px 48px rgba(90,32,4,.26)',
+                'btn' => 'linear-gradient(180deg,#5B2A73,#3B1D52)',
+                'doc' => ['paper' => '#FFF7EA', 'paper-deep' => '#F8E7D2', 'line' => '#E7CFB6',
+                    'forest' => '#3B1D52', 'leaf' => '#E8710A', 'moss' => '#8A6E96',
+                    'pollen' => '#D45F0A', 'pollen-bg' => '#FDE9D2',
+                    'ink' => '#33203A', 'ink-soft' => '#6B5670'],
+                'heroBg' => 'linear-gradient(155deg,#D45F0A 0%,#F0851F 45%,#5B2A73 100%)',
+                'heroRule' => 'linear-gradient(90deg,#3B1D52,#FFC98A 50%,#E8710A)',
+                'heroBrand' => '#FFE2B8',
             ],
 
             // 🐰 PÂQUES — Pastels crayeux, lumière matinale. Aucun œuf emoji.
@@ -381,9 +398,13 @@ if (!function_exists('themeSkinCatalog')) {
                 'heroBrand' => '#F5C9D3',
             ],
 
-            // 🇧🇪 FÊTE NATIONALE — Noir / or / rouge. Graphique et sobre.
+            // 🇧🇪 FÊTE NATIONALE — de VRAIS petits drapeaux belges qui tombent.
+            //    (L'emoji 🇧🇪 est banni : Windows l'affiche en lettres « BE ». Ici le drapeau
+            //     est DESSINÉ en dégradé tricolore → il s'affiche partout, correctement.)
             'fete_nationale' => [
-                'fx' => ['confetti', ['#1A1A1A', '#E9C766', '#E30613'], 24],
+                'fx' => ['flags', [
+                    'linear-gradient(90deg,#111111 33.33%,#FDDA24 33.33% 66.66%,#EF3340 66.66%)',
+                ], 22],
                 'bg' => 'radial-gradient(900px 500px at 50% -8%, rgba(233,199,102,.34), transparent 60%),'
                     . 'linear-gradient(172deg,#FFFDF6 0%,#FBF3DC 60%,#F3E6BE 100%)',
                 'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg stroke='%231A1A1A' stroke-opacity='0.07' stroke-width='10'%3E%3Cpath d='M-20 200 L200 -20' /%3E%3C/g%3E%3Cg stroke='%23E30613' stroke-opacity='0.06' stroke-width='10'%3E%3Cpath d='M-20 240 L240 -20' /%3E%3C/g%3E%3C/svg%3E\") 0 0/180px 180px",
@@ -393,7 +414,10 @@ if (!function_exists('themeSkinCatalog')) {
                 'tilePaper' => 'linear-gradient(180deg,#FFFFFF 0%,#FBF3E0 100%)',
                 'tileBorder' => 'rgba(26,26,26,.18)',
                 'tileBar' => 'linear-gradient(90deg,#1A1A1A 33%,#E9C766 33% 66%,#E30613 66%)',
-                'tileOrnament' => '', 'tileShadow' => '0 2px 4px rgba(30,26,10,.10), 0 16px 40px rgba(30,26,10,.14)',
+                // Drapeau belge dessiné (flottant), en ornement de coin.
+                'tileOrnament' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg%3E%3Crect x='16' y='30' width='18' height='38' fill='%23111111'/%3E%3Crect x='34' y='30' width='18' height='38' fill='%23FDDA24'/%3E%3Crect x='52' y='30' width='18' height='38' fill='%23EF3340'/%3E%3Crect x='13' y='24' width='3' height='52' rx='1.5' fill='%23555'/%3E%3C/g%3E%3C/svg%3E\")",
+                'ornamentOpacity' => '.35', 'ornamentHover' => '.6',
+                'tileShadow' => '0 2px 4px rgba(30,26,10,.10), 0 16px 40px rgba(30,26,10,.14)',
                 'tileShadowHover' => '0 6px 12px rgba(30,26,10,.14), 0 26px 58px rgba(212,175,55,.24)',
                 'tileTitle' => '#1A1A1A', 'tileDesc' => '#6A6350',
                 'cardBg' => 'rgba(255,255,255,.97)', 'cardBorder' => 'rgba(26,26,26,.14)',
@@ -467,34 +491,69 @@ if (!function_exists('themeSkinCatalog')) {
                 'heroBrand' => '#F6E3A4',
             ],
 
-            // ✨ NOUVEL AN — Noir, or, éclat de champagne.
+            // ✨ NOUVEL AN — OR LUMINEUX (retour de Jimmy : le noir faisait « sombre et nul »).
+            //    Champagne éclatant, feux d'artifice dorés. On garde le noir en simple accent.
             'nouvel_an' => [
-                'fx' => ['motes', ['#D4AF37', '#FFFFFF'], 30],
-                'bg' => 'radial-gradient(1000px 560px at 50% -10%, rgba(212,175,55,.24), transparent 60%),'
-                    . 'radial-gradient(800px 600px at 14% 106%, rgba(212,175,55,.10), transparent 64%),'
-                    . 'linear-gradient(172deg,#070604 0%,#14110A 48%,#1E1A10 100%)',
-                'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-opacity='0.10' stroke-width='1'%3E%3Cpath d='M60 20 v50 M35 45 h50'/%3E%3Cpath d='M200 160 v40 M180 180 h40'/%3E%3Cpath d='M130 110 v28 M116 124 h28'/%3E%3C/g%3E%3C/svg%3E\") 0 0/260px 260px",
-                'patternOpacity' => '.6', 'vignette' => 'rgba(0,0,0,.55)',
-                'ink' => '#F2ECDD',
-                'foil' => 'linear-gradient(100deg,#8A6A10 0%,#FFF3C4 28%,#D4AF37 50%,#FFF3C4 72%,#8A6A10 100%)',
-                'tilePaper' => 'linear-gradient(180deg,#FFFDF5 0%,#F5EDD9 100%)',
-                'tileBorder' => 'rgba(212,175,55,.34)',
-                'tileBar' => 'linear-gradient(90deg,#8A6A10,#FFF3C4 50%,#8A6A10)',
-                'tileOrnament' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%231E1A10' stroke-width='2'%3E%3Cpath d='M46 14 v22 M46 56 v22 M14 46 h22 M56 46 h22'/%3E%3Cpath d='M26 26 l14 14 M66 26 l-14 14 M26 66 l14 -14 M66 66 l-14 -14'/%3E%3C/g%3E%3C/svg%3E\")",
-                'ornamentOpacity' => '.12', 'ornamentHover' => '.24',
-                'tileShadow' => '0 2px 4px rgba(0,0,0,.3), 0 16px 40px rgba(0,0,0,.42)',
-                'tileShadowHover' => '0 6px 10px rgba(0,0,0,.32), 0 26px 58px rgba(212,175,55,.3)',
-                'tileTitle' => '#1E1A10', 'tileDesc' => '#6B6350',
-                'cardBg' => 'rgba(255,253,245,.97)', 'cardBorder' => 'rgba(212,175,55,.26)',
-                'cardShadow' => '0 18px 48px rgba(0,0,0,.45)',
-                'btn' => 'linear-gradient(180deg,#D4AF37,#A8871F)', 'btnInk' => '#1E1A10',
-                'doc' => ['paper' => '#FFFDF5', 'paper-deep' => '#F7EFDB', 'line' => '#E7D9B4',
-                    'forest' => '#1E1A10', 'leaf' => '#B8901F', 'moss' => '#8A8064',
+                'fx' => ['motes', ['#B8901F', '#E8C24A', '#FFFFFF'], 34],
+                'bg' => 'radial-gradient(1000px 560px at 50% -10%, rgba(255,240,180,.7), transparent 62%),'
+                    . 'radial-gradient(820px 600px at 12% 106%, rgba(201,151,27,.35), transparent 64%),'
+                    . 'linear-gradient(172deg,#FFF8E2 0%,#F6E4AE 52%,#E9CE7C 100%)',
+                'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%238A6A10' stroke-opacity='0.16' stroke-width='1'%3E%3Cpath d='M60 46 v-26 M60 46 v26 M60 46 h-26 M60 46 h26 M42 28 l36 36 M78 28 l-36 36'/%3E%3Cpath d='M196 180 v-20 M196 180 v20 M196 180 h-20 M196 180 h20'/%3E%3Cpath d='M130 124 v-14 M130 124 v14 M116 124 h28'/%3E%3C/g%3E%3C/svg%3E\") 0 0/260px 260px",
+                'patternOpacity' => '.7', 'vignette' => '',
+                'ink' => '#4A3C12',
+                'foil' => 'linear-gradient(100deg,#6E5208 0%,#C9A227 28%,#8A6A10 50%,#C9A227 72%,#6E5208 100%)',
+                'tilePaper' => 'linear-gradient(180deg,#FFFFFF 0%,#FBF2D8 100%)',
+                'tileBorder' => 'rgba(138,106,16,.32)',
+                'tileBar' => 'linear-gradient(90deg,#1A1A1A,#E8C24A 50%,#1A1A1A)',
+                'tileOrnament' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%238A6A10' stroke-width='2'%3E%3Cpath d='M46 14 v22 M46 56 v22 M14 46 h22 M56 46 h22'/%3E%3Cpath d='M26 26 l14 14 M66 26 l-14 14 M26 66 l14 -14 M66 66 l-14 -14'/%3E%3C/g%3E%3C/svg%3E\")",
+                'ornamentOpacity' => '.2', 'ornamentHover' => '.36',
+                'tileShadow' => '0 2px 4px rgba(90,70,10,.12), 0 16px 40px rgba(90,70,10,.16)',
+                'tileShadowHover' => '0 6px 12px rgba(90,70,10,.16), 0 26px 58px rgba(201,151,27,.34)',
+                'tileTitle' => '#6E5208', 'tileDesc' => '#6B6350',
+                'cardBg' => 'rgba(255,255,255,.97)', 'cardBorder' => 'rgba(138,106,16,.24)',
+                'cardShadow' => '0 18px 46px rgba(90,70,10,.18)',
+                'btn' => 'linear-gradient(180deg,#D4AF37,#A8871F)', 'btnInk' => '#231C05',
+                'doc' => ['paper' => '#FFFCEF', 'paper-deep' => '#F8EFD2', 'line' => '#E7D9AC',
+                    'forest' => '#6E5208', 'leaf' => '#C9A227', 'moss' => '#9A8A5C',
                     'pollen' => '#A8871F', 'pollen-bg' => '#FBF2DA',
-                    'ink' => '#25220F', 'ink-soft' => '#5E5A45'],
-                'heroBg' => 'linear-gradient(155deg,#070604 0%,#1E1A10 52%,#4A3C12 100%)',
-                'heroRule' => 'linear-gradient(90deg,#8A6A10,#FFF3C4 50%,#8A6A10)',
-                'heroBrand' => '#FFF3C4',
+                    'ink' => '#3B3210', 'ink-soft' => '#6B6244'],
+                'heroBg' => 'linear-gradient(155deg,#8A6A10 0%,#C9A227 50%,#F0DC94 100%)',
+                'heroRule' => 'linear-gradient(90deg,#1A1A1A,#FFF3C4 50%,#1A1A1A)',
+                'heroBrand' => '#3B3210',
+            ],
+
+            // 🥞 CRÊPES — « pour le kiff » (Jimmy). Chandeleur : pâte dorée, caramel,
+            //    chocolat, citron. Ambiance cuisine chaleureuse.
+            //    ⚠️ Suppression facile : retirer cette entrée + celle de siteThemeCatalog().
+            'crepes' => [
+                'fx' => ['drift', ['#FFFFFF', '#F6DFA8', '#6B3E1E'], 26], // sucre, pâte, chocolat
+                'bg' => 'radial-gradient(1000px 540px at 22% -8%, rgba(255,232,168,.75), transparent 62%),'
+                    . 'radial-gradient(820px 560px at 86% 6%, rgba(201,138,43,.35), transparent 64%),'
+                    . 'linear-gradient(172deg,#FFF8E8 0%,#F6E3BC 52%,#E9CE96 100%)',
+                // Motif : de petites crêpes rondes, dessinées (pas d'emoji).
+                'pattern' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%237A4A1E' stroke-opacity='0.13' stroke-width='1.4'%3E%3Cellipse cx='60' cy='60' rx='34' ry='12'/%3E%3Cellipse cx='60' cy='54' rx='34' ry='12'/%3E%3Cellipse cx='166' cy='160' rx='30' ry='11'/%3E%3Cellipse cx='166' cy='154' rx='30' ry='11'/%3E%3C/g%3E%3C/svg%3E\") 0 0/220px 220px",
+                'patternOpacity' => '.65', 'vignette' => '',
+                'ink' => '#5A3A18',
+                'foil' => 'linear-gradient(100deg,#7A4A1E 0%,#E8B96A 28%,#C98A2B 50%,#E8B96A 72%,#7A4A1E 100%)',
+                'tilePaper' => 'linear-gradient(180deg,#FFFDF6 0%,#F8E9C9 100%)',
+                'tileBorder' => 'rgba(122,74,30,.28)',
+                'tileBar' => 'linear-gradient(90deg,#7A4A1E,#F0D89A 45%,#C98A2B 60%,#7A4A1E)',
+                // Crêpe dans sa poêle, dessinée.
+                'tileOrnament' => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Cg fill='none' stroke='%237A4A1E' stroke-width='2'%3E%3Cellipse cx='42' cy='56' rx='28' ry='11'/%3E%3Cpath d='M14 56 q28 -16 56 0'/%3E%3Cpath d='M70 54 l18 -8'/%3E%3Cellipse cx='42' cy='46' rx='22' ry='8'/%3E%3C/g%3E%3C/svg%3E\")",
+                'ornamentOpacity' => '.2', 'ornamentHover' => '.38',
+                'tileShadow' => '0 2px 4px rgba(90,58,24,.12), 0 16px 40px rgba(90,58,24,.18)',
+                'tileShadowHover' => '0 6px 12px rgba(90,58,24,.16), 0 26px 58px rgba(201,138,43,.32)',
+                'tileTitle' => '#7A4A1E', 'tileDesc' => '#7A6248',
+                'cardBg' => 'rgba(255,253,246,.97)', 'cardBorder' => 'rgba(122,74,30,.22)',
+                'cardShadow' => '0 18px 46px rgba(90,58,24,.2)',
+                'btn' => 'linear-gradient(180deg,#C98A2B,#98651C)',
+                'doc' => ['paper' => '#FFFBEF', 'paper-deep' => '#F8EAD0', 'line' => '#E7D4AE',
+                    'forest' => '#7A4A1E', 'leaf' => '#C98A2B', 'moss' => '#A08A62',
+                    'pollen' => '#C98A2B', 'pollen-bg' => '#FBF0D8',
+                    'ink' => '#4A3418', 'ink-soft' => '#7A6248'],
+                'heroBg' => 'linear-gradient(155deg,#5A3312 0%,#9E6521 50%,#D9A05B 100%)',
+                'heroRule' => 'linear-gradient(90deg,#7A4A1E,#F0D89A 50%,#C98A2B)',
+                'heroBrand' => '#F6DFA8',
             ],
         ];
     }
