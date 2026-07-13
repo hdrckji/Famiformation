@@ -84,11 +84,17 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     body.editing [contenteditable]:hover { box-shadow:0 0 0 2px #e2ebe1; }
     body.editing [contenteditable]:focus { box-shadow:0 0 0 2px var(--leaf); background:#fff; }
     /* Verrou d'édition : outils et boutons cachés tant qu'on n'a pas cliqué « Modifier ». */
-    .ve-tools, .ve-add, .ve-del, .fix { display:none; }
+    .ve-tools, .ve-add, .ve-del { display:none; }
+    /* Les DOUTES de l'IA sont visibles MÊME en lecture : on doit les voir AVANT de valider.
+       Seuls les boutons Appliquer/Ignorer demandent le mode « Modifier ». */
+    .fix { display:block; }
+    .fix button { display:none; }
+    body.editing .fix button { display:inline-block; }
+    .fix .lockhint { display:block; color:#8a5a00; font-size:.8rem; font-weight:700; margin-top:2px; }
+    body.editing .fix .lockhint { display:none; }
     body.editing .ve-tools { display:flex; }
     body.editing .ve-add { display:inline-block; }
     body.editing .ve-del { display:inline; }
-    body.editing .fix { display:block; }
     body.editing .intro::after { content:" — mode édition ACTIF"; color:#8a5a00; font-weight:700; }
     /* Barre de mise en forme (gras / couleur) + barre d'ajout de bloc + contrôles par bloc. */
     .ve-format, .ve-addbar, .ve-ctrl { display:none; }
@@ -169,6 +175,17 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
     </div>
 
     <div class="intro"><b>Clique sur « ✏️ Modifier »</b> pour éditer. Ensuite : clique un texte pour le corriger, sélectionne des mots pour les mettre en <b>gras</b> ou en <b style="color:#c0392b;">couleur</b>, ajoute des blocs en bas, déplace/supprime‑les. Puis <b>Valider</b>.</div>
+    <?php
+        // Nombre de doutes de l'IA dans ce guide (visibles même en lecture, cf. CSS .fix).
+        $nbDoutes = 0;
+        foreach ($blocks as $b_) { if (is_array($b_) && trim((string) ($b_['fix'] ?? '')) !== '') { $nbDoutes++; } }
+    ?>
+    <?php if ($nbDoutes > 0): ?>
+    <div class="intro" style="background:#fdecec; border:2px solid #f3b4b4; color:#c0392b; font-weight:700;">
+        ⚠ <?= (int) $nbDoutes ?> <?= $nbDoutes > 1 ? 'doutes signalés' : 'doute signalé' ?> par l'IA dans ce guide — ils sont surlignés en rouge ci-dessous.
+        <span style="font-weight:400;">Vérifiez-les <strong>avant de valider</strong> : cliquez sur « ✏️ Modifier » pour appliquer ou ignorer chaque correction.</span>
+    </div>
+    <?php endif; ?>
     <?php if ($lang === 'nl'): ?>
     <div class="intro" style="background:#fff3e0; border:1px solid #f0d089; color:#8a5a00;">
         🇳🇱 <b>Version néerlandaise.</b> Tu corriges ici la traduction. <?php if ($nlFromFr): ?><b>Elle n'était pas encore générée : tu pars du texte français comme base.</b> <?php endif; ?>
@@ -219,6 +236,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
                     <div class="sug"><?= _veInline($b['fix']) ?></div>
                     <button type="button" class="ap" onclick="veApplyFix(this,'text')">✓ Appliquer</button>
                     <button type="button" class="ig" onclick="veIgnoreFix(this)">✗ Ignorer</button>
+                    <span class="lockhint">→ Cliquez sur « ✏️ Modifier » en haut pour appliquer ou ignorer.</span>
                 </div>
                 <?php endif; ?>
             </div>
@@ -262,6 +280,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
                         <div class="sug"><?= _veInline($b['fix']) ?></div>
                         <button type="button" class="ap" onclick="veApplyFix(this,'callout')">✓ Appliquer</button>
                         <button type="button" class="ig" onclick="veIgnoreFix(this)">✗ Ignorer</button>
+                    <span class="lockhint">→ Cliquez sur « ✏️ Modifier » en haut pour appliquer ou ignorer.</span>
                     </div>
                     <?php endif; ?>
                 </div>

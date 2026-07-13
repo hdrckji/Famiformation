@@ -554,15 +554,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                // AUTONOMIE BILINGUE : dès qu'un contenu FR est enregistré, on traduit le NL
-                // (guide + quiz + titre) EN DIRECT, à la validation. On paie l'attente ICI, une
-                // fois, pour que l'ouverture du guide/quiz en néerlandais soit ensuite INSTANTANÉE
-                // (et sans dépendre d'un worker de fond, qui n'est pas fiable).
+                // BILINGUE : on NE traduit PAS le guide/quiz ICI. L'import fait déjà beaucoup
+                // (uniformisation IA + sous-titres + quiz) : y ajouter la traduction complète
+                // faisait dépasser le délai de la requête (erreur affichée alors que tout était
+                // pourtant enregistré). La traduction NL du guide + quiz se fait à la VALIDATION
+                // DE LA RELECTURE (module_review), qui est une requête courte et dédiée.
+                // Ici on ne traduit que le titre/description du module : 1 appel très court.
                 @set_time_limit(0);
-                if ($guideChildId) {
-                    nlSyncModule($db, (int) $guideChildId, true);
-                }
-                nlSyncModule($db, (int) $id, true); // le module parent (titre/description)
+                nlSyncModule($db, (int) $id, true); // module parent : titre/description seulement
 
                 $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;
