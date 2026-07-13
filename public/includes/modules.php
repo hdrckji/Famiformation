@@ -858,6 +858,84 @@ if (!function_exists('ensureModulesTable')) {
     /**
      * Récupère un module par son id.
      */
+    /**
+     * TOUTES les clés de fichiers d'un module stockées sur le volume.
+     * Sert au NETTOYAGE : supprimer un module doit supprimer TOUT ce qui lui est lié,
+     * sinon le stockage se remplit de fichiers orphelins (qu'on paie).
+     *
+     * Attention aux deux pièges :
+     *  - les SOUS-TITRES (.vtt FR/NL + le .srt source) sont sur le volume ;
+     *  - les IMAGES AJOUTÉES DANS L'ÉDITEUR ne sont PAS dans contenu_images :
+     *    elles vivent dans les blocs (type image, champ "src").
+     */
+    function famiModuleFileKeys(array $r)
+    {
+        $keys = [];
+        foreach (['pdf_path', 'video_path', 'video_src_path', 'sub_fr_path', 'sub_nl_path', 'sub_src_path', 'icon_image'] as $col) {
+            $v = trim((string) ($r[$col] ?? ''));
+            if ($v !== '') { $keys[] = $v; }
+        }
+        // Images extraites du PDF.
+        $imgs = json_decode((string) ($r['contenu_images'] ?? '[]'), true);
+        if (is_array($imgs)) {
+            foreach ($imgs as $k) { if (is_string($k) && trim($k) !== '') { $keys[] = trim($k); } }
+        }
+        // Images importées depuis l'éditeur visuel (bloc image -> "src").
+        foreach (['contenu_ia', 'contenu_ia_nl'] as $col) {
+            $d = json_decode((string) ($r[$col] ?? ''), true);
+            if (!is_array($d)) { continue; }
+            $blocks = (isset($d['blocks']) && is_array($d['blocks'])) ? $d['blocks'] : $d;
+            if (!is_array($blocks)) { continue; }
+            foreach ($blocks as $b) {
+                if (is_array($b) && ($b['type'] ?? '') === 'image') {
+                    $s = trim((string) ($b['src'] ?? ''));
+                    if ($s !== '') { $keys[] = $s; }
+                }
+            }
+        }
+        return array_values(array_unique($keys));
+    }
+
+    /** Efface une clé de fichier, qu'elle soit sur le volume ou dans l'ancien uploads/ local. */
+    function famiUnlinkStorageKey($key)
+    {
+        $key = trim((string) $key);
+        if ($key === '') { return; }
+        // Ancien stockage local (icônes) : chemin relatif à public/.
+        if (strpos($key, 'uploads/') === 0) {
+            $abs = realpath(__DIR__ . '/../' . $key);
+            $root = realpath(__DIR__ . '/../uploads');
+            if ($abs !== false && $root !== false && strpos($abs, $root) === 0 && is_file($abs)) { @unlink($abs); }
+            return;
+        }
+        // Volume persistant.
+        $base = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/../uploads');
+        $abs = realpath($base . '/' . $key);
+        $root = realpath($base);
+        if ($abs !== false && $root !== false && strpos($abs, $root) === 0 && is_file($abs)) { @unlink($abs); }
+    }
+
+    /** Supprime du stockage TOUS les fichiers des modules donnés (avant DELETE en base). */
+    function famiPurgeModulesStorage(PDO $db, array $ids)
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), function ($n) { return $n > 0; }));
+        if (empty($ids)) { return 0; }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $n = 0;
+        try {
+            $st = $db->prepare("SELECT pdf_path, video_path, video_src_path, sub_fr_path, sub_nl_path, sub_src_path,
+                                       icon_image, contenu_images, contenu_ia, contenu_ia_nl
+                                FROM modules WHERE id IN ($ph)");
+            $st->execute($ids);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                foreach (famiModuleFileKeys($row) as $k) { famiUnlinkStorageKey($k); $n++; }
+            }
+        } catch (Exception $e) {
+            // Colonnes manquantes sur une vieille base : on ne bloque pas la suppression.
+        }
+        return $n;
+    }
+
     function getModuleById(PDO $db, $id)
     {
         ensureModulesTable($db);

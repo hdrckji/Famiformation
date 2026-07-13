@@ -455,6 +455,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $vidChildId = (int) $vid['id'];
                         // a_evaluer aussi sur la vidéo : permet de générer le quiz depuis la
                         // transcription même s'il n'y a PAS de guide (module vidéo seule).
+                        // REMPLACEMENT de la vidéo (ou nouveau .srt) : les anciens sous-titres ne
+                        // correspondent plus → on les efface du stockage, sinon ils restent
+                        // orphelins sur le volume (et on les paie).
+                        if ($newVideoRaw !== null || $srtSrc !== false) {
+                            try {
+                                $os = $db->prepare("SELECT sub_fr_path, sub_nl_path, sub_src_path FROM modules WHERE id = ? LIMIT 1");
+                                $os->execute([$vidChildId]);
+                                if ($orow = $os->fetch(PDO::FETCH_ASSOC)) {
+                                    foreach (['sub_fr_path', 'sub_nl_path', 'sub_src_path'] as $sc) {
+                                        if (!empty($orow[$sc])) { volumeUnlink((string) $orow[$sc]); }
+                                    }
+                                }
+                                $db->prepare("UPDATE modules SET sub_fr_path = NULL, sub_nl_path = NULL, transcript = NULL, sub_status = NULL WHERE id = ?")
+                                   ->execute([$vidChildId]);
+                            } catch (Exception $e) { /* colonnes absentes : sans gravité */ }
+                        }
                         $db->prepare("UPDATE modules SET video_path = ?, video_status = ?, video_src_path = ?, pdf_path = NULL, a_evaluer = ?, contenu_by = COALESCE(contenu_by, ?) WHERE id = ?")
                            ->execute([$videoPath, $videoStatus, $videoSrc, $aEvaluer, $contenuBy, $vidChildId]);
                     } else {
@@ -649,26 +665,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $toDelete = array_values(array_unique($toDelete));
                     $ph = implode(',', array_fill(0, count($toDelete), '?'));
 
-                    // Nettoyage du VOLUME : on efface les fichiers (PDF, vidéos, sources, images
-                    // extraites) des modules supprimés — aucun intérêt à les garder.
-                    try {
-                        $fbase = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/uploads');
-                        $fbaseReal = realpath($fbase);
-                        $fst = $db->prepare("SELECT pdf_path, video_path, video_src_path, contenu_images FROM modules WHERE id IN ($ph)");
-                        $fst->execute($toDelete);
-                        foreach ($fst->fetchAll(PDO::FETCH_ASSOC) as $fr) {
-                            $keys = [];
-                            foreach (['pdf_path', 'video_path', 'video_src_path'] as $col) {
-                                if (!empty($fr[$col])) { $keys[] = (string) $fr[$col]; }
-                            }
-                            $imgs = json_decode((string) ($fr['contenu_images'] ?? '[]'), true);
-                            if (is_array($imgs)) { foreach ($imgs as $ik) { if (is_string($ik) && $ik !== '') { $keys[] = $ik; } } }
-                            foreach ($keys as $k) {
-                                $abs = realpath($fbase . '/' . $k);
-                                if ($abs !== false && $fbaseReal !== false && strpos($abs, $fbaseReal) === 0 && is_file($abs)) { @unlink($abs); }
-                            }
-                        }
-                    } catch (Exception $e) { /* nettoyage non bloquant */ }
+                    // Nettoyage du STOCKAGE : supprimer un module supprime TOUT ce qui lui est lié
+                    // (PDF, vidéo + source, SOUS-TITRES .vtt FR/NL et .srt, images du PDF, images
+                    // ajoutées dans l'éditeur, icône). Rien ne doit rester à traîner : on le paie.
+                    famiPurgeModulesStorage($db, $toDelete);
 
                     $db->prepare("DELETE FROM modules WHERE id IN ($ph)")->execute($toDelete);
                     storageRecordSample($db); // le volume a changé → point d'historique (pro rata)
