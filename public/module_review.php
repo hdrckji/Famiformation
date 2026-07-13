@@ -148,7 +148,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
             }
         }
 
-        spawnNlSync($id); // le FR (corrigé) + le quiz éventuel → on régénère le NL en tâche de fond
+        @set_time_limit(0);
+        nlSyncModule($db, $id, true); // FR corrigé + quiz éventuel → NL traduit EN DIRECT (prêt tout de suite)
         $_SESSION['module_flash'] = ($proofed ? "✅ Contenu relu, orthographe vérifiée et enregistré." : "✅ Contenu relu et enregistré.") . $quizMsg . " 🌐 La version néerlandaise se met à jour.";
         header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
         exit();
@@ -214,7 +215,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     $clean = function_exists('aiSanitizeBlocks') ? aiSanitizeBlocks($blocks) : $blocks;
     $json = json_encode(['blocks' => $clean], JSON_UNESCAPED_UNICODE);
     $db->prepare("UPDATE modules SET contenu_ia = ?, uniformized = 1 WHERE id = ?")->execute([$json, $id]);
-    spawnNlSync($id); // le FR a changé → on régénère le NL en tâche de fond
+    @set_time_limit(0);
+    nlSyncModule($db, $id, true); // le FR a changé → NL traduit EN DIRECT
     $_SESSION['module_flash'] = "✅ Contenu relu et enregistré. 🌐 La version néerlandaise se met à jour.";
     header('Location: ' . (!empty($module['quiz_json']) ? 'module_quiz.php?id=' . $id : 'module.php?id=' . $id));
     exit();

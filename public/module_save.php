@@ -223,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $newId, 'Nouveau module proposé : ' . $nom);
                 $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé — en attente de validation par un admin.";
             }
-            if (function_exists('spawnNlSync')) { spawnNlSync($newId); } // titre/description → NL auto (Claude, fond)
+            if (function_exists('nlSyncModule')) { @set_time_limit(0); nlSyncModule($db, $newId, true); } // titre/description → NL en direct
         }
 
         if ($parentId) {
@@ -261,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $iconImage,
                     $id,
                 ]);
-                if (function_exists('spawnNlSync')) { spawnNlSync((int) $id); } // titre/description → NL auto (Claude, fond)
+                if (function_exists('nlSyncModule')) { @set_time_limit(0); nlSyncModule($db, (int) $id, true); } // titre/description → NL en direct
                 $_SESSION['module_flash'] = "✅ Module « " . $nom . " » modifié. 🌐 Version néerlandaise mise à jour.";
             }
         } else {
@@ -530,13 +530,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
 
-                // AUTONOMIE BILINGUE : dès qu'un contenu FR est enregistré, on régénère le NL
-                // (guide + quiz + titre) EN TÂCHE DE FOND. L'utilisateur n'attend pas ; si la
-                // traduction échoue, le FR reste affiché et l'admin peut relancer à la main.
+                // AUTONOMIE BILINGUE : dès qu'un contenu FR est enregistré, on traduit le NL
+                // (guide + quiz + titre) EN DIRECT, à la validation. On paie l'attente ICI, une
+                // fois, pour que l'ouverture du guide/quiz en néerlandais soit ensuite INSTANTANÉE
+                // (et sans dépendre d'un worker de fond, qui n'est pas fiable).
+                @set_time_limit(0);
                 if ($guideChildId) {
-                    spawnNlSync((int) $guideChildId);
+                    nlSyncModule($db, (int) $guideChildId, true);
                 }
-                spawnNlSync((int) $id); // le module parent (titre/description)
+                nlSyncModule($db, (int) $id, true); // le module parent (titre/description)
 
                 $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;

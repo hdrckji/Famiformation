@@ -75,7 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         if ($pr['ok'] && trim((string) $pr['json']) !== '') { $json = $pr['json']; }
     }
     $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$json, $id]);
-    spawnNlSync($id); // le quiz FR (corrigé) a changé → on régénère le quiz NL en tâche de fond
+    @set_time_limit(0);
+    nlSyncModule($db, $id, true); // quiz FR corrigé → quiz NL traduit EN DIRECT (prêt tout de suite)
     $_SESSION['module_flash'] = $questions ? ("✅ Quiz enregistré (" . count($questions) . " question" . (count($questions) > 1 ? 's' : '') . "). 🌐 La version néerlandaise se met à jour.") : "✅ Quiz vidé.";
     header('Location: module.php?id=' . $id);
     exit();
