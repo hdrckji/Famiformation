@@ -526,7 +526,9 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             <div class="dz-file" hidden></div>
                         </div>
                         <script>
-                        // Raccourci caché : taper « srt » (hors champ de saisie) révèle la zone de dépôt.
+                        // Raccourci caché : taper « srt » (hors champ de saisie) ouvre la zone de dépôt.
+                        // Le retaper la referme — et vide le fichier choisi, pour ne jamais envoyer
+                        // en douce un .srt que l'on ne voit plus à l'écran.
                         (function () {
                             var dz = document.getElementById('dz_srt');
                             if (!dz) { return; }
@@ -537,13 +539,22 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                                 if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) { return; }
                                 if (!e.key || e.key.length !== 1) { return; }
                                 buf = (buf + e.key.toLowerCase()).slice(-3);
-                                if (buf === 'srt' && dz.hidden) {
+                                if (buf !== 'srt') { return; }
+                                buf = '';
+
+                                if (dz.hidden) {
                                     dz.hidden = false;
                                     dz.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                                     dz.animate(
                                         [{ boxShadow: '0 0 0 0 rgba(62,142,78,.6)' }, { boxShadow: '0 0 0 12px rgba(62,142,78,0)' }],
                                         { duration: 700, iterations: 2 }
                                     );
+                                } else {
+                                    var inp = dz.querySelector('.dz-input');
+                                    if (inp) { inp.value = ''; }
+                                    var shown = dz.querySelector('.dz-file');
+                                    if (shown) { shown.hidden = true; shown.textContent = ''; }
+                                    dz.hidden = true;
                                 }
                             });
                         }());
