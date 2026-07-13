@@ -346,10 +346,20 @@ if (!function_exists('famiInjectPageTheme')) {
                 . '<a href="' . htmlspecialchars($pvPath . '?theme=off', ENT_QUOTES) . '" style="background:#fff; color:#1f1f1f; text-decoration:none; border-radius:999px; padding:5px 14px; font-weight:800;">↩ Revenir à la normale</a>'
                 . '</div><div style="height:38px;"></div>';
         }
-        // Fond de page : le fond du thème si un thème événementiel est actif,
-        // SINON le fond vectoriel par défaut (net, pas de photo floue).
+        // Fond de page :
+        //  1) un HABILLAGE complet si l'événement en a un (direction artistique :
+        //     fond composé, ornements SVG, tuiles retravaillées, guide habillé) ;
+        //  2) sinon le simple fond de couleur du thème (ancien comportement) ;
+        //  3) sinon le fond vectoriel par défaut.
         $th = $GLOBALS['__fami_page_theme'] ?? null;
-        if (is_array($th) && ($th['page_bg'] ?? '') !== '') {
+        $skin = null;
+        if (is_array($th) && !empty($th['key'])) {
+            require_once __DIR__ . '/theme_skins.php';
+            $skin = themeSkin((string) $th['key']);
+        }
+        if ($skin !== null) {
+            $inject .= '<style id="fami-skin">' . $skin['css'] . '</style>' . $skin['decor'];
+        } elseif (is_array($th) && ($th['page_bg'] ?? '') !== '') {
             $inject .= renderPageThemeBackground($th);
         } else {
             $inject .= '<style id="fami-vec-bg">' . famiDefaultVectorBg() . '</style>';
@@ -366,6 +376,16 @@ if (!function_exists('renderSiteTheme')) {
      *  $withEffects=false : garde le fond/couleurs du thème mais SANS les particules animées. */
     function renderSiteTheme(array $theme, $withEffects = true)
     {
+        // Si l'événement a un HABILLAGE, il apporte déjà son ambiance (poussière d'or,
+        // confettis géométriques…). On coupe alors la pluie d'emojis d'origine : les
+        // deux ensemble feraient surchargé, et c'est précisément l'effet « bidon »
+        // qu'on cherche à supprimer.
+        if (!empty($theme['key'])) {
+            require_once __DIR__ . '/theme_skins.php';
+            if (themeSkin((string) $theme['key']) !== null) {
+                $withEffects = false;
+            }
+        }
         $accent = $theme['accent'];
         $accent2 = $theme['accent2'] ?? $accent;
         $lang = function_exists('currentLang') ? currentLang() : 'fr';
