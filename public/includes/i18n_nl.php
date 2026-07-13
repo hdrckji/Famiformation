@@ -724,14 +724,26 @@ if (!function_exists('famiFinalValidation')) {
         }
 
         // 4) PUBLICATION : jusqu'ici le contenu était caché car non validé.
+        //    Un ADMIN publie directement (il est lui-même le contrôle) ; un non-admin
+        //    (teamcoach…) part en file d'attente : ses contenus sont examinés par un admin.
         $pid = (int) ($m['parent_id'] ?? 0);
+        require_once __DIR__ . '/events.php';
         if ($isAdmin && $pid > 0) {
-            require_once __DIR__ . '/events.php';
             if (function_exists('publishSubmission')) {
                 publishSubmission($db, $pid, (int) $actorId);
                 $msg .= ' ✅ Contenu publié — il est maintenant visible.';
             }
         } else {
+            // On prévient les admins MAINTENANT (le contenu est enfin complet et prêt à être examiné).
+            if ($pid > 0 && function_exists('logEvent')) {
+                $nom = '';
+                try {
+                    $ns = $db->prepare("SELECT nom FROM modules WHERE id = ?");
+                    $ns->execute([$pid]);
+                    $nom = (string) $ns->fetchColumn();
+                } catch (Exception $e) { /* non bloquant */ }
+                logEvent($db, 'content_submitted', (int) $actorId, $pid, 'Contenu à examiner : ' . $nom);
+            }
             $msg .= ' ⏳ En attente de validation par un admin (contenu encore caché).';
         }
 

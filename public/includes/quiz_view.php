@@ -6,12 +6,62 @@
 // Additif : autonome.
 // ============================================================
 
-if (!function_exists('renderQuizForm')) {
-    function renderQuizForm($quiz, $moduleId)
+if (!function_exists('quizPickRandom')) {
+    /**
+     * TIRAGE ALÉATOIRE des questions posées à l'apprenant.
+     * La banque contient jusqu'à 75 questions, mais on n'en pose que 10 :
+     * 7 à réponses MULTIPLES + 3 à réponse UNIQUE, tirées au hasard.
+     * Chaque passage est donc différent (et on ne peut pas apprendre le quiz par cœur).
+     *
+     * @return int[] indices (dans la banque) des questions retenues, dans un ordre aléatoire
+     */
+    function quizPickRandom(array $qs, $nMul = 7, $nSin = 3)
     {
-        $qs = (isset($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
+        $mul = [];
+        $sin = [];
+        foreach ($qs as $i => $q) {
+            if ((($q['type'] ?? 'single') === 'multiple')) { $mul[] = $i; } else { $sin[] = $i; }
+        }
+        shuffle($mul);
+        shuffle($sin);
+        $pickM = array_slice($mul, 0, max(0, (int) $nMul));
+        $pickS = array_slice($sin, 0, max(0, (int) $nSin));
+
+        // Si la banque manque d'un type, on complète avec l'autre pour garder le total de 10.
+        $need = ((int) $nMul + (int) $nSin) - count($pickM) - count($pickS);
+        if ($need > 0) {
+            $rest = array_merge(array_slice($mul, count($pickM)), array_slice($sin, count($pickS)));
+            shuffle($rest);
+            $pickM = array_merge($pickM, array_slice($rest, 0, $need));
+        }
+
+        $sel = array_merge($pickM, $pickS);
+        shuffle($sel); // ordre d'affichage aléatoire aussi
+        return array_values($sel);
+    }
+}
+
+if (!function_exists('renderQuizForm')) {
+    /** @param int[]|null $sel indices des questions à poser (null = toutes) */
+    function renderQuizForm($quiz, $moduleId, $sel = null)
+    {
+        $all = (isset($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
+        if (empty($all)) { return; }
+
+        // On ne pose que les questions tirées au sort ; les indices restent ceux de la banque
+        // (quiz_check.php corrige sur ces indices — les bonnes réponses ne sortent jamais du serveur).
+        $qs = [];
+        if (is_array($sel) && !empty($sel)) {
+            foreach ($sel as $i) {
+                $i = (int) $i;
+                if (isset($all[$i])) { $qs[$i] = $all[$i]; }
+            }
+        } else {
+            $qs = $all;
+        }
         if (empty($qs)) { return; }
         $n = count($qs);
+        $num = 0;
         ?>
         <style>
         .qz-wrap { width:92%; max-width:1040px; margin:6px auto 44px; background:#fff; border-radius:16px; box-shadow:0 12px 34px rgba(0,0,0,.14); padding:30px clamp(18px,5vw,54px); }
@@ -34,9 +84,10 @@ if (!function_exists('renderQuizForm')) {
             <form method="POST" action="quiz_check.php" class="qz-form">
                 <?= csrfField() ?>
                 <input type="hidden" name="module_id" value="<?= (int) $moduleId ?>">
-                <?php foreach ($qs as $i => $q): $multi = (($q['type'] ?? 'single') === 'multiple'); ?>
+                <?php foreach ($qs as $i => $q): $multi = (($q['type'] ?? 'single') === 'multiple'); $num++; ?>
+                    <input type="hidden" name="sel[]" value="<?= (int) $i ?>">
                     <div class="qz-q">
-                        <div class="qz-qh"><?= ($i + 1) ?>. <?= htmlspecialchars((string) $q['q']) ?><?php if ($multi): ?><span class="qz-multi">plusieurs réponses</span><?php endif; ?></div>
+                        <div class="qz-qh"><?= (int) $num ?>. <?= htmlspecialchars((string) $q['q']) ?><?php if ($multi): ?><span class="qz-multi">plusieurs réponses</span><?php endif; ?></div>
                         <?php foreach (($q['options'] ?? []) as $j => $opt): ?>
                             <label class="qz-opt">
                                 <input type="<?= $multi ? 'checkbox' : 'radio' ?>" name="a[<?= (int) $i ?>]<?= $multi ? '[]' : '' ?>" value="<?= (int) $j ?>">

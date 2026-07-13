@@ -6,6 +6,7 @@
 require_once 'config.php';
 verifierConnexion($db);
 require_once 'includes/modules.php';
+require_once 'includes/i18n_nl.php'; // moduleQuizJson() : énoncés dans la langue de l'utilisateur
 
 $id = (int) ($_POST['module_id'] ?? 0);
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $id <= 0) {
@@ -26,21 +27,37 @@ if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($modul
     exit();
 }
 
+// On corrige TOUJOURS sur la banque d'origine (les bonnes réponses ne sortent
+// jamais du serveur) ; on affiche les énoncés dans la langue de l'utilisateur
+// (les indices de `correct` sont identiques en FR et en NL).
 $quiz = json_decode((string) $module['quiz_json'], true);
 $qs = (isset($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
+
+$quizLbl = function_exists('moduleQuizJson') ? json_decode((string) moduleQuizJson($module), true) : null;
+$qsLbl = (isset($quizLbl['questions']) && is_array($quizLbl['questions'])) ? $quizLbl['questions'] : $qs;
+
 $answers = $_POST['a'] ?? [];
 
-$total = count($qs);
+// Seules les questions RÉELLEMENT posées (tirage aléatoire de 10) sont notées.
+// Sans `sel` (ancien lien / quiz complet), on corrige tout : rétrocompatible.
+$sel = is_array($_POST['sel'] ?? null)
+    ? array_values(array_unique(array_map('intval', $_POST['sel'])))
+    : array_keys($qs);
+$sel = array_values(array_filter($sel, function ($i) use ($qs) { return isset($qs[$i]); }));
+if (empty($sel)) { $sel = array_keys($qs); }
+
+$total = count($sel);
 $score = 0;
 $results = [];
-foreach ($qs as $i => $q) {
+foreach ($sel as $i) {
+    $q = $qs[$i];
     $ua = array_values(array_unique(array_map('intval', (array) ($answers[$i] ?? []))));
     sort($ua);
     $cor = array_values(array_map('intval', (array) ($q['correct'] ?? [])));
     sort($cor);
     $ok = ($ua === $cor);
     if ($ok) { $score++; }
-    $results[] = ['q' => $q, 'ua' => $ua, 'cor' => $cor, 'ok' => $ok];
+    $results[] = ['q' => (isset($qsLbl[$i]) ? $qsLbl[$i] : $q) + $q, 'ua' => $ua, 'cor' => $cor, 'ok' => $ok];
 }
 $pct = $total > 0 ? round($score * 100 / $total) : 0;
 ?>

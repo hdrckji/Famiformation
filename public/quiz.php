@@ -23,6 +23,11 @@ if (!$isAdmin && function_exists('userCanSeeModule') && !userCanSeeModule($modul
 // `correct` ni à `type`) → quiz_check.php peut continuer à corriger sur le FR.
 $quiz = json_decode((string) moduleQuizJson($module), true);
 $backId = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) $id;
+
+// TIRAGE : la banque compte jusqu'à 75 questions, on n'en pose que 10
+// (7 à réponses multiples + 3 à réponse unique), tirées au hasard à chaque passage.
+$allQs = (isset($quiz['questions']) && is_array($quiz['questions'])) ? $quiz['questions'] : [];
+$sel = quizPickRandom($allQs, 7, 3);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -43,6 +48,6 @@ $backId = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) $id;
 <body>
     <div class="topbar"><a href="module.php?id=<?= (int) $backId ?>" class="back-link">⬅ <?= t('Retour', 'Terug') ?></a></div>
     <div class="qhead"><h1>📝 <?= htmlspecialchars(moduleNom($module)) ?></h1></div>
-    <?php renderQuizForm($quiz, (int) $id); ?>
+    <?php renderQuizForm($quiz, (int) $id, $sel); ?>
 </body>
 </html>
