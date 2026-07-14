@@ -113,12 +113,10 @@ $evIcon = function ($t) {
 </style>
 </head>
 <body>
-<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
-    <div class="topbar">
-        <a href="index.php">⬅ <?= t('Accueil', 'Start') ?></a>
-        <strong>🔔 <?= t('Notifications', 'Meldingen') ?></strong>
-        <span></span>
-    </div>
+<?php
+    require_once __DIR__ . '/includes/topbar.php';
+    famiTopbar($db, ['back' => 'index.php', 'title' => '🔔 ' . t('Notifications', 'Meldingen')]);
+?>
     <div class="wrap">
         <?php if ($flash): ?><div class="flash"><?= htmlspecialchars($flash) ?></div><?php endif; ?>
 

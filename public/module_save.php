@@ -602,6 +602,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // mais il n'encombre PAS la file « à contrôler » ni les notifications.
                 $subStatus = $isAdminActor ? 'draft' : 'pending';
                 $subIds = array_values(array_filter([(int) $guideChildId, (int) $vidChildId]));
+
+                // VIDÉO SEULE : il n'y a AUCUN guide à relire, donc rien ne déclencherait jamais la
+                // validation finale — la vidéo serait restée cachée à vie (bug constaté). On la
+                // publie donc tout de suite pour un admin ; un contributeur, lui, passe en attente.
+                $videoOnly = ($vidChildId && !$guideChildId && trim((string) ($module['contenu_ia'] ?? '')) === '');
+                if ($videoOnly && $isAdminActor) {
+                    try { $db->prepare("UPDATE modules SET is_active = 1, content_status = 'published' WHERE id = ?")->execute([(int) $vidChildId]); } catch (Exception $e) {}
+                    $subIds = [];
+                    $structMsg .= " ✅ Vidéo publiée (aucun guide à relire).";
+                }
+
                 if ($subIds) {
                     $ph = implode(',', array_fill(0, count($subIds), '?'));
                     try { $db->prepare("UPDATE modules SET is_active = 0, content_status = ? WHERE id IN ($ph)")->execute(array_merge([$subStatus], $subIds)); } catch (Exception $e) {}

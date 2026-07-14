@@ -102,7 +102,10 @@ if (getCurrentRole() === 'etudiant' && !hasUnlockedOnboarding(getCurrentUserId()
     </style>
 </head>
 <body>
-<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
+<?php
+    require_once __DIR__ . '/includes/topbar.php';
+    famiTopbar($db, ['back' => 'index.php', 'title' => 'Onboarding']);
+?>
 
     <div class="header">
         <img src="logo.png" alt="FamiFormation" class="logo">
@@ -123,7 +126,6 @@ if (getCurrentRole() === 'etudiant' && !hasUnlockedOnboarding(getCurrentUserId()
         </a>
     </div>
 
-    <a href="index.php" class="back-link">← <?= t("Retour à l'accueil", 'Terug naar de startpagina') ?></a>
 
 </body>
 </html>

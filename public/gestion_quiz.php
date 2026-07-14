@@ -84,12 +84,10 @@ usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); }
 </style>
 </head>
 <body>
-<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
-    <div class="topbar">
-        <a href="index.php">⬅ Accueil</a>
-        <strong style="color:#1E4D2B;">🧩 Gestion Quiz</strong>
-        <span></span>
-    </div>
+<?php
+    require_once __DIR__ . '/includes/topbar.php';
+    famiTopbar($db, ['back' => 'index.php', 'title' => '🧩 Gestion Quiz']);
+?>
     <div class="wrap">
         <?php if ($flash): ?><div class="flash"><?= htmlspecialchars($flash) ?></div><?php endif; ?>
         <h1>Tous les quiz</h1>

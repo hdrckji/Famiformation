@@ -147,8 +147,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .lang-btn:hover { background:#fff; } .lang-btn.active:hover { background:#357a44; }
     </style>
 </head>
-<body class="<?= $emptyContentFocus ? 'fami-empty-content' : '' ?>
-<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>">
+<body class="<?= $emptyContentFocus ? 'fami-empty-content' : '' ?>">
     <?= apercuBanner($db) ?>
     <?php
         require_once __DIR__ . '/includes/pdf_access.php';
@@ -163,8 +162,14 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         $uniVideoUrl = $uniHasVideo ? moduleFileUrl($module['video_path']) : '';
         $canDlVideo = $uniHasVideo && function_exists('videoCanDownload') && videoCanDownload($db, $uniRole, !empty($isAdmin));
     ?>
+    <?php
+        require_once __DIR__ . '/includes/topbar.php';
+        famiTopbar($db, [
+            'back'  => !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php',
+            'title' => moduleNom($module),
+        ]);
+    ?>
     <div class="topbar">
-        <a href="<?= !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php' ?>" class="back-link">⬅ <?= t('Retour', 'Terug') ?></a>
         <div style="display:flex; align-items:center; gap:10px;">
             <?php if ($canViewPdf || $canDlPdf || $canDlVideo): ?>
                 <div class="uni-actions">

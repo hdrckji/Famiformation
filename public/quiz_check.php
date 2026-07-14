@@ -89,9 +89,11 @@ $pct = $total > 0 ? round($score * 100 / $total) : 0;
     </style>
 </head>
 <body>
-<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
+<?php
+    require_once __DIR__ . '/includes/topbar.php';
+    famiTopbar($db, ['back' => 'module.php?id=' . (int) $id, 'title' => t('Résultat du quiz', 'Resultaat van de quiz')]);
+?>
 <div class="container">
-    <a class="back" href="module.php?id=<?= (int) $id ?>">⬅ <?= t('Retour au module', 'Terug naar de module') ?></a>
     <div class="scorecard">
         <div class="score-big"><?= (int) $score ?> / <?= (int) $total ?></div>
         <div style="color:#5a6b60; font-weight:700; margin-top:4px;"><?= (int) $pct ?>% <?= t('de bonnes réponses', 'juiste antwoorden') ?></div>

@@ -54,7 +54,10 @@ function formatNom($u) {
     </style>
 </head>
 <body>
-<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
+<?php
+    require_once __DIR__ . '/includes/topbar.php';
+    famiTopbar($db, ['back' => 'index.php', 'title' => '🏆 ' . t('Classement', 'Klassement')]);
+?>
     <div class="container">
         <h1>🏆 <?= t('Classement FamiFlora', 'FamiFlora-klassement') ?></h1>
         <p class="subtitle"><?= t('Seuls les collaborateurs ayant des points apparaissent ici.', 'Alleen medewerkers met punten verschijnen hier.') ?></p>
