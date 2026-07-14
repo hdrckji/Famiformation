@@ -26,11 +26,6 @@ if (!$isAdmin) {
             .topbar a { color: #2d5a37; text-decoration: none; font-weight: bold; }
             h1 { color: #2d5a37; margin: 0; }
             .card { background: #fff; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 24px; }
-        /* Chaque reglage de l'onglet Preferences vit dans SON bloc : plus lisible qu'une
-           longue page separee par des filets. Liseré vert a gauche = repere visuel. */
-        .pref-block { background:#fff; border:1px solid #e3eae5; border-left:5px solid #3E8E4E; border-radius:14px;
-                      padding:20px 22px; margin:18px 0; box-shadow:0 2px 10px rgba(0,0,0,.05); }
-        .pref-block > h3:first-child, .pref-block > h2:first-child { margin-top:0; }
             .btn { border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
             .btn-primary { background: #2d5a37; color: #fff; }
             .btn-light { background: #e9ecef; color: #333; }
@@ -298,6 +293,12 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .card { background: #fff; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 24px; }
+        /* Chaque réglage admin est un CADRE à part entière (titre + liseré vert), et non une
+           section séparée par un simple filet : on voit immédiatement où il commence et finit. */
+        .pref-block { background:#fdfefd; border:1px solid #d5e3d9; border-left:5px solid #3E8E4E; border-radius:14px;
+                      padding:22px 24px; margin:20px 0; box-shadow:0 3px 12px rgba(30,77,43,.07); }
+        .pref-block > h3:first-child, .pref-block > h2:first-child { margin-top:0; }
+        .pref-block > h3 { font-size:1.15rem; padding-bottom:10px; border-bottom:1px solid #e6efe9; }
         .btn { border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn-primary { background: #2d5a37; color: #fff; }
         .btn-danger { background: #c94a42; color: #fff; }
