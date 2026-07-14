@@ -589,17 +589,16 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <button type="submit" name="uniformize" value="1" class="btn btn-create"><?= $hasAnyContent ? 'Modifier et uniformiser' : 'Valider et uniformiser' ?></button>
                 </div>
             </form>
-            </div>
-        </div>
 
-        <!-- ============================================================
-             VOIE 2 — CRÉER UN GUIDE. Rien à voir avec l'import de fichiers :
-             c'est un autre point de départ (page blanche), donc sa PROPRE carte.
-             ============================================================ -->
-        <div class="content-card" id="createGuideCard">
-            <h3 style="margin:0 0 6px; color:#2d5a37;">✍️ Créer un guide</h3>
-            <p style="color:#666; margin:0 0 14px; font-size:.92rem;">Sans aucun fichier : tu écris la formation directement dans l'éditeur (sections, listes, encadrés, images…).</p>
-            <button type="button" class="btn btn-create" onclick="document.getElementById('createGuideModal').style.display='flex';">✍️ Créer un guide</button>
+            <!-- VOIE 2 — CRÉER UN GUIDE : autre point de départ (page blanche), donc HORS du
+                 formulaire d'import. On garde la même carte, mais séparée nettement. -->
+            <div style="border-top:2px dashed #cfe0d4; margin:20px 0 0; padding-top:18px; text-align:center;">
+                <div style="display:inline-block; background:#f4f7f6; color:#8a968f; font-weight:800; font-size:.78rem; letter-spacing:.08em; padding:3px 12px; border-radius:999px; margin-bottom:10px;">OU</div>
+                <h3 style="margin:0 0 4px; color:#2d5a37;">✍️ Créer un guide</h3>
+                <p style="color:#666; margin:0 0 12px; font-size:.9rem;">Sans aucun fichier : tu écris la formation directement dans l'éditeur.</p>
+                <button type="button" class="btn btn-create" onclick="document.getElementById('createGuideModal').style.display='flex';">✍️ Créer un guide</button>
+            </div>
+            </div>
         </div>
         <!-- Modale : créer un guide de zéro (avec rappel du choix d'évaluation) -->
         <div id="createGuideModal" class="fc-modal">
