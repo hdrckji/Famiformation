@@ -281,7 +281,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php if ($isVideoPage): ?>
             <?php require_once __DIR__ . '/includes/video_view.php'; ?>
             <?php renderVideoPage($module, $isAdmin, $quizHref); ?>
-        <?php elseif ($vStatus === 'processing'): ?>
+        <?php elseif ($vStatus === 'processing' && empty($module['video_src_path'])): ?>
             <div class="content-card" style="text-align:center;">
                 <div style="font-size:2.4rem;">🎬</div>
                 <div style="font-weight:800; color:#2d5a37; font-size:1.15rem; margin-top:6px;"><?= t('Vidéo en cours de préparation…', 'Video wordt voorbereid…') ?></div>
@@ -490,10 +490,10 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
                     <div style="flex:1; min-width:260px;">
                         <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
-                            <input type="file" name="pdf_file" accept="application/pdf" class="dz-input">
+                            <input type="file" name="pdf_file" accept="application/pdf,.pdf" class="dz-input">
                             <div class="dz-icon">📄</div>
                             <div class="dz-title">Guide</div>
-                            <div class="dz-hint">Glissez votre document ici ou cliquez pour parcourir</div>
+                            <div class="dz-hint">Glissez votre document ici ou cliquez pour parcourir<br><small style="color:#8a968f;">PDF uniquement · jusqu'à 30 Mo · (PowerPoint / Word : Fichier → Exporter → PDF)</small></div>
                             <div class="dz-file" hidden></div>
                         </div>
                         <?php if ($existPdf): ?>
@@ -506,10 +506,10 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
 
                     <div style="flex:1; min-width:260px;">
                         <div class="drop-zone" id="dz_video" data-has-existing="<?= !empty($module['video_path']) ? '1' : '0' ?>" data-remove="remove_video">
-                            <input type="file" name="video_file" accept="video/*" class="dz-input">
+                            <input type="file" name="video_file" accept="video/mp4,video/quicktime,.mp4,.mov" class="dz-input">
                             <div class="dz-icon">🎬</div>
                             <div class="dz-title">Vidéo</div>
-                            <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">N'importe quel format · jusqu'à 1 Go · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
+                            <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">MP4 ou MOV · jusqu'à 1 Go · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
                             <div class="dz-file" hidden></div>
                         </div>
 

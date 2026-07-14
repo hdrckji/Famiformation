@@ -112,6 +112,18 @@ function volumeUnlink($key)
     if ($abs !== false && $baseReal !== false && strpos($abs, $baseReal) === 0 && is_file($abs)) { @unlink($abs); }
 }
 
+/**
+ * Extension du fichier réellement envoyé sur ce champ ('' si aucun).
+ * Sert à EXPLIQUER un refus : sans ça, un .pptx déposé disparaissait en silence.
+ */
+function famiUploadedExt($field)
+{
+    if (empty($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return '';
+    }
+    return strtolower(pathinfo((string) ($_FILES[$field]['name'] ?? ''), PATHINFO_EXTENSION));
+}
+
 function handleModuleFileUpload($field, array $allowedMap, $maxSize, $subdir, $namePrefix = '')
 {
     if (empty($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -304,6 +316,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($_POST['remove_video'])) { volumeUnlink($videoPath); volumeUnlink($videoSrc); $videoPath = null; $videoStatus = null; $videoSrc = null; }
 
             // PDF : limite alignée sur Claude (30 Mo) pour l'uniformisation par l'IA.
+            // REFUS EXPLIQUÉS : un fichier au mauvais format était simplement ignoré, sans un mot.
+            // L'utilisateur croyait avoir déposé son cours et se retrouvait avec un module vide.
+            $rejectMsg = '';
+            $extPdf = famiUploadedExt('pdf_file');
+            if ($extPdf !== '' && $extPdf !== 'pdf') {
+                $rejectMsg .= in_array($extPdf, ['ppt', 'pptx', 'doc', 'docx', 'odt', 'odp'], true)
+                    ? "❌ Le document doit être un PDF. Dans PowerPoint / Word : Fichier → Enregistrer sous (ou Exporter) → choisis « PDF », puis redépose le fichier. "
+                    : "❌ Format de document refusé (." . htmlspecialchars($extPdf) . ") : seul le PDF est accepté. ";
+            }
+            $extVid = famiUploadedExt('video_file');
+            if ($extVid !== '' && !in_array($extVid, ['mp4', 'mov'], true)) {
+                $rejectMsg .= "❌ Format vidéo refusé (." . htmlspecialchars($extVid) . ") : seuls le MP4 et le MOV sont acceptés. ";
+            }
+
             $newPdf = handleModuleFileUpload('pdf_file', ['application/pdf' => 'pdf'], 30 * 1024 * 1024, 'pdf', $fSlug . '-guide');
             if ($newPdf !== null) {
                 // Remplacement : on efface l'ancien PDF (guide) + ses images extraites.
@@ -323,9 +349,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Vidéo : on range la source brute (jusqu'à 1 Go), puis on lance la compression
             // 720p faststart EN TÂCHE DE FOND. Le teamcoach n'attend pas.
             $startTranscode = false;
+            // FORMATS ACCEPTÉS : mp4 et mov, point. Ce sont les deux seuls que produisent
+            // réellement les téléphones et les caméras, et les seuls dont on garantit la
+            // lecture après compression. Tout le reste est refusé AVEC une explication.
             $newVideoRaw = handleModuleFileUpload('video_file', [
-                'video/mp4' => 'mp4', 'video/webm' => 'webm', 'video/ogg' => 'ogv', 'video/quicktime' => 'mov',
-                'video/x-msvideo' => 'avi', 'video/x-matroska' => 'mkv', 'video/3gpp' => '3gp', 'video/x-m4v' => 'm4v',
+                'video/mp4' => 'mp4', 'video/quicktime' => 'mov',
             ], 1024 * 1024 * 1024, 'video_raw', $fSlug . '-video');
             if ($newVideoRaw !== null) {
                 // Remplacement : on efface l'ancienne vidéo (720p) + l'ancienne source.
@@ -592,7 +620,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 @set_time_limit(0);
                 nlSyncModule($db, (int) $id, true); // module parent : titre/description seulement
 
-                $_SESSION['module_flash'] = trim($flashMsg . ' ' . $structMsg);
+                $_SESSION['module_flash'] = trim(($rejectMsg ?? '') . ' ' . $flashMsg . ' ' . $structMsg);
                 $redirectTo = 'module.php?id=' . $id;
                 // Étape de relecture (visuelle par défaut) : l'uploadeur relit/corrige avant publication.
                 if ($madeGuide && $uniformized === 1 && $contenuIa && $guideChildId) {

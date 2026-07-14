@@ -21,6 +21,20 @@ if (!function_exists('renderVideoPage')) {
         $status = (string) ($module['video_status'] ?? '');
         $hasVideo = !empty($module['video_path']);
         $videoUrl = $hasVideo ? _vidUrl($module['video_path']) : '';
+
+        // FILET DE SÉCURITÉ : la compression 720p tourne en tâche de fond et peut ne jamais
+        // partir (worker injoignable). Plutôt que de laisser l'apprenant sur « en préparation… »
+        // indéfiniment, on sert la vidéo D'ORIGINE : mp4 et mov sont lus par les navigateurs.
+        // La compression, si elle finit un jour, prendra simplement le relais.
+        $rawFallback = false;
+        if (!$hasVideo && !empty($module['video_src_path'])) {
+            $rawExt = strtolower(pathinfo((string) $module['video_src_path'], PATHINFO_EXTENSION));
+            if (in_array($rawExt, ['mp4', 'mov', 'm4v'], true)) {
+                $hasVideo = true;
+                $rawFallback = true;
+                $videoUrl = _vidUrl($module['video_src_path']);
+            }
+        }
         $quizAvailable = ($quizHref !== '');
 
         // Sous-titre : seulement si une description existe (jamais de texte par défaut).
@@ -100,7 +114,7 @@ if (!function_exists('renderVideoPage')) {
                 </div>
             </header>
 
-            <?php if ($hasVideo && $status !== 'processing' && $status !== 'failed'): ?>
+            <?php if ($hasVideo && ($rawFallback || ($status !== 'processing' && $status !== 'failed'))): ?>
                 <main class="player">
                     <figure style="margin:0;">
                         <div class="player__frame">
