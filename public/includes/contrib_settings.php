@@ -137,18 +137,33 @@ if (!function_exists('contribSettingsCard')) {
                     <?php endforeach; ?>
                 </div>
 
-                <div style="font-weight:700; color:#244230; margin:4px 0 6px;">Zones autorisées <span class="muted" style="font-weight:400;">(modules-conteneurs où ils peuvent créer/ajouter)</span></div>
                 <?php if (empty($containers)): ?>
+                    <div style="font-weight:700; color:#244230; margin:4px 0 6px;">Zones autorisées</div>
                     <p class="muted">Aucun module-conteneur pour l'instant. Crée d'abord un conteneur pour en faire une zone.</p>
                 <?php else: ?>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-bottom:16px;">
-                    <?php foreach ($containers as $ct): ?>
-                    <label style="display:flex; align-items:center; gap:8px; background:#f4f7f6; border:1px solid #e1e8e3; border-radius:10px; padding:8px 12px;">
-                        <input type="checkbox" name="contrib_zones[]" value="<?= (int) $ct['id'] ?>" <?= in_array((int) $ct['id'], $c['zones'], true) ? 'checked' : '' ?>>
-                        📁 <?= htmlspecialchars((string) $ct['nom']) ?>
-                    </label>
-                    <?php endforeach; ?>
-                </div>
+                <!-- Les zones sont nombreuses : repliées par défaut, on n'ouvre que si on veut les changer. -->
+                <details class="zonefold"<?= !empty($c['zones']) ? '' : ' open' ?>>
+                    <summary>
+                        Zones autorisées
+                        <span class="muted" style="font-weight:400;">— <?= count($c['zones']) ?> sélectionnée<?= count($c['zones']) > 1 ? 's' : '' ?> sur <?= count($containers) ?></span>
+                    </summary>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; padding:12px 14px 14px;">
+                        <?php foreach ($containers as $ct): ?>
+                        <label style="display:flex; align-items:center; gap:8px; background:#f4f7f6; border:1px solid #e1e8e3; border-radius:10px; padding:8px 12px;">
+                            <input type="checkbox" name="contrib_zones[]" value="<?= (int) $ct['id'] ?>" <?= in_array((int) $ct['id'], $c['zones'], true) ? 'checked' : '' ?>>
+                            📁 <?= htmlspecialchars((string) $ct['nom']) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </details>
+                <style>
+                .zonefold { border:1px solid #dde7e1; border-radius:12px; background:#fbfdfc; margin-bottom:16px; }
+                .zonefold > summary { cursor:pointer; padding:11px 14px; font-weight:700; color:#244230; list-style:none; }
+                .zonefold > summary::-webkit-details-marker { display:none; }
+                .zonefold > summary::before { content:'▸'; display:inline-block; margin-right:8px; color:#3E8E4E; transition:transform .15s; }
+                .zonefold[open] > summary::before { transform:rotate(90deg); }
+                .zonefold > summary:hover { background:#f2f8f4; border-radius:12px; }
+                </style>
                 <?php endif; ?>
 
                 </div>
