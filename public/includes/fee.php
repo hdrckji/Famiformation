@@ -356,6 +356,17 @@ if (!function_exists('feeOverlay')) {
     background:linear-gradient(90deg,#8DC63F,#1E6B33); transition:width .4s ease; }
 .fee-txt { margin-top:12px; color:#DCEBD6; font-weight:700; font-size:.95rem; }
 
+/* MODE INDÉTERMINÉ : le serveur travaille, mais il ne nous dit RIEN de son avancement
+   (mise en forme IA, génération du quiz, traduction…). Afficher un pourcentage serait
+   un mensonge : il défilerait sans rapport avec le travail réel. On montre donc une
+   barre qui va-et-vient — elle dit « ça travaille », sans prétendre savoir combien il reste. */
+.fee-back.indef .fee-pct { display:none; }
+.fee-back.indef .fee-barre span { width:35% !important; animation:feeIndef 1.15s ease-in-out infinite; }
+@keyframes feeIndef {
+    0%   { transform:translateX(-115%); }
+    100% { transform:translateX(320%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .fee-perso, .fee-ailes, .fee-bras, .fee-halo, .fee-yeux, .fee-fleur { animation:none; }
 }
@@ -404,6 +415,7 @@ if (!function_exists('feeOverlay')) {
     };
 
     window.feeHide = function () {
+        if (back) { back.classList.remove('indef'); }
         if (!els()) { return; }
         back.classList.remove('on');
         back.setAttribute('aria-hidden', 'true');
@@ -425,15 +437,14 @@ if (!function_exists('feeOverlay')) {
     /* La progression ESTIMÉE (quand le serveur ne nous dit rien) : elle RALENTIT en
        s'approchant de la cible et ne l'atteint jamais. C'est le comportement honnête
        — on ne sait pas, donc on n'affirme pas « 95 % » alors qu'on n'en sait rien. */
-    window.feeCreep = function (cible, txt) {
-        if (!els()) { return; }
-        if (txt) { txtEl.textContent = txt; }
-        if (creep) { clearInterval(creep); }
-        creep = setInterval(function () {
-            var reste = cible - pct;
-            if (reste <= 0.4) { return; }
-            window.feeSet(pct + reste * 0.035);
-        }, 320);
+    // (feeCreep supprimée : elle fabriquait un faux pourcentage — voir feeIndef.)
+
+    /* Écran d'attente SANS pourcentage : on ne sait pas combien de temps ça prendra. */
+    window.feeIndef = function (txt) {
+        var back = document.getElementById('feeBack');
+        if (!back) { return; }
+        back.classList.add('indef');
+        window.feeShow(txt);
     };
 
     /* ---------- 1) IMPORT : vrai pourcentage sur l'envoi ---------- */
@@ -456,16 +467,16 @@ if (!function_exists('feeOverlay')) {
         var xhr = new XMLHttpRequest();
         xhr.open('POST', form.action || location.href, true);
 
-        // L'ENVOI, lui, a un vrai pourcentage : le navigateur nous le donne. → 0 à 50 %.
+        // L'ENVOI : le navigateur donne le VRAI pourcentage → 0 à 100 %, aucune invention.
         xhr.upload.onprogress = function (ev) {
-            if (ev.lengthComputable) { window.feeSet((ev.loaded / ev.total) * 50, {$jsEnvoi}); }
+            if (ev.lengthComputable) { window.feeSet((ev.loaded / ev.total) * 100, {$jsEnvoi}); }
         };
-        // Fichier parti : le serveur travaille (IA), et là on ne sait plus rien → on estime.
-        xhr.upload.onload = function () { window.feeCreep(95, {$jsMagie}); };
+        // Fichier parti, le serveur travaille (IA) : il ne nous dit RIEN de son avancement.
+        // On passe donc en mode INDÉTERMINÉ plutôt que de faire défiler un faux compteur.
+        xhr.upload.onload = function () { window.feeIndef({$jsMagie}); };
 
         xhr.onload = function () {
-            window.feeSet(100, {$jsFini});
-            setTimeout(function () { location.href = xhr.responseURL || location.href; }, 550);
+            location.href = xhr.responseURL || location.href;
         };
         // REPLI : si l'envoi par XHR échoue, on refait un envoi CLASSIQUE. L'import ne
         // doit jamais être casse par l'animation — c'est le coeur du site.
@@ -474,51 +485,24 @@ if (!function_exists('feeOverlay')) {
         xhr.send(new FormData(form));
     }, false);
 
-    /* ---------- 2) NAVIGATION : la fée SEULEMENT si la page traîne ---------- */
-    var minuteur = null;
-    // SEUIL : une page qui s'affiche en 2 secondes n'a pas besoin d'un écran d'attente —
-    // il ne ferait que clignoter et ralentir la perception. On n'affiche la fée QUE si la
-    // page traîne vraiment (5 s). Les opérations connues comme LONGUES (import, génération
-    // du quiz, validation finale) la montrent immédiatement : elles sont marquées data-fee.
-    var SEUIL_MS = 5000;
-    function attendrePage(immediat) {
-        if (minuteur) { return; }
-        if (immediat) {
-            window.feeShow({$jsMagie});
-            window.feeCreep(95);
-            minuteur = true;
-            return;
-        }
-        minuteur = setTimeout(function () {
-            window.feeShow({$jsAttente});
-            window.feeCreep(90);
-        }, SEUIL_MS);
-    }
-    document.addEventListener('click', function (e) {
-        var a = e.target.closest ? e.target.closest('a') : null;
-        if (!a || !a.href) { return; }
-        if (a.target === '_blank' || a.hasAttribute('download')) { return; }
-        if (a.getAttribute('href').charAt(0) === '#') { return; }       // ancre : pas de chargement
-        if (/^(javascript|mailto|tel):/i.test(a.getAttribute('href'))) { return; }
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) { return; } // nouvel onglet
-        attendrePage();
-    }, true);
+    /* ---------- 2) OPÉRATIONS LONGUES (data-fee) : écran d'attente SANS pourcentage ----------
+       On n'affiche plus rien sur une navigation ordinaire : le navigateur ne dit RIEN de
+       l'avancement d'un chargement de page. Un pourcentage y serait inventé, et un écran qui
+       surgit après quelques secondes arrive toujours « en décalage » avec ce qu'on voit.
+       On ne montre la fée que là où l'attente est CERTAINE et LONGUE : les appels à l'IA
+       (génération du quiz, validation finale, restauration…), marqués data-fee. */
     document.addEventListener('submit', function (e) {
-        if (e.defaultPrevented || aDesFichiers(e.target)) { return; }  // fichiers : géré plus haut
+        if (e.defaultPrevented || aDesFichiers(e.target)) { return; }   // fichiers : géré plus haut
         var f = e.target;
-        attendrePage(f && f.hasAttribute && f.hasAttribute('data-fee'));
+        if (f && f.hasAttribute && f.hasAttribute('data-fee')) { window.feeIndef({$jsMagie}); }
     }, false);
-    // Un lien peut lui aussi lancer une opération longue (ex. relance d'une génération).
     document.addEventListener('click', function (e) {
         var a = e.target.closest ? e.target.closest('a[data-fee]') : null;
-        if (a) { attendrePage(true); }
+        if (a) { window.feeIndef({$jsMagie}); }
     }, true);
 
     // Retour arrière du navigateur : la page revient du cache, la fée doit disparaître.
-    window.addEventListener('pageshow', function () {
-        if (minuteur) { clearTimeout(minuteur); minuteur = null; }
-        window.feeHide();
-    });
+    window.addEventListener('pageshow', function () { window.feeHide(); });
 })();
 </script>
 HTML;
