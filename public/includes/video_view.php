@@ -50,6 +50,17 @@ if (!function_exists('renderVideoPage')) {
             $backdrop .= (strpos($backdrop, '?') !== false ? '&' : '?')
                 . 'l=' . (function_exists('currentLang') ? currentLang() : 'fr');
         }
+        // Le quiz est-il validé ? Tant qu'il ne l'est pas, l'apprenant ne peut pas SAUTER
+        // librement à l'intro ou à l'outro : il regarde le déroulé normal. Seul le bouton
+        // « La formation » reste actif (pour revenir à la vidéo depuis l'outro). L'admin passe.
+        $quizOk = !empty($isAdmin);
+        if (!$quizOk) {
+            require_once __DIR__ . '/quiz_pass.php';
+            global $db;
+            $pid = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) ($module['id'] ?? 0);
+            $quizOk = (isset($db) && $db instanceof PDO) ? quizUserPassed($db, $pid, (int) ($_SESSION['user_id'] ?? 0)) : true;
+        }
+
         // INTRO / OUTRO : jouées avant et après la formation. On ne colle rien bout à bout —
         // le lecteur enchaîne les fichiers (voir plus bas). Changer l'intro change toutes les
         // vidéos aussitôt, sans le moindre ré-encodage.
@@ -122,6 +133,11 @@ if (!function_exists('renderVideoPage')) {
             font-size:.84rem; border-radius:999px; padding:8px 16px; cursor:pointer; transition:all .14s; }
         .fami-vid .segbtn:hover{ border-color:var(--leaf); color:var(--forest); }
         .fami-vid .segbtn.on{ background:var(--forest); color:#fff; border-color:var(--forest); }
+        /* « La formation » : plus gros, pour qu'on clique dessus par instinct. */
+        .fami-vid .segbtn--main{ font-size:.98rem; padding:11px 24px; font-weight:800; }
+        /* Verrouillé (quiz non validé) : visible mais transparent et non cliquable. */
+        .fami-vid .segbtn.locked{ opacity:.4; cursor:not-allowed; }
+        .fami-vid .segbtn.locked:hover{ border-color:var(--line); color:var(--ink-soft); }
         .fami-vid .player__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:14px; padding-left:14px; border-left:3px solid var(--sprout); }
         .fami-vid .player__note{ text-align:center; color:#7a8a80; font-size:.82rem; margin-top:10px; }
         .fami-vid .videostate{ max-width:var(--measure); margin:calc(clamp(120px,16vw,180px) * -0.5) auto 0; padding:0 24px; }
@@ -187,11 +203,11 @@ if (!function_exists('renderVideoPage')) {
                         <?php if ($introUrl !== '' || $outroUrl !== ''): ?>
                         <nav class="player__segnav" id="famiSegNav" aria-label="<?= t('Navigation dans la vidéo', 'Navigatie in de video') ?>">
                             <?php if ($introUrl !== ''): ?>
-                                <button type="button" class="segbtn" data-seg="intro">▶ <?= t('Introduction', 'Inleiding') ?></button>
+                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="intro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t('Accessible après validation du quiz', 'Beschikbaar na het slagen voor de quiz'), ENT_QUOTES) ?>">▶ <?= t('Introduction', 'Inleiding') ?></button>
                             <?php endif; ?>
-                            <button type="button" class="segbtn" data-seg="main">🎬 <?= t('La formation', 'De opleiding') ?></button>
+                            <button type="button" class="segbtn segbtn--main" data-seg="main">🎬 <?= t('La formation', 'De opleiding') ?></button>
                             <?php if ($outroUrl !== ''): ?>
-                                <button type="button" class="segbtn" data-seg="outro">🏁 <?= t('Fin', 'Slot') ?></button>
+                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="outro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t('Accessible après validation du quiz', 'Beschikbaar na het slagen voor de quiz'), ENT_QUOTES) ?>">🏁 <?= t('Fin', 'Slot') ?></button>
                             <?php endif; ?>
                         </nav>
                         <?php endif; ?>
@@ -278,6 +294,7 @@ if (!function_exists('renderVideoPage')) {
                     if (nav) {
                         nav.querySelectorAll('.segbtn').forEach(function (b) {
                             b.addEventListener('click', function () {
+                                if (b.disabled || b.classList.contains('locked')) { return; }
                                 var want = b.getAttribute('data-seg');
                                 for (var k = 0; k < seq.length; k++) {
                                     if (seq[k].kind === want) {
