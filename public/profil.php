@@ -50,6 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['photo_profil'])) {
             }
 
             if (move_uploaded_file($file['tmp_name'], $destPath)) {
+                require_once 'includes/compress.php';
+                famiCompressImageFile($destPath, 600);
                 $relativePath = 'divers/profils/' . $safeName;
                 $stmt = $db->prepare("UPDATE utilisateurs SET photo_profil = ? WHERE id = ?");
                 $stmt->execute([$relativePath, $user_id]);

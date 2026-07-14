@@ -362,6 +362,9 @@ if (!function_exists('aiExtractPdfImages')) {
         foreach ($files as $f) {
             $m = $meta[$f] ?? null;
             if (!$m || !$m['ok'] || (($hashCount[$m['hash']] ?? 0) !== 1)) { @unlink($f); continue; }
+            // Image conservée -> on l'allège (pdfimages sort souvent du PNG lourd non compressé).
+            if (function_exists('famiCompressImageFile')) { famiCompressImageFile($f, 1600); }
+            else { require_once __DIR__ . '/compress.php'; famiCompressImageFile($f, 1600); }
             $out[] = $relDir . '/' . basename($f);
         }
         sort($out); // ordre des pages

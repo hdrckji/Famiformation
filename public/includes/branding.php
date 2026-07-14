@@ -177,6 +177,8 @@ if (!function_exists('brandingHandlePost')) {
             if (!move_uploaded_file($cf['tmp_name'], $cdir . '/' . $cname)) {
                 $back("❌ Impossible d'enregistrer la vidéo.");
             }
+            require_once __DIR__ . '/compress.php';
+            famiCompressVideoFile($cdir . '/' . $cname);
             brandingUnlinkKey(brandingClipFor($db, $what, $lang));
             widgetSet($db, $setting, 'divers/branding/' . $cname);
             $back('🎬 ' . $wlbl . ' ' . $lbl . ' enregistrée — elle sera jouée sur toutes les formations vidéo.');
@@ -213,6 +215,8 @@ if (!function_exists('brandingHandlePost')) {
             $back("❌ Impossible d'enregistrer l'image.");
         }
 
+        require_once __DIR__ . '/compress.php';
+        famiCompressImageFile($dir . '/' . $name, 1920);
         brandingUnlinkKey(brandingBackdropFor($db, $lang)); // l'ancienne ne sert plus à rien
         widgetSet($db, $setting, 'divers/branding/' . $name);
         $back('🎨 Image ' . $lbl . ' enregistrée — elle habille les vidéos verticales.');

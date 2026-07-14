@@ -88,6 +88,8 @@ function handleModuleIconUpload()
     if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
         return null;
     }
+    require_once __DIR__ . '/includes/compress.php';
+    famiCompressImageFile($dir . '/' . $name, 512);
     return 'divers/icons/' . $name;
 }
 
