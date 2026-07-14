@@ -248,23 +248,6 @@ if (!function_exists('renderOutilsTab')) {
                 <?php endforeach; ?>
             </div>
 
-            <div style="margin-top:18px; border-top:2px solid #e3ece5; padding-top:14px;">
-                <h3 style="margin:0 0 8px; color:#244230; font-size:1.05rem;">🔗 Comment tout s'enchaîne</h3>
-                <pre style="background:#f6f8f7; border:1px solid #e3ece5; border-radius:10px; padding:14px; overflow-x:auto; font-size:.84rem; line-height:1.6; color:#33473b; margin:0;">
-Un teamcoach dépose un PDF + une vidéo
-        │
-        ├─ PDF   ─→ poppler (images) ─→ 🧠 Claude ─→ « Le guide » mis en forme
-        │                                    └────→ 🧠 Claude ─→ Quiz
-        │
-        └─ Vidéo ─→ 🎬 ffmpeg (720p faststart)
-                        └─→ 🎬 ffmpeg (audio) ─→ 🎙️ Whisper ─→ sous-titres FR
-                                                        ├─→ 🧠 Claude ─→ sous-titres NL
-                                                        └─→ 🧠 Claude ─→ quiz enrichi par la vidéo
-
-Tout le contenu FR est ensuite traduit en NL automatiquement
-(🌍 MyMemory pour les titres · 🧠 Claude pour le guide et le quiz).
-Les fichiers vivent sur le 💾 volume et sont servis par media.php.</pre>
-            </div>
         </div>
         <?php
     }
