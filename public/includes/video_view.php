@@ -50,6 +50,16 @@ if (!function_exists('renderVideoPage')) {
             $backdrop .= (strpos($backdrop, '?') !== false ? '&' : '?')
                 . 'l=' . (function_exists('currentLang') ? currentLang() : 'fr');
         }
+        // INTRO / OUTRO : jouées avant et après la formation. On ne colle rien bout à bout —
+        // le lecteur enchaîne les fichiers (voir plus bas). Changer l'intro change toutes les
+        // vidéos aussitôt, sans le moindre ré-encodage.
+        $introUrl = '';
+        $outroUrl = '';
+        if (isset($db) && $db instanceof PDO) {
+            $introUrl = brandingClipUrl($db, 'intro');
+            $outroUrl = brandingClipUrl($db, 'outro');
+        }
+
         $frameCls = $backdrop !== '' ? ' has-backdrop' : '';
         $frameSty = $backdrop !== '' ? ' style="background-image:url(&quot;' . htmlspecialchars($backdrop, ENT_QUOTES) . '&quot;);"' : '';
 
@@ -104,6 +114,9 @@ if (!function_exists('renderVideoPage')) {
            et les bandes redevenaient noires dès qu'on passait en plein écran. */
         .fami-vid .player__frame.has-backdrop .player__video{ background-size:cover; background-position:center; background-repeat:no-repeat; }
         .fami-vid .player__video:fullscreen{ background-size:cover; background-position:center; }
+        .fami-vid .player__seg{ position:absolute; top:14px; left:14px; z-index:3; background:rgba(20,40,22,.78); color:#EAF3E6;
+            font-family:var(--font-label); font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; font-weight:700;
+            padding:6px 12px; border-radius:999px; pointer-events:none; }
         .fami-vid .player__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:14px; padding-left:14px; border-left:3px solid var(--sprout); }
         .fami-vid .player__note{ text-align:center; color:#7a8a80; font-size:.82rem; margin-top:10px; }
         .fami-vid .videostate{ max-width:var(--measure); margin:calc(clamp(120px,16vw,180px) * -0.5) auto 0; padding:0 24px; }
@@ -164,6 +177,7 @@ if (!function_exists('renderVideoPage')) {
                                 <?php endif; ?>
                                 <?= t('Votre navigateur ne peut pas lire cette vidéo.', 'Uw browser kan deze video niet afspelen.') ?>
                             </video>
+                            <span class="player__seg" id="famiSeg" hidden></span>
                         </div>
                         <p class="player__note">⏱️ <?= t('Avance rapide désactivée — le retour en arrière reste possible.', 'Vooruitspoelen uitgeschakeld — terugspoelen blijft mogelijk.') ?></p>
                     </figure>
@@ -172,14 +186,67 @@ if (!function_exists('renderVideoPage')) {
                 (function () {
                     var v = document.getElementById('famiVideo');
                     if (!v) { return; }
-                    var maxT = 0;
+
+                    // ── LISTE DE LECTURE : intro → formation → outro.
+                    // Les fichiers ne sont PAS collés (aucun ré-encodage) : on change la source
+                    // du lecteur à la fin de chaque segment. Les sous-titres n'appartiennent
+                    // qu'à la formation, on les masque pendant l'intro et l'outro.
+                    var MAIN = <?= json_encode($videoUrl, JSON_UNESCAPED_SLASHES) ?>;
+                    var INTRO = <?= json_encode($introUrl, JSON_UNESCAPED_SLASHES) ?>;
+                    var OUTRO = <?= json_encode($outroUrl, JSON_UNESCAPED_SLASHES) ?>;
+
+                    var seq = [];
+                    if (INTRO) { seq.push({ url: INTRO, kind: 'intro' }); }
+                    seq.push({ url: MAIN, kind: 'main' });
+                    if (OUTRO) { seq.push({ url: OUTRO, kind: 'outro' }); }
+
+                    var i = 0;
+                    var maxT = 0;              // progression atteinte DANS le segment courant
+                    var badge = document.getElementById('famiSeg');
+
+                    function tracksVisible(on) {
+                        for (var k = 0; k < v.textTracks.length; k++) {
+                            var tt = v.textTracks[k];
+                            if (!on) { tt.mode = 'disabled'; }
+                            else if (tt.mode === 'disabled') { tt.mode = (k === <?= $isNl && $subNl !== '' ? 1 : 0 ?>) ? 'showing' : 'hidden'; }
+                        }
+                    }
+
+                    function load(n, autoplay) {
+                        i = n;
+                        maxT = 0;
+                        v.src = seq[i].url;
+                        v.load();
+                        var isMain = (seq[i].kind === 'main');
+                        tracksVisible(isMain);
+                        if (badge) {
+                            badge.hidden = isMain;
+                            badge.textContent = (seq[i].kind === 'intro')
+                                ? <?= json_encode(t('Introduction', 'Inleiding')) ?>
+                                : <?= json_encode(t('Fin', 'Slot')) ?>;
+                        }
+                        if (autoplay) { v.play().catch(function () { /* le navigateur peut refuser : l'utilisateur relancera */ }); }
+                    }
+
+                    if (seq.length > 1) { load(0, false); }
+
                     v.addEventListener('timeupdate', function () {
                         if (!v.seeking) { maxT = Math.max(maxT, v.currentTime); }
-                        // Vidéo considérée « vue » à partir de 95 % (ou fin atteinte).
-                        if (v.duration && v.duration > 0 && v.currentTime >= v.duration * 0.95) { window._famiVideoDone = true; }
+                        // « Vue » = la FORMATION est vue à 95 % (l'intro et l'outro ne comptent pas).
+                        if (seq[i].kind === 'main' && v.duration > 0 && v.currentTime >= v.duration * 0.95) {
+                            window._famiVideoDone = true;
+                        }
                     });
-                    v.addEventListener('ended', function () { window._famiVideoDone = true; });
-                    v.addEventListener('seeking', function () { if (v.currentTime > maxT + 1) { v.currentTime = maxT; } });
+
+                    v.addEventListener('ended', function () {
+                        if (seq[i].kind === 'main') { window._famiVideoDone = true; }
+                        if (i + 1 < seq.length) { load(i + 1, true); }   // segment suivant, sans coupure
+                    });
+
+                    // Avance rapide interdite : sur CHAQUE segment (on ne saute pas l'intro).
+                    v.addEventListener('seeking', function () {
+                        if (v.currentTime > maxT + 1) { v.currentTime = maxT; }
+                    });
                 })();
                 </script>
             <?php elseif ($status === 'processing'): ?>

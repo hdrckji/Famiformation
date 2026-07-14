@@ -57,6 +57,46 @@ if (!function_exists('brandingEnabled')) {
     }
 }
 
+if (!function_exists('brandingClipKey')) {
+    /**
+     * INTRO / OUTRO : de courtes vidéos jouées AVANT et APRÈS chaque formation vidéo.
+     *
+     *   On ne colle RIEN bout à bout : ré-encoder chaque vidéo coûterait cher en CPU et
+     *   obligerait à retraiter TOUTES les formations le jour où l'intro change. Le lecteur
+     *   enchaîne simplement les fichiers (liste de lecture). Changer l'intro change donc
+     *   toutes les vidéos instantanément, sans rien retraiter.
+     */
+    function brandingClipKey($what, $lang)
+    {
+        $what = ($what === 'outro') ? 'outro' : 'intro';
+        return 'video_' . $what . ((strtolower((string) $lang) === 'nl') ? '_nl' : '');
+    }
+
+    /** L'intro (ou l'outro) est-elle activée ? */
+    function brandingClipsOn($db)
+    {
+        return !function_exists('widgetGet') || widgetGet($db, 'video_clips_on', '1') === '1';
+    }
+
+    /** Clé (volume) de l'intro/outro d'une langue. '' si aucune. */
+    function brandingClipFor($db, $what, $lang)
+    {
+        if (!function_exists('widgetGet')) { return ''; }
+        return trim((string) widgetGet($db, brandingClipKey($what, $lang), ''));
+    }
+
+    /** URL de l'intro/outro à jouer dans la langue courante (repli sur le français). */
+    function brandingClipUrl($db, $what)
+    {
+        if (!brandingClipsOn($db)) { return ''; }
+        $lang = function_exists('currentLang') ? currentLang() : 'fr';
+        $key = brandingClipFor($db, $what, $lang);
+        if ($key === '' && $lang !== 'fr') { $key = brandingClipFor($db, $what, 'fr'); }
+        if ($key === '') { return ''; }
+        return function_exists('moduleFileUrl') ? moduleFileUrl($key) : ('media.php?f=' . rawurlencode($key));
+    }
+}
+
 if (!function_exists('brandingUnlinkKey')) {
     /** Efface une image d'habillage du volume (pas de fuite de stockage). */
     function brandingUnlinkKey($key)
@@ -102,6 +142,52 @@ if (!function_exists('brandingHandlePost')) {
             brandingUnlinkKey(brandingBackdropFor($db, $lang));
             widgetSet($db, $setting, '');
             $back('🎨 Image ' . $lbl . ' retirée.');
+        }
+
+        // ── INTRO / OUTRO (vidéos courtes) ────────────────────────────────────────
+        if (($_POST['kind'] ?? '') === 'clip') {
+            $what = (($_POST['what'] ?? 'intro') === 'outro') ? 'outro' : 'intro';
+            $setting = brandingClipKey($what, $lang);
+            $wlbl = ($what === 'outro') ? 'Outro' : 'Intro';
+
+            if (!empty($_POST['remove_clip'])) {
+                brandingUnlinkKey(brandingClipFor($db, $what, $lang));
+                widgetSet($db, $setting, '');
+                $back('🎬 ' . $wlbl . ' ' . $lbl . ' retirée.');
+            }
+
+            $cf = $_FILES['clip'] ?? null;
+            if (!$cf || ($cf['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                $back('❌ Aucune vidéo envoyée.');
+            }
+            if ($cf['error'] !== UPLOAD_ERR_OK || $cf['size'] <= 0 || $cf['size'] > 100 * 1024 * 1024) {
+                $back('❌ Vidéo refusée (100 Mo maximum — une intro doit rester courte).');
+            }
+            $cmap = ['video/mp4' => 'mp4', 'video/quicktime' => 'mov'];
+            $cmime = function_exists('mime_content_type') ? @mime_content_type($cf['tmp_name']) : '';
+            $cext = $cmap[$cmime] ?? '';
+            if ($cext === '') {
+                $back('❌ Format refusé : MP4 ou MOV uniquement.');
+            }
+
+            $cbase = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/../uploads');
+            $cdir = $cbase . '/divers/branding';
+            if (!is_dir($cdir)) { @mkdir($cdir, 0775, true); }
+            $cname = $what . '-' . $lang . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(4)), 0, 6) . '.' . $cext;
+            if (!move_uploaded_file($cf['tmp_name'], $cdir . '/' . $cname)) {
+                $back("❌ Impossible d'enregistrer la vidéo.");
+            }
+            brandingUnlinkKey(brandingClipFor($db, $what, $lang));
+            widgetSet($db, $setting, 'divers/branding/' . $cname);
+            $back('🎬 ' . $wlbl . ' ' . $lbl . ' enregistrée — elle sera jouée sur toutes les formations vidéo.');
+        }
+
+        // ── Interrupteur des intros/outros
+        if (!empty($_POST['toggle_clips'])) {
+            widgetSet($db, 'video_clips_on', !empty($_POST['video_clips_on']) ? '1' : '0');
+            $back(!empty($_POST['video_clips_on'])
+                ? '🎬 Intro / outro activées.'
+                : '🎬 Intro / outro désactivées (les vidéos sont conservées).');
         }
 
         $f = $_FILES['backdrop'] ?? null;
@@ -233,6 +319,100 @@ if (!function_exists('brandingCard')) {
                 <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:14px;">
                     <?php $zone('fr', '🇫🇷', 'Version française'); ?>
                     <?php $zone('nl', '🇳🇱', 'Version néerlandaise'); ?>
+                </div>
+            </div>
+        </div>
+
+        <?php brandingClipsCard($db); ?>
+        <?php
+    }
+}
+
+if (!function_exists('brandingClipsCard')) {
+    /** Carte « Intro / Outro » — une vidéo avant, une après, par langue. */
+    function brandingClipsCard($db)
+    {
+        require_once __DIR__ . '/ui_switch.php';
+        $on = brandingClipsOn($db);
+
+        $clip = function ($what, $lang, $flag) use ($db) {
+            $key = brandingClipFor($db, $what, $lang);
+            $url = ($key !== '' && function_exists('moduleFileUrl')) ? moduleFileUrl($key) : '';
+            $id = $what . '-' . $lang;
+            ?>
+            <div style="flex:1; min-width:260px;">
+                <div style="font-weight:800; color:#244230; margin-bottom:8px;"><?= $flag ?> <?= $what === 'outro' ? 'Outro' : 'Intro' ?></div>
+
+                <?php if ($url !== ''): ?>
+                    <video src="<?= htmlspecialchars($url) ?>" controls preload="metadata"
+                           style="width:100%; aspect-ratio:16/9; background:#0c1a11; border-radius:12px; border:1px solid #d9e3dc;"></video>
+                    <div style="color:#7a8a80; font-size:.78rem; margin-top:6px; word-break:break-all;">📁 <?= htmlspecialchars(basename($key)) ?></div>
+                <?php else: ?>
+                    <div style="border:2px dashed #cfdad3; border-radius:12px; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; color:#8a968f; font-style:italic; font-size:.85rem; text-align:center; padding:10px;">
+                        Aucune vidéo<?= $lang === 'nl' ? '<br><small>(la version française sera utilisée)</small>' : '' ?>
+                    </div>
+                <?php endif; ?>
+
+                <form method="POST" action="parametres.php#prefs" enctype="multipart/form-data" style="margin-top:10px;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="set_branding">
+                    <input type="hidden" name="kind" value="clip">
+                    <input type="hidden" name="what" value="<?= htmlspecialchars($what) ?>">
+                    <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
+                    <label class="bd-drop">
+                        <input type="file" name="clip" accept="video/mp4,video/quicktime,.mp4,.mov" required
+                               onchange="var n=this.closest('.bd-drop').querySelector('.bd-name'); if(this.files.length){n.textContent='✓ '+this.files[0].name; n.hidden=false;}">
+                        <span class="bd-ico">🎬</span>
+                        <span class="bd-txt">
+                            <strong><?= $url !== '' ? 'Remplacer' : 'Déposer une vidéo' ?></strong>
+                            <small>MP4 ou MOV · 100 Mo max · quelques secondes suffisent</small>
+                        </span>
+                        <span class="bd-name" hidden></span>
+                    </label>
+                    <button type="submit" class="btn btn-primary" style="margin-top:10px; width:100%;">
+                        <?= $url !== '' ? 'Remplacer' : 'Enregistrer' ?>
+                    </button>
+                </form>
+
+                <?php if ($url !== ''): ?>
+                    <form method="POST" action="parametres.php#prefs" style="margin-top:8px;" onsubmit="return confirm('Retirer cette vidéo ?');">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="set_branding">
+                        <input type="hidden" name="kind" value="clip">
+                        <input type="hidden" name="what" value="<?= htmlspecialchars($what) ?>">
+                        <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
+                        <input type="hidden" name="remove_clip" value="1">
+                        <button type="submit" class="btn" style="background:#fdecec; color:#b3261e;">🗑️ Retirer</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+            <?php
+        };
+        ?>
+        <div class="pref-block">
+            <div class="pref-head">
+                <h3 style="color:#244230;">🎬 Créateur — intro &amp; outro des vidéos</h3>
+                <form method="POST" action="parametres.php#prefs">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="set_branding">
+                    <input type="hidden" name="toggle_clips" value="1">
+                    <label class="fsw">
+                        <input type="checkbox" name="video_clips_on" value="1" <?= $on ? 'checked' : '' ?> onchange="this.form.submit()">
+                        <span class="fsw-track"></span>
+                    </label>
+                </form>
+            </div>
+            <div class="pref-body<?= $on ? '' : ' pref-off' ?>">
+                <p class="muted">Une courte vidéo jouée <strong>avant</strong> chaque formation (logo, message d'accueil) et une autre <strong>après</strong> (rappel, coordonnées). Le lecteur les enchaîne automatiquement.</p>
+                <p class="muted" style="font-size:.84rem;">💡 <strong>Rien n'est ré-encodé</strong> : les vidéos ne sont pas collées bout à bout, le lecteur les joue à la suite. Changer l'intro change <strong>toutes</strong> les formations aussitôt, sans retraiter quoi que ce soit. Une par langue (repli sur le français si la néerlandaise manque). Gardez-les courtes : elles seront vues à chaque formation.</p>
+
+                <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:14px;">
+                    <?php $clip('intro', 'fr', '🇫🇷'); ?>
+                    <?php $clip('intro', 'nl', '🇳🇱'); ?>
+                </div>
+                <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:18px; padding-top:16px; border-top:1px dashed #dfe6e0;">
+                    <?php $clip('outro', 'fr', '🇫🇷'); ?>
+                    <?php $clip('outro', 'nl', '🇳🇱'); ?>
                 </div>
             </div>
         </div>
