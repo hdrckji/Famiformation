@@ -117,6 +117,11 @@ if (!function_exists('renderVideoPage')) {
         .fami-vid .player__seg{ position:absolute; top:14px; left:14px; z-index:3; background:rgba(20,40,22,.78); color:#EAF3E6;
             font-family:var(--font-label); font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; font-weight:700;
             padding:6px 12px; border-radius:999px; pointer-events:none; }
+        .fami-vid .player__segnav{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:14px; }
+        .fami-vid .segbtn{ border:1px solid var(--line); background:#fff; color:var(--ink-soft); font:inherit; font-weight:700;
+            font-size:.84rem; border-radius:999px; padding:8px 16px; cursor:pointer; transition:all .14s; }
+        .fami-vid .segbtn:hover{ border-color:var(--leaf); color:var(--forest); }
+        .fami-vid .segbtn.on{ background:var(--forest); color:#fff; border-color:var(--forest); }
         .fami-vid .player__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:14px; padding-left:14px; border-left:3px solid var(--sprout); }
         .fami-vid .player__note{ text-align:center; color:#7a8a80; font-size:.82rem; margin-top:10px; }
         .fami-vid .videostate{ max-width:var(--measure); margin:calc(clamp(120px,16vw,180px) * -0.5) auto 0; padding:0 24px; }
@@ -179,6 +184,17 @@ if (!function_exists('renderVideoPage')) {
                             </video>
                             <span class="player__seg" id="famiSeg" hidden></span>
                         </div>
+                        <?php if ($introUrl !== '' || $outroUrl !== ''): ?>
+                        <nav class="player__segnav" id="famiSegNav" aria-label="<?= t('Navigation dans la vidéo', 'Navigatie in de video') ?>">
+                            <?php if ($introUrl !== ''): ?>
+                                <button type="button" class="segbtn" data-seg="intro">▶ <?= t('Introduction', 'Inleiding') ?></button>
+                            <?php endif; ?>
+                            <button type="button" class="segbtn" data-seg="main">🎬 <?= t('La formation', 'De opleiding') ?></button>
+                            <?php if ($outroUrl !== ''): ?>
+                                <button type="button" class="segbtn" data-seg="outro">🏁 <?= t('Fin', 'Slot') ?></button>
+                            <?php endif; ?>
+                        </nav>
+                        <?php endif; ?>
                         <p class="player__note">⏱️ <?= t('Avance rapide désactivée — le retour en arrière reste possible.', 'Vooruitspoelen uitgeschakeld — terugspoelen blijft mogelijk.') ?></p>
                     </figure>
                 </main>
@@ -243,10 +259,40 @@ if (!function_exists('renderVideoPage')) {
                         if (i + 1 < seq.length) { load(i + 1, true); }   // segment suivant, sans coupure
                     });
 
-                    // Avance rapide interdite : sur CHAQUE segment (on ne saute pas l'intro).
+                    // Avance rapide interdite : sur CHAQUE segment (on ne bricole pas la barre).
                     v.addEventListener('seeking', function () {
                         if (v.currentTime > maxT + 1) { v.currentTime = maxT; }
                     });
+
+                    // ── NAVIGATION entre les segments : on ne reste plus prisonnier de la
+                    // formation. Un clic revient à l'introduction ou saute à la fin.
+                    // (Le compteur « vu » ne bouge que sur la formation : sauter l'intro ne
+                    //  déverrouille rien, et revenir sur l'intro ne fait rien perdre.)
+                    var nav = document.getElementById('famiSegNav');
+                    function markNav() {
+                        if (!nav) { return; }
+                        nav.querySelectorAll('.segbtn').forEach(function (b) {
+                            b.classList.toggle('on', b.getAttribute('data-seg') === seq[i].kind);
+                        });
+                    }
+                    if (nav) {
+                        nav.querySelectorAll('.segbtn').forEach(function (b) {
+                            b.addEventListener('click', function () {
+                                var want = b.getAttribute('data-seg');
+                                for (var k = 0; k < seq.length; k++) {
+                                    if (seq[k].kind === want) {
+                                        if (k !== i) { load(k, true); }
+                                        else { v.currentTime = 0; v.play().catch(function () {}); }
+                                        markNav();
+                                        return;
+                                    }
+                                }
+                            });
+                        });
+                        markNav();
+                    }
+                    var _load = load;
+                    load = function (n, autoplay) { _load(n, autoplay); markNav(); };
                 })();
                 </script>
             <?php elseif ($status === 'processing'): ?>

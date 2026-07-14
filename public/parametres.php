@@ -381,7 +381,17 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <button class="tab-btn" onclick="showTab('contenu', this)">Stockage</button>
         <button class="tab-btn" onclick="showTab('api', this)">API</button>
         <button class="tab-btn" onclick="showTab('outils', this)">Outils</button>
+        <button class="tab-btn" onclick="showTab('createur', this)">🎨 Créateur</button>
         <button class="tab-btn" onclick="showTab('prefs', this)">Préférences</button>
+    </div>
+
+    <!-- ONGLET : CRÉATEUR (habillage vidéo, intro/outro) — sorti des Préférences, où il
+         prenait toute la place avec ses images et ses lecteurs vidéo. -->
+    <div id="tab-createur" class="tab-content">
+        <div class="card admin-settings">
+            <h2 style="margin-top:0; color:#2d5a37;">🎨 Créateur</h2>
+            <p class="muted">L'habillage visuel des vidéos : l'image qui remplit les bandes noires des vidéos verticales, et les séquences jouées avant et après chaque formation.</p>
+        </div>
     </div>
 
     <!-- ONGLET : API (coûts IA) -->

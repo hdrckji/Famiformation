@@ -121,7 +121,7 @@ if (!function_exists('brandingHandlePost')) {
 
         $back = function ($msg) {
             $_SESSION['module_flash'] = $msg;
-            header('Location: parametres.php#prefs');
+            header('Location: parametres.php#createur');
             exit();
         };
 
@@ -250,7 +250,7 @@ if (!function_exists('brandingCard')) {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="parametres.php#prefs" enctype="multipart/form-data" style="margin-top:10px;" id="bdForm-<?= $lang ?>">
+                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;" id="bdForm-<?= $lang ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
@@ -272,7 +272,7 @@ if (!function_exists('brandingCard')) {
                 </form>
 
                 <?php if ($url !== ''): ?>
-                    <form method="POST" action="parametres.php#prefs" style="margin-top:8px;" onsubmit="return confirm('Retirer cette image ?');">
+                    <form method="POST" action="parametres.php#createur" style="margin-top:8px;" onsubmit="return confirm('Retirer cette image ?');">
                         <?= csrfField() ?>
                         <input type="hidden" name="action" value="set_branding">
                         <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
@@ -353,7 +353,7 @@ if (!function_exists('brandingClipsCard')) {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="parametres.php#prefs" enctype="multipart/form-data" style="margin-top:10px;">
+                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="kind" value="clip">
@@ -375,7 +375,7 @@ if (!function_exists('brandingClipsCard')) {
                 </form>
 
                 <?php if ($url !== ''): ?>
-                    <form method="POST" action="parametres.php#prefs" style="margin-top:8px;" onsubmit="return confirm('Retirer cette vidéo ?');">
+                    <form method="POST" action="parametres.php#createur" style="margin-top:8px;" onsubmit="return confirm('Retirer cette vidéo ?');">
                         <?= csrfField() ?>
                         <input type="hidden" name="action" value="set_branding">
                         <input type="hidden" name="kind" value="clip">
@@ -392,7 +392,7 @@ if (!function_exists('brandingClipsCard')) {
         <div class="pref-block">
             <div class="pref-head">
                 <h3 style="color:#244230;">🎬 Créateur — intro &amp; outro des vidéos</h3>
-                <form method="POST" action="parametres.php#prefs">
+                <form method="POST" action="parametres.php#createur">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="toggle_clips" value="1">
