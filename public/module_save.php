@@ -675,34 +675,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                // Statut : 'pending' = « à contrôler par un admin » (file de modération). Un ADMIN
-                // n'a personne au-dessus de lui : son contenu est en 'draft' — caché lui aussi,
-                // mais il n'encombre PAS la file « à contrôler » ni les notifications.
-                $subStatus = $isAdminActor ? 'draft' : 'pending';
+                // QUI PUBLIE QUOI :
+                //  - ADMIN : il EST le contrôle. Son contenu est publié DIRECTEMENT (visible tout
+                //    de suite). Il peut le relire quand il veut — on l'y emmène juste après —
+                //    mais rien ne l'y oblige et rien n'est caché en attendant.
+                //  - NON-ADMIN (teamcoach…) : son contenu reste CACHÉ et part en file de
+                //    modération ; un admin le relit puis le publie.
+                $subStatus = $isAdminActor ? 'published' : 'pending';
+                $subActive = $isAdminActor ? 1 : 0;
                 $subIds = array_values(array_filter([(int) $guideChildId, (int) $vidChildId]));
 
                 // VIDÉO SEULE : il n'y a AUCUN guide à relire, donc rien ne déclencherait jamais la
                 // validation finale — la vidéo serait restée cachée à vie (bug constaté). On la
                 // publie donc tout de suite pour un admin ; un contributeur, lui, passe en attente.
                 $videoOnly = ($vidChildId && !$guideChildId && trim((string) ($module['contenu_ia'] ?? '')) === '');
-                if ($videoOnly && $isAdminActor) {
-                    try { $db->prepare("UPDATE modules SET is_active = 1, content_status = 'published' WHERE id = ?")->execute([(int) $vidChildId]); } catch (Exception $e) {}
-                    $subIds = [];
-                    $structMsg .= " ✅ Vidéo publiée (aucun guide à relire).";
-                }
-
                 if ($subIds) {
                     $ph = implode(',', array_fill(0, count($subIds), '?'));
-                    try { $db->prepare("UPDATE modules SET is_active = 0, content_status = ? WHERE id IN ($ph)")->execute(array_merge([$subStatus], $subIds)); } catch (Exception $e) {}
+                    try {
+                        $db->prepare("UPDATE modules SET is_active = ?, content_status = ? WHERE id IN ($ph)")
+                           ->execute(array_merge([$subActive, $subStatus], $subIds));
+                    } catch (Exception $e) {}
                 }
                 // La modification de contenu est un ÉVÉNEMENT, quel qu'en soit l'auteur.
                 famiLogChange($db, 'content_updated', (int) $id, '📎 Contenu ' . ($hasAnyContentBefore ? 'remplacé' : 'ajouté') . ' (' . $ajout . ') : ' . $modNom);
 
                 if (!$isAdminActor) {
                     logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu proposé (' . $ajout . ') : ' . $modNom);
-                    $structMsg .= " En attente de validation par un admin.";
+                    $structMsg .= " En attente de validation par un admin (non visible en attendant).";
                 } else {
-                    $structMsg .= " ⚠️ Non visible tant que tu n'as pas terminé la relecture.";
+                    $structMsg .= " ✅ Publié — déjà visible par les apprenants.";
                 }
                 storageRecordSample($db); // fichiers ajoutés → point d'historique (facturation au pro rata)
 
@@ -769,13 +770,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // Le module courant devient le conteneur qui regroupe le guide.
             $db->prepare("UPDATE modules SET is_container = 1, pdf_path = NULL, uniformized = 0, a_evaluer = 0, contenu_ia = NULL, contenu_images = NULL, quiz_json = NULL WHERE id = ?")->execute([$id]);
-            // Pas encore relu → caché pour tout le monde jusqu'à la validation finale.
-            // 'draft' pour un admin (caché mais hors file de modération), 'pending' sinon.
+            // Un ADMIN publie directement ; un non-admin passe par la modération.
+            // (Un guide vierge n'a de toute façon rien à montrer tant qu'il n'est pas écrit.)
             try {
-                $db->prepare("UPDATE modules SET is_active = 0, content_status = ? WHERE id = ?")
-                   ->execute([($isAdminActor ? 'draft' : 'pending'), $guideChildId]);
+                $db->prepare("UPDATE modules SET is_active = ?, content_status = ? WHERE id = ?")
+                   ->execute([($isAdminActor ? 1 : 0), ($isAdminActor ? 'published' : 'pending'), $guideChildId]);
             } catch (Exception $e) {}
-            $_SESSION['module_flash'] = "✍️ Guide créé (non visible tant qu'il n'est pas validé) — rédige ta formation puis clique sur « Valider ».";
+            $_SESSION['module_flash'] = $isAdminActor
+                ? "✍️ Guide créé — rédige ta formation puis clique sur « Valider »."
+                : "✍️ Guide créé — rédige-le puis valide : un admin le relira avant publication.";
             header('Location: module_edit.php?id=' . $guideChildId);
             exit();
         }
