@@ -399,7 +399,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 <div class="guide-actions">
                     <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="<?= t('Voir le PDF original', 'Originele PDF bekijken') ?>" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
                     <?php if ($canDlPdf): ?><button type="button" class="uni-ico" title="<?= t('Télécharger le guide (PDF, mise en page du site)', 'De gids downloaden (PDF, opmaak van de site)') ?>" onclick="window.print()">⤓ <span><?= t('Guide PDF', 'Gids PDF') ?></span></button><?php endif; ?>
-                    <?php if ($canDlVideo): ?><a class="uni-ico" href="<?= htmlspecialchars($uniVideoUrl) ?>" download title="<?= t('Télécharger la vidéo', 'De video downloaden') ?>">🎬 <span><?= t('Vidéo', 'Video') ?></span></a><?php endif; ?>
+                    <?php if ($canDlVideo): ?><button type="button" class="uni-ico" data-vid="<?= (int) $module['id'] ?>" onclick="famiVideoDownload(this)" title="<?= t('Télécharger la vidéo (intro + vidéo + fin)', 'De video downloaden (intro + video + slot)') ?>">🎬 <span><?= t('Vidéo', 'Video') ?></span></button><?php endif; ?>
                 </div>
                 <?php endif; ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
@@ -1201,5 +1201,30 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <script src="/pdf-viewer.js" defer></script>
         <?php endif; ?>
     <?php endif; ?>
+<script>
+// Téléchargement vidéo : on PRÉPARE la fusion (intro + vidéo + outro) côté serveur — ça peut
+// prendre des minutes la 1re fois (ré-encodage), donc la fée s'affiche — PUIS on télécharge.
+// Sans intro/outro, la préparation est instantanée et on télécharge la vidéo seule.
+function famiVideoDownload(btn) {
+    var vid = btn.getAttribute('data-vid');
+    if (!vid || vid === '0') { return; }
+    if (window.feeIndef) { window.feeIndef(); }
+    btn.disabled = true;
+    fetch('video_download.php?id=' + encodeURIComponent(vid) + '&prepare=1', { credentials: 'same-origin' })
+        .then(function (r) { return r.json().catch(function () { return { ok: r.ok }; }); })
+        .then(function (res) {
+            if (window.feeHide) { window.feeHide(); }
+            btn.disabled = false;
+            if (res && res.ok === false) { alert(res.error || 'Téléchargement impossible.'); return; }
+            // Fichier prêt (fusionné ou vidéo seule) : le navigateur lance le téléchargement.
+            window.location = 'video_download.php?id=' + encodeURIComponent(vid);
+        })
+        .catch(function () {
+            if (window.feeHide) { window.feeHide(); }
+            btn.disabled = false;
+            window.location = 'video_download.php?id=' + encodeURIComponent(vid); // repli : on tente le direct
+        });
+}
+</script>
 </body>
 </html>

@@ -54,6 +54,10 @@ if (!function_exists('ensureModulesTable')) {
                 // Drapeau : le quiz a déjà été enrichi avec le contenu de la vidéo.
                 // Évite qu'un ré-upload de vidéo n'écrase un quiz corrigé à la main.
                 'quiz_from_video' => "ALTER TABLE modules ADD COLUMN quiz_from_video TINYINT(1) NOT NULL DEFAULT 0",
+                // Vidéo fusionnée (intro + vidéo + outro) mise en cache pour le téléchargement,
+                // et empreinte de ses sources : si l'intro/outro/vidéo change, on la refait.
+                'merged_path'    => "ALTER TABLE modules ADD COLUMN merged_path VARCHAR(255) NULL",
+                'merged_hash'    => "ALTER TABLE modules ADD COLUMN merged_hash VARCHAR(64) NULL",
             ];
             foreach ($extraColumns as $col => $ddl) {
                 $check = $db->query("SHOW COLUMNS FROM modules LIKE " . $db->quote($col));
@@ -871,7 +875,7 @@ if (!function_exists('ensureModulesTable')) {
     function famiModuleFileKeys(array $r)
     {
         $keys = [];
-        foreach (['pdf_path', 'video_path', 'video_src_path', 'sub_fr_path', 'sub_nl_path', 'sub_src_path', 'icon_image'] as $col) {
+        foreach (['pdf_path', 'video_path', 'video_src_path', 'sub_fr_path', 'sub_nl_path', 'sub_src_path', 'icon_image', 'merged_path'] as $col) {
             $v = trim((string) ($r[$col] ?? ''));
             if ($v !== '') { $keys[] = $v; }
         }
