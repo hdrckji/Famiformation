@@ -37,14 +37,15 @@ if (!function_exists('renderVideoPage')) {
         }
         $quizAvailable = ($quizHref !== '');
 
-        // HABILLAGE : image de fond derriere le lecteur (Parametres -> Preferences -> Createur).
-        // Une video 9:16 ne couvre pas toute la boite 16:9 : au lieu de bandes NOIRES, on voit
-        // cette image. Une video 16:9 la recouvre entierement, donc elle ne se voit pas.
+        // HABILLAGE : image de fond DERRIÈRE le lecteur (Paramètres → Préférences → Créateur).
+        // Une vidéo 9:16 ne couvre pas toute la boîte 16:9 : au lieu de bandes NOIRES, on voit
+        // cette image. Une vidéo 16:9 la recouvre entièrement, donc elle ne se voit pas.
+        // (branding.php doit être chargé ICI : il ne l'était que dans les paramètres, donc
+        //  function_exists() renvoyait faux et l'image n'était jamais affichée.)
+        require_once __DIR__ . '/branding.php';
         $backdrop = '';
-        if (function_exists('brandingVideoBackdropUrl')) {
-            global $db;
-            if ($db instanceof PDO) { $backdrop = brandingVideoBackdropUrl($db); }
-        }
+        global $db;
+        if (isset($db) && $db instanceof PDO) { $backdrop = brandingVideoBackdropUrl($db); }
         $frameCls = $backdrop !== '' ? ' has-backdrop' : '';
         $frameSty = $backdrop !== '' ? ' style="background-image:url(&quot;' . htmlspecialchars($backdrop, ENT_QUOTES) . '&quot;);"' : '';
 

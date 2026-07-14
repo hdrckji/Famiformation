@@ -502,7 +502,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             <input type="file" name="pdf_file" accept="application/pdf,.pdf" class="dz-input">
                             <div class="dz-icon">📄</div>
                             <div class="dz-title">Guide</div>
-                            <div class="dz-hint">Glissez votre document ici ou cliquez pour parcourir<br><small style="color:#8a968f;">PDF uniquement · jusqu'à 30 Mo · (PowerPoint / Word : Fichier → Exporter → PDF)</small></div>
+                            <div class="dz-hint">Glissez votre document ici ou cliquez pour parcourir<br><small style="color:#8a968f;"><strong>PDF uniquement</strong> · jusqu'à 30 Mo<br>PowerPoint et Word ne sont pas acceptés : exportez-les en PDF (Fichier → Exporter → PDF).</small></div>
                             <div class="dz-file" hidden></div>
                         </div>
                         <?php if ($existPdf): ?>

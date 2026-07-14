@@ -75,6 +75,11 @@ $evIcon = function ($t) {
     if ($t === 'content_published') { return '✅'; }
     if ($t === 'content_rejected')  { return '↩'; }
     if ($t === 'ai_doubt')          { return '⚠️'; }
+    if ($t === 'module_created')    { return '🧩'; }
+    if ($t === 'module_updated')    { return '✏️'; }
+    if ($t === 'module_deleted')    { return '🗑️'; }
+    if ($t === 'module_toggled')    { return '🔀'; }
+    if ($t === 'content_updated')   { return '📎'; }
     return '•';
 };
 ?>

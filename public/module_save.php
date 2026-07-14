@@ -176,6 +176,19 @@ function spawnVideoTranscode($rawKey, $moduleId)
     @exec($cmd);
 }
 
+/**
+ * Journalise TOUTE modification du site dans le fil d'événements (boîte « Événements »).
+ * Avant, seuls les dépôts de contenu par un non-admin étaient tracés : renommer un module,
+ * l'activer, le supprimer ou remplacer son contenu ne laissait AUCUNE trace.
+ */
+function famiLogChange($db, $type, $moduleId, $message)
+{
+    require_once __DIR__ . '/includes/events.php';
+    if (function_exists('logEvent')) {
+        logEvent($db, $type, (int) ($_SESSION['user_id'] ?? 0), (int) $moduleId, $message);
+    }
+}
+
 $redirectTo = safeReturn($_POST['return'] ?? '', 'index.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -226,6 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $nextSort,
             ]);
             $newId = (int) $db->lastInsertId();
+            famiLogChange($db, 'module_created', $newId, '🧩 Module créé : ' . $nom);
             $_SESSION['module_flash'] = "✅ Module « " . $nom . " » créé. 🌐 Version néerlandaise en cours.";
 
             // Contributeur : le module reste EN ATTENTE (caché) jusqu'à validation admin.
@@ -289,6 +303,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $iconImage,
                     $id,
                 ]);
+                // Ce qui a réellement changé (pour une notification utile, pas un « modifié » vague).
+                $changed = [];
+                if (trim((string) ($existing['nom'] ?? '')) !== $nom) { $changed[] = 'nom'; }
+                if (trim((string) ($existing['description'] ?? '')) !== $description) { $changed[] = 'description'; }
+                if (trim((string) ($existing['roles'] ?? '')) !== $roles) { $changed[] = 'accès'; }
+                if (trim((string) ($existing['icon'] ?? '')) !== $icon || ($existing['icon_image'] ?? null) !== $iconImage) { $changed[] = 'icône'; }
+                if ($changed) {
+                    famiLogChange($db, 'module_updated', (int) $id, '✏️ Module modifié (' . implode(', ', $changed) . ') : ' . $nom);
+                }
+
                 if (function_exists('nlSyncModule')) { @set_time_limit(0); nlSyncModule($db, (int) $id, true); } // titre/description → NL en direct
                 $_SESSION['module_flash'] = "✅ Module « " . $nom . " » modifié. 🌐 Version néerlandaise mise à jour.";
             }
@@ -303,12 +327,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['module_flash'] = "❌ Module verrouillé : déverrouillez-le d'abord pour changer son statut.";
             } else {
                 $db->prepare("UPDATE modules SET is_active = 1 - is_active WHERE id = ?")->execute([$id]);
+                $nowOn = $module && (int) ($module['is_active'] ?? 0) === 0; // il vient de basculer
+                famiLogChange($db, 'module_toggled', (int) $id,
+                    ($nowOn ? '▶ Module activé : ' : '⏸ Module désactivé : ') . moduleNom($module ?: []));
                 $_SESSION['module_flash'] = "✅ Statut du module mis à jour.";
             }
         }
     } elseif ($action === 'content') {
         $id = (int) ($_POST['id'] ?? 0);
         $module = $id > 0 ? getModuleById($db, $id) : null;
+        // Contenu déjà présent avant cet envoi ? (pour dire « ajouté » ou « remplacé »)
+        $hasAnyContentBefore = $module && (!empty($module['pdf_path']) || !empty($module['video_path']) || !empty($module['contenu_ia']));
         // Contributeur non-admin : uniquement dans une zone autorisée.
         if (!$isAdminActor && (!$module || !contribCanAddContent($db, $module, $actorRole))) {
             $_SESSION['module_flash'] = "❌ Vous n'avez pas le droit d'ajouter du contenu ici.";
@@ -633,6 +662,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ph = implode(',', array_fill(0, count($subIds), '?'));
                     try { $db->prepare("UPDATE modules SET is_active = 0, content_status = ? WHERE id IN ($ph)")->execute(array_merge([$subStatus], $subIds)); } catch (Exception $e) {}
                 }
+                // La modification de contenu est un ÉVÉNEMENT, quel qu'en soit l'auteur.
+                famiLogChange($db, 'content_updated', (int) $id, '📎 Contenu ' . ($hasAnyContentBefore ? 'remplacé' : 'ajouté') . ' (' . $ajout . ') : ' . $modNom);
+
                 if (!$isAdminActor) {
                     logEvent($db, 'content_submitted', (int) ($_SESSION['user_id'] ?? 0), $id, 'Contenu proposé (' . $ajout . ') : ' . $modNom);
                     $structMsg .= " En attente de validation par un admin.";
@@ -778,6 +810,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $db->prepare("DELETE FROM modules WHERE id IN ($ph)")->execute($toDelete);
                     storageRecordSample($db); // le volume a changé → point d'historique (pro rata)
                     $nbSub = count($toDelete) - 1;
+                    famiLogChange($db, 'module_deleted', 0, '🗑️ Module supprimé : ' . moduleNom($module)
+                        . ($nbSub > 0 ? ' (+ ' . $nbSub . ' sous-module' . ($nbSub > 1 ? 's' : '') . ')' : ''));
                     $_SESSION['module_flash'] = "✅ Module supprimé" . ($nbSub > 0 ? " (et $nbSub sous-module" . ($nbSub > 1 ? 's' : '') . ")" : "") . ".";
                     if (!empty($module['parent_id'])) {
                         $redirectTo = 'module.php?id=' . (int) $module['parent_id'];
