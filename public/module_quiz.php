@@ -40,7 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         if ($text === '' || count($opts) < 2 || empty($correct)) { continue; }
         $type = (($qi['type'] ?? 'single') === 'multiple') ? 'multiple' : 'single';
         if ($type === 'single') { $correct = [$correct[0]]; }
-        $questions[] = ['q' => $text, 'type' => $type, 'options' => $opts, 'correct' => array_values($correct)];
+        $qBlk = ['q' => $text, 'type' => $type, 'options' => $opts, 'correct' => array_values($correct)];
+        // Le doute de l'IA SURVIT à l'enregistrement tant que l'humain ne l'a pas levé
+        // (bouton « Doute levé » : il supprime le champ caché, donc le doute disparaît ici).
+        $fix = trim((string) ($qi['fix'] ?? ''));
+        if ($fix !== '') { $qBlk['fix'] = $fix; }
+        $questions[] = $qBlk;
     }
     $json = $questions ? json_encode(['questions' => $questions], JSON_UNESCAPED_UNICODE) : null;
     // Le contrôle se fait TOUJOURS dans la langue du document : la traduction n'existe pas
@@ -86,6 +91,15 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
     .intro { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; line-height:1.5; }
     .intro b { color:var(--forest); }
     .q { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:14px; position:relative; }
+    /* DOUTE de l'IA sur une question : visible en permanence, pas seulement en mode edition. */
+    .q.doubt { border-color:#f3b4b4; box-shadow:0 0 0 2px #fdecec inset; }
+    .qfix { background:#fdecec; border:1px solid #f3b4b4; border-radius:10px; padding:10px 12px; margin:0 0 10px; color:#c0392b; }
+    .qfix .lab { font-weight:800; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; }
+    .qfix-ok { margin-top:8px; border:none; border-radius:8px; padding:6px 12px; font-weight:700; cursor:pointer; background:var(--forest); color:#fff; }
+    body:not(.qedit) .qfix-ok { display:none; }
+    .qbanner { display:flex; align-items:center; gap:12px; background:linear-gradient(180deg,#fff3e0,#ffe6c7); border:2px solid #e8a13a;
+               color:#7a4b00; padding:14px 18px; border-radius:14px; margin-bottom:14px; font-weight:700; }
+    .qbanner .ic { font-size:1.5rem; }
     .q .num { font-family:ui-monospace,monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--leaf); font-weight:700; }
     .q .qtext { width:100%; padding:10px; border:1px solid #ccd6cf; border-radius:8px; font:inherit; font-weight:700; margin:6px 0 10px; }
     .typewrap { display:flex; gap:16px; margin-bottom:10px; font-weight:600; flex-wrap:wrap; }
@@ -123,11 +137,34 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
             Relis les questions générées par l'IA : corrige le texte, coche <b>la ou les bonnes réponses</b>, choisis <b>Unique</b> (1 bonne réponse) ou <b>Multiple</b> (plusieurs). Tu peux ajouter/supprimer des questions.
             <div style="margin-top:8px;"><span class="pill" id="pillSin"><?= (int) $nbSin ?> unique(s)</span> <span class="pill" id="pillMul"><?= (int) $nbMul ?> multiple(s)</span></div>
         </div>
+        <?php
+            $nbDoubt = 0;
+            foreach ($questions as $q_) { if (trim((string) ($q_['fix'] ?? '')) !== '') { $nbDoubt++; } }
+        ?>
+        <?php if ($nbDoubt > 0): ?>
+        <div class="qbanner">
+            <span class="ic">&#9888;</span>
+            <span><?= (int) $nbDoubt ?> question<?= $nbDoubt > 1 ? 's' : '' ?> sur laquelle l'IA a un <strong>doute</strong> — elle n'est pas sure de la bonne reponse.
+            Elles sont encadrees en rouge ci-dessous : <strong>tranche avant de valider</strong>.</span>
+        </div>
+        <?php endif; ?>
         <div id="qlist">
-            <?php foreach ($questions as $i => $q): $type = (($q['type'] ?? 'single') === 'multiple') ? 'multiple' : 'single'; $correct = array_map('intval', (array) ($q['correct'] ?? [])); ?>
-            <div class="q" data-q>
-                <div class="delq" onclick="delQ(this)">🗑 Supprimer</div>
+            <?php foreach ($questions as $i => $q):
+                $type = (($q['type'] ?? 'single') === 'multiple') ? 'multiple' : 'single';
+                $correct = array_map('intval', (array) ($q['correct'] ?? []));
+                $fix = trim((string) ($q['fix'] ?? ''));
+            ?>
+            <div class="q<?= $fix !== '' ? ' doubt' : '' ?>" data-q>
+                <div class="delq" onclick="delQ(this)">&#128465; Supprimer</div>
                 <div class="num">Question <?= (int) $i + 1 ?></div>
+                <?php if ($fix !== ''): ?>
+                    <div class="qfix">
+                        <div class="lab">&#9888; Doute de l'IA</div>
+                        <div><?= htmlspecialchars($fix) ?></div>
+                        <button type="button" class="qfix-ok" onclick="qClearFix(this)">✓ Doute levé — j'ai vérifié</button>
+                        <input type="hidden" name="q[<?= (int) $i ?>][fix]" value="<?= htmlspecialchars($fix, ENT_QUOTES) ?>">
+                    </div>
+                <?php endif; ?>
                 <input type="text" class="qtext" name="q[<?= $i ?>][text]" value="<?= htmlspecialchars((string) ($q['q'] ?? '')) ?>" placeholder="Énoncé de la question">
                 <div class="typewrap">
                     <label><input type="radio" name="q[<?= $i ?>][type]" value="single" <?= $type === 'single' ? 'checked' : '' ?> onchange="syncType(this)"> Réponse unique</label>
@@ -157,6 +194,14 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
 
 <script>
 var QC = <?= count($questions) ?>; // compteur d'index de questions (unique)
+// « Doute levé » : on retire le champ caché -> le doute disparaît à l'enregistrement.
+function qClearFix(btn) {
+    var box = btn.closest('.qfix');
+    if (!box) { return; }
+    var card = btn.closest('.q');
+    box.remove();                       // enlève aussi le <input type=hidden name=q[i][fix]>
+    if (card) { card.classList.remove('doubt'); }
+}
 function syncType(r) { /* pas de contrainte dure : l'enregistrement normalise (single -> 1 bonne) */ }
 function delOpt(x) { var o = x.closest('.opt'); if (o) { o.remove(); } }
 function addOpt(btn) {

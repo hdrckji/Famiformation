@@ -553,6 +553,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // On le CACHE donc pour tout le monde, même pour un admin — personne ne doit voir
                 // une formation non relue. Il sera PUBLIÉ à la validation finale de la relecture
                 // (famiFinalValidation), c.-à-d. après le quiz s'il y en a un.
+                // DOUTES DE L'IA sur le guide : on prévient dans les notifications (admins + auteur).
+                if ($guideChildId && function_exists('famiCountDoubts') && function_exists('logAiDoubts')) {
+                    $nbD = famiCountDoubts($contenuIa ?? '');
+                    if ($nbD > 0) {
+                        logAiDoubts($db, (int) $guideChildId, (int) ($_SESSION['user_id'] ?? 0), $nbD, 'guide');
+                        $flashMsg .= " ⚠️ " . $nbD . " point" . ($nbD > 1 ? 's' : '') . " douteux signalé" . ($nbD > 1 ? 's' : '') . " par l'IA.";
+                    }
+                }
+
                 // Statut : 'pending' = « à contrôler par un admin » (file de modération). Un ADMIN
                 // n'a personne au-dessus de lui : son contenu est en 'draft' — caché lui aussi,
                 // mais il n'encombre PAS la file « à contrôler » ni les notifications.

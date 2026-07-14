@@ -37,14 +37,15 @@ foreach ($rows as $r) {
     $q = json_decode((string) $r['quiz_json'], true);
     $questions = (is_array($q) && !empty($q['questions']) && is_array($q['questions'])) ? $q['questions'] : [];
     if (empty($questions)) { continue; }
-    $mul = 0; $sin = 0; $texts = [];
+    $mul = 0; $sin = 0; $texts = []; $doubts = 0;
     foreach ($questions as $qq) {
         if (($qq['type'] ?? 'single') === 'multiple') { $mul++; } else { $sin++; }
+        if (trim((string) ($qq['fix'] ?? '')) !== '') { $doubts++; } // doute non tranche par l'IA
         $texts[] = (string) ($qq['q'] ?? '');
     }
     $quizzes[] = [
         'id' => (int) $r['id'], 'name' => moduleNom($r), 'path' => $crumb((int) $r['id']),
-        'nb' => count($questions), 'mul' => $mul, 'sin' => $sin, 'texts' => $texts,
+        'nb' => count($questions), 'mul' => $mul, 'sin' => $sin, 'texts' => $texts, 'doubts' => $doubts,
     ];
     $totQ += count($questions); $totMul += $mul; $totSin += $sin;
 }
@@ -71,6 +72,9 @@ usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); }
     .stat .n { font-size:1.6rem; font-weight:800; color:var(--forest); } .stat .l { font-size:.8rem; color:#5a6b60; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
     .search { width:100%; padding:12px 14px; border:1px solid #cfdad3; border-radius:12px; font-size:1rem; margin-bottom:14px; }
     .qz { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    /* Quiz contenant au moins une question douteuse : impossible de le rater dans la liste. */
+    .qz-doubt { border-color:#e8a13a; border-left:6px solid #e8a13a; background:#fffaf2; }
+    .qz-alert { margin-top:8px; background:#fdecec; border:1px solid #f3b4b4; color:#c0392b; border-radius:9px; padding:7px 11px; font-size:.86rem; font-weight:600; }
     .qz .name { font-weight:800; color:var(--forest); font-size:1.1rem; }
     .qz .path { color:#5a6b60; font-size:.82rem; }
     .qz .badges span { display:inline-block; background:#eef7f0; border:1px solid #cfe3d5; color:var(--forest); border-radius:999px; padding:3px 10px; font-size:.8rem; font-weight:700; margin:4px 6px 0 0; }
@@ -104,7 +108,7 @@ usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); }
             <p class="muted">Aucun quiz pour l'instant. Ils apparaîtront ici dès qu'un contenu « à évaluer » sera importé.</p>
         <?php else: ?>
             <?php foreach ($quizzes as $qz): ?>
-            <div class="qz" data-search="<?= htmlspecialchars(strtolower($qz['name'] . ' ' . $qz['path'] . ' ' . implode(' ', $qz['texts'])), ENT_QUOTES) ?>">
+            <div class="qz<?= $qz['doubts'] > 0 ? ' qz-doubt' : '' ?>" data-search="<?= htmlspecialchars(strtolower($qz['name'] . ' ' . $qz['path'] . ' ' . implode(' ', $qz['texts'])), ENT_QUOTES) ?>">
                 <div>
                     <div class="name"><?= htmlspecialchars($qz['name']) ?></div>
                     <?php if ($qz['path'] !== ''): ?><div class="path">📍 <?= htmlspecialchars($qz['path']) ?></div><?php endif; ?>
@@ -113,6 +117,9 @@ usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); }
                         <span><?= (int) $qz['mul'] ?> multiple<?= $qz['mul'] > 1 ? 's' : '' ?></span>
                         <span><?= (int) $qz['sin'] ?> unique<?= $qz['sin'] > 1 ? 's' : '' ?></span>
                     </div>
+                    <?php if ($qz['doubts'] > 0): ?>
+                    <div class="qz-alert">&#9888; <strong><?= (int) $qz['doubts'] ?> question<?= $qz['doubts'] > 1 ? 's' : '' ?></strong> sur laquelle l'IA a un doute — a trancher.</div>
+                    <?php endif; ?>
                 </div>
                 <a class="btn" href="module_quiz.php?id=<?= (int) $qz['id'] ?>">📝 Gérer le quiz</a>
             </div>

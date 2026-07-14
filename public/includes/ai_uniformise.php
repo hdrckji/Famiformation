@@ -506,8 +506,9 @@ if (!function_exists('aiGenerateQuiz')) {
                 . "- Chaque question a 3 à 5 options claires et distinctes.\n"
                 . "- \"correct\" = indices 0-based des bonnes options.\n"
                 . "- Si le contenu ne permet pas $n questions de qualité, fais-en MOINS plutôt que d'inventer.\n"
+                . "- DOUTE : si le contenu est ambigu, contradictoire ou insuffisant pour garantir la bonne réponse, garde quand même la question mais ajoute un champ \"fix\" expliquant TON DOUTE en une phrase (ex. « le document donne deux chiffres différents »). L'humain tranchera. Mets \"fix\" UNIQUEMENT en cas de vrai doute, jamais autrement.\n"
                 . "- Réponds UNIQUEMENT en JSON valide, sans aucun texte autour :\n"
-                . '{"questions":[{"q":"...","type":"single","options":["...","..."],"correct":[0]}]}';
+                . '{"questions":[{"q":"...","type":"single","options":["...","..."],"correct":[0],"fix":"(facultatif) doute"}]}';
 
             $user = "CONTENU DE FORMATION :\n\n" . $contentText;
             if (!empty($clean)) {
@@ -551,7 +552,11 @@ if (!function_exists('aiGenerateQuiz')) {
                 if (empty($correct)) { continue; }
                 if ($type === 'single') { $correct = [$correct[0]]; }
                 $seen[$key] = true;
-                $clean[] = ['q' => (string) $it['q'], 'type' => $type, 'options' => $opts, 'correct' => $correct];
+                $qBlk = ['q' => (string) $it['q'], 'type' => $type, 'options' => $opts, 'correct' => $correct];
+                // Doute de l'IA sur cette question : conserve tel quel, affiche partout
+                // (bandeau du module, controle du quiz, gestionnaire) jusqu'a ce qu'un humain tranche.
+                if (trim((string) ($it['fix'] ?? '')) !== '') { $qBlk['fix'] = (string) $it['fix']; }
+                $clean[] = $qBlk;
                 $added++;
                 if (count($clean) >= $nbTotal) { break; }
             }

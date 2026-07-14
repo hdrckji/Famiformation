@@ -936,6 +936,24 @@ if (!function_exists('ensureModulesTable')) {
         return $n;
     }
 
+    /**
+     * Compte les DOUTES de l'IA (champ "fix") dans un JSON de guide OU de quiz.
+     * Le guide est {"blocks":[...]}, le quiz {"questions":[...]} : même champ, même logique.
+     */
+    function famiCountDoubts($json)
+    {
+        $d = json_decode((string) $json, true);
+        if (!is_array($d)) { return 0; }
+        $items = [];
+        if (!empty($d['blocks']) && is_array($d['blocks'])) { $items = $d['blocks']; }
+        elseif (!empty($d['questions']) && is_array($d['questions'])) { $items = $d['questions']; }
+        $n = 0;
+        foreach ($items as $it) {
+            if (is_array($it) && trim((string) ($it['fix'] ?? '')) !== '') { $n++; }
+        }
+        return $n;
+    }
+
     function getModuleById(PDO $db, $id)
     {
         ensureModulesTable($db);

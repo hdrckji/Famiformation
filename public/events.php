@@ -74,6 +74,7 @@ $evIcon = function ($t) {
     if ($t === 'content_submitted') { return '📥'; }
     if ($t === 'content_published') { return '✅'; }
     if ($t === 'content_rejected')  { return '↩'; }
+    if ($t === 'ai_doubt')          { return '⚠️'; }
     return '•';
 };
 ?>

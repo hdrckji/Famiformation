@@ -250,19 +250,22 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             $canEditContent = ($isAdmin || !empty($canContribHere) || (int) ($module['contenu_by'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0));
             $isGuide = (!empty($module['uniformized']) && !empty($module['contenu_ia']));
             // Doutes de l'IA (champ "fix") : comptés pour les éditeurs, signalés bien visiblement.
-            $aiDoubts = 0;
-            if ($canEditContent && $isGuide) {
-                $dData = json_decode((string) ($module['contenu_ia'] ?? ''), true);
-                foreach ((is_array($dData) && !empty($dData['blocks']) ? $dData['blocks'] : []) as $db_) {
-                    if (is_array($db_) && trim((string) ($db_['fix'] ?? '')) !== '') { $aiDoubts++; }
-                }
-            }
+            // Le guide ET le quiz peuvent en porter — on affiche un bandeau par source.
+            $aiDoubts = ($canEditContent && $isGuide) ? famiCountDoubts($module['contenu_ia'] ?? '') : 0;
+            $quizDoubts = $canEditContent ? famiCountDoubts($module['quiz_json'] ?? '') : 0;
         ?>
         <?php if ($aiDoubts > 0): ?>
         <a href="module_edit.php?id=<?= (int) $module['id'] ?>" class="ai-doubt-banner">
             <span class="ai-doubt-ico">⚠️</span>
-            <span><strong><?= (int) $aiDoubts ?> <?= $aiDoubts > 1 ? 'points signalés' : 'point signalé' ?> par l'IA</strong> — à vérifier. Cliquez pour voir le détail et corriger.</span>
+            <span><strong><?= (int) $aiDoubts ?> <?= $aiDoubts > 1 ? 'points signalés' : 'point signalé' ?> par l'IA dans le guide</strong> — à vérifier. Cliquez pour voir le détail et corriger.</span>
             <span class="ai-doubt-cta">Voir →</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($quizDoubts > 0): ?>
+        <a href="module_quiz.php?id=<?= (int) $module['id'] ?>" class="ai-doubt-banner">
+            <span class="ai-doubt-ico">⚠️</span>
+            <span><strong><?= (int) $quizDoubts ?> <?= $quizDoubts > 1 ? 'questions douteuses' : 'question douteuse' ?> dans le quiz</strong> — l'IA n'est pas sûre de la bonne réponse. Cliquez pour trancher.</span>
+            <span class="ai-doubt-cta">Contrôler →</span>
         </a>
         <style>
         .ai-doubt-banner { display:flex; align-items:center; gap:12px; max-width:820px; width:92%; margin:14px auto 0; text-decoration:none;
@@ -466,7 +469,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             <?php if ($hasAnyContent): ?>
                 <button type="button" id="editContentBtn" onclick="toggleContentForm()" style="width:100%; border:none; background:linear-gradient(180deg,#eef7f0,#e0efe3); color:#2d5a37; font-weight:800; font-size:1.05rem; padding:16px; border-radius:12px; cursor:pointer;">✏️ Modifier le contenu <span id="editContentCaret" style="opacity:.6;">▾</span></button>
             <?php else: ?>
-                <h3 style="margin-top:0; color:#2d5a37; font-size:1.35rem;">📎 Ajout de contenu</h3>
+                <h3 style="margin-top:0; color:#2d5a37; font-size:1.35rem;">📎 Importer des fichiers</h3>
                 <p style="color:#666; margin:-4px 0 12px;">Déposez votre <strong>document</strong> et/ou votre <strong>vidéo</strong>. À la validation : « Guide » pour le document, « Vidéo » pour la vidéo.</p>
             <?php endif; ?>
             <div id="contentFormWrap"<?= $hasAnyContent ? ' style="display:none; margin-top:16px;"' : '' ?>>
@@ -577,7 +580,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
 
                 <label class="chk" style="margin-top:18px; padding:12px 14px; background:#f4f7f6; border-radius:10px;">
                     <input type="checkbox" name="a_evaluer" value="1" <?= !empty($module['a_evaluer']) ? 'checked' : '' ?>>
-                    📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz de 75 questions sera généré pour l'évaluer)</small>
+                    📝 Générer un quiz <small style="font-weight:400; color:#777;">(l'IA crée les questions à partir du document et de la vidéo)</small>
                 </label>
 
                 <p style="font-size:0.82rem; color:#777; margin-top:14px;">« <?= $hasAnyContent ? 'Modifier' : 'Valider' ?> et uniformiser » : l'IA lit le document et construit la belle page « Guide » (au lieu de l'afficher brut).</p>
@@ -586,18 +589,24 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <button type="submit" name="uniformize" value="1" class="btn btn-create"><?= $hasAnyContent ? 'Modifier et uniformiser' : 'Valider et uniformiser' ?></button>
                 </div>
             </form>
-            <div style="border-top:1px dashed #cfe0d4; margin:18px 0 0; padding-top:16px; text-align:center;">
-                <p style="color:#666; margin:0 0 10px; font-size:.9rem;">Pas de PDF&nbsp;? Vous pouvez aussi <strong>rédiger la formation vous-même</strong>.</p>
-                <button type="button" class="btn btn-create" onclick="document.getElementById('createGuideModal').style.display='flex';">✍️ Créer un guide (rédiger de zéro)</button>
             </div>
-            </div>
+        </div>
+
+        <!-- ============================================================
+             VOIE 2 — CRÉER UN GUIDE. Rien à voir avec l'import de fichiers :
+             c'est un autre point de départ (page blanche), donc sa PROPRE carte.
+             ============================================================ -->
+        <div class="content-card" id="createGuideCard">
+            <h3 style="margin:0 0 6px; color:#2d5a37;">✍️ Créer un guide</h3>
+            <p style="color:#666; margin:0 0 14px; font-size:.92rem;">Sans aucun fichier : tu écris la formation directement dans l'éditeur (sections, listes, encadrés, images…).</p>
+            <button type="button" class="btn btn-create" onclick="document.getElementById('createGuideModal').style.display='flex';">✍️ Créer un guide</button>
         </div>
         <!-- Modale : créer un guide de zéro (avec rappel du choix d'évaluation) -->
         <div id="createGuideModal" class="fc-modal">
             <div class="fc-modal-box">
                 <div class="fc-modal-icon">✍️</div>
-                <div class="fc-modal-title">Rédiger une formation de zéro ?</div>
-                <div class="fc-modal-text">Un guide vierge sera créé : tu le rédiges directement dans l'éditeur (sections, listes, encadrés, images…). À la <strong>validation</strong>, l'IA vérifie l'orthographe, génère le quiz si demandé, puis traduit en néerlandais.</div>
+                <div class="fc-modal-title">Créer un guide ?</div>
+                <div class="fc-modal-text">Un guide vierge sera créé et tu arrives <strong>directement dans l'éditeur</strong>. À la <strong>validation</strong> : si tu as coché « Générer un quiz », l'IA le construit à partir de ce que tu as écrit et tu le relis ; sinon elle corrige l'orthographe et traduit dans l'autre langue, puis publie.</div>
                 <form method="POST" action="module_save.php">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="create_blank_guide">
@@ -606,11 +615,11 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                         <input type="password" name="admin_password" placeholder="Mot de passe de verrouillage" required style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;">
                     <?php endif; ?>
                     <label class="chk" style="display:flex; align-items:center; gap:10px; justify-content:center; background:#f4f7f6; border-radius:10px; padding:12px; margin:0 0 12px; font-weight:700; color:#244230;">
-                        <input type="checkbox" name="a_evaluer" value="1"> 📝 Ce contenu est à évaluer <small style="font-weight:400; color:#777;">(un quiz sera généré à la validation)</small>
+                        <input type="checkbox" name="a_evaluer" value="1"> 📝 Générer un quiz <small style="font-weight:400; color:#777;">(à partir de ce que tu auras écrit)</small>
                     </label>
                     <div class="fc-modal-actions">
                         <button type="button" class="btn" style="background:#e9ecef; color:#333;" onclick="document.getElementById('createGuideModal').style.display='none';">Annuler</button>
-                        <button type="submit" class="btn btn-create">✍️ Créer et rédiger</button>
+                        <button type="submit" class="btn btn-create">✍️ Créer le guide</button>
                     </div>
                 </form>
             </div>

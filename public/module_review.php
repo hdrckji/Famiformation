@@ -89,10 +89,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                 }
                 $qz = aiGenerateQuiz($db, $qSource);
                 if (!empty($qz['ok']) && !empty($qz['quiz'])) {
-                    $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")
-                       ->execute([json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE), $id]);
+                    $quizJson = json_encode($qz['quiz'], JSON_UNESCAPED_UNICODE);
+                    $db->prepare("UPDATE modules SET quiz_json = ? WHERE id = ?")->execute([$quizJson, $id]);
                     $hasQuiz = true;
                     $quizMsg = ' 📝 Quiz généré (' . count($qz['quiz']['questions'] ?? []) . ').';
+
+                    // Questions sur lesquelles l'IA a un doute → notification (admins + auteur).
+                    if (function_exists('famiCountDoubts') && function_exists('logAiDoubts')) {
+                        $nbQD = famiCountDoubts($quizJson);
+                        if ($nbQD > 0) {
+                            require_once 'includes/events.php';
+                            logAiDoubts($db, $id, (int) ($_SESSION['user_id'] ?? 0), $nbQD, 'quiz');
+                            $quizMsg .= ' ⚠️ ' . $nbQD . ' question' . ($nbQD > 1 ? 's' : '') . ' douteuse' . ($nbQD > 1 ? 's' : '') . ' — à trancher.';
+                        }
+                    }
                 } else {
                     $quizFailed = true;
                     $quizMsg = ' ⚠️ Quiz non généré : ' . ($qz['error'] ?? 'erreur') . '.';

@@ -38,6 +38,30 @@ if (!function_exists('logEvent')) {
     }
 }
 
+if (!function_exists('logAiDoubts')) {
+    /**
+     * L'IA a signalé des doutes (champ "fix") : on le dit dans les notifications.
+     * L'auteur du contenu ET les admins le verront dans le fil (et le rond rouge s'allume).
+     *
+     * @param string $what 'guide' ou 'quiz'
+     */
+    function logAiDoubts($db, $moduleId, $actorId, $nb, $what = 'guide')
+    {
+        $nb = (int) $nb;
+        if ($nb <= 0) { return; }
+        $nom = '';
+        try {
+            $st = $db->prepare("SELECT nom FROM modules WHERE id = ?");
+            $st->execute([(int) $moduleId]);
+            $nom = (string) $st->fetchColumn();
+        } catch (Exception $e) {}
+        $lbl = ($what === 'quiz')
+            ? ($nb . ' question' . ($nb > 1 ? 's' : '') . ' douteuse' . ($nb > 1 ? 's' : '') . ' dans le quiz')
+            : ($nb . ' point' . ($nb > 1 ? 's' : '') . ' douteux dans le guide');
+        logEvent($db, 'ai_doubt', $actorId, $moduleId, '⚠️ ' . $lbl . ' — à vérifier : ' . $nom);
+    }
+}
+
 if (!function_exists('eventsPendingSubmissions')) {
     /** Soumissions en attente = modules content_status='pending' dont le parent n'est PAS lui-même en attente. */
     function eventsPendingSubmissions($db)
