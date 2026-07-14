@@ -46,6 +46,10 @@ if (!function_exists('renderVideoPage')) {
         $backdrop = '';
         global $db;
         if (isset($db) && $db instanceof PDO) { $backdrop = brandingVideoBackdropUrl($db); }
+        if ($backdrop !== '') {
+            $backdrop .= (strpos($backdrop, '?') !== false ? '&' : '?')
+                . 'l=' . (function_exists('currentLang') ? currentLang() : 'fr');
+        }
         $frameCls = $backdrop !== '' ? ' has-backdrop' : '';
         $frameSty = $backdrop !== '' ? ' style="background-image:url(&quot;' . htmlspecialchars($backdrop, ENT_QUOTES) . '&quot;);"' : '';
 

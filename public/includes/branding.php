@@ -143,14 +143,21 @@ if (!function_exists('brandingCard')) {
         $zone = function ($lang, $flag, $label) use ($db) {
             $key = brandingBackdropFor($db, $lang);
             $url = ($key !== '' && function_exists('moduleFileUrl')) ? moduleFileUrl($key) : '';
+            $servedNow = (function_exists('currentLang') ? currentLang() : 'fr') === $lang;
             ?>
             <div style="flex:1; min-width:280px;">
-                <div style="font-weight:800; color:#244230; margin-bottom:8px;"><?= $flag ?> <?= htmlspecialchars($label) ?></div>
+                <div style="font-weight:800; color:#244230; margin-bottom:8px;">
+                    <?= $flag ?> <?= htmlspecialchars($label) ?>
+                    <?php if ($servedNow): ?>
+                        <span style="font-size:.7rem; font-weight:800; background:#2d5a37; color:#fff; border-radius:999px; padding:2px 8px; margin-left:6px;">AFFICHÉE ACTUELLEMENT</span>
+                    <?php endif; ?>
+                </div>
 
                 <?php if ($url !== ''): ?>
                     <div style="position:relative; border-radius:12px; overflow:hidden; border:1px solid #d9e3dc; background:#111 url('<?= htmlspecialchars($url) ?>') center/cover no-repeat; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;">
                         <div style="height:100%; aspect-ratio:9/16; background:#0c1a11; display:flex; align-items:center; justify-content:center; color:#9fb8a6; font-size:.72rem; font-weight:700;">vidéo 9:16</div>
                     </div>
+                    <div class="muted" style="font-size:.78rem; margin-top:6px; word-break:break-all;">📁 <?= htmlspecialchars(basename($key)) ?></div>
                 <?php else: ?>
                     <div style="border:2px dashed #cfdad3; border-radius:12px; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; color:#8a968f; font-style:italic; font-size:.85rem; text-align:center; padding:10px;">
                         Aucune image<?= $lang === 'nl' ? '<br><small>(la version française sera utilisée)</small>' : '' ?>
