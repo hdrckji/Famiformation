@@ -685,17 +685,8 @@ BLAGUES
             $showMeteo = widgetGet($db, 'show_meteo', '1') === '1';
             $showPhrases = widgetGet($db, 'show_phrases', '1') === '1';
             $showDate = widgetGet($db, 'show_date', '1') === '1';
-
-            // 🍦 TICKET GLACE : il se colle là où se trouve la RAISON — sur la météo
-            // quand il fait ≥ 30 °C, sur la date quand on est dimanche. Un seul ticket
-            // si les deux tombent le même jour (on n'en offre pas deux) : il reste sur
-            // la météo, et le message signale le doublé.
-            require_once __DIR__ . '/glace.php';
-            $glTemp = $weather ? (int) $weather['temp'] : null;
-            $glRaisons = glaceRaisons($glTemp);
-            $glChaud = in_array('chaud', $glRaisons, true);
-            $glSurMeteo = ($showMeteo && $weather && $glChaud);
-            $glSurDate  = ($showDate && !$glSurMeteo && in_array('dimanche', $glRaisons, true));
+            // 🍦 Le ticket glace n'est PLUS ici : il vit dans le ruban (voir glace.php),
+            //    pour ne pas empiéter sur la météo ni sur la date, qui restent lisibles.
         ?>
         <div class="home-widget">
             <?php if ($showMeteo): ?>
@@ -703,7 +694,6 @@ BLAGUES
                 <?php if ($weather): ?>
                     <?= $weather['emoji'] ?> <?= (int) $weather['temp'] ?>°C
                     <?php if ($siteLabel !== ''): ?><span class="hw-soon"><?= htmlspecialchars($siteLabel) ?></span><?php endif; ?>
-                    <?php if ($glSurMeteo) { echo glaceBadge($glRaisons, $glTemp); } ?>
                 <?php else: ?>
                     🌤️ <span class="hw-soon"><?= htmlspecialchars($tt('Météo indisponible', 'Weer onbeschikbaar')) ?></span>
                 <?php endif; ?>
@@ -713,7 +703,7 @@ BLAGUES
             <div class="hw-center" id="hwCenter" data-phrases="<?= $phrasesAttr ?>"><span class="hw-phrase"><?= htmlspecialchars($phrases[0]) ?></span></div>
             <?php endif; ?>
             <?php if ($showDate): ?>
-            <div class="hw-date"><?= htmlspecialchars(widgetDate()) ?><?php if ($glSurDate) { echo glaceBadge($glRaisons, $glTemp); } ?></div>
+            <div class="hw-date"><?= htmlspecialchars(widgetDate()) ?></div>
             <?php endif; ?>
         </div>
         <style>
