@@ -75,6 +75,16 @@ if (!function_exists('contribHandlePost')) {
         requireValidCSRF();
         if (($_SESSION['role'] ?? '') !== 'admin') { header('Location: index.php'); exit(); }
 
+        // Bascule seule (interrupteur du titre) : on n'écrase NI les profils NI les zones.
+        if (!empty($_POST['toggle_only'])) {
+            widgetSet($db, 'contrib_enabled', !empty($_POST['contrib_enabled']) ? '1' : '0');
+            $_SESSION['module_flash'] = !empty($_POST['contrib_enabled'])
+                ? '🤝 Contribution activée.'
+                : '🤝 Contribution coupée : seuls les admins peuvent ajouter du contenu.';
+            header('Location: parametres.php#prefs');
+            exit();
+        }
+
         widgetSet($db, 'contrib_enabled', !empty($_POST['contrib_enabled']) ? '1' : '0');
 
         $validRoles = array_keys(moduleProfiles($db));
@@ -105,16 +115,17 @@ if (!function_exists('contribSettingsCard')) {
         } catch (Exception $e) {}
         ?>
         <div class="pref-block">
-            <h2 style="margin-top:0; color:#2d5a37;">🤝 Droits de contribution</h2>
+            <?php
+                require_once __DIR__ . '/ui_switch.php';
+                famiPrefHead('🤝 Droits de contribution', 'save_contrib', 'contrib_enabled', $c['enabled'],
+                    "Coupé : seuls les admins peuvent créer un module ou ajouter du contenu.");
+            ?>
             <p class="muted" style="margin-top:-6px;">Qui peut <strong>créer un module</strong> ou <strong>ajouter du contenu</strong>, et <strong>où</strong>. L'admin n'est jamais limité.</p>
             <form method="POST" action="parametres.php">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="save_contrib">
-
-                <label class="chk" style="display:flex; align-items:center; gap:10px; font-weight:700; color:#244230; margin:6px 0 14px;">
-                    <input type="checkbox" name="contrib_enabled" value="1" <?= $c['enabled'] ? 'checked' : '' ?>>
-                    Activer la contribution par des non-admins
-                </label>
+                <input type="hidden" name="contrib_enabled" value="<?= $c['enabled'] ? '1' : '0' ?>">
+                <div class="pref-body<?= $c['enabled'] ? '' : ' pref-off' ?>">
 
                 <div style="font-weight:700; color:#244230; margin:4px 0 6px;">Profils autorisés</div>
                 <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px;">

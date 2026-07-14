@@ -132,15 +132,8 @@ if (!function_exists('quizConfigCard')) {
         $on = quizCfgEnabled($db);
         ?>
         <div class="pref-block">
-            <h3 style="margin:0 0 6px; color:#244230;">📝 Quiz — génération &amp; tirage</h3>
-            <form method="POST" action="parametres.php#prefs" style="margin:0 0 12px;">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="set_quiz_config">
-                <input type="hidden" name="toggle_only" value="1">
-                <?php famiSwitch('quiz_enabled', $on, 'Quiz activés',
-                    "Coupé : aucun quiz n'est généré, même si la case « Générer un quiz » est cochée à l'import.",
-                    'onchange="this.form.submit()"'); ?>
-            </form>
+            <?php famiPrefHead('📝 Quiz — génération &amp; tirage', 'set_quiz_config', 'quiz_enabled', $on,
+                "Coupé : aucun quiz n'est généré, même si la case « Générer un quiz » est cochée à l'import."); ?>
             <div class="pref-body<?= $on ? '' : ' pref-off' ?>">
             <p class="muted">L'IA génère une <strong>banque</strong> de questions à la validation du guide. À chaque passage, l'apprenant n'en reçoit qu'une <strong>partie, tirée au hasard</strong> : deux passages ne tombent pas sur les mêmes questions. Plus la banque est grande, plus la génération coûte du temps et des jetons.</p>
 

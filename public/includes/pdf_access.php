@@ -7,9 +7,17 @@
 // Additif : autonome (stockage via widgetGet/widgetSet).
 // ============================================================
 
+if (!function_exists('filesAccessOn')) {
+    /** Interrupteur MAÎTRE du bloc « Accès aux fichiers ». Coupé : plus aucun accès (sauf admin). */
+    function filesAccessOn($db)
+    {
+        return !function_exists('widgetGet') || widgetGet($db, 'files_access_on', '1') === '1';
+    }
+}
+
 if (!function_exists('pdfViewEnabled')) {
-    function pdfViewEnabled($db)     { return !function_exists('widgetGet') || widgetGet($db, 'pdf_view_enabled', '1') === '1'; }
-    function pdfDownloadEnabled($db) { return !function_exists('widgetGet') || widgetGet($db, 'pdf_download_enabled', '1') === '1'; }
+    function pdfViewEnabled($db)     { return filesAccessOn($db) && (!function_exists('widgetGet') || widgetGet($db, 'pdf_view_enabled', '1') === '1'); }
+    function pdfDownloadEnabled($db) { return filesAccessOn($db) && (!function_exists('widgetGet') || widgetGet($db, 'pdf_download_enabled', '1') === '1'); }
     function pdfViewRoles($db)       { return array_values(array_filter(array_map('trim', explode(',', (string) (function_exists('widgetGet') ? widgetGet($db, 'pdf_view_roles', '') : ''))))); }
     function pdfDownloadRoles($db)   { return array_values(array_filter(array_map('trim', explode(',', (string) (function_exists('widgetGet') ? widgetGet($db, 'pdf_download_roles', '') : ''))))); }
 
@@ -32,7 +40,7 @@ if (!function_exists('pdfViewEnabled')) {
 
     // --- VIDÉO : même logique (le téléchargement d'une vidéo coûte BEAUCOUP de bande passante).
     // Par défaut DÉSACTIVÉ, contrairement au PDF : une vidéo pèse lourd.
-    function videoDownloadEnabled($db) { return function_exists('widgetGet') && widgetGet($db, 'video_download_enabled', '0') === '1'; }
+    function videoDownloadEnabled($db) { return filesAccessOn($db) && function_exists('widgetGet') && widgetGet($db, 'video_download_enabled', '0') === '1'; }
     function videoDownloadRoles($db)   { return array_values(array_filter(array_map('trim', explode(',', (string) (function_exists('widgetGet') ? widgetGet($db, 'video_download_roles', '') : ''))))); }
 
     /** L'utilisateur (rôle donné) peut-il TÉLÉCHARGER la vidéo ? Admin = toujours. */
@@ -51,6 +59,17 @@ if (!function_exists('pdfAccessHandlePost')) {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { return; }
         if (($_POST['action'] ?? '') !== 'set_pdf_access') { return; }
         requireValidCSRF();
+
+        // Bascule seule (interrupteur du titre) : on ne touche pas aux options du bloc.
+        if (!empty($_POST['toggle_only'])) {
+            widgetSet($db, 'files_access_on', !empty($_POST['files_access_on']) ? '1' : '0');
+            $_SESSION['module_flash'] = !empty($_POST['files_access_on'])
+                ? '📄 Accès aux fichiers activé.'
+                : "📄 Accès aux fichiers coupé : plus personne (hors admin) ne peut voir ni télécharger les fichiers d'origine.";
+            header('Location: parametres.php#prefs');
+            exit();
+        }
+
         widgetSet($db, 'pdf_view_enabled', !empty($_POST['pdf_view_enabled']) ? '1' : '0');
         widgetSet($db, 'pdf_download_enabled', !empty($_POST['pdf_download_enabled']) ? '1' : '0');
         $valid = function_exists('moduleProfiles') ? array_keys(moduleProfiles($db)) : [];
@@ -71,6 +90,7 @@ if (!function_exists('pdfAccessHandlePost')) {
 if (!function_exists('pdfAccessCard')) {
     function pdfAccessCard($db)
     {
+        $mOn = filesAccessOn($db);
         $profiles = function_exists('moduleProfiles') ? moduleProfiles($db) : [];
         $vEnabled = pdfViewEnabled($db);
         $dEnabled = pdfDownloadEnabled($db);
@@ -90,8 +110,13 @@ if (!function_exists('pdfAccessCard')) {
         };
         ?>
         <div class="pref-block">
-            <h3 style="margin:0 0 6px; color:#244230;">📄 Accès aux fichiers (PDF &amp; vidéo)</h3>
-            <p class="muted">Voir ou télécharger le fichier d'origine consomme de la <strong>bande passante</strong> (payante chez certains hébergeurs, gratuite chez d'autres). Active/désactive chaque option et choisis les profils autorisés. <strong>Les admins ont toujours accès.</strong> (La lecture du guide et la lecture de la vidéo en streaming restent gratuites pour tous.)</p>
+            <?php
+                require_once __DIR__ . '/ui_switch.php';
+                famiPrefHead('📄 Accès aux fichiers (PDF &amp; vidéo)', 'set_pdf_access', 'files_access_on', $mOn,
+                    "Coupé : personne (hors admin) ne peut voir ni télécharger les fichiers d'origine.");
+            ?>
+            <div class="pref-body<?= $mOn ? '' : ' pref-off' ?>">
+            <p class="muted">Voir ou télécharger le fichier d'origine consomme de la <strong>bande passante</strong> (payante chez certains hébergeurs, gratuite en local). Choisis ce qui est autorisé, et pour quels profils. <strong>Les admins ont toujours accès.</strong> (La lecture du guide et de la vidéo en streaming reste libre pour tous.)</p>
 
             <form method="POST" action="parametres.php#prefs">
                 <?= csrfField() ?>
@@ -111,6 +136,7 @@ if (!function_exists('pdfAccessCard')) {
 
                 <div style="margin-top:16px;"><button type="submit" class="btn btn-primary">Enregistrer</button></div>
             </form>
+            </div>
         </div>
         <?php
     }

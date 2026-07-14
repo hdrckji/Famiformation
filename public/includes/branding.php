@@ -119,15 +119,8 @@ if (!function_exists('brandingCard')) {
         $url = $on ? brandingVideoBackdropUrl($db) : '';
         ?>
         <div class="pref-block">
-            <h3 style="margin:0 0 6px; color:#244230;">🎨 Créateur — habillage des vidéos</h3>
-            <form method="POST" action="parametres.php#prefs" id="brandToggleForm" style="margin:0 0 12px;">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="set_branding">
-                <input type="hidden" name="toggle_only" value="1">
-                <?php famiSwitch('video_backdrop_on', $on, 'Habillage activé',
-                    "Coupé : les vidéos verticales retrouvent leurs bandes noires (l'image reste enregistrée).",
-                    'onchange="this.form.submit()"'); ?>
-            </form>
+            <?php famiPrefHead('🎨 Créateur — habillage des vidéos', 'set_branding', 'video_backdrop_on', $on,
+                "Coupé : les vidéos verticales retrouvent leurs bandes noires (l'image reste enregistrée)."); ?>
             <div class="pref-body<?= $on ? '' : ' pref-off' ?>">
             <p class="muted">Une vidéo filmée au téléphone (format <strong>9:16</strong>, portrait) laisse deux grosses <strong>bandes noires</strong> sur les côtés du lecteur. Dépose une image ici : elle s'affiche <strong>derrière</strong> la vidéo et remplit ces bandes. Les vidéos en 16:9 la recouvrent entièrement, donc elle ne se voit pas — aucun risque.</p>
             <p class="muted" style="font-size:.84rem;">💡 Rien n'est ré-encodé : changer l'image change <strong>toutes</strong> les vidéos, immédiatement. Idéal : une image large (1920×1080), plutôt sombre et peu chargée, pour ne pas voler la vedette à la vidéo. JPEG, PNG ou WebP, 5 Mo maximum.</p>
