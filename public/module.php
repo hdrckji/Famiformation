@@ -59,6 +59,16 @@ if ($isContainer) {
     }
 }
 $hasAnyContent = $existPdf || $existVideo || $existVideoProc;
+
+// Quiz DÉJÀ en place ? Un remplacement de contenu l'efface : on doit prévenir avant,
+// sinon on perd un quiz relu et corrigé à la main sans s'en apercevoir.
+$existingQuizNb = 0;
+try {
+    $qq = $db->prepare("SELECT quiz_json FROM modules WHERE (id = ? OR parent_id = ?) AND quiz_json IS NOT NULL AND quiz_json <> '' LIMIT 1");
+    $qq->execute([$moduleId, $moduleId]);
+    $qj = json_decode((string) $qq->fetchColumn(), true);
+    $existingQuizNb = (is_array($qj) && !empty($qj['questions'])) ? count($qj['questions']) : 0;
+} catch (Exception $e) {}
 // Module vierge (aucun contenu) : on remonte le formulaire d'ajout tout en haut.
 $emptyContentFocus = $showContentForm && !$hasAnyContent;
 
@@ -646,6 +656,26 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </form>
             </div>
         </div>
+        <!-- Modale : le remplacement va effacer le quiz existant -->
+        <div id="quizLossModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">🗑️</div>
+                <div class="fc-modal-title">L'ancien quiz va être supprimé</div>
+                <div class="fc-modal-text">
+                    Cette formation a un quiz de <strong><?= (int) $existingQuizNb ?> question<?= $existingQuizNb > 1 ? 's' : '' ?></strong>.
+                    Comme vous remplacez le contenu et que <strong>« Générer un quiz » n'est pas coché</strong>,
+                    ce quiz sera <strong>définitivement effacé</strong> : la formation ne sera plus évaluée,
+                    et vos corrections manuelles seront perdues.<br><br>
+                    Pour le remplacer par un quiz portant sur le nouveau contenu, cochez « Générer un quiz ».
+                </div>
+                <div class="fc-modal-actions" style="flex-direction:column; gap:8px;">
+                    <button type="button" class="btn btn-create" style="width:100%; box-sizing:border-box;" onclick="qlKeepQuiz()">📝 Cocher « Générer un quiz » et continuer</button>
+                    <button type="button" class="btn" style="width:100%; background:#fdecec; color:#b3261e;" onclick="qlDropQuiz()">Continuer sans quiz (l'ancien sera perdu)</button>
+                    <button type="button" class="btn" style="width:100%; background:#e9ecef; color:#333;" onclick="document.getElementById('quizLossModal').style.display='none';">Annuler</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modale : que faire du fichier déjà présent ? -->
         <div id="fileMenuModal" class="fc-modal">
             <div class="fc-modal-box">
@@ -867,6 +897,22 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             return false;
         }
         var fcPendingUniformize = '0';
+        // Le remplacement efface le quiz existant : on ne le laisse pas filer en silence.
+        var QUIZ_NB = <?= (int) $existingQuizNb ?>;
+        function qlKeepQuiz() {
+            var fe = document.querySelector('#contentForm input[name="a_evaluer"]');
+            if (fe) { fe.checked = true; }
+            document.getElementById('quizLossModal').style.display = 'none';
+            document.getElementById('contentForm').requestSubmit(qlSubmitter);
+        }
+        function qlDropQuiz() {
+            document.getElementById('quizLossModal').style.display = 'none';
+            qlConfirmed = true;
+            document.getElementById('contentForm').requestSubmit(qlSubmitter);
+        }
+        var qlConfirmed = false;
+        var qlSubmitter = null;
+
         function validateContent(e) {
             var n = (dzPresent('dz_pdf') ? 1 : 0) + (dzPresent('dz_video') ? 1 : 0);
             if (e && e.submitter && e.submitter.name === 'uniformize') {
@@ -874,6 +920,12 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             }
             if (n === 0) {
                 document.getElementById('fileErrorModal').style.display = 'flex';
+                return false;
+            }
+            var aEval = document.querySelector('#contentForm input[name="a_evaluer"]');
+            if (QUIZ_NB > 0 && aEval && !aEval.checked && !qlConfirmed) {
+                qlSubmitter = (e && e.submitter) ? e.submitter : null;
+                document.getElementById('quizLossModal').style.display = 'flex';
                 return false;
             }
             if (fcPendingUniformize === '1') {
