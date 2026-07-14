@@ -484,13 +484,15 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php if ($showContentForm): // $existPdf/$existVideo/$existVideoProc/$hasAnyContent calculés en tête de page ?>
         <div class="content-card add-content" style="max-width:900px; text-align:left; margin:26px auto;<?= $hasAnyContent ? '' : ' border:2px solid #bfe0c8; box-shadow:0 12px 34px rgba(30,90,55,.14);' ?>">
             <?php if ($hasAnyContent): ?>
-                <button type="button" id="editContentBtn" onclick="toggleContentForm()" style="width:100%; border:none; background:linear-gradient(180deg,#eef7f0,#e0efe3); color:#2d5a37; font-weight:800; font-size:1.05rem; padding:16px; border-radius:12px; cursor:pointer;">✏️ Modifier le contenu <span id="editContentCaret" style="opacity:.6;">▾</span></button>
+                <button type="button" id="editContentBtn" onclick="toggleContentForm()" style="width:100%; border:none; background:linear-gradient(180deg,#eef7f0,#e0efe3); color:#2d5a37; font-weight:800; font-size:1.05rem; padding:16px; border-radius:12px; cursor:pointer;">🔄 Remplacer le contenu <span id="editContentCaret" style="opacity:.6;">▾</span></button>
             <?php else: ?>
                 <h3 style="margin-top:0; color:#2d5a37; font-size:1.35rem;">📎 Importer des fichiers</h3>
                 <p style="color:#666; margin:-4px 0 12px;">Déposez votre <strong>document</strong> et/ou votre <strong>vidéo</strong>. À la validation : « Guide » pour le document, « Vidéo » pour la vidéo.</p>
             <?php endif; ?>
             <div id="contentFormWrap"<?= $hasAnyContent ? ' style="display:none; margin-top:16px;"' : '' ?>>
-            <?php if ($hasAnyContent): ?><p style="color:#666; margin:0 0 12px;">Fichiers actuels ci-dessous. Déposez un nouveau fichier pour <strong>remplacer</strong>, puis choisissez « Modifier » ou « Modifier et uniformiser ».</p><?php endif; ?>
+            <?php if ($hasAnyContent): ?>
+                <p style="color:#666; margin:0 0 12px;">Déposez un nouveau fichier pour <strong>remplacer</strong> celui d'à côté. Un remplacement crée une <strong>nouvelle version</strong> : le guide relu, sa traduction et le quiz sont refaits à partir du nouveau contenu, et la formation repasse par la relecture avant d'être republiée.</p>
+            <?php endif; ?>
             <form id="contentForm" method="POST" action="module_save.php" enctype="multipart/form-data" onsubmit="return validateContent(event);">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="content">
@@ -604,10 +606,10 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     </span>
                 </label>
 
-                <p style="font-size:0.82rem; color:#777; margin-top:16px;">« <?= $hasAnyContent ? 'Modifier' : 'Valider' ?> et uniformiser » : l'IA lit le document et construit la belle page « Guide » (au lieu de l'afficher brut).</p>
+                <p style="font-size:0.82rem; color:#777; margin-top:16px;">« <?= $hasAnyContent ? 'Remplacer' : 'Valider' ?> et uniformiser » : l'IA lit le document et construit la belle page « Guide » (au lieu de l'afficher brut).</p>
                 <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
-                    <button type="submit" name="uniformize" value="0" class="btn" style="background:#e9ecef; color:#333;"><?= $hasAnyContent ? 'Modifier' : 'Valider' ?></button>
-                    <button type="submit" name="uniformize" value="1" class="btn btn-create"><?= $hasAnyContent ? 'Modifier et uniformiser' : 'Valider et uniformiser' ?></button>
+                    <button type="submit" name="uniformize" value="0" class="btn" style="background:#e9ecef; color:#333;"><?= $hasAnyContent ? 'Remplacer' : 'Valider' ?></button>
+                    <button type="submit" name="uniformize" value="1" class="btn btn-create"><?= $hasAnyContent ? 'Remplacer et uniformiser' : 'Valider et uniformiser' ?></button>
                 </div>
             </form>
 
