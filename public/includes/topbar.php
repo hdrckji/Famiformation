@@ -34,6 +34,7 @@ if (!function_exists('famiTopbar')) {
         $back = (string) ($opts['back'] ?? 'index.php');
         $backLabel = (string) ($opts['back_label'] ?? t('Retour', 'Terug'));
         $title = (string) ($opts['title'] ?? '');
+        $actions = (string) ($opts['actions'] ?? ''); // icônes propres à la page (PDF, vidéo…)
 
         // Pastille : ce qu'il y a de neuf POUR MOI.
         $n = 0;
@@ -52,6 +53,9 @@ if (!function_exists('famiTopbar')) {
         ?>
         <style>
         .fami-rib { position:sticky; top:0; z-index:9000; display:flex; align-items:center; gap:14px;
+            /* Toute la largeur : plusieurs pages ont un <body> en flex centré, où un simple
+               bloc se rétrécit à son contenu. width + align-self forcent la pleine largeur. */
+            width:100%; align-self:stretch; box-sizing:border-box; flex:none;
             padding:12px 16px; background:rgba(255,255,255,.78); backdrop-filter:blur(10px);
             border-bottom:1px solid rgba(45,90,55,.10); }
         .fami-rib .rb-back, .fami-rib .rb-btn {
@@ -87,6 +91,7 @@ if (!function_exists('famiTopbar')) {
             <div class="rb-title"><?= htmlspecialchars($title) ?></div>
             <div class="rb-right">
                 <div class="rb-row">
+                    <?= $actions ?>
                     <a href="events.php" class="rb-btn" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="rb-dot"><?= (int) $n ?></span><?php endif; ?></a>
                     <a href="index.php" class="rb-btn" title="<?= t('Accueil', 'Start') ?>">🏠</a>
                     <a href="parametres.php" class="rb-btn" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
