@@ -299,7 +299,7 @@ if (!function_exists('storageCostCard')) {
         </div>
 
         <h3 style="margin:0 0 4px; color:#244230; font-size:1.05rem;">💰 Coût d'hébergement des contenus</h3>
-        <p class="muted" style="margin:0 0 12px; font-size:.85rem;">Renseigne les prix de ton hébergeur, le site calcule le coût réel. <em>(Chez OVH l'egress est gratuit → mets 0.)</em></p>
+        <p class="muted" style="margin:0 0 12px; font-size:.85rem;">Renseigne les prix de ton hébergeur, le site calcule le coût réel. <em>(Site hébergé en local, sur ta propre machine ou ton propre serveur : le stockage et le trafic ne coûtent rien → mets 0 partout.)</em></p>
 
         <form method="POST" action="parametres.php" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
             <?= csrfField() ?>

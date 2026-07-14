@@ -3,7 +3,7 @@
 // pdf_access.php — réglage d'accès aux PDF (voir / télécharger),
 // activable/désactivable et filtrable par profil (préférences admin).
 // Utile car l'egress (bande passante) est payant chez certains hébergeurs
-// (Railway) et gratuit chez d'autres (OVH). Les admins ont toujours accès.
+// (Railway) et gratuit en hébergement local. Les admins ont toujours accès.
 // Additif : autonome (stockage via widgetGet/widgetSet).
 // ============================================================
 
