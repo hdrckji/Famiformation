@@ -391,6 +391,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <div class="card admin-settings">
             <h2 style="margin-top:0; color:#2d5a37;">🎨 Créateur</h2>
             <p class="muted">L'habillage visuel des vidéos : l'image qui remplit les bandes noires des vidéos verticales, et les séquences jouées avant et après chaque formation.</p>
+            <?php brandingCard($db); ?>
         </div>
     </div>
 
@@ -889,7 +890,6 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                  « Services configurés ») : un réglage se règle là où on le consulte. -->
             <?php pdfAccessCard($db); ?>
             <?php quizConfigCard($db); ?>
-            <?php brandingCard($db); ?>
             <?php contribSettingsCard($db); ?>
 
             <!-- 🎨 PERSONNALISATION : options « fun » regroupées, chaque bascule via un bouton

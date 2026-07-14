@@ -406,13 +406,19 @@ if (!function_exists('brandingClipsCard')) {
                 <p class="muted">Une courte vidéo jouée <strong>avant</strong> chaque formation (logo, message d'accueil) et une autre <strong>après</strong> (rappel, coordonnées). Le lecteur les enchaîne automatiquement.</p>
                 <p class="muted" style="font-size:.84rem;">💡 <strong>Rien n'est ré-encodé</strong> : les vidéos ne sont pas collées bout à bout, le lecteur les joue à la suite. Changer l'intro change <strong>toutes</strong> les formations aussitôt, sans retraiter quoi que ce soit. Une par langue (repli sur le français si la néerlandaise manque). Gardez-les courtes : elles seront vues à chaque formation.</p>
 
-                <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:14px;">
-                    <?php $clip('intro', 'fr', '🇫🇷'); ?>
-                    <?php $clip('intro', 'nl', '🇳🇱'); ?>
+                <div style="margin-top:16px;">
+                    <div style="font-weight:800; color:#244230; margin-bottom:10px;">🇫🇷 Version française</div>
+                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <?php $clip('intro', 'fr', '▶'); ?>
+                        <?php $clip('outro', 'fr', '🏁'); ?>
+                    </div>
                 </div>
-                <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:18px; padding-top:16px; border-top:1px dashed #dfe6e0;">
-                    <?php $clip('outro', 'fr', '🇫🇷'); ?>
-                    <?php $clip('outro', 'nl', '🇳🇱'); ?>
+                <div style="margin-top:20px; padding-top:18px; border-top:1px dashed #dfe6e0;">
+                    <div style="font-weight:800; color:#244230; margin-bottom:10px;">🇳🇱 Version néerlandaise</div>
+                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <?php $clip('intro', 'nl', '▶'); ?>
+                        <?php $clip('outro', 'nl', '🏁'); ?>
+                    </div>
                 </div>
             </div>
         </div>
