@@ -99,6 +99,11 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .tile-title { font-size: 1.3rem; font-weight: 700; color: #2d5a37; margin: 10px 0; }
         .tile-desc { font-size: 0.92rem; color: #666; }
         .tile.inactive { opacity: 0.5; }
+        /* Contenu importé mais pas encore relu : ce n'est PAS un module désactivé, c'est un
+           travail en cours. On le montre comme tel, avec un accès direct à la relecture. */
+        .tile-review { border: 2px dashed #e8a13a; background: linear-gradient(180deg, #fffaf2, #fff5e6); }
+        .tile-review .tile-title { color: #8a5a00; }
+        .tile-review .tile-desc { color: #a06f21; font-weight: 600; }
         .badge-eval { display:inline-block; background:#2d5a37; color:#fff; font-size:0.78rem; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:8px; }
         .tile .badge-eval { position:absolute; top:12px; right:12px; margin:0; }
         .uni-actions-bar { width:90%; max-width:900px; display:flex; justify-content:flex-end; gap:8px; margin:10px 0 -10px; }
@@ -248,12 +253,32 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
                 </a>
                 <?php else: ?>
-                <div class="tile inactive<?= $isAdmin ? ' mod-tile' : '' ?>"<?= $isAdmin ? ' data-mod-id="' . (int) $child['id'] . '"' : '' ?> title="<?= $isAdmin ? 'Module inactif — clic droit pour modifier' : t('Module inactif — réactive-le dans Gestion des modules', 'Module niet actief — heractiveer hem in Modulebeheer') ?>" style="cursor:<?= $isAdmin ? 'context-menu' : 'not-allowed' ?>;">
-                    <span class="badge-eval" style="background:#999;"><?= t('Inactif', 'Niet actief') ?></span>
-                    <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
-                    <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
-                    <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
-                </div>
+                    <?php
+                        // « Inactif » était un MENSONGE : un contenu fraîchement importé n'est pas
+                        // désactivé, il attend d'être RELU (on l'a caché exprès tant qu'il n'est pas
+                        // validé). On le dit, et on donne le lien pour finir le travail.
+                        $enRelecture = in_array((string) ($child['content_status'] ?? ''), ['draft', 'pending'], true)
+                            && (!empty($child['contenu_ia']) || !empty($child['video_path']) || !empty($child['video_src_path']));
+                        $peutRelire = $isAdmin || (int) ($child['contenu_by'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0);
+                        $lienRelire = (($child['content_kind'] ?? '') === 'ecrit')
+                            ? 'module_edit.php?id=' . (int) $child['id']
+                            : 'module.php?id=' . (int) $child['id'];
+                    ?>
+                    <?php if ($enRelecture && $peutRelire): ?>
+                    <a href="<?= htmlspecialchars($lienRelire) ?>" class="tile tile-review<?= $isAdmin ? ' mod-tile' : '' ?>"<?= $isAdmin ? ' data-mod-id="' . (int) $child['id'] . '"' : '' ?> title="<?= t('Ce contenu attend votre relecture. Il sera visible dès que vous l\'aurez validé.', 'Deze inhoud wacht op je nalezing. Ze wordt zichtbaar zodra je ze goedkeurt.') ?>">
+                        <span class="badge-eval" style="background:#e8a13a;">✍️ <?= t('À relire', 'Na te lezen') ?></span>
+                        <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
+                        <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
+                        <div class="tile-desc"><?= t('Pas encore visible par les apprenants — termine la relecture pour le publier.', 'Nog niet zichtbaar voor de lerenden — lees na en keur goed om te publiceren.') ?></div>
+                    </a>
+                    <?php else: ?>
+                    <div class="tile inactive<?= $isAdmin ? ' mod-tile' : '' ?>"<?= $isAdmin ? ' data-mod-id="' . (int) $child['id'] . '"' : '' ?> title="<?= $isAdmin ? 'Module inactif — clic droit pour modifier' : t('Module inactif — réactive-le dans Gestion des modules', 'Module niet actief — heractiveer hem in Modulebeheer') ?>" style="cursor:<?= $isAdmin ? 'context-menu' : 'not-allowed' ?>;">
+                        <span class="badge-eval" style="background:#999;"><?= t('Inactif', 'Niet actief') ?></span>
+                        <div class="tile-icon"><?= moduleIconHtml($child, '3rem') ?></div>
+                        <div class="tile-title"><?= htmlspecialchars(moduleNom($child)) ?></div>
+                        <div class="tile-desc"><?= htmlspecialchars(moduleDesc($child)) ?></div>
+                    </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             <?php endforeach; ?>
             <?php if (empty($children)): ?>
@@ -281,6 +306,29 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             $aiDoubts = ($canEditContent && $isGuide) ? famiCountDoubts($module['contenu_ia'] ?? '') : 0;
             $quizDoubts = $canEditContent ? famiCountDoubts($module['quiz_json'] ?? '') : 0;
         ?>
+        <?php
+            // BANDEAU « en relecture » : le contenu est caché tant qu'il n'est pas validé.
+            // Sans ce rappel, on croit que l'import a échoué ou que le module est cassé.
+            $pending = [];
+            if ($canEditContent) {
+                foreach ($children as $ch) {
+                    if ((int) ($ch['is_active'] ?? 1) === 0
+                        && in_array((string) ($ch['content_status'] ?? ''), ['draft', 'pending'], true)) {
+                        $pending[] = $ch;
+                    }
+                }
+            }
+            $pendingGuide = 0;
+            foreach ($pending as $ch) { if (($ch['content_kind'] ?? '') === 'ecrit') { $pendingGuide = (int) $ch['id']; } }
+        ?>
+        <?php if (!empty($pending)): ?>
+        <a href="<?= $pendingGuide > 0 ? 'module_edit.php?id=' . $pendingGuide : 'module.php?id=' . (int) $pending[0]['id'] ?>" class="ai-doubt-banner" style="background:linear-gradient(180deg,#fff8e6,#ffefcc); border-color:#e8a13a; color:#7a4b00;">
+            <span class="ai-doubt-ico">✍️</span>
+            <span><strong><?= t('Ce contenu attend votre relecture', 'Deze inhoud wacht op je nalezing') ?></strong> — <?= t("il n'est pas encore visible par les apprenants. Il sera publié automatiquement dès que vous aurez validé la relecture (et le quiz, s'il y en a un).", 'ze is nog niet zichtbaar voor de lerenden. Ze wordt automatisch gepubliceerd zodra je de nalezing (en de quiz, indien aanwezig) goedkeurt.') ?></span>
+            <span class="ai-doubt-cta"><?= t('Relire', 'Nalezen') ?> →</span>
+        </a>
+        <?php endif; ?>
+
         <?php if ($aiDoubts > 0): ?>
         <a href="module_edit.php?id=<?= (int) $module['id'] ?>" class="ai-doubt-banner">
             <span class="ai-doubt-ico">⚠️</span>
