@@ -643,7 +643,6 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 <div class="fc-modal-text">
                     Aucune piste audio détectée. Sans son, <strong>aucun sous-titre ne pourra être généré</strong>,
                     et le quiz ne s'appuiera que sur le document écrit.<br><br>
-                    <span style="color:#6b7f70;">Rien ne sera facturé pour la transcription.</span><br>
                     Voulez-vous quand même poursuivre avec cette vidéo&nbsp;?
                 </div>
                 <div class="fc-modal-actions">
