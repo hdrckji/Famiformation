@@ -277,6 +277,7 @@ if (!function_exists('renderStorageTab')) {
             }
             return implode(' › ', array_reverse($parts));
         };
+        require_once __DIR__ . '/storage_stats.php';
         ?>
         <div class="card">
             <h2 style="margin-top:0; color:#2d5a37;">💾 Stockage — espace occupé</h2>
@@ -298,6 +299,16 @@ if (!function_exists('renderStorageTab')) {
                     <?php endforeach; ?>
                 </div>
             </div>
+
+            <!-- Réglages & coût du stockage : ils vivaient dans Préférences → Paramètres
+                 administrateur, ce qui n'avait aucun sens. Ils sont ici, repliés, pour ne
+                 pas noyer le chiffre important (l'espace occupé) sous du détail comptable. -->
+            <details class="fold" style="margin-top:18px;">
+                <summary>Détails</summary>
+                <div class="fold-body">
+                    <?php storageCostCard($db); ?>
+                </div>
+            </details>
         </div>
 
         <div class="card" style="margin-top:18px;">

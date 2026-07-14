@@ -572,6 +572,13 @@ if (!function_exists('aiGenerateQuiz')) {
         $rate = $pricing[$model] ?? [3.0, 15.0];
         $costEur = (($inTok / 1e6) * $rate[0] + ($outTok / 1e6) * $rate[1]) * 0.92;
 
-        return ['ok' => true, 'quiz' => ['questions' => $clean], 'error' => '', 'cost_eur' => $costEur];
+        // COÛT : enregistré ICI et pas chez l'appelant. La génération de quiz part de
+        // plusieurs endroits (relecture, worker vidéo) et aucun ne la comptait → elle
+        // était invisible dans le total. Un seul point = plus d'oubli possible.
+        require_once __DIR__ . '/ia_usage.php';
+        iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), 'quiz', $model, $inTok, $outTok, $costEur);
+
+        return ['ok' => true, 'quiz' => ['questions' => $clean], 'error' => '', 'cost_eur' => $costEur,
+            'model' => $model, 'in' => $inTok, 'out' => $outTok];
     }
 }

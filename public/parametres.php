@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_costs'])) {
     widgetSet($db, 'price_storage_gb', (string) max(0, (float) $ps));
     widgetSet($db, 'price_egress_gb', (string) max(0, (float) $pe));
     $_SESSION['module_flash'] = "✅ Prix enregistrés.";
-    header('Location: parametres.php#prefs');
+    header('Location: parametres.php#contenu'); // le réglage vit maintenant dans l'onglet Stockage
     exit();
 }
 
@@ -307,11 +307,21 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         .tree-spacer { display:inline-block; width:28px; margin-right:8px; }
         .child-count { display:inline-block; margin-left:8px; font-size:0.72rem; font-weight:700; color:#2d5a37; background:#e8f5e9; padding:2px 9px; border-radius:999px; vertical-align:middle; }
         .type-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:0.76rem; font-weight:700; white-space:nowrap; }
-        /* Paramètres administrateur : séparation NETTE entre chaque réglage
-           (avant, tout était collé dans un seul bloc → illisible). */
-        .admin-settings > div { border-top:3px solid #e3ece5; margin-top:26px; padding-top:22px; }
-        .admin-settings > div:first-of-type { border-top:none; margin-top:10px; padding-top:0; }
-        .admin-settings > div > h3:first-child { margin-top:0; }
+        /* Les blocs encadrés des réglages admin sont la classe .pref-block (voir plus haut) :
+           chaque réglage est un cadre à liseré vert, et non un simple trait de séparation. */
+
+        /* Zone repliable réutilisable (« Détails », « Services configurés »). */
+        .fold { border:1px solid #dde7e1; border-radius:12px; background:#fbfdfc; }
+        .fold > summary {
+            cursor:pointer; list-style:none; padding:12px 16px; font-weight:700; color:#2d5a37;
+            display:flex; align-items:center; gap:8px; border-radius:12px; user-select:none;
+        }
+        .fold > summary::-webkit-details-marker { display:none; }
+        .fold > summary::before { content:'▸'; font-size:.9rem; transition:transform .15s; }
+        .fold[open] > summary::before { transform:rotate(90deg); }
+        .fold > summary:hover { background:#f1f7f3; }
+        .fold[open] > summary { border-bottom:1px solid #e6ede9; border-radius:12px 12px 0 0; }
+        .fold-body { padding:16px 18px; }
 
         .type-container { background:#e8f5e9; color:#2d5a37; }
         /* Sous-types d'Élément : C = affiche du contenu (PDF/vidéo) · S = fonction spéciale dédiée */
@@ -856,102 +866,9 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
             <h2 style="margin-top:0; color:#2d5a37;">Paramètres administrateur</h2>
             <p class="muted">Réservé aux administrateurs.</p>
 
-            <?php
-                $onVolume = (defined('FAMI_STORAGE_BASE') && FAMI_STORAGE_BASE !== (__DIR__ . '/uploads'));
-                require_once __DIR__ . '/includes/storage_stats.php';
-                $stUse   = famiStorageUsage();
-                storageRecordSample($db, $stUse['total']); // point d'historique (facturation au pro rata)
-                $stMonth = storageMonthUsage($db);
-                $egBytes = egressMonth($db);
-                $priceSt = (float) widgetGet($db, 'price_storage_gb', '0');
-                $priceEg = (float) widgetGet($db, 'price_egress_gb', '0');
-
-                $goNow = famiBytesToGo($stUse['total']);   // volume à l'instant T
-                $goEg  = famiBytesToGo($egBytes);
-
-                // Stockage : on facture des « Go-mois » = volume MOYEN × durée écoulée.
-                $costStSoFar = $stMonth['gb_month'] * $priceSt;
-                // Projection fin de mois si le volume actuel est conservé jusqu'au bout.
-                $costStProj  = $costStSoFar + ($goNow * $priceSt * max(0, 1 - $stMonth['elapsed']));
-
-                $costEg      = $goEg * $priceEg;
-                $costTot     = $costStSoFar + $costEg;   // accumulé à ce jour
-                $costTotProj = $costStProj + $costEg;    // projection fin de mois
-                $catLabels = ['video' => '🎬 Vidéos', 'video_raw' => '🎬 Vidéos (sources en attente)', 'pdf' => '📄 PDF', 'icons' => '🖼️ Icônes'];
-            ?>
-            <div class="pref-block" style="border-left-color:<?= $onVolume ? '#3E8E4E' : '#e8a13a' ?>; font-size:.92rem;">
-                🗄️ <strong>Stockage des fichiers :</strong>
-                <?php if ($onVolume): ?>
-                    <span style="color:#256b39; font-weight:700;">Volume persistant ✓</span>
-                    <span class="muted">(<?= htmlspecialchars(FAMI_STORAGE_BASE) ?>)</span> — les PDF/vidéos survivent aux redéploiements.
-                <?php else: ?>
-                    <span style="color:#8a6d1a; font-weight:700;">Local — non persistant ⚠</span>
-                    <span class="muted">Aucun volume détecté. Attache un volume Railway au service pour ne pas perdre les fichiers à chaque redéploiement.</span>
-                <?php endif; ?>
-            </div>
-
-            <!-- 💰 Coût d'hébergement des contenus = stockage + trafic (egress) -->
-            <div class="pref-block">
-                <h3 style="margin:0 0 4px; color:#244230; font-size:1.05rem;">💰 Coût d'hébergement des contenus</h3>
-                <p class="muted" style="margin:0 0 12px; font-size:.85rem;">Renseigne les prix de ton hébergeur, le site calcule le coût réel. <em>(Chez OVH l'egress est gratuit → mets 0.)</em></p>
-
-                <form method="POST" action="parametres.php" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="save_costs" value="1">
-                    <div>
-                        <label style="display:block; font-weight:700; color:#244230; font-size:.82rem;">Prix stockage ($/Go/mois)</label>
-                        <input type="text" name="price_storage_gb" value="<?= htmlspecialchars((string) $priceSt) ?>" placeholder="0.01" style="width:130px; padding:8px 10px; border:1px solid #ccc; border-radius:8px;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-weight:700; color:#244230; font-size:.82rem;">Prix egress ($/Go envoyé)</label>
-                        <input type="text" name="price_egress_gb" value="<?= htmlspecialchars((string) $priceEg) ?>" placeholder="0.05" style="width:130px; padding:8px 10px; border:1px solid #ccc; border-radius:8px;">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Enregistrer</button>
-                </form>
-
-                <table style="margin:0;">
-                    <tbody>
-                        <tr>
-                            <td style="font-weight:700; color:#244230;">📦 Stockage actuel</td>
-                            <td><?= famiFormatSize($stUse['total']) ?> <span class="muted">(<?= (int) $stUse['files'] ?> fichier<?= $stUse['files'] > 1 ? 's' : '' ?>)</span></td>
-                            <td></td>
-                        </tr>
-                        <?php foreach ($stUse['by'] as $cat => $b): ?>
-                        <tr>
-                            <td class="muted" style="padding-left:22px; font-size:.85rem;">↳ <?= htmlspecialchars($catLabels[$cat] ?? $cat) ?></td>
-                            <td class="muted" style="font-size:.85rem;"><?= famiFormatSize($b) ?></td>
-                            <td></td>
-                        </tr>
-                        <?php endforeach; ?>
-                        <tr>
-                            <td style="font-weight:700; color:#244230;">⏳ Stockage facturé <span class="muted" style="font-weight:400;">(pro rata : volume moyen × durée)</span></td>
-                            <td><?= famiFormatSize($stMonth['avg_bytes']) ?> <span class="muted">en moyenne · <?= number_format($stMonth['gb_month'], 3, ',', ' ') ?> Go-mois</span></td>
-                            <td style="text-align:right; font-weight:700;"><?= number_format($costStSoFar, 3, ',', ' ') ?> $</td>
-                        </tr>
-                        <tr>
-                            <td style="font-weight:700; color:#244230;">📡 Trafic envoyé (ce mois-ci)</td>
-                            <td><?= famiFormatSize($egBytes) ?></td>
-                            <td style="text-align:right; font-weight:700;"><?= number_format($costEg, 3, ',', ' ') ?> $</td>
-                        </tr>
-                        <tr style="border-top:2px solid #dde3e0;">
-                            <td style="font-weight:800; color:#2d5a37;">TOTAL accumulé à ce jour</td>
-                            <td class="muted" style="font-size:.85rem;"><?= number_format($stMonth['elapsed'] * 100, 0) ?> % du mois écoulé</td>
-                            <td style="text-align:right; font-weight:800; color:#2d5a37; font-size:1.05rem;"><?= number_format($costTot, 2, ',', ' ') ?> $</td>
-                        </tr>
-                        <tr>
-                            <td class="muted">🔮 Projection fin de mois <span style="font-size:.82rem;">(si tu gardes le stockage actuel)</span></td>
-                            <td></td>
-                            <td style="text-align:right; font-weight:700; color:#54606b;"><?= number_format($costTotProj, 2, ',', ' ') ?> $</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <p class="muted" style="margin:10px 0 0; font-size:.8rem;">
-                    ℹ️ <strong>Stockage = facturé au pro rata</strong> (Go × durée) : si tu stockes 10 Go pendant 20 jours puis que tu supprimes tout, ces 20 jours restent facturés. Le site historise donc le volume et l'intègre dans le temps — supprimer des fichiers <strong>arrête</strong> le compteur, mais n'efface pas ce qui est déjà consommé.<br>
-                    ℹ️ <strong>Trafic</strong> = uniquement ce qui <strong>sort réellement</strong> du serveur : un fichier relu depuis le cache du navigateur n'est <strong>ni envoyé ni facturé</strong>. Tout repart à zéro chaque mois (comme la facture). Le suivi a démarré à la mise en place de cette fonction.
-                </p>
-            </div>
-
-            <?php iaSettingsCard($db); ?>
+            <!-- Le coût du STOCKAGE est parti dans l'onglet « Stockage » (replié sous
+                 « Détails ») et le réglage des API dans l'onglet « API » (replié sous
+                 « Services configurés ») : un réglage se règle là où on le consulte. -->
             <?php pdfAccessCard($db); ?>
             <?php quizConfigCard($db); ?>
             <?php contribSettingsCard($db); ?>

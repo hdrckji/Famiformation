@@ -212,6 +212,8 @@ if (!function_exists('aiTranslateStringsToNl')) {
             . "- Aucun texte autour du JSON.";
 
         $out = [];
+        $inTok = 0;
+        $outTok = 0;
         // Lots de 100 : garde des réponses courtes et fiables, et limite la casse en cas d'échec.
         foreach (array_chunk($strings, 100) as $chunk) {
             $payload = [
@@ -228,6 +230,8 @@ if (!function_exists('aiTranslateStringsToNl')) {
             // interminable puis échouait. Voir aiClaudeStreamText().
             require_once __DIR__ . '/ai_uniformise.php';
             $r = aiClaudeStreamText($apiKey, $payload);
+            $inTok += (int) ($r['in'] ?? 0);   // cumulé sur TOUS les lots → coût réel
+            $outTok += (int) ($r['out'] ?? 0);
             if (empty($r['ok'])) {
                 return ['ok' => false, 'items' => [], 'error' => (string) $r['error']];
             }
@@ -247,7 +251,28 @@ if (!function_exists('aiTranslateStringsToNl')) {
                 $out[] = (string) $v;
             }
         }
+
+        // COÛT : la traduction NL appelle Claude et n'était PAS comptée.
+        nlLogAiCost($db, 'traduction', $model, $inTok, $outTok);
+
         return ['ok' => true, 'items' => $out, 'error' => ''];
+    }
+}
+
+if (!function_exists('nlLogAiCost')) {
+    /**
+     * Enregistre le coût d'un appel Claude dans le compteur API.
+     * Factorisé ici : traduction ET relecture appelaient Claude sans rien compter,
+     * ce qui faussait le total affiché dans l'onglet API.
+     */
+    function nlLogAiCost($db, $kind, $model, $inTok, $outTok)
+    {
+        if (!($db instanceof PDO) || ($inTok <= 0 && $outTok <= 0)) { return; }
+        require_once __DIR__ . '/ai_uniformise.php';
+        require_once __DIR__ . '/ia_usage.php';
+        $rate = aiModelPricing()[$model] ?? [3.0, 15.0];
+        $costEur = (($inTok / 1e6) * $rate[0] + ($outTok / 1e6) * $rate[1]) * 0.92;
+        iaLogUsage($db, (int) ($_SESSION['user_id'] ?? 0), $kind, $model, $inTok, $outTok, $costEur);
     }
 }
 
@@ -333,6 +358,8 @@ if (!function_exists('aiProofreadStringsFr')) {
             . "- Aucun texte autour du JSON.";
 
         $out = [];
+        $inTok = 0;
+        $outTok = 0;
         foreach (array_chunk($strings, 100) as $chunk) {
             $payload = [
                 'model' => $model,
@@ -348,6 +375,8 @@ if (!function_exists('aiProofreadStringsFr')) {
             // interminable puis échouait. Voir aiClaudeStreamText().
             require_once __DIR__ . '/ai_uniformise.php';
             $r = aiClaudeStreamText($apiKey, $payload);
+            $inTok += (int) ($r['in'] ?? 0);   // cumulé sur TOUS les lots → coût réel
+            $outTok += (int) ($r['out'] ?? 0);
             if (empty($r['ok'])) {
                 return ['ok' => false, 'items' => [], 'error' => (string) $r['error']];
             }
@@ -365,6 +394,10 @@ if (!function_exists('aiProofreadStringsFr')) {
                 $out[] = (string) $v;
             }
         }
+
+        // COÛT : la relecture appelle Claude et n'était PAS comptée non plus.
+        nlLogAiCost($db, 'relecture', $model, $inTok, $outTok);
+
         return ['ok' => true, 'items' => $out, 'error' => ''];
     }
 }

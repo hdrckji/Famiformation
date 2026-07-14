@@ -33,6 +33,9 @@ if (!function_exists('iaLogUsage')) {
     /** Enregistre un appel API IA. $kind : 'uniformise' | 'quiz'. */
     function iaLogUsage($db, $userId, $kind, $model, $in, $out, $costEur, $moduleId = null, $provider = 'Claude (Anthropic)')
     {
+        // Le journal ne doit JAMAIS casser l'appel qu'il mesure : appelé depuis un worker
+        // en arrière-plan, $db peut être absent → on renonce silencieusement.
+        if (!($db instanceof PDO)) { return; }
         iaUsageEnsureTable($db);
         try {
             $db->prepare("INSERT INTO ia_usage (created_at, user_id, provider, kind, model, in_tokens, out_tokens, cost_eur, module_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
@@ -70,6 +73,97 @@ if (!function_exists('iaUsageHandlePost')) {
     }
 }
 
+if (!function_exists('iaApiServicesTable')) {
+    /**
+     * État + PRIX de chaque API utilisée par le site.
+     *
+     * Répond à « je n'ai pas les prix de mes API OpenAI » : Whisper (OpenAI/Groq)
+     * facture à la MINUTE d'audio, pas au token — son prix n'apparaissait donc nulle
+     * part, et ses appels n'étaient même pas enregistrés. Les deux sont corrigés :
+     * ici on affiche le tarif, et famiSttRun() alimente désormais le compteur.
+     */
+    function iaApiServicesTable($db)
+    {
+        require_once __DIR__ . '/transcription.php';
+        require_once __DIR__ . '/ia_settings.php';
+
+        $hasClaude = (getenv('ANTHROPIC_API_KEY') || isset($_SERVER['ANTHROPIC_API_KEY']));
+        $iaModel = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
+        $rate = (function_exists('aiModelPricing') ? aiModelPricing() : [])[$iaModel] ?? [3.0, 15.0];
+
+        $sttProv = famiSttProvider();
+        $sttOk = famiSttReady();
+        $sttMin = famiSttPricing()[$sttProv] ?? 0.0;
+        $sttLbl = ($sttProv === 'groq') ? 'Groq (Whisper)' : (($sttProv === 'openai') ? 'OpenAI (Whisper)' : 'Whisper local');
+
+        $mmEmail = getenv('MYMEMORY_EMAIL');
+        $mmHasEmail = ($mmEmail !== false && trim((string) $mmEmail) !== '');
+
+        $services = [
+            [
+                'nom' => 'Claude (Anthropic)',
+                'ok' => (bool) $hasClaude,
+                'pour' => 'Lecture des PDF, mise en forme, quiz, traduction NL, relecture',
+                'prix' => number_format($rate[0], 2, ',', ' ') . ' $ / M tokens entrée · ' . number_format($rate[1], 2, ',', ' ') . ' $ / M tokens sortie',
+                'modele' => $iaModel,
+                'cle' => 'ANTHROPIC_API_KEY',
+            ],
+            [
+                'nom' => $sttLbl,
+                'ok' => (bool) $sttOk,
+                'pour' => 'Transcription des vidéos → sous-titres FR/NL + questions du quiz',
+                'prix' => ($sttProv === 'local')
+                    ? 'Gratuit (tourne chez nous)'
+                    : number_format($sttMin, 5, ',', ' ') . ' $ / minute d\'audio  ≈ ' . number_format($sttMin * 60, 2, ',', ' ') . ' $ / heure',
+                'modele' => ($sttProv === 'groq') ? 'whisper-large-v3' : 'whisper-1',
+                'cle' => ($sttProv === 'groq') ? 'GROQ_API_KEY' : 'OPENAI_API_KEY',
+            ],
+            [
+                'nom' => 'MyMemory',
+                'ok' => true,
+                'pour' => 'Traduction NL des textes courts (phrases du widget, titres)',
+                'prix' => 'Gratuit — ' . ($mmHasEmail ? '~50 000 mots/jour (email configuré)' : '~5 000 mots/jour (sans email)'),
+                'modele' => '—',
+                'cle' => 'MYMEMORY_EMAIL (facultatif, ×10 de quota)',
+            ],
+        ];
+        ?>
+        <p class="muted" style="margin:0 0 12px;">
+            Chaque API, son <strong>tarif</strong> et l'état de sa clé. Attention : Claude facture au
+            <strong>token</strong>, Whisper à la <strong>minute d'audio</strong> — les deux entrent dans le total ci-dessus.
+        </p>
+        <div style="overflow-x:auto;">
+        <table style="margin:0;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;">Service</th>
+                    <th style="text-align:left;">Sert à</th>
+                    <th style="text-align:left;">Prix</th>
+                    <th style="text-align:left;">État</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($services as $s): ?>
+                <tr>
+                    <td style="font-weight:700; color:#244230; white-space:nowrap;">
+                        <?= htmlspecialchars($s['nom']) ?>
+                        <div class="muted" style="font-weight:400; font-size:.78rem;"><?= htmlspecialchars($s['modele']) ?></div>
+                    </td>
+                    <td style="font-size:.88rem;"><?= htmlspecialchars($s['pour']) ?></td>
+                    <td style="font-size:.88rem; font-weight:700; color:#2d5a37;"><?= htmlspecialchars($s['prix']) ?></td>
+                    <td>
+                        <span class="pill <?= $s['ok'] ? 'on' : 'off' ?>"><?= $s['ok'] ? '✓ Configuré' : '✗ Clé absente' ?></span>
+                        <div class="muted" style="font-size:.76rem; margin-top:3px;"><?= htmlspecialchars($s['cle']) ?></div>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
+        <?php
+    }
+}
+
 if (!function_exists('renderApiUsageTab')) {
     function renderApiUsageTab($db)
     {
@@ -99,6 +193,9 @@ if (!function_exists('renderApiUsageTab')) {
         $kindLabel = function ($k) {
             if ($k === 'uniformise') { return '🪄 Mise en forme (fiche)'; }
             if ($k === 'quiz') { return '📝 Génération du quiz'; }
+            if ($k === 'traduction') { return '🌍 Traduction néerlandaise'; }
+            if ($k === 'relecture') { return '✍️ Relecture orthographique'; }
+            if ($k === 'transcription') { return '🎙️ Transcription vidéo (sous-titres)'; }
             return htmlspecialchars((string) $k);
         };
         $eur = function ($v) { return number_format((float) $v, 4, ',', ' ') . ' €'; };
@@ -128,6 +225,18 @@ if (!function_exists('renderApiUsageTab')) {
                 </div>
                 <?php endforeach; ?>
             </div>
+
+            <!-- Services configurés : le réglage du modèle IA vivait dans Préférences →
+                 Paramètres administrateur, loin des coûts qu'il détermine. Il est ici,
+                 replié, avec l'état et le PRIX de chaque API — y compris Whisper, dont
+                 les appels n'étaient tout simplement pas comptés jusqu'ici. -->
+            <details class="fold" style="margin-top:18px;">
+                <summary>Services configurés</summary>
+                <div class="fold-body">
+                    <?php iaApiServicesTable($db); ?>
+                    <?php if (function_exists('iaSettingsCard')) { iaSettingsCard($db); } ?>
+                </div>
+            </details>
         </div>
 
         <!-- Modale : remise à zéro du compteur API -->

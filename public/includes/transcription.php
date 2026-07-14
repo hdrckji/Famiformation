@@ -111,15 +111,49 @@ if (!function_exists('famiExtractAudio')) {
     }
 }
 
+if (!function_exists('famiSttPricing')) {
+    /**
+     * Prix de la transcription, en DOLLARS par MINUTE d'audio.
+     * Groq est ~3× moins cher qu'OpenAI pour le même modèle Whisper — d'où le
+     * choix de Groq par défaut (voir famiSttProvider).
+     */
+    function famiSttPricing()
+    {
+        return [
+            'openai' => 0.0060,   // whisper-1        : 0,006 $/min
+            'groq'   => 0.00185,  // whisper-large-v3 : 0,111 $/h
+            'local'  => 0.0,      // à venir : tourne chez nous, donc gratuit
+        ];
+    }
+}
+
+if (!function_exists('famiAudioMinutes')) {
+    /**
+     * Durée (en minutes) déduite du POIDS du mp3 produit par famiExtractAudio().
+     * Ce mp3 est encodé à débit CONSTANT (48 kbps) → durée = octets × 8 / 48000.
+     * Évite d'appeler ffprobe : c'est gratuit, immédiat, et exact à la seconde près.
+     */
+    function famiAudioMinutes($audioAbs)
+    {
+        $b = (int) @filesize($audioAbs);
+        if ($b <= 0) { return 0.0; }
+        return ($b * 8 / 48000) / 60;
+    }
+}
+
 if (!function_exists('famiSttRun')) {
     /**
      * Transcrit un fichier AUDIO et renvoie un SRT (avec timecodes).
      * Point d'extension unique : pour passer à un Whisper LOCAL, il suffira
      * d'ajouter ici un cas 'local' (appel à whisper.cpp) — rien d'autre à changer.
      *
+     * $db (optionnel) : si fourni, le coût de l'appel est ENREGISTRÉ dans le
+     * compteur API. Whisper en était absent → les transcriptions coûtaient de
+     * l'argent sans jamais apparaître dans le total « Coûts API ».
+     *
      * @return array ['ok'=>bool, 'srt'=>string, 'error'=>string]
      */
-    function famiSttRun($audioAbs, $lang = 'fr')
+    function famiSttRun($audioAbs, $lang = 'fr', $db = null)
     {
         $provider = famiSttProvider();
 
@@ -174,6 +208,25 @@ if (!function_exists('famiSttRun')) {
         if ($srt === '') {
             return ['ok' => false, 'srt' => '', 'error' => 'Transcription vide.'];
         }
+
+        // COÛT : on facture à la minute d'audio. Sans cet enregistrement, les appels
+        // OpenAI/Groq n'apparaissaient nulle part et le total « Coûts API » était faux.
+        if ($db instanceof PDO) {
+            require_once __DIR__ . '/ia_usage.php';
+            $usd = famiAudioMinutes($audioAbs) * (famiSttPricing()[$provider] ?? 0.0);
+            iaLogUsage(
+                $db,
+                (int) ($_SESSION['user_id'] ?? 0),
+                'transcription',
+                $model,
+                0,
+                0,
+                $usd * 0.92, // $ → € (le compteur est en euros)
+                null,
+                ($provider === 'groq') ? 'Groq (Whisper)' : 'OpenAI (Whisper)'
+            );
+        }
+
         return ['ok' => true, 'srt' => $srt, 'error' => ''];
     }
 }
@@ -340,7 +393,7 @@ if (!function_exists('famiVideoSubtitles')) {
                     'error' => 'Extraction audio impossible (ffmpeg).',
                 ];
             }
-            $r = famiSttRun($audio, 'fr');
+            $r = famiSttRun($audio, 'fr', $db); // $db → le coût entre dans le compteur API
             @unlink($audio); // on ne garde pas l'audio temporaire
             if (!$r['ok']) {
                 return [
@@ -466,7 +519,7 @@ if (!function_exists('fami_parse_srt')) {
     }
 }
 if (!function_exists('fami_get_transcript')) {
-    function fami_get_transcript($srtPath, $videoPath)
+    function fami_get_transcript($srtPath, $videoPath, $db = null)
     {
         if ($srtPath !== '' && is_file($srtPath)) {
             $raw = @file_get_contents($srtPath);
@@ -478,7 +531,7 @@ if (!function_exists('fami_get_transcript')) {
         if ($audio === '') {
             return ['ok' => false, 'source' => 'none', 'text' => '', 'error' => 'Extraction audio impossible'];
         }
-        $r = famiSttRun($audio, 'fr');
+        $r = famiSttRun($audio, 'fr', $db); // $db → le coût entre dans le compteur API
         @unlink($audio);
         return [
             'ok' => $r['ok'],

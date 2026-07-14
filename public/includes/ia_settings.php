@@ -63,7 +63,7 @@ function iaSettingsHandlePost($db)
         widgetSet($db, 'ia_model', $model);
         $_SESSION['module_flash'] = 'Modèle IA enregistré : ' . iaModelCatalog()[$model]['label'];
     }
-    header('Location: parametres.php#prefs');
+    header('Location: parametres.php#api'); // le réglage vit maintenant dans l'onglet API
     exit();
 }
 
@@ -77,7 +77,7 @@ function iaSettingsCard($db)
         <h3 style="margin:0 0 6px; color:#244230;">🤖 Intelligence artificielle</h3>
         <p class="muted">Modèle utilisé pour <strong>lire les PDF</strong>, uniformiser le contenu, traduire en néerlandais et générer les quiz. Prix indicatif par contenu (document d'environ 10 pages).</p>
 
-        <form method="POST" action="parametres.php#prefs" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+        <form method="POST" action="parametres.php#api" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="set_ia_model">
             <div style="flex:1; min-width:260px;">
