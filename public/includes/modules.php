@@ -916,6 +916,33 @@ if (!function_exists('ensureModulesTable')) {
     }
 
     /** Supprime du stockage TOUS les fichiers des modules donnés (avant DELETE en base). */
+    /** Relève TOUS les fichiers de ces modules, AVANT que leurs lignes ne disparaissent. */
+    function famiCollectModulesFileKeys(PDO $db, array $ids)
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), function ($n) { return $n > 0; }));
+        if (empty($ids)) { return []; }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $keys = [];
+        try {
+            $st = $db->prepare("SELECT pdf_path, video_path, video_src_path, sub_fr_path, sub_nl_path, sub_src_path,
+                                       icon_image, contenu_images, contenu_ia, contenu_ia_nl
+                                FROM modules WHERE id IN ($ph)");
+            $st->execute($ids);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                foreach (famiModuleFileKeys($row) as $k) { $keys[$k] = true; }
+            }
+        } catch (Exception $e) {}
+        return array_keys($keys);
+    }
+
+    /** Efface une liste de fichiers du stockage. */
+    function famiUnlinkKeys(array $keys)
+    {
+        $n = 0;
+        foreach ($keys as $k) { famiUnlinkStorageKey((string) $k); $n++; }
+        return $n;
+    }
+
     function famiPurgeModulesStorage(PDO $db, array $ids)
     {
         $ids = array_values(array_filter(array_map('intval', $ids), function ($n) { return $n > 0; }));

@@ -883,10 +883,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // (PDF, vidéo + source, SOUS-TITRES .vtt FR/NL et .srt, images du PDF, images
                     // ajoutées dans l'éditeur, icône). Rien ne doit rester à traîner : on le paie.
                     require_once __DIR__ . '/includes/versions.php';
-                    versionsPurgeForModules($db, $toDelete); // versions archivées + leurs fichiers
-                    famiPurgeModulesStorage($db, $toDelete);
+                    // 1) On relève les fichiers AVANT de perdre les lignes.
+                    $keysToKill = famiCollectModulesFileKeys($db, $toDelete);
 
+                    // 2) Les lignes partent. 3) Puis les versions (plus rien ne « retient » leurs
+                    //    fichiers). 4) Enfin les fichiers du module.
                     $db->prepare("DELETE FROM modules WHERE id IN ($ph)")->execute($toDelete);
+                    versionsPurgeForModules($db, $toDelete);
+                    famiUnlinkKeys($keysToKill);
                     storageRecordSample($db); // le volume a changé → point d'historique (pro rata)
                     $nbSub = count($toDelete) - 1;
                     famiLogChange($db, 'module_deleted', 0, '🗑️ Module supprimé : ' . moduleNom($module)

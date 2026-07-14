@@ -69,9 +69,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
                 // Nettoyage COMPLET du stockage (PDF, vidéo + source, sous-titres .vtt/.srt,
                 // images du PDF, images de l'éditeur, icône) — voir famiModuleFileKeys().
                 require_once __DIR__ . '/includes/versions.php';
-                versionsPurgeForModules($db, $all);   // versions archivées + leurs fichiers
-                famiPurgeModulesStorage($db, $all);
+                // 1) On relève les fichiers AVANT de perdre les lignes.
+                $keysToKill = famiCollectModulesFileKeys($db, $all);
                 $db->prepare("DELETE FROM modules WHERE id IN ($ap)")->execute($all);
+                versionsPurgeForModules($db, $all);
+                famiUnlinkKeys($keysToKill);
                 $done = count($del);
             }
         } elseif ($entity === 'profile') {
