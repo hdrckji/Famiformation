@@ -34,6 +34,16 @@ if (!function_exists('moduleFileUrl')) {
      * - anciens fichiers (déjà sous public/uploads/...) : URL directe (compat).
      * - nouveaux fichiers (clé « modules/... » sur le volume) : script sécurisé media.php.
      */
+    /** Le fichier existe-t-il vraiment ? (clé volume OU ancien chemin public/uploads) */
+    function famiStoredFileExists($path)
+    {
+        $path = (string) $path;
+        if ($path === '') { return false; }
+        if (strpos($path, 'uploads/') === 0) { return is_file(__DIR__ . '/' . $path); }
+        $base = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/uploads');
+        return is_file($base . '/' . $path);
+    }
+
     function moduleFileUrl($path)
     {
         $path = (string) $path;

@@ -285,7 +285,7 @@ if (!function_exists('storageCostCard')) {
         $costEg = $goEg * $priceEg;
         $costTot = $costStSoFar + $costEg;   // accumulé à ce jour
         $costTotProj = $costStProj + $costEg; // projection fin de mois
-        $catLabels = ['video' => '🎬 Vidéos', 'video_raw' => '🎬 Vidéos (sources en attente)', 'pdf' => '📄 PDF', 'icons' => '🖼️ Icônes'];
+        $catLabels = ['video' => '🎬 Vidéos', 'video_raw' => '🎬 Vidéos (sources en attente)', 'pdf' => '📄 PDF', 'icons' => '🖼️ Images des PDF', 'divers' => '🗂️ Divers (icônes, photos de profil, habillage)', 'branding' => '🗂️ Divers (habillage)'];
         ?>
         <div style="border:1px solid <?= $onVolume ? '#cfe6d5' : '#f0d9a8' ?>; background:<?= $onVolume ? '#f2f9f4' : '#fdf6e6' ?>; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:.9rem;">
             🗄️ <strong>Stockage des fichiers :</strong>

@@ -79,13 +79,16 @@ function handleModuleIconUpload()
         }
         if ($ext === 'jpeg') { $ext = 'jpg'; }
     }
-    $dir = __DIR__ . '/uploads/modules/icons';
+    // Sur le VOLUME persistant, catégorie « divers » (icônes, photos de profil, habillage) :
+    // ces fichiers survivent aux redéploiements et sont comptés dans le stockage.
+    $storeBase = defined('FAMI_STORAGE_BASE') ? FAMI_STORAGE_BASE : (__DIR__ . '/uploads');
+    $dir = rtrim($storeBase, '/') . '/divers/icons';
     if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
     $name = 'icon_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
     if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
         return null;
     }
-    return 'uploads/modules/icons/' . $name;
+    return 'divers/icons/' . $name;
 }
 
 // Upload générique d'un fichier de module (pdf, vidéo) -> chemin relatif ou null
@@ -246,6 +249,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nom = trim((string) ($_POST['nom'] ?? ''));
         $description = trim((string) ($_POST['description'] ?? ''));
         $isContainer = !empty($_POST['is_container']) ? 1 : 0;
+
+        // GARDE-FOU SERVEUR : un module qui PORTE du contenu ne peut jamais devenir un
+        // conteneur (ce n'est pas sa fonction, et le passer en conteneur efface son contenu).
+        // Le formulaire ne propose plus la case, mais une requête forgée ne doit pas passer.
+        try {
+            $ck = $db->prepare("SELECT content_kind, pdf_path, video_path, contenu_ia FROM modules WHERE id = ? LIMIT 1");
+            $ck->execute([$id]);
+            if ($cur = $ck->fetch(PDO::FETCH_ASSOC)) {
+                $isElement = in_array((string) ($cur['content_kind'] ?? ''), ['ecrit', 'video'], true)
+                    || !empty($cur['pdf_path']) || !empty($cur['video_path']) || !empty($cur['contenu_ia']);
+                if ($isElement) { $isContainer = 0; }
+            }
+        } catch (Exception $e) { /* non bloquant */ }
         $icon = trim((string) ($_POST['icon'] ?? ''));
         $roles = sanitizeModuleRoles($_POST['roles'] ?? []);
 

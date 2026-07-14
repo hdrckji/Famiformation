@@ -5,10 +5,13 @@ verifierConnexion($db);
 $user_id = $_SESSION['user_id'];
 $message = '';
 
-// Dossier de stockage des photos
-$uploadDir = __DIR__ . '/uploads/profils/';
+// Photos de profil : sur le VOLUME persistant, catégorie « divers » (comme les icônes de
+// module et l'habillage vidéo). Avant, elles vivaient dans public/uploads : elles étaient
+// PERDUES à chaque redéploiement Railway et ne comptaient dans aucun total de stockage.
+$storeBase = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/uploads');
+$uploadDir = $storeBase . '/divers/profils/';
 if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
+    @mkdir($uploadDir, 0775, true);
 }
 
 // Traitement de l'upload
@@ -35,16 +38,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['photo_profil'])) {
             $safeName = 'user_' . $user_id . '_' . time() . '.' . $ext;
             $destPath = $uploadDir . $safeName;
 
-            // Supprimer l'ancienne photo si elle existe
+            // Supprimer l'ancienne photo si elle existe (volume OU ancien dossier public).
             $stmtOld = $db->prepare("SELECT photo_profil FROM utilisateurs WHERE id = ?");
             $stmtOld->execute([$user_id]);
-            $oldPhoto = $stmtOld->fetchColumn();
-            if ($oldPhoto && is_file($uploadDir . basename($oldPhoto))) {
-                @unlink($uploadDir . basename($oldPhoto));
+            $oldPhoto = (string) $stmtOld->fetchColumn();
+            if ($oldPhoto !== '') {
+                $oldAbs = (strpos($oldPhoto, 'uploads/') === 0)
+                    ? __DIR__ . '/' . $oldPhoto
+                    : $storeBase . '/' . $oldPhoto;
+                if (is_file($oldAbs)) { @unlink($oldAbs); }
             }
 
             if (move_uploaded_file($file['tmp_name'], $destPath)) {
-                $relativePath = 'uploads/profils/' . $safeName;
+                $relativePath = 'divers/profils/' . $safeName;
                 $stmt = $db->prepare("UPDATE utilisateurs SET photo_profil = ? WHERE id = ?");
                 $stmt->execute([$relativePath, $user_id]);
                 $_SESSION['photo_profil'] = $relativePath;
@@ -62,8 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['supprimer_photo'])) {
     $stmtOld = $db->prepare("SELECT photo_profil FROM utilisateurs WHERE id = ?");
     $stmtOld->execute([$user_id]);
     $oldPhoto = $stmtOld->fetchColumn();
-    if ($oldPhoto && is_file($uploadDir . basename($oldPhoto))) {
-        @unlink($uploadDir . basename($oldPhoto));
+    if ($oldPhoto) {
+        $oldAbs = (strpos($oldPhoto, 'uploads/') === 0) ? __DIR__ . '/' . $oldPhoto : $storeBase . '/' . $oldPhoto;
+        if (is_file($oldAbs)) { @unlink($oldAbs); }
     }
     $stmt = $db->prepare("UPDATE utilisateurs SET photo_profil = NULL WHERE id = ?");
     $stmt->execute([$user_id]);
@@ -119,8 +126,8 @@ $currentPhoto = $currentUser['photo_profil'] ?? null;
 
     <?= $message ?>
 
-    <?php if ($currentPhoto && is_file(__DIR__ . '/' . $currentPhoto)): ?>
-        <img src="<?= htmlspecialchars($currentPhoto) ?>?v=<?= time() ?>" alt="<?= t('Photo de profil', 'Profielfoto') ?>" class="photo-preview">
+    <?php if ($currentPhoto && famiStoredFileExists($currentPhoto)): ?>
+        <img src="<?= htmlspecialchars(moduleFileUrl($currentPhoto)) ?>&v=<?= time() ?>" alt="<?= t('Photo de profil', 'Profielfoto') ?>" class="photo-preview">
     <?php else: ?>
         <div class="photo-placeholder">👤</div>
     <?php endif; ?>

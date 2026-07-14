@@ -420,8 +420,8 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
             $userPhoto = $_SESSION['photo_profil'] ?? null;
         ?>
         <a href="profil.php" class="user-info">
-            <?php if ($userPhoto && is_file(__DIR__ . '/' . $userPhoto)): ?>
-                <img src="<?= htmlspecialchars($userPhoto) ?>" alt="<?= t('Photo de profil', 'Profielfoto') ?>" class="user-avatar">
+            <?php if ($userPhoto && famiStoredFileExists($userPhoto)): ?>
+                <img src="<?= htmlspecialchars(moduleFileUrl($userPhoto)) ?>" alt="<?= t('Photo de profil', 'Profielfoto') ?>" class="user-avatar">
             <?php else: ?>
                 <span class="user-avatar-placeholder">👤</span>
             <?php endif; ?>

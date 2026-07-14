@@ -1020,7 +1020,10 @@ if (!function_exists('ensureModulesTable')) {
     {
         $img = trim((string) ($module['icon_image'] ?? ''));
         if ($img !== '') {
-            return '<img src="' . htmlspecialchars($img) . '" alt="" style="width:' . $size . ';height:' . $size . ';object-fit:contain;display:inline-block;">';
+            // Les icônes vivent sur le VOLUME (divers/icons) ; les anciennes sont encore
+            // dans public/uploads. moduleFileUrl() sait servir les deux.
+            $src = function_exists('moduleFileUrl') ? moduleFileUrl($img) : $img;
+            return '<img src="' . htmlspecialchars($src) . '" alt="" style="width:' . $size . ';height:' . $size . ';object-fit:contain;display:inline-block;">';
         }
         return '<span class="tile-icon" style="font-size:' . $size . ';">' . moduleIcon($module) . '</span>';
     }
@@ -1049,6 +1052,12 @@ if (!function_exists('ensureModulesTable')) {
         $nom         = htmlspecialchars($module['nom'] ?? '');
         $desc        = htmlspecialchars($module['description'] ?? '');
         $isContainer = !empty($module['is_container']);
+
+        // MODULE-ÉLÉMENT (il PORTE du contenu : guide, vidéo, PDF…) : ce n'est pas un
+        // conteneur et ça ne le sera jamais. On retire donc la case, au lieu de laisser
+        // cocher une option qui casserait le module (elle efface son contenu).
+        $isElement = in_array((string) ($module['content_kind'] ?? ''), ['ecrit', 'video'], true)
+            || !empty($module['pdf_path']) || !empty($module['video_path']) || !empty($module['contenu_ia']);
         $curIcon     = trim((string) ($module['icon'] ?? ''));
         $curImage    = trim((string) ($module['icon_image'] ?? ''));
         $curRoles    = array_filter(array_map('trim', explode(',', (string) ($module['roles'] ?? ''))));
@@ -1078,7 +1087,14 @@ if (!function_exists('ensureModulesTable')) {
             🌐 La version <strong>néerlandaise</strong> est générée <strong>automatiquement</strong> — rien à saisir.
         </p>
 
-        <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
+        <?php if ($isElement): ?>
+            <input type="hidden" name="is_container" value="0">
+            <div class="muted" style="font-size:.85rem; color:#7a8a80; margin:6px 0;">
+                📄 Module de contenu — il ne peut pas contenir d'autres modules. Tu peux modifier son nom, sa description, son icône et ses accès.
+            </div>
+        <?php else: ?>
+            <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
+        <?php endif; ?>
 
         <label>Accès <small>(rien de coché = visible par tous)</small></label>
         <details class="access-drop">
