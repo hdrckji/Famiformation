@@ -140,27 +140,45 @@ if (!function_exists('glaceStickers')) {
         }
         @media (prefers-reduced-motion: reduce) { .glace-btn { animation:none; } }
 
-        /* La BULLE s\'ouvre AU-DESSUS (le ticket est en bas du widget) et se cale du
-           bon côté pour ne jamais sortir de l\'écran. */
-        .glace-bulle { position:absolute; bottom:calc(100% + 12px); z-index:9999;
+        /* La BULLE s\'ouvre EN DESSOUS. Au-dessus, elle se faisait couper par la barre du
+           navigateur : le widget est tout en haut de la page, il n\'y a pas la place. */
+        .glace-bulle { position:absolute; top:calc(100% + 12px); z-index:9999;
             width:250px; background:#fff; border-radius:14px; padding:13px 15px; text-align:left;
-            border:2px solid #1d4ed8; box-shadow:0 12px 32px rgba(12,30,60,.26);
-            opacity:0; visibility:hidden; transform:translateY(8px) scale(.94);
+            border:2px solid #2d5a37; box-shadow:0 12px 32px rgba(20,60,35,.26);
+            opacity:0; visibility:hidden; transform:translateY(-8px) scale(.94);
             transition:opacity .18s, transform .18s, visibility .18s; }
         .glace-gauche .glace-bulle { left:0; }
         .glace-droite .glace-bulle { right:0; }
         .glace-st.open .glace-bulle { opacity:1; visibility:visible; transform:translateY(0) scale(1); }
-        .glace-bulle::after { content:""; position:absolute; bottom:-9px; width:14px; height:14px;
-            background:#fff; border-right:2px solid #1d4ed8; border-bottom:2px solid #1d4ed8; transform:rotate(45deg); }
+        .glace-bulle::after { content:""; position:absolute; top:-9px; width:14px; height:14px;
+            background:#fff; border-left:2px solid #2d5a37; border-top:2px solid #2d5a37; transform:rotate(45deg); }
         .glace-gauche .glace-bulle::after { left:24px; }
         .glace-droite .glace-bulle::after { right:24px; }
-        .glace-bulle-t { font-weight:800; color:#1d4ed8; font-size:.95rem; margin-bottom:3px; }
+        .glace-bulle-t { font-weight:800; color:#2d5a37; font-size:.95rem; margin-bottom:3px; }
         .glace-bulle-x { color:#44566b; font-size:.86rem; line-height:1.45; }
+
+        /* 🥚 Œuf de Pâques : au 5e clic, le ticket EN A MARRE et s\'envole. */
+        .glace-st.envole { animation:glaceEnvol 1.1s cubic-bezier(.36,.07,.3,1) forwards; pointer-events:none; }
+        @keyframes glaceEnvol {
+            0%   { transform:translate(0,0) rotate(0) scale(1); opacity:1; }
+            18%  { transform:translate(0,10px) rotate(-12deg) scale(.86); opacity:1; }
+            100% { transform:translate(90px,-260px) rotate(420deg) scale(.25); opacity:0; }
+        }
         </style>';
 
         $h .= '<script>
         function glaceToggle(e){ e.stopPropagation();
             var st = e.currentTarget.parentNode;
+
+            // 🥚 Cinq clics et il se sauve. Compteur PAR ticket : chacun a sa patience.
+            st.dataset.clics = String((parseInt(st.dataset.clics || "0", 10)) + 1);
+            if (parseInt(st.dataset.clics, 10) >= 5) {
+                st.classList.remove("open");
+                st.classList.add("envole");
+                setTimeout(function(){ st.remove(); }, 1100);
+                return;
+            }
+
             var wasOpen = st.classList.contains("open");
             document.querySelectorAll(".glace-st.open").forEach(function(o){ o.classList.remove("open"); });
             if (!wasOpen) { st.classList.add("open"); } }
