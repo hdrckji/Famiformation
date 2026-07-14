@@ -52,37 +52,68 @@ if (!function_exists('famiTopbar')) {
         $lang = function_exists('currentLang') ? currentLang() : 'fr';
         ?>
         <style>
-        .fami-rib { position:sticky; top:0; z-index:9000; display:flex; align-items:center; gap:14px;
-            /* Toute la largeur : plusieurs pages ont un <body> en flex centré, où un simple
-               bloc se rétrécit à son contenu. width + align-self forcent la pleine largeur. */
-            width:100%; align-self:stretch; box-sizing:border-box; flex:none;
-            padding:12px 16px; background:rgba(255,255,255,.78); backdrop-filter:blur(10px);
-            border-bottom:1px solid rgba(45,90,55,.10); }
-        .fami-rib .rb-back, .fami-rib .rb-btn {
-            border:none; cursor:pointer; font:inherit; font-weight:700; text-decoration:none;
-            background:rgba(255,255,255,.92); color:#2d5a37; border-radius:999px;
-            box-shadow:0 2px 8px rgba(0,0,0,.10); display:inline-flex; align-items:center; justify-content:center; gap:6px;
-            transition:transform .12s, box-shadow .12s;
+        /* MÊME STRUCTURE ET MÊMES STYLES QUE LE RUBAN DE L'ACCUEIL (.top-nav / .btn-param /
+           .lang-btn) : retour à gauche, titre au centre, boutons à droite avec FR-NL dessous.
+           Différence voulue : le ruban lui-même est TRANSPARENT (ce sont les pastilles blanches
+           qui portent le contraste), et il reste collé en haut. */
+        .fami-rib {
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            padding: 8px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 300;
+            background: transparent;
+            flex: none;
+            align-self: stretch;
         }
-        .fami-rib .rb-back { height:38px; padding:0 16px; flex:none; }
-        .fami-rib .rb-btn { width:38px; height:38px; font-size:1.05rem; position:relative; }
-        .fami-rib .rb-btn.rb-out { background:#c0392b; color:#fff; }
-        .fami-rib .rb-back:hover, .fami-rib .rb-btn:hover { transform:translateY(-1px); box-shadow:0 5px 14px rgba(0,0,0,.16); }
-        .fami-rib .rb-title { flex:1; text-align:center; font-weight:800; color:#2d5a37; font-size:1.05rem;
-            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .fami-rib .rb-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:none; }
-        .fami-rib .rb-row { display:flex; align-items:center; gap:8px; }
-        .fami-rib .rb-lang { height:26px; padding:0 11px; font-size:.76rem; font-weight:800; border-radius:999px;
-            background:rgba(255,255,255,.92); color:#2d5a37; text-decoration:none; box-shadow:0 2px 8px rgba(0,0,0,.10);
-            display:inline-flex; align-items:center; }
-        .fami-rib .rb-lang.active { background:#2d5a37; color:#fff; }
-        .fami-rib .rb-dot { position:absolute; top:-4px; right:-4px; background:#c0392b; color:#fff; border-radius:999px;
-            font-size:.66rem; font-weight:800; padding:1px 6px; line-height:1.4; box-shadow:0 0 0 2px #fff; }
-        @media (max-width:700px) {
-            .fami-rib { gap:8px; padding:10px 10px; }
-            .fami-rib .rb-title { font-size:.92rem; }
-            .fami-rib .rb-back span { display:none; }
-            .fami-rib .rb-back { width:38px; padding:0; }
+        .fami-rib .rb-back {
+            background: rgba(255,255,255,0.9); color: #2d5a37; text-decoration: none;
+            padding: 12px 18px; border-radius: 30px; font-weight: bold; font-size: 0.9rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: all 0.3s ease;
+            display: inline-flex; align-items: center; gap: 6px; flex: none; border: none; cursor: pointer; font-family: inherit;
+        }
+        .fami-rib .rb-back:hover { background: #fff; transform: scale(1.05); }
+        .fami-rib .rb-title {
+            flex: 1; text-align: center; font-weight: 800; color: #2d5a37; font-size: 1.05rem;
+            background: rgba(255,255,255,0.9); border-radius: 30px; padding: 10px 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; margin: 0 auto;
+        }
+        .fami-rib .rb-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
+        .fami-rib .rb-row { display: flex; align-items: center; gap: 10px; }
+        .fami-rib .rb-btn {
+            background: rgba(255,255,255,0.9); color: #2d5a37; text-decoration: none;
+            padding: 12px 18px; border-radius: 30px; font-weight: bold; font-size: 0.9rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: all 0.3s ease;
+            border: none; cursor: pointer; font-family: inherit; position: relative;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .fami-rib .rb-btn:hover { background: #fff; transform: scale(1.05); }
+        .fami-rib .rb-btn.rb-out { background: rgba(255,255,255,0.9); color: #d93025; }
+        .fami-rib .rb-btn.rb-out:hover { background: #fff; }
+        .fami-rib .rb-lang {
+            background: rgba(255,255,255,0.9); color: #2d5a37; text-decoration: none;
+            padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 0.8rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .fami-rib .rb-lang.active { background: #2d5a37; color: #fff; }
+        .fami-rib .rb-lang:hover { background: #fff; }
+        .fami-rib .rb-lang.active:hover { background: #357a44; }
+        .fami-rib .rb-dot {
+            position: absolute; top: -6px; right: -6px; background: #c0392b; color: #fff;
+            border-radius: 999px; font-size: 0.7rem; font-weight: 800; padding: 1px 6px; line-height: 1.4;
+            box-shadow: 0 0 0 2px #fff;
+        }
+        @media (max-width: 760px) {
+            .fami-rib { gap: 8px; padding: 8px 10px; }
+            .fami-rib .rb-title { display: none; }
+            .fami-rib .rb-back span { display: none; }
+            .fami-rib .rb-back, .fami-rib .rb-btn { padding: 10px 14px; }
         }
         </style>
 
@@ -93,8 +124,8 @@ if (!function_exists('famiTopbar')) {
                 <div class="rb-row">
                     <?= $actions ?>
                     <a href="events.php" class="rb-btn" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="rb-dot"><?= (int) $n ?></span><?php endif; ?></a>
-                    <a href="index.php" class="rb-btn" title="<?= t('Accueil', 'Start') ?>">🏠</a>
                     <a href="parametres.php" class="rb-btn" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
+                    <a href="index.php" class="rb-btn" title="<?= t('Accueil', 'Start') ?>">🏠</a>
                     <button type="button" class="rb-btn rb-out" title="<?= t('Déconnexion', 'Afmelden') ?>" onclick="famiLogoutAsk()">⏻</button>
                 </div>
                 <div class="rb-row">
