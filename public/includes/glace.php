@@ -64,6 +64,11 @@ if (!function_exists('glaceMessage')) {
         $nl = (function_exists('currentLang') && currentLang() === 'nl');
         $t = (int) $temp;
 
+        if ($raison === 'les_deux') {
+            return $nl
+                ? ['titre' => $t . ' °C… op een zondag !', 'texte' => 'Warm én weekend: twee keer reden voor een ijsje. Het jouwe is gratis. 🍦😊']
+                : ['titre' => $t . ' °C… un dimanche !', 'texte' => "La chaleur ET le week-end : deux bonnes raisons d'une glace. La tienne est offerte. 🍦😊"];
+        }
         if ($raison === 'chaud') {
             return $nl
                 ? ['titre' => 'Het is ' . $t . ' °C !', 'texte' => 'Vanaf ' . glaceSeuilChaud() . ' °C geven we de planten water… en de ploeg verkoeling. Je ijsje is gratis. 🍦']
@@ -107,11 +112,18 @@ if (!function_exists('glaceStickers')) {
             return '';
         }
 
-        // UN SEUL ticket, au CENTRE, en bas du widget. Deux tickets (un par occasion)
-        // encombraient la barre et diluaient l'effet : c'est un clin d'œil, pas une
-        // décoration permanente. Si les deux occasions tombent le même jour, la chaleur
-        // l'emporte — c'est elle qui donne vraiment envie d'une glace.
-        $h = glaceSticker($chaud ? 'chaud' : 'dimanche', $temp, 'centre');
+        // UNE occasion = un ticket de son côté (chaleur à gauche, du côté de la météo ;
+        // dimanche à droite, du côté de la date). LES DEUX en même temps = UN SEUL ticket,
+        // au centre : deux tickets d'un coup, c'est trop, et le message est de toute façon
+        // le même — la glace est offerte.
+        $h = '';
+        if ($chaud && $dim) {
+            $h .= glaceSticker('les_deux', $temp, 'centre');
+        } elseif ($chaud) {
+            $h .= glaceSticker('chaud', $temp, 'gauche');      // côté météo
+        } else {
+            $h .= glaceSticker('dimanche', $temp, 'droite');   // côté date
+        }
 
         $h .= '<style>
         /* STICKER : posé par-dessus le coin du widget, en débord. Il ne prend donc
