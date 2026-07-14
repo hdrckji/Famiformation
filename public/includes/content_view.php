@@ -357,6 +357,19 @@ if (!function_exists('renderUniformContent')) {
         @keyframes cover-in{ from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
         @keyframes hint-bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(4px); } }
         @media (max-width:560px){ .fami-doc .pagenav{ grid-template-columns:1fr 1fr; } .fami-doc .pagenav__counter{ grid-column:1/-1; order:3; } .fami-doc .toc__link{ grid-template-columns:48px 1fr auto; gap:14px; } .fami-doc .toc__num{ font-size:1.4rem; } }
+        /* IMPRESSION → PDF : « Télécharger le guide » lance l'impression du navigateur.
+           On imprime le GUIDE seul, toutes ses pages à la suite, avec les couleurs. */
+        @media print {
+            body { background:#fff !important; }
+            body * { visibility:hidden; }
+            .fami-doc, .fami-doc * { visibility:visible; }
+            .fami-doc { position:absolute; left:0; top:0; width:100%;
+                        -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+            .fami-doc .doc-page { display:block !important; page-break-after:always; }
+            .fami-doc .doc-page:last-child { page-break-after:auto; }
+            .fami-doc .page { max-width:none; }
+            .fami-doc .doc-pdf, .fami-doc .pagenav, .fami-doc #famiDoneModal { display:none !important; }
+        }
         </style>
 
         <div class="fami-doc">

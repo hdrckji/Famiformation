@@ -111,6 +111,7 @@ if (!function_exists('quizConfigHandlePost')) {
         widgetSet($db, 'quiz_gen_pct_multiple', (string) $pct);
         widgetSet($db, 'quiz_asked_total', (string) $asked);
         widgetSet($db, 'quiz_asked_multiple', (string) $askedMul);
+        widgetSet($db, 'quiz_pass_mark', (string) max(1, min(100, (int) ($_POST['quiz_pass_mark'] ?? 70))));
         widgetSet($db, 'quiz_cfg_saved', '1'); // à partir d'ici, c'est TON réglage qui prime
 
         $_SESSION['module_flash'] = '📝 Réglages du quiz enregistrés.';
@@ -163,6 +164,14 @@ if (!function_exists('quizConfigCard')) {
                         <input type="number" name="quiz_asked_multiple" min="0" max="100" value="<?= (int) $askMul ?>" style="<?= $inp ?>">
                     </label>
                 </div>
+                <div style="display:flex; gap:22px; flex-wrap:wrap; margin-top:18px; padding-top:14px; border-top:1px dashed #dfe6e0;">
+                    <label style="font-weight:700; color:#244230;">
+                        Note de réussite (%)<br>
+                        <input type="number" name="quiz_pass_mark" min="1" max="100" value="<?= (int) (function_exists('widgetGet') ? widgetGet($db, 'quiz_pass_mark', '70') : 70) ?>" style="<?= $inp ?>">
+                    </label>
+                </div>
+                <div class="muted" style="font-size:.85rem; margin-top:6px;">En dessous de cette note, le quiz n'est pas validé. La réussite peut conditionner le téléchargement (Créateur / Accès aux fichiers).</div>
+
                 <div class="muted" style="font-size:.85rem; margin-top:6px;">L'apprenant répond à <strong><?= (int) $asked ?></strong> questions : <strong><?= (int) $askMul ?></strong> multiples + <strong><?= (int) $askSin ?></strong> uniques. Si la banque manque d'un type, on complète avec l'autre.</div>
 
                 <div style="margin-top:16px;"><button type="submit" class="btn btn-primary">Enregistrer</button></div>

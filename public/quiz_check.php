@@ -60,6 +60,12 @@ foreach ($sel as $i) {
     $results[] = ['q' => (isset($qsLbl[$i]) ? $qsLbl[$i] : $q) + $q, 'ua' => $ua, 'cor' => $cor, 'ok' => $ok];
 }
 $pct = $total > 0 ? round($score * 100 / $total) : 0;
+
+// On MÉMORISE le résultat : c'est lui qui débloque le téléchargement (si l'admin l'autorise).
+// Le quiz vit sur le guide ; on rattache la réussite à la FORMATION (le module parent).
+require_once 'includes/quiz_pass.php';
+$passModuleId = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) $id;
+$aReussi = quizRecordResult($db, (int) ($_SESSION['user_id'] ?? 0), $passModuleId, $score, $total);
 ?>
 <!DOCTYPE html>
 <html lang="fr">

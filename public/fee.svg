@@ -1,0 +1,107 @@
+<svg viewBox="130 20 360 490" width="360" height="490" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    /* Les ailes battent doucement, la fée flotte : les mêmes animations que sur le site. */
+    .fee-ailes { animation: ailes 1.5s ease-in-out infinite; transform-origin: 300px 300px; }
+    @keyframes ailes { 0%,100% { transform: scaleX(1); } 50% { transform: scaleX(.9); } }
+  </style>
+  <defs>
+    <linearGradient id="feeSkin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBE1C4"/><stop offset="1" stop-color="#F3CBA3"/>
+    </linearGradient>
+    <linearGradient id="feeHair" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#94512F"/><stop offset="1" stop-color="#6E3A22"/>
+    </linearGradient>
+    <linearGradient id="feeDress" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A9D454"/><stop offset="1" stop-color="#84BD3C"/>
+    </linearGradient>
+    <radialGradient id="feeGlow">
+      <stop offset="0" stop-color="#EAF6CE" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#C9E58B" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#8DC63F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- AILES = les feuilles du symbole Famiflora -->
+  <g class="fee-ailes">
+    <path d="M298 318 Q 156 330 140 160 Q 270 152 298 318 Z" fill="#1E6B33"/>
+    <path d="M280 296 Q 186 306 176 192 Q 256 186 280 296 Z" fill="#8DC63F"/>
+    <path d="M302 318 Q 444 330 460 160 Q 330 152 302 318 Z" fill="#1E6B33"/>
+    <path d="M320 296 Q 414 306 424 192 Q 344 186 320 296 Z" fill="#8DC63F"/>
+    <path d="M298 330 Q 178 322 170 456 Q 262 466 298 330 Z" fill="#1E6B33"/>
+    <path d="M290 340 Q 210 334 206 416 Q 258 424 290 340 Z" fill="#8DC63F"/>
+    <path d="M302 330 Q 422 322 430 456 Q 338 466 302 330 Z" fill="#1E6B33"/>
+    <path d="M310 340 Q 390 334 394 416 Q 342 424 310 340 Z" fill="#8DC63F"/>
+  </g>
+
+  <!-- JAMBES + CHAUSSONS -->
+  <path d="M282 436 Q 279 462 277 484" stroke="url(#feeSkin)" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M318 436 Q 321 462 323 484" stroke="url(#feeSkin)" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <ellipse cx="274" cy="492" rx="16" ry="9" fill="#1E6B33"/>
+  <ellipse cx="326" cy="492" rx="16" ry="9" fill="#1E6B33"/>
+  <ellipse cx="272" cy="488" rx="4.5" ry="3" fill="#8DC63F"/>
+  <ellipse cx="324" cy="488" rx="4.5" ry="3" fill="#8DC63F"/>
+
+  <!-- COU -->
+  <path d="M288 298 L 312 298 L 311 336 L 289 336 Z" fill="#F3CBA3"/>
+
+  <!-- ROBE EN FEUILLES -->
+  <path d="M250 414 L 262 444 L 276 416 L 290 448 L 300 418 L 310 448 L 324 416 L 338 444 L 350 414 Z" fill="#1E6B33"/>
+  <path d="M258 330 Q 300 318 342 330 L 352 422 Q 300 438 248 422 Z" fill="url(#feeDress)"/>
+  <g fill="#2E7D3B">
+    <path d="M262 342 Q 272 334 282 342 Q 272 350 262 342 Z"/>
+    <path d="M290 336 Q 300 328 310 336 Q 300 344 290 336 Z"/>
+    <path d="M318 342 Q 328 334 338 342 Q 328 350 318 342 Z"/>
+    <path d="M272 374 Q 282 366 292 374 Q 282 382 272 374 Z"/>
+    <path d="M304 372 Q 314 364 324 372 Q 314 380 304 372 Z"/>
+    <path d="M288 404 Q 298 396 308 404 Q 298 412 288 404 Z"/>
+  </g>
+  <g transform="translate(330,388)">
+    <circle cx="-6" cy="0" r="4.8" fill="#F5EFDF"/><circle cx="6" cy="0" r="4.8" fill="#F5EFDF"/>
+    <circle cx="0" cy="-6" r="4.8" fill="#F5EFDF"/><circle cx="0" cy="6" r="4.8" fill="#F5EFDF"/>
+    <circle r="3.6" fill="#E8C46B"/>
+  </g>
+
+  <!-- BRAS GAUCHE : main sur la hanche -->
+  <path d="M260 342 Q 240 360 246 384 Q 252 396 264 396" stroke="url(#feeSkin)" stroke-width="12" stroke-linecap="round" fill="none"/>
+
+  <!-- TÊTE -->
+  <circle cx="300" cy="220" r="92" fill="url(#feeSkin)"/>
+  <circle cx="300" cy="72" r="37" fill="url(#feeHair)"/>
+  <path d="M326 52 Q 342 34 364 36 Q 356 58 334 64 Z" fill="#8DC63F"/>
+  <path d="M328 50 Q 342 42 356 40" stroke="#5E9430" stroke-width="2.5" fill="none"/>
+  <path d="M204 258 Q 184 112 300 88 Q 416 112 396 258 Q 386 262 380 252
+           Q 386 202 356 178 Q 336 158 300 152 Q 264 158 244 178
+           Q 214 202 220 252 Q 214 262 204 258 Z" fill="url(#feeHair)"/>
+  <path d="M222 236 Q 216 262 226 284 Q 236 274 234 248 Q 228 238 222 236 Z" fill="url(#feeHair)"/>
+  <path d="M378 236 Q 384 262 374 284 Q 364 274 366 248 Q 372 238 378 236 Z" fill="url(#feeHair)"/>
+  <path d="M252 136 Q 280 110 318 106" stroke="#B5794A" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.8"/>
+  <path d="M286 52 Q 298 46 310 50" stroke="#B5794A" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8"/>
+
+  <!-- VISAGE -->
+  <path d="M241 214 Q 262 199 283 212" stroke="#8DC63F" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.8"/>
+  <path d="M317 212 Q 338 199 359 214" stroke="#8DC63F" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.8"/>
+  <g class="fee-yeux">
+    <circle cx="262" cy="232" r="20" fill="#1E4020"/>
+    <circle cx="338" cy="232" r="20" fill="#1E4020"/>
+    <circle cx="269" cy="224" r="7" fill="#FFFFFF"/>
+    <circle cx="345" cy="224" r="7" fill="#FFFFFF"/>
+  </g>
+  <path d="M242 218 Q 248 210 256 207 M344 207 Q 352 210 358 218" stroke="#1E4020" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  <ellipse cx="230" cy="268" rx="17" ry="10.5" fill="#F0A96B" opacity="0.6"/>
+  <ellipse cx="370" cy="268" rx="17" ry="10.5" fill="#F0A96B" opacity="0.6"/>
+  <path d="M280 270 Q 300 292 320 270 Q 312 286 300 286 Q 288 286 280 270 Z" fill="#1A1A1A"/>
+  <path d="M293 283 Q 300 287 307 283" stroke="#1A1A1A" stroke-width="2" fill="none"/>
+
+  <!-- BRAS DROIT + BAGUETTE + ÉTOILE : le groupe qui PIVOTE (le coup de baguette).
+       Dessiné après la tête pour passer par-dessus, comme dans les images fournies. -->
+  <g class="fee-bras">
+    <path d="M340 342 Q 366 330 380 306" stroke="url(#feeSkin)" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <circle cx="381" cy="303" r="9" fill="#F3CBA3"/>
+    <line x1="382" y1="300" x2="402" y2="254" stroke="#8A5B36" stroke-width="6" stroke-linecap="round"/>
+    <circle class="fee-halo" cx="405" cy="247" r="42" fill="url(#feeGlow)"/>
+    <path d="M405 218 l8 21 21 8 -21 8 -8 21 -8 -21 -21 -8 21 -8 Z" fill="#8DC63F"/>
+    <circle cx="405" cy="247" r="6.5" fill="#1E6B33"/>
+    <path d="M442 214 l3.5 9 9 3.5 -9 3.5 -3.5 9 -3.5 -9 -9 -3.5 9 -3.5 Z" fill="#B5D95A"/>
+    <circle cx="434" cy="286" r="3.2" fill="#B5D95A"/>
+  </g>
+</svg>

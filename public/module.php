@@ -106,7 +106,10 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .tile-review .tile-desc { color: #a06f21; font-weight: 600; }
         .badge-eval { display:inline-block; background:#2d5a37; color:#fff; font-size:0.78rem; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:8px; }
         .tile .badge-eval { position:absolute; top:12px; right:12px; margin:0; }
-        .uni-actions-bar { width:90%; max-width:900px; display:flex; justify-content:flex-end; gap:8px; margin:10px 0 -10px; }
+        /* Actions du guide : au-dessus de la fiche, alignées à DROITE. */
+        .guide-actions { width:92%; max-width:1040px; margin:14px auto -6px; display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+        .guide-actions .uni-ico { display:inline-flex; align-items:center; gap:6px; }
+        @media print { .guide-actions { display:none !important; } }
         .content-card { background: rgba(255,255,255,0.96); border-radius: 18px; padding: 32px; width: 90%; max-width: 900px; margin: 30px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         /* Module vierge : le bloc « Ajout de contenu » remonte tout en haut (après le titre). */
         body.fami-empty-content .fami-rib { order:-10; }   /* le ruban reste EN PREMIER */
@@ -194,11 +197,18 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         $uniRole = function_exists('currentDisplayRole') ? currentDisplayRole() : ($_SESSION['role'] ?? '');
         $uniPdfUrl = $uniHasPdf ? moduleFileUrl($module['pdf_path']) : '';
         $canViewPdf = $uniHasContent && pdfCanView($db, $uniRole, !empty($isAdmin));
-        $canDlPdf = $uniHasPdf && pdfCanDownload($db, $uniRole, !empty($isAdmin));
+
+        // GATE QUIZ : un apprenant ne télécharge (guide OU vidéo) QUE s'il a validé le quiz
+        // de la formation. Sans quiz, rien à valider → autorisé. L'admin n'est jamais bloqué.
+        require_once __DIR__ . '/includes/quiz_pass.php';
+        $quizGateOk = !empty($isAdmin)
+            || quizUserPassed($db, !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) $module['id'], (int) ($_SESSION['user_id'] ?? 0));
+
+        $canDlPdf = $uniHasPdf && $quizGateOk && pdfCanDownload($db, $uniRole, !empty($isAdmin));
         // Vidéo : téléchargement réglable dans Paramètres → Préférences (désactivé par défaut).
         $uniHasVideo = !empty($module['video_path']);
         $uniVideoUrl = $uniHasVideo ? moduleFileUrl($module['video_path']) : '';
-        $canDlVideo = $uniHasVideo && function_exists('videoCanDownload') && videoCanDownload($db, $uniRole, !empty($isAdmin));
+        $canDlVideo = $uniHasVideo && $quizGateOk && function_exists('videoCanDownload') && videoCanDownload($db, $uniRole, !empty($isAdmin));
     ?>
     <?php
         require_once __DIR__ . '/includes/topbar.php';
@@ -211,13 +221,6 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         ]);
     ?>
 
-    <?php if ($canViewPdf || $canDlPdf || $canDlVideo): ?>
-        <div class="uni-actions-bar">
-            <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="<?= t('Voir le PDF original', 'Originele PDF bekijken') ?>" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
-            <?php if ($canDlPdf): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="<?= t('Télécharger le PDF original', 'Originele PDF downloaden') ?>">⤓</a><?php endif; ?>
-            <?php if ($canDlVideo): ?><a class="uni-ico" href="<?= htmlspecialchars($uniVideoUrl) ?>" download title="<?= t('Télécharger la vidéo', 'De video downloaden') ?>">🎬⤓</a><?php endif; ?>
-        </div>
-    <?php endif; ?>
     <?php if (empty($uniHasContent) && empty($isVideoPage)): ?>
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main"><br>
@@ -392,6 +395,13 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php endif; ?>
         <?php if (!empty($module['pdf_path'])): ?>
             <?php if ($isUni && !empty($module['contenu_ia'])): ?>
+                <?php if ($canViewPdf || $canDlPdf || $canDlVideo): ?>
+                <div class="guide-actions">
+                    <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="<?= t('Voir le PDF original', 'Originele PDF bekijken') ?>" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
+                    <?php if ($canDlPdf): ?><button type="button" class="uni-ico" title="<?= t('Télécharger le guide (PDF, mise en page du site)', 'De gids downloaden (PDF, opmaak van de site)') ?>" onclick="window.print()">⤓ <span><?= t('Guide PDF', 'Gids PDF') ?></span></button><?php endif; ?>
+                    <?php if ($canDlVideo): ?><a class="uni-ico" href="<?= htmlspecialchars($uniVideoUrl) ?>" download title="<?= t('Télécharger la vidéo', 'De video downloaden') ?>">🎬 <span><?= t('Vidéo', 'Video') ?></span></a><?php endif; ?>
+                </div>
+                <?php endif; ?>
                 <?php require_once __DIR__ . '/includes/content_view.php'; ?>
                 <?php // moduleContenu() sert la version NL si l'utilisateur est en néerlandais (sinon FR). ?>
                 <?php
