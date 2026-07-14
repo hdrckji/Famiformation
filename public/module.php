@@ -125,7 +125,20 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .dz-icon { font-size:2.6rem; line-height:1; }
         .dz-title { font-weight:800; color:#2d5a37; font-size:1.15rem; margin-top:6px; }
         .dz-hint { color:#6c7a70; font-size:0.85rem; margin-top:4px; }
-        .dz-file { margin-top:8px; font-weight:700; color:#244230; word-break:break-all; }
+        .dz-file { margin-top:10px; font-weight:800; color:#1d6a39; word-break:break-all;
+                   background:#e7f6ec; border:1px solid #b6e0c2; border-radius:9px; padding:7px 10px; }
+        /* Colonnes de dépôt : même largeur, même hauteur, la zone occupe toute sa colonne. */
+        .dz-cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; align-items:stretch; }
+        .dz-cols > div { display:flex; flex-direction:column; }
+        .dz-cols .drop-zone { flex:1; display:flex; flex-direction:column; justify-content:center; }
+        /* « Générer un quiz » : un vrai BLOC. En inline, son fond et son padding débordaient
+           par-dessus la zone vidéo et masquaient le nom du fichier choisi. */
+        .quiz-opt { display:flex; align-items:flex-start; gap:12px; margin-top:20px; padding:14px 16px;
+                    background:#f4f7f6; border:1px solid #e1e8e3; border-radius:12px; cursor:pointer; }
+        .quiz-opt:hover { background:#eef7f0; border-color:#cfe3d5; }
+        .quiz-opt input { margin-top:3px; flex:none; }
+        .quiz-opt strong { color:#244230; display:block; }
+        .quiz-opt small { display:block; color:#7a8a80; font-weight:400; margin-top:2px; }
         .dz-existing { font-size:0.85rem; color:#555; margin:4px 0 2px; }
         /* Variante FINE (sous-titres .srt) : compacte, sur une ligne, moitié moins haute */
         .drop-zone--slim { padding:7px 12px; border-width:2px; margin:6px 0 2px; display:flex; align-items:center; gap:8px; text-align:left; }
@@ -482,9 +495,9 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <input type="password" name="admin_password" required autocomplete="off" placeholder="Mot de passe de verrouillage" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px;">
                 <?php endif; ?>
 
-                <!-- Les deux blocs, côte à côte -->
-                <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
-                    <div style="flex:1; min-width:260px;">
+                <!-- Les deux zones de dépôt, côte à côte et de même hauteur -->
+                <div class="dz-cols">
+                    <div>
                         <div class="drop-zone" id="dz_pdf" data-ext="pdf" data-max="30" data-what="document" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
                             <input type="file" name="pdf_file" accept="application/pdf,.pdf" class="dz-input">
                             <div class="dz-icon">📄</div>
@@ -500,7 +513,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                         <?php endif; ?>
                     </div>
 
-                    <div style="flex:1; min-width:260px;">
+                    <div>
                         <div class="drop-zone" id="dz_video" data-ext="mp4,mov" data-max="1024" data-what="vidéo" data-has-existing="<?= !empty($module['video_path']) ? '1' : '0' ?>" data-remove="remove_video">
                             <input type="file" name="video_file" accept="video/mp4,video/quicktime,.mp4,.mov" class="dz-input">
                             <div class="dz-icon">🎬</div>
@@ -574,12 +587,15 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     </div>
                 </div>
 
-                <label class="chk" style="margin-top:18px; padding:12px 14px; background:#f4f7f6; border-radius:10px;">
+                <label class="quiz-opt">
                     <input type="checkbox" name="a_evaluer" value="1" <?= !empty($module['a_evaluer']) ? 'checked' : '' ?>>
-                    📝 Générer un quiz <small style="font-weight:400; color:#777;">(l'IA crée les questions à partir du document et de la vidéo)</small>
+                    <span>
+                        <strong>📝 Générer un quiz</strong>
+                        <small>L'IA crée les questions à partir du document et de la vidéo. Tu les reliras avant publication.</small>
+                    </span>
                 </label>
 
-                <p style="font-size:0.82rem; color:#777; margin-top:14px;">« <?= $hasAnyContent ? 'Modifier' : 'Valider' ?> et uniformiser » : l'IA lit le document et construit la belle page « Guide » (au lieu de l'afficher brut).</p>
+                <p style="font-size:0.82rem; color:#777; margin-top:16px;">« <?= $hasAnyContent ? 'Modifier' : 'Valider' ?> et uniformiser » : l'IA lit le document et construit la belle page « Guide » (au lieu de l'afficher brut).</p>
                 <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
                     <button type="submit" name="uniformize" value="0" class="btn" style="background:#e9ecef; color:#333;"><?= $hasAnyContent ? 'Modifier' : 'Valider' ?></button>
                     <button type="submit" name="uniformize" value="1" class="btn btn-create"><?= $hasAnyContent ? 'Modifier et uniformiser' : 'Valider et uniformiser' ?></button>
