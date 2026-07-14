@@ -70,6 +70,7 @@ if (!function_exists('famiTopbar')) {
             background: transparent;
             flex: none;
             align-self: stretch;
+            position: relative;   /* repère pour le titre centré sur la page */
         }
         .fami-rib .rb-back {
             background: rgba(255,255,255,0.9); color: #2d5a37; text-decoration: none;
@@ -78,11 +79,15 @@ if (!function_exists('famiTopbar')) {
             display: inline-flex; align-items: center; gap: 6px; flex: none; border: none; cursor: pointer; font-family: inherit;
         }
         .fami-rib .rb-back:hover { background: #fff; transform: scale(1.05); }
+        /* Titre centré sur la PAGE (et non entre le bouton retour et les boutons de droite,
+           qui n'ont pas la même largeur : le titre paraissait alors décalé). */
         .fami-rib .rb-title {
-            flex: 1; text-align: center; font-weight: 800; color: #2d5a37; font-size: 1.05rem;
+            position: absolute; left: 50%; transform: translateX(-50%);
+            font-weight: 800; color: #2d5a37; font-size: 1.05rem;
             background: rgba(255,255,255,0.9); border-radius: 30px; padding: 10px 20px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; margin: 0 auto;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%;
+            pointer-events: none;
         }
         .fami-rib .rb-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
         .fami-rib .rb-row { display: flex; align-items: center; gap: 10px; }

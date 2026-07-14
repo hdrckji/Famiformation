@@ -706,7 +706,14 @@ BLAGUES
         </div>
         <style>
         /* Bande horizontale intégrée dans le ruban du haut (météo à gauche, date à droite, infos au centre) */
-        .home-widget { flex: 1 1 auto; min-width: 0; max-width: 860px; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 52px; background: rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); padding: 6px 16px; box-sizing: border-box; }
+        /* Centré sur la PAGE, pas entre le profil (à gauche) et les boutons (à droite) :
+           ces deux blocs n'ont pas la même largeur, le widget paraissait donc décalé. */
+        .home-widget { position: absolute; left: 50%; transform: translateX(-50%);
+            width: min(860px, calc(100% - 620px)); min-width: 260px;
+            display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 52px;
+            background: rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+            padding: 6px 16px; box-sizing: border-box; }
+        @media (max-width: 1100px) { .home-widget { position: static; transform: none; width: auto; flex: 1 1 auto; } }
         .hw-weather { font-weight: 700; color: #2d5a37; white-space: nowrap; flex-shrink: 0; }
         .hw-soon { color: #9bb3a3; font-weight: 600; font-size: 0.82rem; }
         .hw-center { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; text-align: center; }

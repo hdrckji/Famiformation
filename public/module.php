@@ -635,6 +635,24 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </form>
             </div>
         </div>
+        <!-- Modale : la vidéo déposée n'a pas de son -->
+        <div id="noAudioModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">🔇</div>
+                <div class="fc-modal-title">Cette vidéo n'a pas de son</div>
+                <div class="fc-modal-text">
+                    Aucune piste audio détectée. Sans son, <strong>aucun sous-titre ne pourra être généré</strong>,
+                    et le quiz ne s'appuiera que sur le document écrit.<br><br>
+                    <span style="color:#6b7f70;">Rien ne sera facturé pour la transcription.</span><br>
+                    Voulez-vous quand même poursuivre avec cette vidéo&nbsp;?
+                </div>
+                <div class="fc-modal-actions">
+                    <button type="button" class="btn" style="background:#e9ecef; color:#333;" onclick="naCancel()">Choisir une autre vidéo</button>
+                    <button type="button" class="btn btn-create" onclick="document.getElementById('noAudioModal').style.display='none';">Oui, poursuivre</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modale : format ou poids refuse (le fichier n'est JAMAIS envoye) -->
         <div id="fcRejectModal" class="fc-modal">
             <div class="fc-modal-box">
@@ -723,6 +741,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             label.textContent = '✓ ' + f.name;
                             label.hidden = false;
                             dz.classList.add('has-file');
+                            if (dz.id === 'dz_video') { naCheck(f); }   // vidéo muette ?
                         } else {
                             label.hidden = true;
                             dz.classList.remove('has-file');
@@ -737,6 +756,45 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 })(zones[i]);
             }
         })();
+        // La vidéo a-t-elle du son ? On la lit dans le navigateur (rien n'est envoyé au serveur)
+        // et on interroge les indicateurs de piste audio. Ils diffèrent selon les navigateurs ;
+        // si AUCUN ne répond, on se tait plutôt que d'alerter à tort.
+        function naCheck(file) {
+            var v = document.createElement('video');
+            v.preload = 'metadata';
+            v.muted = true;
+            v.src = URL.createObjectURL(file);
+            v.onloadeddata = function () {
+                var known = false, hasAudio = false;
+                if (typeof v.mozHasAudio === 'boolean') { known = true; hasAudio = v.mozHasAudio; }
+                else if (v.audioTracks && typeof v.audioTracks.length === 'number') { known = true; hasAudio = v.audioTracks.length > 0; }
+                else if (typeof v.webkitAudioDecodedByteCount === 'number') {
+                    // Chrome ne remplit ce compteur qu'après un début de lecture.
+                    v.play().then(function () {
+                        setTimeout(function () {
+                            v.pause();
+                            if (v.webkitAudioDecodedByteCount === 0) { naWarn(); }
+                            URL.revokeObjectURL(v.src);
+                        }, 400);
+                    }).catch(function () { URL.revokeObjectURL(v.src); });
+                    return;
+                }
+                if (known && !hasAudio) { naWarn(); }
+                URL.revokeObjectURL(v.src);
+            };
+            v.onerror = function () { URL.revokeObjectURL(v.src); };
+        }
+        function naWarn() { document.getElementById('noAudioModal').style.display = 'flex'; }
+        function naCancel() {
+            var dz = document.getElementById('dz_video');
+            var input = dz.querySelector('.dz-input');
+            var label = dz.querySelector('.dz-file');
+            input.value = '';
+            label.hidden = true;
+            dz.classList.remove('has-file');
+            document.getElementById('noAudioModal').style.display = 'none';
+        }
+
         // Explique POURQUOI le fichier est refuse, et ce qu'il faut faire.
         function fcReject(what, ext, exts, maxMo, okExt) {
             var t = document.getElementById('fcRejectTitle');

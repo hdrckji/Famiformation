@@ -95,7 +95,11 @@ if (!function_exists('renderVideoPage')) {
         .fami-vid .player__video{ display:block; width:100%; aspect-ratio:16/9; background:#0c1a11; object-fit:contain; }
         /* Habillage actif : le fond du lecteur devient l'image, et la video se pose dessus. */
         .fami-vid .player__frame.has-backdrop{ background-size:cover; background-position:center; background-repeat:no-repeat; }
-        .fami-vid .player__frame.has-backdrop .player__video{ background:transparent; }
+        /* La vidéo porte la MÊME image en fond : en plein écran, le navigateur ne met que la
+           balise <video> en grand (le cadre disparaît). Sans ça, l'habillage s'évanouissait
+           et les bandes redevenaient noires dès qu'on passait en plein écran. */
+        .fami-vid .player__frame.has-backdrop .player__video{ background-size:cover; background-position:center; background-repeat:no-repeat; }
+        .fami-vid .player__video:fullscreen{ background-size:cover; background-position:center; }
         .fami-vid .player__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:14px; padding-left:14px; border-left:3px solid var(--sprout); }
         .fami-vid .player__note{ text-align:center; color:#7a8a80; font-size:.82rem; margin-top:10px; }
         .fami-vid .videostate{ max-width:var(--measure); margin:calc(clamp(120px,16vw,180px) * -0.5) auto 0; padding:0 24px; }
@@ -142,7 +146,7 @@ if (!function_exists('renderVideoPage')) {
                                 $subNl = trim((string) ($module['sub_nl_path'] ?? ''));
                                 $isNl = (function_exists('currentLang') && currentLang() === 'nl');
                             ?>
-                            <video id="famiVideo" class="player__video" controls controlsList="nodownload" playsinline preload="metadata"<?= ($subFr !== '' || $subNl !== '') ? ' crossorigin="anonymous"' : '' ?>>
+                            <video id="famiVideo" class="player__video"<?= $frameSty ?> controls controlsList="nodownload" playsinline preload="metadata"<?= ($subFr !== '' || $subNl !== '') ? ' crossorigin="anonymous"' : '' ?>>
                                 <source src="<?= htmlspecialchars($videoUrl) ?>">
                                 <?php if ($subFr !== ''): ?>
                                     <track kind="subtitles" srclang="fr" label="<?= t('Français', 'Frans') ?>"

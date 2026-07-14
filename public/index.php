@@ -164,6 +164,8 @@ if (!empty($_SESSION['module_flash'])) {
             background: rgba(255,255,255,0.72);
             box-shadow: 0 2px 12px rgba(0,0,0,0.10);
         }
+        /* Repère pour le widget, centré sur la page (voir includes/widget.php). */
+        .top-nav { position: sticky; }
         .user-info {
             display: flex;
             align-items: center;
