@@ -338,6 +338,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $module = $id > 0 ? getModuleById($db, $id) : null;
         // Contenu déjà présent avant cet envoi ? (pour dire « ajouté » ou « remplacé »)
         $hasAnyContentBefore = $module && (!empty($module['pdf_path']) || !empty($module['video_path']) || !empty($module['contenu_ia']));
+
+        // HISTORIQUE : on archive l'état actuel AVANT de l'écraser (contenu, quiz, fichiers).
+        // Les fichiers archivés ne doivent donc PLUS être supprimés ci-dessous : ils
+        // appartiennent maintenant à une version.
+        $archived = false;
+        if ($id > 0) {
+            require_once __DIR__ . '/includes/versions.php';
+            $archived = versionSnapshot($db, (int) $id, (int) ($_SESSION['user_id'] ?? 0)) > 0;
+        }
         // Contributeur non-admin : uniquement dans une zone autorisée.
         if (!$isAdminActor && (!$module || !contribCanAddContent($db, $module, $actorRole))) {
             $_SESSION['module_flash'] = "❌ Vous n'avez pas le droit d'ajouter du contenu ici.";
@@ -378,14 +387,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newPdf = handleModuleFileUpload('pdf_file', ['application/pdf' => 'pdf'], 30 * 1024 * 1024, 'pdf', $fSlug . '-guide');
             if ($newPdf !== null) {
                 // Remplacement : on efface l'ancien PDF (guide) + ses images extraites.
-                foreach ([$pdfPath, $module['pdf_path'] ?? null] as $oldp) { if ($oldp && $oldp !== $newPdf) { volumeUnlink($oldp); } }
+                // Archivé ? on garde le fichier (il appartient à une version). Sinon on l'efface.
+                if (!$archived) {
+                    foreach ([$pdfPath, $module['pdf_path'] ?? null] as $oldp) { if ($oldp && $oldp !== $newPdf) { volumeUnlink($oldp); } }
+                }
                 try {
                     $og = $db->prepare("SELECT pdf_path, contenu_images FROM modules WHERE parent_id = ? AND content_kind = 'ecrit' LIMIT 1");
                     $og->execute([(int) $id]);
                     if ($or = $og->fetch(PDO::FETCH_ASSOC)) {
-                        if (!empty($or['pdf_path']) && $or['pdf_path'] !== $newPdf) { volumeUnlink($or['pdf_path']); }
+                        if (!$archived && !empty($or['pdf_path']) && $or['pdf_path'] !== $newPdf) { volumeUnlink($or['pdf_path']); }
                         $oimg = json_decode((string) ($or['contenu_images'] ?? '[]'), true);
-                        if (is_array($oimg)) { foreach ($oimg as $ik) { volumeUnlink($ik); } }
+                        if (!$archived && is_array($oimg)) { foreach ($oimg as $ik) { volumeUnlink($ik); } }
                     }
                 } catch (Exception $e) {}
                 $pdfPath = $newPdf;
@@ -405,9 +417,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $ov = $db->prepare("SELECT video_path, video_src_path FROM modules WHERE parent_id = ? AND content_kind = 'video' LIMIT 1");
                     $ov->execute([(int) $id]);
-                    if ($vr = $ov->fetch(PDO::FETCH_ASSOC)) { volumeUnlink($vr['video_path'] ?? ''); volumeUnlink($vr['video_src_path'] ?? ''); }
+                    if (!$archived && ($vr = $ov->fetch(PDO::FETCH_ASSOC))) {
+                        volumeUnlink($vr['video_path'] ?? ''); volumeUnlink($vr['video_src_path'] ?? '');
+                    }
                 } catch (Exception $e) {}
-                volumeUnlink($videoPath); volumeUnlink($videoSrc);
+                if (!$archived) { volumeUnlink($videoPath); volumeUnlink($videoSrc); }
                 $videoSrc = $newVideoRaw;
                 $videoPath = null; // le transcodage fournira la nouvelle version 720p
                 $videoStatus = 'processing';
@@ -522,8 +536,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         try {
                             $oldG = $db->prepare("SELECT contenu_images FROM modules WHERE id = ? LIMIT 1");
                             $oldG->execute([$guideChildId]);
-                            foreach ((array) json_decode((string) $oldG->fetchColumn(), true) as $oldImg) {
-                                volumeUnlink((string) $oldImg);
+                            if (!$archived) {
+                                foreach ((array) json_decode((string) $oldG->fetchColumn(), true) as $oldImg) {
+                                    volumeUnlink((string) $oldImg);
+                                }
                             }
                         } catch (Exception $e) { /* non bloquant */ }
 
@@ -764,6 +780,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
         $redirectTo = 'module.php?id=' . $id;
+    } elseif ($action === 'eval_toggle' || $action === 'eval_generate' || $action === 'eval_delete_quiz') {
+        // ÉVALUATION d'une formation (module parent) : activer/couper, générer, supprimer le quiz.
+        $id = (int) ($_POST['id'] ?? 0);
+        require_once __DIR__ . '/includes/evaluation.php';
+        if ($id > 0) {
+            if ($action === 'eval_toggle') {
+                $on = !empty($_POST['eval_on']);
+                evalSetOn($db, $id, $on);
+                famiLogChange($db, 'module_updated', $id,
+                    ($on ? '📝 Formation rendue évaluable' : '📝 Évaluation désactivée') . ' : ' . moduleNom(getModuleById($db, $id) ?: []));
+                $_SESSION['module_flash'] = $on
+                    ? "✅ Cette formation est désormais évaluée."
+                    : "✅ Évaluation désactivée. Le quiz est conservé : tu peux le réactiver quand tu veux.";
+            } elseif ($action === 'eval_generate') {
+                $_SESSION['module_flash'] = evalGenerateQuiz($db, $id, (int) ($_SESSION['user_id'] ?? 0));
+            } elseif ($action === 'eval_delete_quiz') {
+                if (!$isAdminActor || !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+                    $_SESSION['module_flash'] = "❌ Mot de passe incorrect : quiz conservé.";
+                } else {
+                    evalDeleteQuiz($db, $id);
+                    $_SESSION['module_flash'] = "🗑️ Quiz supprimé.";
+                }
+            }
+        }
+        $redirectTo = 'module.php?id=' . $id;
+    } elseif ($action === 'version_restore' || $action === 'version_delete') {
+        // HISTORIQUE des versions.
+        $vid = (int) ($_POST['version_id'] ?? 0);
+        $id = (int) ($_POST['id'] ?? 0);
+        require_once __DIR__ . '/includes/versions.php';
+        if (!$isAdminActor) {
+            $_SESSION['module_flash'] = "❌ Réservé aux admins.";
+        } elseif ($action === 'version_restore') {
+            $_SESSION['module_flash'] = versionRestore($db, $vid, (int) ($_SESSION['user_id'] ?? 0))
+                . " La formation repasse par la relecture avant d'être republiée.";
+        } else {
+            $_SESSION['module_flash'] = versionsDelete($db, $vid)
+                ? "🗑️ Version supprimée (ses fichiers aussi)."
+                : "❌ Suppression impossible.";
+        }
+        $redirectTo = 'module.php?id=' . $id;
     } elseif ($action === 'nl_sync') {
         // Secours MANUEL de la traduction néerlandaise.
         // La synchro se fait normalement toute seule en tâche de fond après chaque
@@ -822,6 +879,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Nettoyage du STOCKAGE : supprimer un module supprime TOUT ce qui lui est lié
                     // (PDF, vidéo + source, SOUS-TITRES .vtt FR/NL et .srt, images du PDF, images
                     // ajoutées dans l'éditeur, icône). Rien ne doit rester à traîner : on le paie.
+                    require_once __DIR__ . '/includes/versions.php';
+                    versionsPurgeForModules($db, $toDelete); // versions archivées + leurs fichiers
                     famiPurgeModulesStorage($db, $toDelete);
 
                     $db->prepare("DELETE FROM modules WHERE id IN ($ph)")->execute($toDelete);

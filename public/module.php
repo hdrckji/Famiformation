@@ -491,6 +491,133 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php endif; ?>
         <?php endif; ?>
 
+        <?php
+            // ── ÉVALUATION + HISTORIQUE (la formation = le module parent, dès qu'elle a du contenu)
+            $canManageEval = ($isAdmin || !empty($canContribHere));
+            if ($canManageEval && $hasAnyContent && !$isContentChild):
+                require_once __DIR__ . '/includes/evaluation.php';
+                require_once __DIR__ . '/includes/versions.php';
+                require_once __DIR__ . '/includes/ui_switch.php';
+                famiSwitchCss();
+                $ev = evalStatus($db, (int) $module['id']);
+                $vers = $isAdmin ? versionsList($db, (int) $module['id']) : [];
+                $regenMsg = $ev['nb'] > 0
+                    ? "Régénérer le quiz ? L'actuel sera remplacé, et tes corrections manuelles perdues."
+                    : "Générer le quiz à partir du guide et de la vidéo ?";
+        ?>
+        <div class="content-card" style="max-width:900px; text-align:left; margin:22px auto;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:12px; border-bottom:1px solid #e6efe9;">
+                <h3 style="margin:0; color:#2d5a37;">📝 Évaluation de la formation</h3>
+                <form method="POST" action="module_save.php" style="margin:0; line-height:0;">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="eval_toggle">
+                    <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                    <label class="fsw">
+                        <input type="checkbox" name="eval_on" value="1" <?= $ev['on'] ? 'checked' : '' ?> onchange="this.form.submit()">
+                        <span class="fsw-track"></span>
+                    </label>
+                </form>
+            </div>
+
+            <p style="color:#7a8a80; margin:12px 0;">
+                <?php if ($ev['on']): ?>
+                    Les apprenants passent un quiz à la fin de cette formation.
+                <?php else: ?>
+                    Cette formation n'est <strong>pas évaluée</strong> : aucun quiz n'est proposé.
+                    <?php if ($ev['nb'] > 0): ?> Son quiz est <strong>conservé</strong> et repart dès que tu réactives l'évaluation.<?php endif; ?>
+                <?php endif; ?>
+            </p>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <?php if ($ev['nb'] > 0): ?>
+                    <span class="pill-quiz">📝 <?= (int) $ev['nb'] ?> question<?= $ev['nb'] > 1 ? 's' : '' ?></span>
+                    <a class="btn" style="background:#eef7f0; color:#2d5a37; border:1px solid #cfe3d5;" href="module_quiz.php?id=<?= (int) $ev['module_id'] ?>">✏️ Contrôler le quiz</a>
+                <?php else: ?>
+                    <span class="pill-quiz" style="background:#fff3e0; border-color:#f0d089; color:#8a5a00;">Aucun quiz</span>
+                <?php endif; ?>
+
+                <form method="POST" action="module_save.php" style="margin:0;" onsubmit="return confirm(<?= htmlspecialchars(json_encode($regenMsg, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>);">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="eval_generate">
+                    <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                    <button type="submit" class="btn btn-create">🤖 <?= $ev['nb'] > 0 ? 'Régénérer le quiz' : 'Générer le quiz' ?></button>
+                </form>
+
+                <?php if ($ev['nb'] > 0 && $isAdmin): ?>
+                    <button type="button" class="btn" style="background:#fdecec; color:#b3261e;" onclick="document.getElementById('delQuizModal').style.display='flex';">🗑️ Supprimer le quiz</button>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($isAdmin && !empty($vers)): ?>
+            <details class="verfold" style="margin-top:18px;">
+                <summary>🕘 Historique des versions <span style="font-weight:400; color:#7a8a80;">— <?= count($vers) ?> archivée<?= count($vers) > 1 ? 's' : '' ?></span></summary>
+                <div style="padding:8px 14px 14px;">
+                    <p style="color:#7a8a80; font-size:.82rem; margin:0 0 10px;">Chaque remplacement de contenu archive la version précédente (guide, quiz, PDF, vidéo). Restaurer une version remet son contenu en place — l'état actuel est archivé au passage, donc rien n'est jamais perdu.</p>
+                    <?php foreach ($vers as $v): $vq = versionQuizNb($v); ?>
+                    <div class="ver-row">
+                        <div>
+                            <strong><?= htmlspecialchars(date('d/m/Y à H:i', strtotime((string) $v['created_at']))) ?></strong>
+                            <div style="color:#7a8a80; font-size:.82rem;">
+                                <?= htmlspecialchars(trim((string) (($v['prenom'] ?? '') . ' ' . ($v['unom'] ?? ''))) ?: 'auteur inconnu') ?>
+                                · <?= $vq > 0 ? ((int) $vq) . ' question' . ($vq > 1 ? 's' : '') : 'sans quiz' ?>
+                                <?= !empty($v['pdf_path']) ? ' · 📄 PDF' : '' ?><?= (!empty($v['video_path']) || !empty($v['video_src_path'])) ? ' · 🎬 vidéo' : '' ?>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <form method="POST" action="module_save.php" style="margin:0;" onsubmit="return confirm('Restaurer cette version ? Le contenu actuel sera archivé, puis remplacé.');">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="version_restore">
+                                <input type="hidden" name="version_id" value="<?= (int) $v['id'] ?>">
+                                <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                                <button type="submit" class="btn" style="background:#eef7f0; color:#2d5a37; border:1px solid #cfe3d5;">↩ Restaurer</button>
+                            </form>
+                            <form method="POST" action="module_save.php" style="margin:0;" onsubmit="return confirm('Supprimer définitivement cette version et ses fichiers ?');">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="version_delete">
+                                <input type="hidden" name="version_id" value="<?= (int) $v['id'] ?>">
+                                <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                                <button type="submit" class="btn" style="background:#fdecec; color:#b3261e;">🗑️</button>
+                            </form>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </details>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($ev['nb'] > 0 && $isAdmin): ?>
+        <div id="delQuizModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">🗑️</div>
+                <div class="fc-modal-title">Supprimer le quiz ?</div>
+                <div class="fc-modal-text">Ses <strong><?= (int) $ev['nb'] ?> questions</strong> et vos corrections manuelles seront <strong>perdues</strong>. Mot de passe admin requis.</div>
+                <form method="POST" action="module_save.php">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="eval_delete_quiz">
+                    <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
+                    <input type="password" name="admin_password" placeholder="Mot de passe admin" required style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;">
+                    <div class="fc-modal-actions">
+                        <button type="button" class="btn" style="background:#e9ecef; color:#333;" onclick="document.getElementById('delQuizModal').style.display='none';">Annuler</button>
+                        <button type="submit" class="btn btn-danger">Supprimer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <style>
+        .pill-quiz { display:inline-block; background:#eef7f0; border:1px solid #cfe3d5; color:#2d5a37; border-radius:999px; padding:7px 14px; font-weight:700; font-size:.86rem; }
+        .verfold { border:1px solid #dde7e1; border-radius:12px; background:#fbfdfc; }
+        .verfold > summary { cursor:pointer; padding:12px 14px; font-weight:700; color:#244230; list-style:none; }
+        .verfold > summary::-webkit-details-marker { display:none; }
+        .verfold > summary::before { content:'\25B8'; display:inline-block; margin-right:8px; color:#3E8E4E; transition:transform .15s; }
+        .verfold[open] > summary::before { transform:rotate(90deg); }
+        .ver-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+                   background:#fff; border:1px solid #e6efe9; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+        </style>
+        <?php endif; ?>
+
         <?php if ($showContentForm): // $existPdf/$existVideo/$existVideoProc/$hasAnyContent calculés en tête de page ?>
         <div class="content-card add-content" style="max-width:900px; text-align:left; margin:26px auto;<?= $hasAnyContent ? '' : ' border:2px solid #bfe0c8; box-shadow:0 12px 34px rgba(30,90,55,.14);' ?>">
             <?php if ($hasAnyContent): ?>

@@ -68,6 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
                 $ap = implode(',', array_fill(0, count($all), '?'));
                 // Nettoyage COMPLET du stockage (PDF, vidéo + source, sous-titres .vtt/.srt,
                 // images du PDF, images de l'éditeur, icône) — voir famiModuleFileKeys().
+                require_once __DIR__ . '/includes/versions.php';
+                versionsPurgeForModules($db, $all);   // versions archivées + leurs fichiers
                 famiPurgeModulesStorage($db, $all);
                 $db->prepare("DELETE FROM modules WHERE id IN ($ap)")->execute($all);
                 $done = count($del);

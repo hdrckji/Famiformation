@@ -334,6 +334,13 @@ if (!function_exists('storageCostCard')) {
                     <td><?= famiFormatSize($stMonth['avg_bytes']) ?> <span class="muted">en moyenne · <?= number_format($stMonth['gb_month'], 3, ',', ' ') ?> Go-mois</span></td>
                     <td style="text-align:right; font-weight:700;"><?= number_format($costStSoFar, 3, ',', ' ') ?> $</td>
                 </tr>
+                <?php if ($verNb > 0): ?>
+                <tr>
+                    <td style="font-weight:700; color:#244230;">🕘 Historique des versions <span class="muted" style="font-weight:400;">(<?= (int) $verNb ?> archivée<?= $verNb > 1 ? 's' : '' ?>)</span></td>
+                    <td><?= famiFormatSize($verBytes) ?> <span class="muted">de fichiers conservés (PDF + vidéos)</span></td>
+                    <td></td>
+                </tr>
+                <?php endif; ?>
                 <tr>
                     <td style="font-weight:700; color:#244230;">📡 Trafic envoyé (ce mois-ci)</td>
                     <td><?= famiFormatSize($egBytes) ?></td>

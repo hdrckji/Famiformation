@@ -50,6 +50,26 @@ foreach ($rows as $r) {
     $totQ += count($questions); $totMul += $mul; $totSin += $sin;
 }
 usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); });
+
+// FORMATIONS SANS QUIZ : celles qui ont du contenu (guide et/ou vidéo) mais aucune question.
+// Elles n'apparaissaient nulle part : impossible de leur en créer un sans tout réimporter.
+require_once __DIR__ . '/includes/evaluation.php';
+$sansQuiz = [];
+try {
+    $rowsP = $db->query("SELECT DISTINCT p.id, p.nom, p.nom_nl
+                         FROM modules p
+                         JOIN modules c ON c.parent_id = p.id AND c.content_kind IN ('ecrit','video')
+                         WHERE (c.contenu_ia IS NOT NULL AND c.contenu_ia <> '')
+                            OR (c.video_path IS NOT NULL AND c.video_path <> '')
+                            OR (c.video_src_path IS NOT NULL AND c.video_src_path <> '')")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rowsP as $pm) {
+        $ev = evalStatus($db, (int) $pm['id']);
+        if ($ev['nb'] === 0) {
+            $sansQuiz[] = ['id' => (int) $pm['id'], 'name' => moduleNom($pm), 'path' => $crumb((int) $pm['id'])];
+        }
+    }
+    usort($sansQuiz, function ($a, $b) { return strcasecmp($a['name'], $b['name']); });
+} catch (Exception $e) {}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -81,6 +101,9 @@ usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); }
     .btn { border:none; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; text-decoration:none; font:inherit; background:var(--forest); color:#fff; white-space:nowrap; }
     .muted { color:#7a8a80; }
     #empty { display:none; }
+    .noquiz { background:#fffaf2; border:1px solid #f0d089; border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+    .nq-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+              background:#fff; border:1px solid #e6efe9; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
 </style>
 </head>
 <body>
@@ -99,6 +122,27 @@ usort($quizzes, function ($a, $b) { return strcasecmp($a['name'], $b['name']); }
             <div class="stat"><div class="n"><?= (int) $totMul ?></div><div class="l">Multiples</div></div>
             <div class="stat"><div class="n"><?= (int) $totSin ?></div><div class="l">Uniques</div></div>
         </div>
+
+        <?php if (!empty($sansQuiz)): ?>
+        <div class="noquiz">
+            <h3 style="margin:0 0 4px; color:#8a5a00;">➕ Formations sans quiz (<?= count($sansQuiz) ?>)</h3>
+            <p class="muted" style="margin:0 0 10px; font-size:.86rem;">Elles ont du contenu mais ne sont pas évaluées. Le quiz se génère à partir du guide et de la transcription de la vidéo — <strong>rien à réimporter</strong>.</p>
+            <?php foreach ($sansQuiz as $nq): ?>
+            <div class="nq-row">
+                <div>
+                    <div style="font-weight:800; color:#244230;"><?= htmlspecialchars($nq['name']) ?></div>
+                    <?php if ($nq['path'] !== ''): ?><div class="path">📍 <?= htmlspecialchars($nq['path']) ?></div><?php endif; ?>
+                </div>
+                <form method="POST" action="module_save.php" style="margin:0;" onsubmit="return confirm('Générer le quiz de cette formation ?');">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="eval_generate">
+                    <input type="hidden" name="id" value="<?= (int) $nq['id'] ?>">
+                    <button type="submit" class="btn">🤖 Créer le quiz</button>
+                </form>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
 
         <input type="text" class="search" id="qsearch" placeholder="🔍 Rechercher un quiz ou une question…" onkeyup="filterQ()">
 
