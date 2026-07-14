@@ -113,7 +113,6 @@ $currentPhoto = $currentUser['photo_profil'] ?? null;
     famiTopbar($db, ['back' => 'index.php', 'title' => t('Mon profil', 'Mijn profiel')]);
 ?>
 <div class="top-nav">
-    <a href="index.php" class="btn-back">← <?= t('Retour accueil', 'Terug naar start') ?></a>
 </div>
 <div class="card">
     <h1>Mon profil</h1>
