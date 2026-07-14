@@ -102,19 +102,22 @@ if (!function_exists('glaceMessage')) {
         $dim = in_array('dimanche', $raisons, true);
         $t = (int) $temp;
 
+        // Clin d'œil au métier : on est jardinier. Quand il fait chaud, on ARROSE —
+        // alors autant arroser les équipes aussi. Le dimanche, même les cactus lèvent
+        // le pied. Le message doit sentir la jardinerie, pas la note de service.
         if ($chaud && $dim) {
             return $nl
-                ? ['titre' => $t . ' °C én zondag !', 'texte' => 'Dubbele reden om te smullen — vraag gerust je gratis ijsje. 😎']
-                : ['titre' => $t . ' °C et dimanche !', 'texte' => 'Double raison de te régaler — demande ta glace gratuite. 😎'];
+                ? ['titre' => $t . ' °C én zondag !', 'texte' => 'Zelfs de cactussen vragen om schaduw — dubbele reden voor je gratis ijsje. 😎']
+                : ['titre' => $t . ' °C et dimanche !', 'texte' => 'Même les cactus réclament de l\'ombre — double raison de prendre ta glace gratuite. 😎'];
         }
         if ($chaud) {
             return $nl
-                ? ['titre' => 'Het is ' . $t . ' °C !', 'texte' => 'Vanaf ' . glaceSeuilChaud() . ' °C trakteert de zaak — vraag gerust je gratis ijsje. 🍦']
-                : ['titre' => 'Il fait ' . $t . ' °C !', 'texte' => 'Dès ' . glaceSeuilChaud() . ' °C, la maison régale — n\'hésite pas à demander ta glace gratuite. 🍦'];
+                ? ['titre' => 'Het is ' . $t . ' °C !', 'texte' => 'Vanaf ' . glaceSeuilChaud() . ' °C geven we de planten water… en de ploeg verkoeling. Je ijsje is gratis. 🍦']
+                : ['titre' => 'Il fait ' . $t . ' °C !', 'texte' => 'Dès ' . glaceSeuilChaud() . ' °C, on arrose les plantes… et on rafraîchit les équipes. Ta glace est offerte. 🍦'];
         }
         return $nl
-            ? ['titre' => 'Het is zondag !', 'texte' => 'En op zondag is je ijsje gratis — vraag het gerust. 😊']
-            : ['titre' => 'On est dimanche !', 'texte' => 'Et le dimanche, ta glace est offerte — n\'hésite pas à la demander. 😊'];
+            ? ['titre' => 'Het is zondag !', 'texte' => 'Zelfs de cactussen nemen het er vandaag van — je ijsje is gratis. 😊']
+            : ['titre' => 'On est dimanche !', 'texte' => 'Même les cactus lèvent le pied aujourd\'hui — ta glace est offerte. 😊'];
     }
 }
 
