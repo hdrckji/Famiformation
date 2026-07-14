@@ -95,6 +95,17 @@ if (!function_exists('famiExtractAudio')) {
         if (!is_file($videoAbs) || !function_exists('exec')) {
             return '';
         }
+
+        // 1) PAS DE PISTE AUDIO DU TOUT → inutile d'appeler Whisper (et de le payer).
+        //    ffprobe liste les flux audio : s'il n'en trouve aucun, on s'arrête ici.
+        $probe = [];
+        $pc = 0;
+        @exec('ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 '
+            . escapeshellarg($videoAbs) . ' 2>&1', $probe, $pc);
+        if ($pc === 0 && empty(array_filter($probe))) {
+            return ''; // vidéo muette : aucun coût
+        }
+
         $out = sys_get_temp_dir() . '/fami_audio_' . bin2hex(random_bytes(6)) . '.mp3';
         // -vn : pas d'image · -ac 1 : mono · -ar 16000 : 16 kHz (ce que Whisper attend)
         // -b:a 48k : ~3 Mo pour 10 min → ~70 min de vidéo sous la limite des 25 Mo.
@@ -107,6 +118,23 @@ if (!function_exists('famiExtractAudio')) {
             @unlink($out);
             return '';
         }
+
+        // 2) PISTE AUDIO PRÉSENTE MAIS SILENCIEUSE (cas fréquent : une vidéo « sans son » garde
+        //    souvent une piste muette). Whisper la transcrirait quand même — facturée, pour rien.
+        //    volumedetect donne le volume moyen : sous -50 dB, il n'y a rien à entendre.
+        $vol = [];
+        $vc = 0;
+        @exec('ffmpeg -i ' . escapeshellarg($out) . ' -af volumedetect -f null - 2>&1', $vol, $vc);
+        foreach ($vol as $line) {
+            if (preg_match('/mean_volume:\s*(-?[\d.]+) dB/', $line, $m)) {
+                if ((float) $m[1] < -50.0) {
+                    @unlink($out);
+                    return ''; // silence : aucun appel, aucun coût
+                }
+                break;
+            }
+        }
+
         return $out;
     }
 }
@@ -390,7 +418,7 @@ if (!function_exists('famiVideoSubtitles')) {
             if ($audio === '') {
                 return [
                     'ok' => false, 'srt_fr' => '', 'srt_nl' => '', 'text' => '', 'source' => 'none',
-                    'error' => 'Extraction audio impossible (ffmpeg).',
+                    'error' => "Aucun son à transcrire (vidéo muette ou silencieuse) — rien n'a été facturé.",
                 ];
             }
             $r = famiSttRun($audio, 'fr', $db); // $db → le coût entre dans le compteur API
