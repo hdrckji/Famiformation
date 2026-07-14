@@ -685,10 +685,16 @@ BLAGUES
             $showMeteo = widgetGet($db, 'show_meteo', '1') === '1';
             $showPhrases = widgetGet($db, 'show_phrases', '1') === '1';
             $showDate = widgetGet($db, 'show_date', '1') === '1';
-            // 🍦 Le ticket glace n'est PLUS ici : il vit dans le ruban (voir glace.php),
-            //    pour ne pas empiéter sur la météo ni sur la date, qui restent lisibles.
+
+            // 🍦 TICKET GLACE : collé dans le COIN du widget qui porte sa raison —
+            //    en bas à GAUCHE pour la chaleur (côté météo), en bas à DROITE pour le
+            //    dimanche (côté date). Posé en sticker, en débord : il ne prend aucune
+            //    place et ne pousse donc ni la météo ni la date.
+            require_once __DIR__ . '/glace.php';
+            $glTemp = ($showMeteo && $weather) ? (int) $weather['temp'] : null;
         ?>
         <div class="home-widget">
+            <?= glaceStickers($glTemp) ?>
             <?php if ($showMeteo): ?>
             <div class="hw-weather">
                 <?php if ($weather): ?>
@@ -715,7 +721,9 @@ BLAGUES
             display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 52px;
             background: rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
             padding: 6px 16px; box-sizing: border-box; }
-        @media (max-width: 1100px) { .home-widget { position: static; transform: none; width: auto; flex: 1 1 auto; } }
+        /* `relative` et non `static` : identique pour la mise en page, mais le widget reste
+           le repère des tickets glace collés dans ses coins (sinon ils s'échapperaient). */
+        @media (max-width: 1100px) { .home-widget { position: relative; left: auto; transform: none; width: auto; flex: 1 1 auto; } }
         .hw-weather { font-weight: 700; color: #2d5a37; white-space: nowrap; flex-shrink: 0; }
         .hw-soon { color: #9bb3a3; font-weight: 600; font-size: 0.82rem; }
         .hw-center { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; text-align: center; }

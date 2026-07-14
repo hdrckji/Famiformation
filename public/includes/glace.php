@@ -2,20 +2,20 @@
 // ============================================================
 // glace.php — le TICKET GLACE 🍦
 //
-// Deux occasions de se le voir offrir :
-//   • il fait ≥ 30 °C sur SON site (météo Open-Meteo du lieu de travail)
-//   • on est dimanche
-//   • les deux le même jour → un seul ticket, et le message signale le doublé.
+// Deux occasions de se le voir offrir, et le ticket se pose dans le COIN du widget
+// qui correspond à sa raison — on comprend sans explication :
+//   • il fait ≥ 30 °C  → ticket en bas à GAUCHE, du côté de la météo
+//   • on est dimanche  → ticket en bas à DROITE, du côté de la date
+//   • les deux le même jour → les deux tickets, chacun dans son coin.
 //
-// EMPLACEMENT : dans le RUBAN, avec les autres boutons (🔔 ⚙️ 🏠). Il est donc
-// présent sur TOUTES les pages, et surtout il ne prend pas la place du widget :
-// la date et la météo restent visibles, intactes.
+// Il est posé en STICKER (par-dessus le coin, en débord) : il ne prend donc aucune
+// place dans le widget et ne pousse ni la météo ni la date.
 //
-// AU CLIC : une petite BULLE s'ouvre sous le ticket. Pas une fenêtre plein écran —
-// pour une glace offerte, bloquer tout l'écran était disproportionné.
+// AU CLIC : une petite bulle sort du ticket. Pas de fenêtre plein écran — pour une
+// glace offerte, bloquer tout l'écran serait disproportionné.
 //
 // Autonome : SVG + CSS + JS + textes, tout est ici. Pour le retirer : supprimer ce
-// fichier et les appels à glaceRuban() dans index.php et includes/topbar.php.
+// fichier et l'appel à glaceStickers() dans widget.php.
 // ============================================================
 
 if (!function_exists('glaceSeuilChaud')) {
@@ -26,91 +26,45 @@ if (!function_exists('glaceSeuilChaud')) {
     }
 }
 
-if (!function_exists('glaceTempDuSite')) {
-    /**
-     * Température du SITE de l'utilisateur (son lieu de travail), pas d'ailleurs.
-     * Réutilise la météo du widget — déjà mise en cache 30 min en base, donc
-     * l'afficher dans le ruban de chaque page ne coûte aucun appel réseau de plus.
-     * @return int|null null si aucun site ou météo indisponible.
-     */
-    function glaceTempDuSite(PDO $db)
-    {
-        if (!function_exists('userSite') || !function_exists('widgetWeather')) {
-            return null;
-        }
-        $site = userSite($db, $_SESSION['user_id'] ?? null);
-        if (!$site) {
-            return null;
-        }
-        $w = widgetWeather($db, $site);
-        return (is_array($w) && isset($w['temp'])) ? (int) $w['temp'] : null;
-    }
-}
-
-if (!function_exists('glaceRaisons')) {
-    /**
-     * Pourquoi (et si) le ticket est offert aujourd'hui.
-     * @return array liste parmi 'chaud', 'dimanche' — vide si aucune occasion.
-     */
-    function glaceRaisons($temp = null)
-    {
-        $r = [];
-        if ($temp !== null && (int) $temp >= glaceSeuilChaud()) {
-            $r[] = 'chaud';
-        }
-        if (date('w') === '0') { // 0 = dimanche
-            $r[] = 'dimanche';
-        }
-        return $r;
-    }
-}
-
 if (!function_exists('glaceTicketSvg')) {
-    /** Le ticket, dessiné. Contours en BLEU (demande de Jimmy). */
+    /**
+     * Le ticket, dessiné. ENTIÈREMENT BLEU (demande de Jimmy : le corps vert devait
+     * passer au bleu lui aussi, pas seulement les contours).
+     */
     function glaceTicketSvg()
     {
         return '<svg viewBox="0 0 170 104" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
             . '<defs><linearGradient id="glaceTg" x1="0" y1="0" x2="1" y2="1">'
-            . '<stop offset="0" stop-color="#4bb063"></stop><stop offset="1" stop-color="#1f5c34"></stop></linearGradient></defs>'
-            . '<rect x="2" y="2" width="166" height="100" rx="12" fill="url(#glaceTg)" stroke="#1d4ed8" stroke-width="3"></rect>'
-            . '<rect x="10" y="12" width="106" height="80" rx="7" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"></rect>'
+            . '<stop offset="0" stop-color="#5b9bf5"></stop><stop offset="1" stop-color="#1e40af"></stop></linearGradient></defs>'
+            . '<rect x="2" y="2" width="166" height="100" rx="12" fill="url(#glaceTg)" stroke="#152c6b" stroke-width="3"></rect>'
+            . '<rect x="10" y="12" width="106" height="80" rx="7" fill="#fff" stroke="#152c6b" stroke-width="1.6"></rect>'
             . '<text x="24" y="52" font-family="Inter,Arial,sans-serif" font-size="34" font-weight="900" fill="#1c1c1c" font-style="italic">1x</text>'
             . '<text x="18" y="72" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="900" fill="#1c1c1c" font-style="italic">GRATUIT</text>'
             . '<text x="22" y="88" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="900" fill="#1c1c1c" font-style="italic">GRATIS</text>'
             . '<g>'
-            . '<path d="M118 60 L152 60 L135 98 Z" fill="#e8a94a" stroke="#1d4ed8" stroke-width="1.5"></path>'
-            . '<path d="M122 66 L148 66 M126 74 L144 74 M130 82 L140 82 M126 60 L138 92 M144 60 L133 92" stroke="#1d4ed8" stroke-width="1.2" opacity=".55"></path>'
-            . '<path d="M116 58 C110 40 118 26 128 24 C126 12 146 8 150 20 C160 18 166 30 158 38 C166 44 158 58 150 56 Z" fill="#fdf6e6" stroke="#1d4ed8" stroke-width="1.6"></path>'
+            . '<path d="M118 60 L152 60 L135 98 Z" fill="#e8a94a" stroke="#152c6b" stroke-width="1.5"></path>'
+            . '<path d="M122 66 L148 66 M126 74 L144 74 M130 82 L140 82 M126 60 L138 92 M144 60 L133 92" stroke="#152c6b" stroke-width="1.2" opacity=".5"></path>'
+            . '<path d="M116 58 C110 40 118 26 128 24 C126 12 146 8 150 20 C160 18 166 30 158 38 C166 44 158 58 150 56 Z" fill="#fdf6e6" stroke="#152c6b" stroke-width="1.6"></path>'
             . '<circle cx="130" cy="40" r="2.6" fill="#2a2a2a"></circle><circle cx="146" cy="40" r="2.6" fill="#2a2a2a"></circle>'
             . '<circle cx="126" cy="47" r="2.4" fill="#ff9d8a" opacity=".6"></circle><circle cx="150" cy="47" r="2.4" fill="#ff9d8a" opacity=".6"></circle>'
             . '<path d="M131 48 Q138 55 145 48" fill="none" stroke="#2a2a2a" stroke-width="2" stroke-linecap="round"></path>'
-            . '<path d="M128 64 C124 60 128 54 133 57 C134 53 141 53 142 57 C147 54 151 60 147 64 C144 68 132 68 128 64z" fill="#e5533c" stroke="#1d4ed8" stroke-width="1.2"></path>'
+            . '<path d="M128 64 C124 60 128 54 133 57 C134 53 141 53 142 57 C147 54 151 60 147 64 C144 68 132 68 128 64z" fill="#e5533c" stroke="#152c6b" stroke-width="1.2"></path>'
             . '</g></svg>';
     }
 }
 
 if (!function_exists('glaceMessage')) {
     /**
-     * UNE phrase, pas un paragraphe. C'est une glace offerte : le message doit se
-     * lire d'un coup d'œil, sans qu'on ait à « lire ».
+     * UNE phrase, et un clin d'œil au métier : chez un jardinier, quand il fait
+     * chaud, on ARROSE — alors autant arroser les équipes aussi.
      * @return array ['titre', 'texte']
      */
-    function glaceMessage(array $raisons, $temp = null)
+    function glaceMessage($raison, $temp = null)
     {
         $nl = (function_exists('currentLang') && currentLang() === 'nl');
-        $chaud = in_array('chaud', $raisons, true);
-        $dim = in_array('dimanche', $raisons, true);
         $t = (int) $temp;
 
-        // Clin d'œil au métier : on est jardinier. Quand il fait chaud, on ARROSE —
-        // alors autant arroser les équipes aussi. Le dimanche, même les cactus lèvent
-        // le pied. Le message doit sentir la jardinerie, pas la note de service.
-        if ($chaud && $dim) {
-            return $nl
-                ? ['titre' => $t . ' °C én zondag !', 'texte' => 'Zelfs de cactussen vragen om schaduw — dubbele reden voor je gratis ijsje. 😎']
-                : ['titre' => $t . ' °C et dimanche !', 'texte' => 'Même les cactus réclament de l\'ombre — double raison de prendre ta glace gratuite. 😎'];
-        }
-        if ($chaud) {
+        if ($raison === 'chaud') {
             return $nl
                 ? ['titre' => 'Het is ' . $t . ' °C !', 'texte' => 'Vanaf ' . glaceSeuilChaud() . ' °C geven we de planten water… en de ploeg verkoeling. Je ijsje is gratis. 🍦']
                 : ['titre' => 'Il fait ' . $t . ' °C !', 'texte' => 'Dès ' . glaceSeuilChaud() . ' °C, on arrose les plantes… et on rafraîchit les équipes. Ta glace est offerte. 🍦'];
@@ -121,40 +75,59 @@ if (!function_exists('glaceMessage')) {
     }
 }
 
-if (!function_exists('glaceRuban')) {
-    /**
-     * Le ticket, prêt à être posé dans un ruban, à côté des autres boutons.
-     * Renvoie '' quand aucune occasion — donc l'appel est sans risque partout.
-     */
-    function glaceRuban(PDO $db)
+if (!function_exists('glaceSticker')) {
+    /** Un ticket collé dans un coin. $pos : 'gauche' | 'droite'. */
+    function glaceSticker($raison, $temp, $pos)
     {
-        $temp = glaceTempDuSite($db);
-        $raisons = glaceRaisons($temp);
-        if (empty($raisons)) {
-            return '';
-        }
-        $m = glaceMessage($raisons, $temp);
-        $titreAttr = htmlspecialchars($m['titre'], ENT_QUOTES, 'UTF-8');
-
-        $h = '<div class="glace-wrap">'
-            . '<button type="button" class="glace-btn" onclick="glaceToggle(event)" title="' . $titreAttr . '">'
+        $m = glaceMessage($raison, $temp);
+        $id = 'glace-' . $raison;
+        return '<div class="glace-st glace-' . $pos . '" id="' . $id . '">'
+            . '<button type="button" class="glace-btn" onclick="glaceToggle(event)"'
+            . ' title="' . htmlspecialchars($m['titre'], ENT_QUOTES, 'UTF-8') . '">'
             . glaceTicketSvg() . '</button>'
-            . '<div class="glace-bulle" id="glaceBulle">'
+            . '<div class="glace-bulle">'
             . '<div class="glace-bulle-t">🍦 ' . htmlspecialchars($m['titre']) . '</div>'
             . '<div class="glace-bulle-x">' . htmlspecialchars($m['texte']) . '</div>'
             . '</div></div>';
+    }
+}
+
+if (!function_exists('glaceStickers')) {
+    /**
+     * Les tickets à coller sur le widget, selon les occasions du jour.
+     * Renvoie '' quand il n'y en a aucune — l'appel est donc sans risque.
+     *
+     * @param int|null $temp température du site de l'utilisateur (météo du widget)
+     */
+    function glaceStickers($temp = null)
+    {
+        $chaud = ($temp !== null && (int) $temp >= glaceSeuilChaud());
+        $dim = (date('w') === '0'); // 0 = dimanche
+        if (!$chaud && !$dim) {
+            return '';
+        }
+
+        $h = '';
+        if ($chaud) {
+            $h .= glaceSticker('chaud', $temp, 'gauche');    // côté météo
+        }
+        if ($dim) {
+            $h .= glaceSticker('dimanche', $temp, 'droite'); // côté date
+        }
 
         $h .= '<style>
-        .glace-wrap { position:relative; display:inline-flex; align-items:center; }
+        /* STICKER : posé par-dessus le coin du widget, en débord. Il ne prend donc
+           aucune place dans la barre et ne pousse ni la météo ni la date. */
+        .glace-st { position:absolute; bottom:-14px; z-index:50; }
+        .glace-st.glace-gauche { left:-10px; }
+        .glace-st.glace-droite { right:-10px; }
 
-        /* Même pastille blanche arrondie que les autres boutons du ruban : le ticket
-           s\'y intègre au lieu de flotter comme un corps étranger. */
-        .glace-btn { background:rgba(255,255,255,0.9); border:none; border-radius:30px; cursor:pointer;
-            padding:6px 12px; height:44px; box-sizing:border-box; display:inline-flex; align-items:center;
-            box-shadow:0 4px 10px rgba(0,0,0,0.1); transition:background .2s, transform .2s; }
-        .glace-btn:hover { background:#fff; transform:scale(1.05); }
-        .glace-btn svg { width:48px; height:29px; display:block;
+        .glace-btn { background:none; border:none; padding:0; margin:0; cursor:pointer;
+            display:block; width:52px; height:32px;
+            filter:drop-shadow(0 3px 6px rgba(21,44,107,.4));
             animation:glaceWiggle 3.4s ease-in-out infinite; transform-origin:50% 60%; }
+        .glace-btn svg { width:100%; height:100%; display:block; }
+        .glace-btn:hover { animation:none; transform:scale(1.16) rotate(-4deg); transition:transform .15s; }
 
         /* Il GIGOTE par à-coups : une animation en boucle continue devient un papier
            peint qu\'on ne voit plus. Là, il reste sage puis a un frisson. */
@@ -165,28 +138,35 @@ if (!function_exists('glaceRuban')) {
             76% { transform:rotate(-5deg) scale(1.04); }
             80% { transform:rotate(3deg) scale(1.01); }
         }
-        @media (prefers-reduced-motion: reduce) { .glace-btn svg { animation:none; } }
+        @media (prefers-reduced-motion: reduce) { .glace-btn { animation:none; } }
 
-        /* La BULLE : elle sort du ticket, elle ne bloque pas la page. */
-        .glace-bulle { position:absolute; top:calc(100% + 12px); right:0; z-index:9999;
+        /* La BULLE s\'ouvre AU-DESSUS (le ticket est en bas du widget) et se cale du
+           bon côté pour ne jamais sortir de l\'écran. */
+        .glace-bulle { position:absolute; bottom:calc(100% + 12px); z-index:9999;
             width:250px; background:#fff; border-radius:14px; padding:13px 15px; text-align:left;
             border:2px solid #1d4ed8; box-shadow:0 12px 32px rgba(12,30,60,.26);
-            opacity:0; visibility:hidden; transform:translateY(-8px) scale(.94);
+            opacity:0; visibility:hidden; transform:translateY(8px) scale(.94);
             transition:opacity .18s, transform .18s, visibility .18s; }
-        .glace-wrap.open .glace-bulle { opacity:1; visibility:visible; transform:translateY(0) scale(1); }
-        .glace-bulle::before { content:""; position:absolute; top:-9px; right:24px; width:14px; height:14px;
-            background:#fff; border-left:2px solid #1d4ed8; border-top:2px solid #1d4ed8; transform:rotate(45deg); }
+        .glace-gauche .glace-bulle { left:0; }
+        .glace-droite .glace-bulle { right:0; }
+        .glace-st.open .glace-bulle { opacity:1; visibility:visible; transform:translateY(0) scale(1); }
+        .glace-bulle::after { content:""; position:absolute; bottom:-9px; width:14px; height:14px;
+            background:#fff; border-right:2px solid #1d4ed8; border-bottom:2px solid #1d4ed8; transform:rotate(45deg); }
+        .glace-gauche .glace-bulle::after { left:24px; }
+        .glace-droite .glace-bulle::after { right:24px; }
         .glace-bulle-t { font-weight:800; color:#1d4ed8; font-size:.95rem; margin-bottom:3px; }
         .glace-bulle-x { color:#44566b; font-size:.86rem; line-height:1.45; }
         </style>';
 
         $h .= '<script>
         function glaceToggle(e){ e.stopPropagation();
-            var w = e.currentTarget.parentNode; w.classList.toggle("open"); }
-        document.addEventListener("click", function(){
-            var w = document.querySelector(".glace-wrap.open"); if (w) { w.classList.remove("open"); } });
-        document.addEventListener("keydown", function(e){ if (e.key === "Escape") {
-            var w = document.querySelector(".glace-wrap.open"); if (w) { w.classList.remove("open"); } } });
+            var st = e.currentTarget.parentNode;
+            var wasOpen = st.classList.contains("open");
+            document.querySelectorAll(".glace-st.open").forEach(function(o){ o.classList.remove("open"); });
+            if (!wasOpen) { st.classList.add("open"); } }
+        function glaceCloseAll(){ document.querySelectorAll(".glace-st.open").forEach(function(o){ o.classList.remove("open"); }); }
+        document.addEventListener("click", glaceCloseAll);
+        document.addEventListener("keydown", function(e){ if (e.key === "Escape") { glaceCloseAll(); } });
         </script>';
 
         return $h;

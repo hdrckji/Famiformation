@@ -127,8 +127,6 @@ if (!function_exists('famiTopbar')) {
             <div class="rb-title"><?= htmlspecialchars($title) ?></div>
             <div class="rb-right">
                 <div class="rb-row">
-                    <?php require_once __DIR__ . '/glace.php'; // 🍦 ticket glace (≥ 30 °C ou dimanche) ?>
-                    <?= glaceRuban($db) ?>
                     <a href="events.php" class="rb-btn" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="rb-dot"><?= (int) $n ?></span><?php endif; ?></a>
                     <a href="parametres.php" class="rb-btn" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                     <a href="index.php" class="rb-btn" title="<?= t('Accueil', 'Start') ?>">🏠</a>
