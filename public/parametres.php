@@ -68,6 +68,8 @@ require_once __DIR__ . '/includes/pdf_access.php';
 pdfAccessHandlePost($db);
 require_once __DIR__ . '/includes/quiz_config.php';
 quizConfigHandlePost($db);
+require_once __DIR__ . '/includes/branding.php';
+brandingHandlePost($db);
 require_once __DIR__ . '/includes/storage_admin.php';
 require_once __DIR__ . '/includes/transcription.php'; // état de Whisper pour l'onglet Outils
 require_once __DIR__ . '/includes/outils_tab.php';    // onglet Outils (informatif)
@@ -871,6 +873,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
                  « Services configurés ») : un réglage se règle là où on le consulte. -->
             <?php pdfAccessCard($db); ?>
             <?php quizConfigCard($db); ?>
+            <?php brandingCard($db); ?>
             <?php contribSettingsCard($db); ?>
 
             <!-- 🎨 PERSONNALISATION : options « fun » regroupées, chaque bascule via un bouton

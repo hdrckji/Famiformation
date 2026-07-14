@@ -37,6 +37,17 @@ if (!function_exists('renderVideoPage')) {
         }
         $quizAvailable = ($quizHref !== '');
 
+        // HABILLAGE : image de fond derriere le lecteur (Parametres -> Preferences -> Createur).
+        // Une video 9:16 ne couvre pas toute la boite 16:9 : au lieu de bandes NOIRES, on voit
+        // cette image. Une video 16:9 la recouvre entierement, donc elle ne se voit pas.
+        $backdrop = '';
+        if (function_exists('brandingVideoBackdropUrl')) {
+            global $db;
+            if ($db instanceof PDO) { $backdrop = brandingVideoBackdropUrl($db); }
+        }
+        $frameCls = $backdrop !== '' ? ' has-backdrop' : '';
+        $frameSty = $backdrop !== '' ? ' style="background-image:url(&quot;' . htmlspecialchars($backdrop, ENT_QUOTES) . '&quot;);"' : '';
+
         // Sous-titre : seulement si une description existe (jamais de texte par défaut).
         $subtitle = trim($descRaw) !== ''
             ? '<p class="videohero__subtitle">' . htmlspecialchars($descRaw) . '</p>'
@@ -81,6 +92,9 @@ if (!function_exists('renderVideoPage')) {
         .fami-vid .player{ max-width:var(--measure); margin:calc(clamp(120px,16vw,180px) * -0.62) auto 0; padding:0 24px; position:relative; animation:vid-rise .9s ease-out .15s both; }
         .fami-vid .player__frame{ position:relative; border-radius:18px; overflow:hidden; background:#10241633; border:1px solid rgba(255,255,255,.5); box-shadow:0 2px 6px rgba(20,40,22,.18),0 24px 60px rgba(20,40,22,.28); }
         .fami-vid .player__video{ display:block; width:100%; aspect-ratio:16/9; background:#0c1a11; object-fit:contain; }
+        /* Habillage actif : le fond du lecteur devient l'image, et la video se pose dessus. */
+        .fami-vid .player__frame.has-backdrop{ background-size:cover; background-position:center; background-repeat:no-repeat; }
+        .fami-vid .player__frame.has-backdrop .player__video{ background:transparent; }
         .fami-vid .player__caption{ font-family:var(--font-label); font-size:.8rem; color:var(--ink-soft); margin-top:14px; padding-left:14px; border-left:3px solid var(--sprout); }
         .fami-vid .player__note{ text-align:center; color:#7a8a80; font-size:.82rem; margin-top:10px; }
         .fami-vid .videostate{ max-width:var(--measure); margin:calc(clamp(120px,16vw,180px) * -0.5) auto 0; padding:0 24px; }
@@ -117,7 +131,7 @@ if (!function_exists('renderVideoPage')) {
             <?php if ($hasVideo && ($rawFallback || ($status !== 'processing' && $status !== 'failed'))): ?>
                 <main class="player">
                     <figure style="margin:0;">
-                        <div class="player__frame">
+                        <div class="player__frame<?= $frameCls ?>"<?= $frameSty ?>>
                             <?php
                                 // SOUS-TITRES BILINGUES. Les navigateurs ne lisent que le WebVTT
                                 // (d'où la conversion faite par le worker). La piste de la langue

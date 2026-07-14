@@ -489,7 +489,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 <!-- Les deux blocs, côte à côte -->
                 <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
                     <div style="flex:1; min-width:260px;">
-                        <div class="drop-zone" id="dz_pdf" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
+                        <div class="drop-zone" id="dz_pdf" data-ext="pdf" data-max="30" data-what="document" data-has-existing="<?= !empty($module['pdf_path']) ? '1' : '0' ?>" data-remove="remove_pdf">
                             <input type="file" name="pdf_file" accept="application/pdf,.pdf" class="dz-input">
                             <div class="dz-icon">📄</div>
                             <div class="dz-title">Guide</div>
@@ -505,11 +505,11 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     </div>
 
                     <div style="flex:1; min-width:260px;">
-                        <div class="drop-zone" id="dz_video" data-has-existing="<?= !empty($module['video_path']) ? '1' : '0' ?>" data-remove="remove_video">
+                        <div class="drop-zone" id="dz_video" data-ext="mp4,mov" data-max="1024" data-what="vidéo" data-has-existing="<?= !empty($module['video_path']) ? '1' : '0' ?>" data-remove="remove_video">
                             <input type="file" name="video_file" accept="video/mp4,video/quicktime,.mp4,.mov" class="dz-input">
                             <div class="dz-icon">🎬</div>
                             <div class="dz-title">Vidéo</div>
-                            <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">MP4 ou MOV · jusqu'à 1 Go · elle sera optimisée automatiquement (720p) pour une lecture fluide</small></div>
+                            <div class="dz-hint">Glissez votre vidéo ici ou cliquez pour parcourir<br><small style="color:#8a968f;">MP4 ou MOV · jusqu'à 1 Go · <strong>format 16:9 conseillé</strong><br>Une vidéo verticale (9:16) laisse des bandes sur les côtés : elles sont habillées par l'image définie dans Paramètres → Créateur.</small></div>
                             <div class="dz-file" hidden></div>
                         </div>
 
@@ -521,7 +521,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             // « srt » au clavier dans le formulaire pour le faire apparaître.
                             // (Il se montre aussi tout seul si un .srt est déjà attaché au module.)
                         ?>
-                        <div class="drop-zone drop-zone--slim" id="dz_srt" hidden data-has-existing="<?= !empty($module['sub_src_path']) ? '1' : '0' ?>" data-remove="remove_srt" title="Facultatif : le site génère et traduit les sous-titres tout seul. Déposez un .srt seulement si vous en avez déjà un.">
+                        <div class="drop-zone drop-zone--slim" id="dz_srt" data-ext="srt,vtt" data-max="5" data-what="sous-titres" hidden data-has-existing="<?= !empty($module['sub_src_path']) ? '1' : '0' ?>" data-remove="remove_srt" title="Facultatif : le site génère et traduit les sous-titres tout seul. Déposez un .srt seulement si vous en avez déjà un.">
                             <input type="file" name="srt_file" accept=".srt,.vtt,text/plain" class="dz-input">
                             <div class="dz-icon">💬</div>
                             <div class="dz-title">Sous-titres <span style="font-weight:400; color:#8a968f;">.srt · facultatif</span></div>
@@ -623,6 +623,18 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </form>
             </div>
         </div>
+        <!-- Modale : format ou poids refuse (le fichier n'est JAMAIS envoye) -->
+        <div id="fcRejectModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">🚫</div>
+                <div class="fc-modal-title" id="fcRejectTitle">Format non accepté</div>
+                <div class="fc-modal-text" id="fcRejectText"></div>
+                <div class="fc-modal-actions">
+                    <button type="button" class="btn btn-create" onclick="document.getElementById('fcRejectModal').style.display='none';">J'ai compris</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modale : aucun fichier -->
         <div id="fileErrorModal" class="fc-modal">
             <div class="fc-modal-box">
@@ -680,7 +692,23 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     var label = dz.querySelector('.dz-file');
                     input.addEventListener('change', function () {
                         if (input.files && input.files.length) {
-                            label.textContent = '✓ ' + input.files[0].name;
+                            // REFUS IMMEDIAT du mauvais format / du fichier trop lourd :
+                            // on n'envoie rien au serveur, on explique, on vide le champ.
+                            var f = input.files[0];
+                            var exts = (dz.getAttribute('data-ext') || '').split(',');
+                            var maxMo = parseInt(dz.getAttribute('data-max') || '0', 10);
+                            var what = dz.getAttribute('data-what') || 'fichier';
+                            var ext = (f.name.split('.').pop() || '').toLowerCase();
+                            var okExt = exts.indexOf(ext) !== -1;
+                            var okSize = !maxMo || f.size <= maxMo * 1024 * 1024;
+                            if (!okExt || !okSize) {
+                                input.value = '';
+                                label.hidden = true;
+                                dz.classList.remove('has-file');
+                                fcReject(what, ext, exts, maxMo, okExt);
+                                return;
+                            }
+                            label.textContent = '✓ ' + f.name;
                             label.hidden = false;
                             dz.classList.add('has-file');
                         } else {
@@ -697,6 +725,25 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 })(zones[i]);
             }
         })();
+        // Explique POURQUOI le fichier est refuse, et ce qu'il faut faire.
+        function fcReject(what, ext, exts, maxMo, okExt) {
+            var t = document.getElementById('fcRejectTitle');
+            var m = document.getElementById('fcRejectText');
+            if (!okExt) {
+                t.textContent = 'Format non accepté';
+                var msg = 'Le fichier <strong>.' + (ext || '?') + '</strong> n'est pas accepté pour le ' + what
+                        + '. Formats acceptés : <strong>' + exts.map(function (e) { return '.' + e; }).join(', ') + '</strong>.';
+                if (['ppt', 'pptx', 'doc', 'docx', 'odt', 'odp'].indexOf(ext) !== -1) {
+                    msg += '<br><br>Dans PowerPoint ou Word : <strong>Fichier → Enregistrer sous (ou Exporter) → PDF</strong>, puis redéposez le fichier ici.';
+                }
+                m.innerHTML = msg;
+            } else {
+                t.textContent = 'Fichier trop lourd';
+                m.innerHTML = 'Ce ' + what + ' dépasse la taille maximale de <strong>'
+                            + (maxMo >= 1024 ? (maxMo / 1024) + ' Go' : maxMo + ' Mo') + '</strong>.';
+            }
+            document.getElementById('fcRejectModal').style.display = 'flex';
+        }
         function dzPresent(id) {
             var dz = document.getElementById(id);
             if (!dz) { return false; }
