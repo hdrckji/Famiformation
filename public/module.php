@@ -91,8 +91,10 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .tile.inactive { opacity: 0.5; }
         .badge-eval { display:inline-block; background:#2d5a37; color:#fff; font-size:0.78rem; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:8px; }
         .tile .badge-eval { position:absolute; top:12px; right:12px; margin:0; }
+        .uni-actions-bar { width:90%; max-width:900px; display:flex; justify-content:flex-end; gap:8px; margin:10px 0 -10px; }
         .content-card { background: rgba(255,255,255,0.96); border-radius: 18px; padding: 32px; width: 90%; max-width: 900px; margin: 30px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         /* Module vierge : le bloc « Ajout de contenu » remonte tout en haut (après le titre). */
+        body.fami-empty-content .fami-rib { order:-10; }   /* le ruban reste EN PREMIER */
         body.fami-empty-content .topbar { order:-3; }
         body.fami-empty-content .header { order:-2; }
         body.fami-empty-content .content-card.add-content { order:-1; }
@@ -177,24 +179,22 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
     ?>
     <?php
         require_once __DIR__ . '/includes/topbar.php';
-        // Icônes propres à la page (voir / télécharger le PDF, télécharger la vidéo) :
-        // elles vont DANS le ruban, à côté du titre — plus de second bandeau en dessous.
-        $ribActions = '';
-        if ($canViewPdf) {
-            $ribActions .= '<button type="button" id="uniEye" class="rb-btn" title="' . htmlspecialchars(t('Voir le PDF original', 'Originele PDF bekijken'), ENT_QUOTES) . '" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button>';
-        }
-        if ($canDlPdf) {
-            $ribActions .= '<a class="rb-btn" href="' . htmlspecialchars($uniPdfUrl) . '" download title="' . htmlspecialchars(t('Télécharger le PDF original', 'Originele PDF downloaden'), ENT_QUOTES) . '">⤓</a>';
-        }
-        if ($canDlVideo) {
-            $ribActions .= '<a class="rb-btn" href="' . htmlspecialchars($uniVideoUrl) . '" download title="' . htmlspecialchars(t('Télécharger la vidéo', 'De video downloaden'), ENT_QUOTES) . '">🎬</a>';
-        }
+        // Le RUBAN ne contient QUE : retour · titre · notifs · paramètres · accueil ·
+        // déconnexion · FR/NL. Rien d'autre ne s'y ajoute (les actions de la page vivent
+        // dans la page).
         famiTopbar($db, [
-            'back'    => !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php',
-            'title'   => moduleNom($module),
-            'actions' => $ribActions,
+            'back'  => !empty($module['parent_id']) ? 'module.php?id=' . (int) $module['parent_id'] : 'index.php',
+            'title' => moduleNom($module),
         ]);
     ?>
+
+    <?php if ($canViewPdf || $canDlPdf || $canDlVideo): ?>
+        <div class="uni-actions-bar">
+            <?php if ($canViewPdf): ?><button type="button" id="uniEye" class="uni-ico" title="<?= t('Voir le PDF original', 'Originele PDF bekijken') ?>" onclick="window.uniTogglePdf && window.uniTogglePdf()">👁</button><?php endif; ?>
+            <?php if ($canDlPdf): ?><a class="uni-ico" href="<?= htmlspecialchars($uniPdfUrl) ?>" download title="<?= t('Télécharger le PDF original', 'Originele PDF downloaden') ?>">⤓</a><?php endif; ?>
+            <?php if ($canDlVideo): ?><a class="uni-ico" href="<?= htmlspecialchars($uniVideoUrl) ?>" download title="<?= t('Télécharger la vidéo', 'De video downloaden') ?>">🎬⤓</a><?php endif; ?>
+        </div>
+    <?php endif; ?>
     <?php if (empty($uniHasContent) && empty($isVideoPage)): ?>
     <div class="header">
         <img src="logo.png" alt="Famiflora" class="logo-main"><br>

@@ -34,7 +34,6 @@ if (!function_exists('famiTopbar')) {
         $back = (string) ($opts['back'] ?? 'index.php');
         $backLabel = (string) ($opts['back_label'] ?? t('Retour', 'Terug'));
         $title = (string) ($opts['title'] ?? '');
-        $actions = (string) ($opts['actions'] ?? ''); // icônes propres à la page (PDF, vidéo…)
 
         // Pastille : ce qu'il y a de neuf POUR MOI.
         $n = 0;
@@ -71,6 +70,7 @@ if (!function_exists('famiTopbar')) {
             flex: none;
             align-self: stretch;
             position: relative;   /* repère pour le titre centré sur la page */
+            order: -10;           /* TOUJOURS le premier élément de la page */
         }
         .fami-rib .rb-back {
             background: rgba(255,255,255,0.9); color: #2d5a37; text-decoration: none;
@@ -127,7 +127,6 @@ if (!function_exists('famiTopbar')) {
             <div class="rb-title"><?= htmlspecialchars($title) ?></div>
             <div class="rb-right">
                 <div class="rb-row">
-                    <?= $actions ?>
                     <a href="events.php" class="rb-btn" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="rb-dot"><?= (int) $n ?></span><?php endif; ?></a>
                     <a href="parametres.php" class="rb-btn" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                     <a href="index.php" class="rb-btn" title="<?= t('Accueil', 'Start') ?>">🏠</a>

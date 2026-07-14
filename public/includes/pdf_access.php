@@ -21,19 +21,23 @@ if (!function_exists('pdfViewEnabled')) {
     function pdfViewRoles($db)       { return array_values(array_filter(array_map('trim', explode(',', (string) (function_exists('widgetGet') ? widgetGet($db, 'pdf_view_roles', '') : ''))))); }
     function pdfDownloadRoles($db)   { return array_values(array_filter(array_map('trim', explode(',', (string) (function_exists('widgetGet') ? widgetGet($db, 'pdf_download_roles', '') : ''))))); }
 
-    /** L'utilisateur (rôle donné) peut-il VOIR le PDF ? Admin = toujours. */
+    /**
+     * L'option DÉSACTIVÉE cache le bouton POUR TOUT LE MONDE, admin compris.
+     * (Avant, l'admin passait avant le réglage : on décochait « télécharger la vidéo »
+     *  et le bouton restait affiché — un interrupteur qui ne coupe rien pour celui qui
+     *  le règle n'a aucun sens.) Le filtre par PROFIL, lui, ne s'applique pas à l'admin.
+     */
     function pdfCanView($db, $role, $isAdmin = false)
     {
-        if ($isAdmin) { return true; }
         if (!pdfViewEnabled($db)) { return false; }
+        if ($isAdmin) { return true; }
         $roles = pdfViewRoles($db);
         return empty($roles) || in_array($role, $roles, true);
     }
-    /** L'utilisateur (rôle donné) peut-il TÉLÉCHARGER le PDF ? Admin = toujours. */
     function pdfCanDownload($db, $role, $isAdmin = false)
     {
-        if ($isAdmin) { return true; }
         if (!pdfDownloadEnabled($db)) { return false; }
+        if ($isAdmin) { return true; }
         $roles = pdfDownloadRoles($db);
         return empty($roles) || in_array($role, $roles, true);
     }
@@ -43,11 +47,11 @@ if (!function_exists('pdfViewEnabled')) {
     function videoDownloadEnabled($db) { return filesAccessOn($db) && function_exists('widgetGet') && widgetGet($db, 'video_download_enabled', '0') === '1'; }
     function videoDownloadRoles($db)   { return array_values(array_filter(array_map('trim', explode(',', (string) (function_exists('widgetGet') ? widgetGet($db, 'video_download_roles', '') : ''))))); }
 
-    /** L'utilisateur (rôle donné) peut-il TÉLÉCHARGER la vidéo ? Admin = toujours. */
+    /** Option coupée = bouton caché pour TOUT LE MONDE (admin compris). */
     function videoCanDownload($db, $role, $isAdmin = false)
     {
-        if ($isAdmin) { return true; }
         if (!videoDownloadEnabled($db)) { return false; }
+        if ($isAdmin) { return true; }
         $roles = videoDownloadRoles($db);
         return empty($roles) || in_array($role, $roles, true);
     }
