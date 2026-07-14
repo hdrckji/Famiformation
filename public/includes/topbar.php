@@ -72,6 +72,33 @@ if (!function_exists('famiTopbar')) {
             <?php endif; ?>
         </div>
 
+        <?php famiLogoutModal(); ?>
+        <?php
+    }
+}
+
+if (!function_exists('famiLogoutModal')) {
+    /**
+     * Modale « Êtes-vous sûr de vouloir vous déconnecter ? ».
+     * Séparée de la barre : l'ACCUEIL garde son ruban d'origine et n'a besoin que de ça.
+     */
+    function famiLogoutModal()
+    {
+        if (empty($_SESSION['user_id'])) { return; }
+        static $done = false;
+        if ($done) { return; }
+        $done = true;
+        ?>
+        <style>
+        /* Styles de la modale portés PAR la modale (et non par la barre) : l'accueil n'affiche
+           que celle-ci, sans la barre — elle doit donc être autonome. */
+        .fami-tb-mask { position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; padding:20px; }
+        .fami-tb-box { background:#fff; border-radius:16px; padding:26px; max-width:400px; width:100%; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+        .fami-tb-box h3 { margin:8px 0 6px; color:#2d5a37; }
+        .fami-tb-box p { color:#5a6b60; margin:0 0 18px; }
+        .fami-tb-box .row { display:flex; gap:10px; justify-content:center; }
+        .fami-tb-box .row a, .fami-tb-box .row button { border:none; border-radius:10px; padding:11px 20px; font-weight:700; cursor:pointer; text-decoration:none; font:inherit; }
+        </style>
         <div class="fami-tb-mask" id="famiLogoutModal">
             <div class="fami-tb-box">
                 <div style="font-size:2.2rem;">⏻</div>

@@ -33,6 +33,7 @@ if (!$isAdmin) {
         </style>
     </head>
     <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
         <div class="container">
             <div class="topbar">
                 <h1><?= t('Préférences', 'Voorkeuren') ?></h1>
@@ -358,6 +359,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
 <div class="container">
     <div class="topbar">
         <a href="index.php">⬅ Retour à l'accueil</a>

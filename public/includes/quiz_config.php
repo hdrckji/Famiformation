@@ -8,18 +8,32 @@
 // Additif : autonome (stockage via widgetGet/widgetSet, comme pdf_access.php).
 // ============================================================
 
+if (!function_exists('quizCfgSaved')) {
+    /**
+     * L'admin a-t-il DÉJÀ enregistré ces réglages lui-même ?
+     * Sinon, on ignore ce qui traîne en base et on applique les valeurs par défaut du code
+     * (sans ça, un ancien 75 % enregistré automatiquement écraserait le nouveau 50/50).
+     */
+    function quizCfgSaved($db)
+    {
+        return function_exists('widgetGet') && widgetGet($db, 'quiz_cfg_saved', '0') === '1';
+    }
+}
+
 if (!function_exists('quizCfgGen')) {
     /** Nombre total de questions générées par l'IA (la banque). */
     function quizCfgGen($db)
     {
-        $n = (int) (function_exists('widgetGet') ? widgetGet($db, 'quiz_gen_total', '25') : 25);
+        if (!quizCfgSaved($db)) { return 25; }
+        $n = (int) widgetGet($db, 'quiz_gen_total', '25');
         return max(5, min(100, $n ?: 25));
     }
 
     /** Part (%) de questions à réponses MULTIPLES à la génération. */
     function quizCfgGenPctMultiple($db)
     {
-        $p = (int) (function_exists('widgetGet') ? widgetGet($db, 'quiz_gen_pct_multiple', '50') : 50);
+        if (!quizCfgSaved($db)) { return 50; } // 50 / 50 par défaut
+        $p = (int) widgetGet($db, 'quiz_gen_pct_multiple', '50');
         return max(0, min(100, $p));
     }
 
@@ -35,7 +49,8 @@ if (!function_exists('quizCfgGen')) {
     /** Nombre de questions POSÉES à l'apprenant (tirées au hasard dans la banque). */
     function quizCfgAsked($db)
     {
-        $n = (int) (function_exists('widgetGet') ? widgetGet($db, 'quiz_asked_total', '10') : 10);
+        if (!quizCfgSaved($db)) { return 10; }
+        $n = (int) widgetGet($db, 'quiz_asked_total', '10');
         return max(1, min(100, $n ?: 10));
     }
 
@@ -43,7 +58,7 @@ if (!function_exists('quizCfgGen')) {
     function quizCfgAskedMultiple($db)
     {
         $asked = quizCfgAsked($db);
-        $raw = function_exists('widgetGet') ? widgetGet($db, 'quiz_asked_multiple', '') : '';
+        $raw = quizCfgSaved($db) ? widgetGet($db, 'quiz_asked_multiple', '') : '';
         if (trim((string) $raw) === '') {
             return (int) round($asked * 0.5); // 50 / 50 : autant de multiples que d'uniques
         }
@@ -75,6 +90,7 @@ if (!function_exists('quizConfigHandlePost')) {
         widgetSet($db, 'quiz_gen_pct_multiple', (string) $pct);
         widgetSet($db, 'quiz_asked_total', (string) $asked);
         widgetSet($db, 'quiz_asked_multiple', (string) $askedMul);
+        widgetSet($db, 'quiz_cfg_saved', '1'); // à partir d'ici, c'est TON réglage qui prime
 
         $_SESSION['module_flash'] = '📝 Réglages du quiz enregistrés.';
         header('Location: parametres.php#prefs');
