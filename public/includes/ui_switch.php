@@ -37,17 +37,46 @@ if (!function_exists('famiSwitchCss')) {
         .pref-head h3 { margin:0 !important; border:none !important; padding:0 !important; }
         .pref-head form { margin:0; line-height:0; }
         /* Bloc entier désactivé (interrupteur maître coupé) : grisé et inopérant. */
+        .pref-body { transition:opacity .16s ease, filter .16s ease; }
         .pref-off { opacity:.45; pointer-events:none; filter:saturate(.4); }
+        .fsw > input:disabled + .fsw-track { opacity:.65; }
         </style>
         <script>
         // Un interrupteur MAÎTRE (data-master="x") grise en direct le bloc data-body="x".
-        // Pas besoin d'enregistrer pour voir l'effet : le retour visuel est immédiat.
         document.addEventListener('change', function (e) {
             var m = e.target.getAttribute && e.target.getAttribute('data-master');
             if (!m) { return; }
             var body = document.querySelector('[data-body="' + m + '"]');
             if (body) { body.classList.toggle('pref-off', !e.target.checked); }
         });
+
+        // INTERRUPTEUR DE BLOC : l'effet doit être IMMÉDIAT.
+        // Avant, le clic rechargeait toute la page : plusieurs secondes d'attente pendant
+        // lesquelles on pouvait recliquer. Maintenant on grise tout de suite, on verrouille
+        // le bouton, et on enregistre EN ARRIÈRE-PLAN (sans recharger). Si le serveur refuse,
+        // on remet l'interrupteur dans son état d'origine et on le dit.
+        function famiPrefToggle(input) {
+            var form = input.form;
+            var block = input.closest('.pref-block');
+            var body = block ? block.querySelector('.pref-body') : null;
+            var on = input.checked;
+
+            if (body) { body.classList.toggle('pref-off', !on); }   // effet visuel : instantané
+            input.disabled = true;                                   // verrou : plus de double-clic
+
+            fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r.ok) { throw new Error('HTTP ' + r.status); }
+                    input.disabled = false;
+                })
+                .catch(function () {
+                    // Échec : on annule proprement l'affichage plutôt que de mentir.
+                    input.checked = !on;
+                    if (body) { body.classList.toggle('pref-off', on); }
+                    input.disabled = false;
+                    alert("Le réglage n'a pas pu être enregistré. Réessaie.");
+                });
+        }
         </script>
         <?php
     }
@@ -98,7 +127,7 @@ if (!function_exists('famiPrefHead')) {
                 <input type="hidden" name="action" value="<?= htmlspecialchars($action) ?>">
                 <input type="hidden" name="toggle_only" value="1">
                 <label class="fsw">
-                    <input type="checkbox" name="<?= htmlspecialchars($name) ?>" value="1" <?= $on ? 'checked' : '' ?> onchange="this.form.submit()">
+                    <input type="checkbox" name="<?= htmlspecialchars($name) ?>" value="1" <?= $on ? 'checked' : '' ?> onchange="famiPrefToggle(this)">
                     <span class="fsw-track"></span>
                 </label>
             </form>
