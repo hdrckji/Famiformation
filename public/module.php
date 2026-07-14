@@ -727,8 +727,8 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             var m = document.getElementById('fcRejectText');
             if (!okExt) {
                 t.textContent = 'Format non accepté';
-                var msg = 'Le fichier <strong>.' + (ext || '?') + '</strong> n'est pas accepté pour le ' + what
-                        + '. Formats acceptés : <strong>' + exts.map(function (e) { return '.' + e; }).join(', ') + '</strong>.';
+                var msg = "Le fichier <strong>." + (ext || '?') + "</strong> n'est pas accepté pour le " + what
+                        + ". Formats acceptés : <strong>" + exts.map(function (e) { return '.' + e; }).join(', ') + "</strong>.";
                 if (['ppt', 'pptx', 'doc', 'docx', 'odt', 'odp'].indexOf(ext) !== -1) {
                     msg += '<br><br>Dans PowerPoint ou Word : <strong>Fichier → Enregistrer sous (ou Exporter) → PDF</strong>, puis redéposez le fichier ici.';
                 }

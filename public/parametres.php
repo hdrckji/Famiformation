@@ -362,7 +362,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     </style>
 </head>
 <body>
-<?php famiTopbar($db, ['back' => 'index.php', 'title' => t('Paramètres', 'Instellingen')]); ?>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, ['back' => 'index.php', 'title' => t('Paramètres', 'Instellingen')]); ?>
 <div class="container">
     <div class="topbar">
         <a href="index.php">⬅ Retour à l'accueil</a>
