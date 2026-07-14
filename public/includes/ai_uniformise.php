@@ -460,9 +460,14 @@ if (!function_exists('aiGenerateQuiz')) {
         if ($contentText === '') {
             return ['ok' => false, 'quiz' => null, 'error' => 'Contenu vide', 'cost_eur' => 0.0];
         }
-        // Par défaut : ce qui est réglé dans Paramètres → Préférences (25 questions, 75 % de multiples).
+        // Quiz coupés dans les préférences → on ne génère rien (et on le dit clairement).
+        require_once __DIR__ . '/quiz_config.php';
+        if (function_exists('quizCfgEnabled') && !quizCfgEnabled($db)) {
+            return ['ok' => false, 'quiz' => null, 'error' => 'Les quiz sont désactivés dans les paramètres.', 'cost_eur' => 0.0];
+        }
+
+        // Par défaut : ce qui est réglé dans Paramètres → Préférences (25 questions, 50 % de multiples).
         if ($nbMultiple === null || $nbSingle === null) {
-            require_once __DIR__ . '/quiz_config.php';
             list($cfgMul, $cfgSin) = quizCfgGenSplit($db);
             if ($nbMultiple === null) { $nbMultiple = $cfgMul; }
             if ($nbSingle === null)   { $nbSingle = $cfgSin; }

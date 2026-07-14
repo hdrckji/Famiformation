@@ -97,21 +97,15 @@ if (!function_exists('pdfAccessCard')) {
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="set_pdf_access">
 
-                <label style="display:flex; align-items:center; gap:10px; font-weight:700; color:#244230; margin-top:10px;">
-                    <input type="checkbox" name="pdf_view_enabled" value="1" <?= $vEnabled ? 'checked' : '' ?>> 👁 Autoriser la <span style="color:#2d5a37;">vue</span> du PDF dans le site
-                </label>
+                <?php require_once __DIR__ . '/ui_switch.php'; famiSwitch('pdf_view_enabled', $vEnabled, '👁 Voir le PDF dans le site'); ?>
                 <div class="muted" style="margin-left:26px; font-size:.82rem;">Profils autorisés (aucun coché = tout le monde) :</div>
                 <?php $rolesBox('pdf_view_roles', $vRoles); ?>
 
-                <label style="display:flex; align-items:center; gap:10px; font-weight:700; color:#244230; margin-top:16px;">
-                    <input type="checkbox" name="pdf_download_enabled" value="1" <?= $dEnabled ? 'checked' : '' ?>> ⤓ Autoriser le <span style="color:#2d5a37;">téléchargement</span> du PDF
-                </label>
+                <div style="margin-top:18px;"><?php famiSwitch('pdf_download_enabled', $dEnabled, '⤓ Télécharger le PDF'); ?></div>
                 <div class="muted" style="margin-left:26px; font-size:.82rem;">Profils autorisés (aucun coché = tout le monde) :</div>
                 <?php $rolesBox('pdf_download_roles', $dRoles); ?>
 
-                <label style="display:flex; align-items:center; gap:10px; font-weight:700; color:#244230; margin-top:20px; padding-top:14px; border-top:1px dashed #dfe6e0;">
-                    <input type="checkbox" name="video_download_enabled" value="1" <?= $vdEnabled ? 'checked' : '' ?>> ⤓ Autoriser le <span style="color:#2d5a37;">téléchargement de la vidéo</span> 🎬
-                </label>
+                <div style="margin-top:20px; padding-top:16px; border-top:1px dashed #dfe6e0;"><?php famiSwitch('video_download_enabled', $vdEnabled, '⤓ Télécharger la vidéo 🎬'); ?></div>
                 <div class="muted" style="margin-left:26px; font-size:.82rem;">⚠️ Une vidéo pèse lourd : le téléchargement consomme <strong>beaucoup</strong> de bande passante. Profils autorisés (aucun coché = tout le monde) :</div>
                 <?php $rolesBox('video_download_roles', $vdRoles); ?>
 

@@ -12,9 +12,16 @@
 // ============================================================
 
 if (!function_exists('brandingVideoBackdrop')) {
-    /** Clé (volume) de l'image d'habillage des vidéos, ou '' si aucune. */
+    /** L'habillage est-il activé ? (interrupteur du bloc « Créateur ») */
+    function brandingEnabled($db)
+    {
+        return !function_exists('widgetGet') || widgetGet($db, 'video_backdrop_on', '1') === '1';
+    }
+
+    /** Clé (volume) de l'image d'habillage des vidéos, ou '' si aucune / désactivée. */
     function brandingVideoBackdrop($db)
     {
+        if (!brandingEnabled($db)) { return ''; }
         return function_exists('widgetGet') ? trim((string) widgetGet($db, 'video_backdrop', '')) : '';
     }
 
@@ -46,6 +53,16 @@ if (!function_exists('brandingHandlePost')) {
             }
             widgetSet($db, 'video_backdrop', '');
             $_SESSION['module_flash'] = '🎨 Habillage vidéo retiré (les bandes redeviennent noires).';
+            header('Location: parametres.php#prefs');
+            exit();
+        }
+
+        // Interrupteur du bloc (activer / désactiver l'habillage sans supprimer l'image).
+        if (!empty($_POST['toggle_only'])) {
+            widgetSet($db, 'video_backdrop_on', !empty($_POST['video_backdrop_on']) ? '1' : '0');
+            $_SESSION['module_flash'] = !empty($_POST['video_backdrop_on'])
+                ? '🎨 Habillage vidéo activé.'
+                : "🎨 Habillage vidéo désactivé (les bandes redeviennent noires ; l'image est conservée).";
             header('Location: parametres.php#prefs');
             exit();
         }
@@ -97,10 +114,21 @@ if (!function_exists('brandingHandlePost')) {
 if (!function_exists('brandingCard')) {
     function brandingCard($db)
     {
-        $url = brandingVideoBackdropUrl($db);
+        require_once __DIR__ . '/ui_switch.php';
+        $on = brandingEnabled($db);
+        $url = $on ? brandingVideoBackdropUrl($db) : '';
         ?>
         <div class="pref-block">
             <h3 style="margin:0 0 6px; color:#244230;">🎨 Créateur — habillage des vidéos</h3>
+            <form method="POST" action="parametres.php#prefs" id="brandToggleForm" style="margin:0 0 12px;">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="set_branding">
+                <input type="hidden" name="toggle_only" value="1">
+                <?php famiSwitch('video_backdrop_on', $on, 'Habillage activé',
+                    "Coupé : les vidéos verticales retrouvent leurs bandes noires (l'image reste enregistrée).",
+                    'onchange="this.form.submit()"'); ?>
+            </form>
+            <div class="pref-body<?= $on ? '' : ' pref-off' ?>">
             <p class="muted">Une vidéo filmée au téléphone (format <strong>9:16</strong>, portrait) laisse deux grosses <strong>bandes noires</strong> sur les côtés du lecteur. Dépose une image ici : elle s'affiche <strong>derrière</strong> la vidéo et remplit ces bandes. Les vidéos en 16:9 la recouvrent entièrement, donc elle ne se voit pas — aucun risque.</p>
             <p class="muted" style="font-size:.84rem;">💡 Rien n'est ré-encodé : changer l'image change <strong>toutes</strong> les vidéos, immédiatement. Idéal : une image large (1920×1080), plutôt sombre et peu chargée, pour ne pas voler la vedette à la vidéo. JPEG, PNG ou WebP, 5 Mo maximum.</p>
 
@@ -130,6 +158,7 @@ if (!function_exists('brandingCard')) {
                     <button type="submit" class="btn" style="background:#fdecec; color:#b3261e;">🗑️ Retirer l'habillage</button>
                 </form>
             <?php endif; ?>
+            </div>
         </div>
         <?php
     }

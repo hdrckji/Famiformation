@@ -8,6 +8,17 @@
 // Additif : autonome (stockage via widgetGet/widgetSet, comme pdf_access.php).
 // ============================================================
 
+if (!function_exists('quizCfgEnabled')) {
+    /**
+     * Les quiz sont-ils activés sur le site ?
+     * Coupé : plus aucune génération, la case « Générer un quiz » n'a plus d'effet.
+     */
+    function quizCfgEnabled($db)
+    {
+        return !function_exists('widgetGet') || widgetGet($db, 'quiz_enabled', '1') === '1';
+    }
+}
+
 if (!function_exists('quizCfgSaved')) {
     /**
      * L'admin a-t-il DÉJÀ enregistré ces réglages lui-même ?
@@ -81,6 +92,16 @@ if (!function_exists('quizConfigHandlePost')) {
         if (($_POST['action'] ?? '') !== 'set_quiz_config') { return; }
         requireValidCSRF();
 
+        // Bascule seule (interrupteur du bloc) : on n'écrase pas les autres réglages.
+        if (!empty($_POST['toggle_only'])) {
+            widgetSet($db, 'quiz_enabled', !empty($_POST['quiz_enabled']) ? '1' : '0');
+            $_SESSION['module_flash'] = !empty($_POST['quiz_enabled'])
+                ? '📝 Quiz activés.'
+                : '📝 Quiz désactivés : plus aucun quiz ne sera généré.';
+            header('Location: parametres.php#prefs');
+            exit();
+        }
+
         $gen = max(5, min(100, (int) ($_POST['quiz_gen_total'] ?? 25)));
         $pct = max(0, min(100, (int) ($_POST['quiz_gen_pct_multiple'] ?? 75)));
         $asked = max(1, min($gen, (int) ($_POST['quiz_asked_total'] ?? 10)));
@@ -107,9 +128,20 @@ if (!function_exists('quizConfigCard')) {
         $asked = quizCfgAsked($db);
         list($askMul, $askSin) = quizCfgAskedSplit($db);
         $inp = 'padding:9px 11px; border:1px solid #ccd6cf; border-radius:9px; font:inherit; width:110px;';
+        require_once __DIR__ . '/ui_switch.php';
+        $on = quizCfgEnabled($db);
         ?>
         <div class="pref-block">
             <h3 style="margin:0 0 6px; color:#244230;">📝 Quiz — génération &amp; tirage</h3>
+            <form method="POST" action="parametres.php#prefs" style="margin:0 0 12px;">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="set_quiz_config">
+                <input type="hidden" name="toggle_only" value="1">
+                <?php famiSwitch('quiz_enabled', $on, 'Quiz activés',
+                    "Coupé : aucun quiz n'est généré, même si la case « Générer un quiz » est cochée à l'import.",
+                    'onchange="this.form.submit()"'); ?>
+            </form>
+            <div class="pref-body<?= $on ? '' : ' pref-off' ?>">
             <p class="muted">L'IA génère une <strong>banque</strong> de questions à la validation du guide. À chaque passage, l'apprenant n'en reçoit qu'une <strong>partie, tirée au hasard</strong> : deux passages ne tombent pas sur les mêmes questions. Plus la banque est grande, plus la génération coûte du temps et des jetons.</p>
 
             <form method="POST" action="parametres.php#prefs">
@@ -142,6 +174,7 @@ if (!function_exists('quizConfigCard')) {
 
                 <div style="margin-top:16px;"><button type="submit" class="btn btn-primary">Enregistrer</button></div>
             </form>
+            </div>
         </div>
         <?php
     }

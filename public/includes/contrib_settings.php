@@ -140,6 +140,7 @@ if (!function_exists('contribSettingsCard')) {
                 </div>
                 <?php endif; ?>
 
+                </div>
                 <button type="submit" class="btn btn-primary">💾 Enregistrer les droits</button>
             </form>
         </div>
