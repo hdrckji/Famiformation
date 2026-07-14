@@ -257,7 +257,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                         // « Inactif » était un MENSONGE : un contenu fraîchement importé n'est pas
                         // désactivé, il attend d'être RELU (on l'a caché exprès tant qu'il n'est pas
                         // validé). On le dit, et on donne le lien pour finir le travail.
-                        $enRelecture = in_array((string) ($child['content_status'] ?? ''), ['draft', 'pending'], true)
+                        $enRelecture = ((string) ($child['content_status'] ?? '') === 'pending')
                             && (!empty($child['contenu_ia']) || !empty($child['video_path']) || !empty($child['video_src_path']));
                         $peutRelire = $isAdmin || (int) ($child['contenu_by'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0);
                         $lienRelire = (($child['content_kind'] ?? '') === 'ecrit')
@@ -313,7 +313,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             if ($canEditContent) {
                 foreach ($children as $ch) {
                     if ((int) ($ch['is_active'] ?? 1) === 0
-                        && in_array((string) ($ch['content_status'] ?? ''), ['draft', 'pending'], true)) {
+                        && (string) ($ch['content_status'] ?? '') === 'pending') {
                         $pending[] = $ch;
                     }
                 }

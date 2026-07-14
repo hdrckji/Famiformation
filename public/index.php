@@ -126,6 +126,7 @@ if ($role === 'etudiant') {
 // --- Modules dynamiques (créés par l'admin) ---
 $isAdmin = ($role === 'admin');
 ensureModulesTable($db);
+famiFixLegacyDrafts($db); // débloque le contenu admin caché par l'ancienne règle (une seule fois)
 $dynamicModules = getModules($db, null, !$isAdmin); // l'admin voit aussi les modules inactifs
 // Carte nom -> id des modules racine (pour router les tuiles conteneur vers le moteur module.php)
 $rootModuleIds = [];

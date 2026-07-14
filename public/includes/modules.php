@@ -954,6 +954,30 @@ if (!function_exists('ensureModulesTable')) {
         return $n;
     }
 
+    /**
+     * RATTRAPAGE (une seule fois) : le contenu importé par un ADMIN était autrefois caché
+     * (is_active = 0, statut 'draft') en attendant sa relecture. Cette règle a été abandonnée
+     * — un admin publie directement. Mais l'ancien contenu, lui, est resté bloqué : il
+     * s'affichait « à relire » alors que personne ne devait le relire. On le publie.
+     *
+     * On ne touche QU'aux 'draft' antérieurs à ce correctif : depuis, 'draft' signifie
+     * « rejeté par un admin », et ceux-là doivent bien rester cachés.
+     */
+    function famiFixLegacyDrafts(PDO $db)
+    {
+        if (!function_exists('widgetGet') || !function_exists('widgetSet')) { return; }
+        if (widgetGet($db, 'legacy_drafts_fixed', '0') === '1') { return; }
+        try {
+            $db->exec("UPDATE modules
+                       SET is_active = 1, content_status = 'published'
+                       WHERE is_active = 0 AND content_status = 'draft'
+                         AND ((contenu_ia IS NOT NULL AND contenu_ia <> '')
+                           OR (video_path IS NOT NULL AND video_path <> '')
+                           OR (video_src_path IS NOT NULL AND video_src_path <> ''))");
+            widgetSet($db, 'legacy_drafts_fixed', '1');
+        } catch (Exception $e) { /* non bloquant */ }
+    }
+
     function getModuleById(PDO $db, $id)
     {
         ensureModulesTable($db);
