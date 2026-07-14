@@ -208,6 +208,9 @@ if (!empty($_SESSION['module_flash'])) {
             font-size: 0.9rem; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             transition: all 0.3s ease;
+            border: none;            /* <button> : sinon le navigateur dessine un contour */
+            cursor: pointer;
+            font-family: inherit;
         }
         .btn-logout:hover {
             background: #fff;

@@ -40,7 +40,10 @@ if (!function_exists('famiTopbar')) {
         $lang = function_exists('currentLang') ? currentLang() : 'fr';
         ?>
         <style>
-        .fami-tb { position:fixed; top:14px; right:14px; z-index:9000; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        /* Même agencement que le ruban de l'accueil : notifs / paramètres / déconnexion sur une
+           ligne, puis FR-NL en dessous, alignés à droite. */
+        .fami-tb { position:fixed; top:14px; right:14px; z-index:9000; display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+        .fami-tb .tb-row { display:flex; align-items:center; gap:8px; }
         .fami-tb a, .fami-tb button { text-decoration:none; border:none; cursor:pointer; font:inherit; font-weight:700;
             background:rgba(255,255,255,.94); color:#2d5a37; border-radius:999px; box-shadow:0 4px 14px rgba(0,0,0,.14);
             display:inline-flex; align-items:center; justify-content:center; gap:6px; }
@@ -61,15 +64,15 @@ if (!function_exists('famiTopbar')) {
         </style>
 
         <div class="fami-tb">
-            <a href="events.php" class="tb-ico" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="tb-dot"><?= (int) $n ?></span><?php endif; ?></a>
-            <a href="<?= htmlspecialchars($self . $sep) ?>lang=fr" class="tb-lang<?= $lang === 'fr' ? ' active' : '' ?>">FR</a>
-            <a href="<?= htmlspecialchars($self . $sep) ?>lang=nl" class="tb-lang<?= $lang === 'nl' ? ' active' : '' ?>">NL</a>
-            <a href="parametres.php" class="tb-ico" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
-            <?php if ($home): ?>
-                <button type="button" class="tb-out" onclick="famiLogoutAsk()">⏻ <span><?= t('Déconnexion', 'Afmelden') ?></span></button>
-            <?php else: ?>
+            <div class="tb-row">
+                <a href="events.php" class="tb-ico" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="tb-dot"><?= (int) $n ?></span><?php endif; ?></a>
+                <a href="parametres.php" class="tb-ico" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                 <button type="button" class="tb-ico" style="background:#c0392b; color:#fff;" title="<?= t('Déconnexion', 'Afmelden') ?>" onclick="famiLogoutAsk()">⏻</button>
-            <?php endif; ?>
+            </div>
+            <div class="tb-row">
+                <a href="<?= htmlspecialchars($self . $sep) ?>lang=fr" class="tb-lang<?= $lang === 'fr' ? ' active' : '' ?>">FR</a>
+                <a href="<?= htmlspecialchars($self . $sep) ?>lang=nl" class="tb-lang<?= $lang === 'nl' ? ' active' : '' ?>">NL</a>
+            </div>
         </div>
 
         <?php famiLogoutModal(); ?>
