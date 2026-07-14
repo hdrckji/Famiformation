@@ -287,17 +287,27 @@ if (!function_exists('famiScrollRestoreScript')) {
      */
     function famiScrollRestoreScript()
     {
+        // Après une MANIP qui recharge la page (formulaire), on revient LÀ OÙ ON ÉTAIT.
+        // Robuste : on ré-applique la position tant que la page grandit (guide, images, fée
+        // arrivent après coup), et on l'emporte sur le saut d'ancre (#...). Usage unique.
         return '<script>(function(){try{'
+            . 'if("scrollRestoration" in history){history.scrollRestoration="manual";}'
             . 'var k="fscroll:"+location.pathname+location.search;'
-            . 'var s=sessionStorage.getItem(k);'
-            . 'sessionStorage.removeItem(k);' // à usage unique : jamais réutilisé plus tard
-            . 'if(s){var d=null;try{d=JSON.parse(s);}catch(e){}'
-            . 'if(d&&d.submit&&(Date.now()-d.t)<10000&&d.y>0){var y=d.y;var go=function(){window.scrollTo(0,y);};'
-            . 'go();document.addEventListener("DOMContentLoaded",go);window.addEventListener("load",go);'
-            . 'setTimeout(go,120);setTimeout(go,400);}}'
-            . 'document.addEventListener("submit",function(){try{'
-            . 'sessionStorage.setItem(k,JSON.stringify({y:window.scrollY||window.pageYOffset||0,t:Date.now(),submit:1}));'
-            . '}catch(e){}},true);'
+            . 'var s=sessionStorage.getItem(k);sessionStorage.removeItem(k);'
+            . 'var d=null;try{d=s?JSON.parse(s):null;}catch(e){}'
+            . 'if(d&&d.submit&&(Date.now()-d.t)<20000&&d.y>0){'
+            .   'var y=d.y,t0=Date.now();'
+            .   'var go=function(){window.scrollTo(0,y);};go();'
+            .   'var tick=function(){go();'                       // on insiste : le contenu s\'installe progressivement
+            .     'if(Date.now()-t0<2000){requestAnimationFrame(tick);}'
+            .   '};requestAnimationFrame(tick);'
+            .   'window.addEventListener("load",function(){go();setTimeout(go,150);});'
+            . '}'
+            . 'var save=function(){try{'
+            .   'sessionStorage.setItem(k,JSON.stringify({y:window.scrollY||window.pageYOffset||0,t:Date.now(),submit:1}));'
+            . '}catch(e){}};'
+            . 'document.addEventListener("submit",save,true);'   // toute soumission de formulaire
+            . 'window.addEventListener("fami:reload",save);'     // les rechargements pilotés par JS (fée, fetch…)
             . '}catch(e){}})();</script>';
     }
 }
