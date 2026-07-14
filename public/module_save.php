@@ -514,8 +514,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     try { $guide = $db->query("SELECT id FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
                     if ($guide) {
                         $guideChildId = (int) $guide['id'];
-                        $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL, uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ?, quiz_json = ?, source_lang = ? WHERE id = ?")
-                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, $guideLang, (int) $guide['id']]);
+
+                        // NOUVEAU DOCUMENT = NOUVELLE VERSION : on repart de zéro. Le guide relu,
+                        // sa traduction, le quiz, la traduction du quiz et l'empreinte NL sont
+                        // EFFACÉS — sinon on garderait un quiz qui porte sur l'ancien document.
+                        // Les images extraites de l'ancien PDF sont supprimées du stockage.
+                        try {
+                            $oldG = $db->prepare("SELECT contenu_images FROM modules WHERE id = ? LIMIT 1");
+                            $oldG->execute([$guideChildId]);
+                            foreach ((array) json_decode((string) $oldG->fetchColumn(), true) as $oldImg) {
+                                volumeUnlink((string) $oldImg);
+                            }
+                        } catch (Exception $e) { /* non bloquant */ }
+
+                        $db->prepare("UPDATE modules SET pdf_path = ?, video_path = NULL, video_status = NULL, video_src_path = NULL,
+                                        uniformized = ?, a_evaluer = ?, contenu_ia = ?, contenu_by = ?, contenu_images = ?,
+                                        quiz_json = ?, source_lang = ?,
+                                        contenu_ia_nl = NULL, quiz_json_nl = NULL, nl_hash = NULL
+                                      WHERE id = ?")
+                           ->execute([$pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, $guideLang, $guideChildId]);
                     } else {
                         $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, pdf_path, uniformized, a_evaluer, contenu_ia, contenu_by, contenu_images, quiz_json, source_lang, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'ecrit')")
                            ->execute(['Guide', 'Gids', (int) $id, $childRoles, $pdfPath, $uniformized, $aEvaluer, $contenuIa, $contenuBy, $contenuImages, $quizJson, $guideLang]);
@@ -722,13 +739,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try { $guide = $db->query("SELECT id, contenu_ia FROM modules WHERE parent_id = " . (int) $id . " AND content_kind = 'ecrit' LIMIT 1")->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
             if ($guide) {
                 $guideChildId = (int) $guide['id'];
-                if (trim((string) ($guide['contenu_ia'] ?? '')) === '') {
-                    $db->prepare("UPDATE modules SET uniformized = 1, a_evaluer = ?, contenu_ia = ?, contenu_by = COALESCE(contenu_by, ?) WHERE id = ?")
-                       ->execute([$aEvaluer, $starter, $contenuBy, $guideChildId]);
-                } else {
-                    // Contenu déjà présent : on n'écrase pas, on met juste à jour le choix d'évaluation.
-                    $db->prepare("UPDATE modules SET a_evaluer = ? WHERE id = ?")->execute([$aEvaluer, $guideChildId]);
-                }
+                // « Créer un guide » sur un module qui en a déjà un = NOUVELLE VERSION : on repart
+                // d'une page blanche et on efface tout ce qui portait sur l'ancienne (traduction,
+                // quiz, quiz traduit, empreinte NL). L'utilisateur a confirmé dans la modale.
+                $db->prepare("UPDATE modules SET uniformized = 1, a_evaluer = ?, contenu_ia = ?, contenu_by = COALESCE(contenu_by, ?),
+                                contenu_ia_nl = NULL, quiz_json = NULL, quiz_json_nl = NULL, nl_hash = NULL
+                              WHERE id = ?")
+                   ->execute([$aEvaluer, $starter, $contenuBy, $guideChildId]);
             } else {
                 $db->prepare("INSERT INTO modules (nom, nom_nl, is_container, parent_id, icon, roles, is_active, uniformized, a_evaluer, contenu_ia, contenu_by, content_kind) VALUES (?, ?, 0, ?, '📄', ?, 1, 1, ?, ?, ?, 'ecrit')")
                    ->execute(['Guide', 'Gids', (int) $id, $childRoles, $aEvaluer, $starter, $contenuBy]);

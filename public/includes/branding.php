@@ -157,12 +157,25 @@ if (!function_exists('brandingCard')) {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="parametres.php#prefs" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+                <form method="POST" action="parametres.php#prefs" enctype="multipart/form-data" style="margin-top:10px;" id="bdForm-<?= $lang ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
-                    <input type="file" name="backdrop" accept="image/jpeg,image/png,image/webp" required style="max-width:100%;">
-                    <button type="submit" class="btn btn-primary"><?= $url !== '' ? 'Remplacer' : 'Enregistrer' ?></button>
+
+                    <label class="bd-drop" id="bdDrop-<?= $lang ?>">
+                        <input type="file" name="backdrop" accept="image/jpeg,image/png,image/webp" required
+                               onchange="bdPick(this, '<?= $lang ?>')">
+                        <span class="bd-ico">🖼️</span>
+                        <span class="bd-txt">
+                            <strong><?= $url !== '' ? "Remplacer l'image" : 'Déposer une image' ?></strong>
+                            <small>Glissez-la ici ou cliquez · JPEG, PNG, WebP · 5 Mo max · idéal 1920×1080</small>
+                        </span>
+                        <span class="bd-name" id="bdName-<?= $lang ?>" hidden></span>
+                    </label>
+
+                    <button type="submit" class="btn btn-primary" style="margin-top:10px; width:100%;">
+                        <?= $url !== '' ? "Remplacer l'image" : "Enregistrer l'image" ?>
+                    </button>
                 </form>
 
                 <?php if ($url !== ''): ?>
@@ -178,6 +191,31 @@ if (!function_exists('brandingCard')) {
             <?php
         };
         ?>
+        <style>
+        .bd-drop { position:relative; display:flex; align-items:center; gap:12px; cursor:pointer;
+            border:2.5px dashed #b9cdbf; border-radius:12px; background:#f6faf7; padding:14px 16px; transition:all .15s; }
+        .bd-drop:hover, .bd-drop.over { border-color:#2d5a37; background:#eef7f0; }
+        .bd-drop input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+        .bd-ico { font-size:1.7rem; flex:none; }
+        .bd-txt strong { display:block; color:#244230; }
+        .bd-txt small { display:block; color:#7a8a80; font-size:.78rem; margin-top:2px; }
+        .bd-name { margin-left:auto; font-weight:800; color:#1d6a39; background:#e7f6ec; border:1px solid #b6e0c2;
+                   border-radius:8px; padding:5px 9px; font-size:.78rem; max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        </style>
+        <script>
+        // Aperçu immédiat du fichier choisi + glisser-déposer.
+        function bdPick(input, lang) {
+            var n = document.getElementById('bdName-' + lang);
+            if (input.files && input.files.length) { n.textContent = '✓ ' + input.files[0].name; n.hidden = false; }
+            else { n.hidden = true; }
+        }
+        ['fr', 'nl'].forEach(function (lg) {
+            var dz = document.getElementById('bdDrop-' + lg);
+            if (!dz) { return; }
+            ['dragenter', 'dragover'].forEach(function (e) { dz.addEventListener(e, function () { dz.classList.add('over'); }); });
+            ['dragleave', 'drop'].forEach(function (e) { dz.addEventListener(e, function () { dz.classList.remove('over'); }); });
+        });
+        </script>
         <div class="pref-block">
             <?php famiPrefHead('🎨 Créateur — habillage des vidéos', 'set_branding', 'video_backdrop_on', $on,
                 "Coupé : les vidéos verticales retrouvent leurs bandes noires (les images restent enregistrées)."); ?>

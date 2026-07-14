@@ -142,6 +142,14 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .quiz-opt strong { color:#244230; display:block; }
         .quiz-opt small { display:block; color:#7a8a80; font-weight:400; margin-top:2px; }
         .dz-existing { font-size:0.85rem; color:#555; margin:4px 0 2px; }
+        /* Fichier déjà présent : un CLIC ouvre un choix (télécharger / supprimer).
+           Avant, le clic téléchargeait directement — sans le vouloir, on lançait un
+           téléchargement de plusieurs centaines de Mo. */
+        .file-chip { display:flex; align-items:center; gap:8px; width:100%; text-align:left; margin:8px 0 2px;
+            background:#eef7f0; border:1px solid #cfe3d5; color:#244230; border-radius:10px; padding:9px 12px;
+            font:inherit; font-weight:700; cursor:pointer; transition:background .12s; }
+        .file-chip:hover { background:#e3f2e7; }
+        .file-chip small { margin-left:auto; font-weight:400; color:#7a8a80; font-size:.76rem; }
         /* Variante FINE (sous-titres .srt) : compacte, sur une ligne, moitié moins haute */
         .drop-zone--slim { padding:7px 12px; border-width:2px; margin:6px 0 2px; display:flex; align-items:center; gap:8px; text-align:left; }
         /* `display:flex` ci-dessus écrase l'attribut [hidden] : on le rétablit explicitement,
@@ -506,10 +514,10 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             <div class="dz-file" hidden></div>
                         </div>
                         <?php if ($existPdf): ?>
-                            <div class="dz-existing">
-                                📄 <a href="<?= htmlspecialchars(moduleFileUrl($existPdf)) ?>" download>Document actuel</a>
-                                <?php if (!empty($module['pdf_path'])): ?><label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_pdf" value="1"> Supprimer</label><?php endif; ?>
-                            </div>
+                            <button type="button" class="file-chip" onclick="fileMenu('📄 Document', '<?= htmlspecialchars(moduleFileUrl($existPdf), ENT_QUOTES) ?>', 'remove_pdf')">
+                                📄 <span>Document actuel</span> <small>cliquer pour télécharger ou supprimer</small>
+                            </button>
+                            <label class="chk" hidden><input type="checkbox" name="remove_pdf" id="rm_remove_pdf" value="1"></label>
                         <?php endif; ?>
                     </div>
 
@@ -572,15 +580,16 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                         }());
                         </script>
                         <?php if (!empty($module['sub_src_path'])): ?>
-                            <div class="dz-existing">💬 Sous-titres fournis
-                                <label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_srt" value="1"> Supprimer</label>
-                            </div>
+                            <button type="button" class="file-chip" onclick="fileMenu('💬 Sous-titres', '<?= htmlspecialchars(moduleFileUrl($module['sub_src_path']), ENT_QUOTES) ?>', 'remove_srt')">
+                                💬 <span>Sous-titres fournis</span> <small>cliquer pour télécharger ou supprimer</small>
+                            </button>
+                            <label class="chk" hidden><input type="checkbox" name="remove_srt" id="rm_remove_srt" value="1"></label>
                         <?php endif; ?>
                         <?php if ($existVideo): ?>
-                            <div class="dz-existing">
-                                🎬 <a href="<?= htmlspecialchars(moduleFileUrl($existVideo)) ?>" download>Vidéo actuelle</a>
-                                <?php if (!empty($module['video_path'])): ?><label class="chk" style="display:inline-flex; margin-left:12px;"><input type="checkbox" name="remove_video" value="1"> Supprimer</label><?php endif; ?>
-                            </div>
+                            <button type="button" class="file-chip" onclick="fileMenu('🎬 Vidéo', '<?= htmlspecialchars(moduleFileUrl($existVideo), ENT_QUOTES) ?>', 'remove_video')">
+                                🎬 <span>Vidéo actuelle</span> <small>cliquer pour télécharger ou supprimer</small>
+                            </button>
+                            <label class="chk" hidden><input type="checkbox" name="remove_video" id="rm_remove_video" value="1"></label>
                         <?php elseif ($existVideoProc): ?>
                             <div class="dz-existing">🎬 <span style="color:#8a5a00;">Vidéo en préparation…</span></div>
                         <?php endif; ?>
@@ -635,6 +644,20 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </form>
             </div>
         </div>
+        <!-- Modale : que faire du fichier déjà présent ? -->
+        <div id="fileMenuModal" class="fc-modal">
+            <div class="fc-modal-box">
+                <div class="fc-modal-icon">📎</div>
+                <div class="fc-modal-title" id="fmTitle">Fichier</div>
+                <div class="fc-modal-text">Que voulez-vous faire de ce fichier&nbsp;?</div>
+                <div class="fc-modal-actions" style="flex-direction:column; gap:8px;">
+                    <a id="fmDownload" class="btn btn-create" href="#" download style="width:100%; box-sizing:border-box;">⤓ Télécharger</a>
+                    <button type="button" class="btn" style="width:100%; background:#fdecec; color:#b3261e;" onclick="fmDelete()">🗑️ Supprimer</button>
+                    <button type="button" class="btn" style="width:100%; background:#e9ecef; color:#333;" onclick="document.getElementById('fileMenuModal').style.display='none';">Annuler</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modale : la vidéo déposée n'a pas de son -->
         <div id="noAudioModal" class="fc-modal">
             <div class="fc-modal-box">
@@ -755,6 +778,23 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 })(zones[i]);
             }
         })();
+        // Fichier déjà présent : on propose de le télécharger OU de le supprimer (avec
+        // confirmation). Supprimer coche la case cachée correspondante puis enregistre.
+        var fmField = '';
+        function fileMenu(title, url, field) {
+            fmField = field;
+            document.getElementById('fmTitle').textContent = title;
+            document.getElementById('fmDownload').href = url;
+            document.getElementById('fileMenuModal').style.display = 'flex';
+        }
+        function fmDelete() {
+            if (!confirm('Supprimer ce fichier définitivement ? Cette action est irréversible.')) { return; }
+            var box = document.getElementById('rm_' + fmField);
+            if (box) { box.checked = true; }
+            document.getElementById('fileMenuModal').style.display = 'none';
+            document.getElementById('contentForm').submit();
+        }
+
         // La vidéo a-t-elle du son ? On la lit dans le navigateur (rien n'est envoyé au serveur)
         // et on interroge les indicateurs de piste audio. Ils diffèrent selon les navigateurs ;
         // si AUCUN ne répond, on se tait plutôt que d'alerter à tort.
