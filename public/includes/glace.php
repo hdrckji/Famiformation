@@ -76,7 +76,7 @@ if (!function_exists('glaceMessage')) {
 }
 
 if (!function_exists('glaceSticker')) {
-    /** Un ticket collé dans un coin. $pos : 'gauche' | 'droite'. */
+    /** Le ticket, collé au bas du widget. $pos : 'centre' (ou 'gauche'/'droite', hérité). */
     function glaceSticker($raison, $temp, $pos)
     {
         $m = glaceMessage($raison, $temp);
@@ -107,13 +107,11 @@ if (!function_exists('glaceStickers')) {
             return '';
         }
 
-        $h = '';
-        if ($chaud) {
-            $h .= glaceSticker('chaud', $temp, 'gauche');    // côté météo
-        }
-        if ($dim) {
-            $h .= glaceSticker('dimanche', $temp, 'droite'); // côté date
-        }
+        // UN SEUL ticket, au CENTRE, en bas du widget. Deux tickets (un par occasion)
+        // encombraient la barre et diluaient l'effet : c'est un clin d'œil, pas une
+        // décoration permanente. Si les deux occasions tombent le même jour, la chaleur
+        // l'emporte — c'est elle qui donne vraiment envie d'une glace.
+        $h = glaceSticker($chaud ? 'chaud' : 'dimanche', $temp, 'centre');
 
         $h .= '<style>
         /* STICKER : posé par-dessus le coin du widget, en débord. Il ne prend donc
@@ -121,6 +119,7 @@ if (!function_exists('glaceStickers')) {
         .glace-st { position:absolute; bottom:-14px; z-index:50; }
         .glace-st.glace-gauche { left:-10px; }
         .glace-st.glace-droite { right:-10px; }
+        .glace-st.glace-centre { left:50%; transform:translateX(-50%); }
 
         .glace-btn { background:none; border:none; padding:0; margin:0; cursor:pointer;
             display:block; width:52px; height:32px;
@@ -149,11 +148,14 @@ if (!function_exists('glaceStickers')) {
             transition:opacity .18s, transform .18s, visibility .18s; }
         .glace-gauche .glace-bulle { left:0; }
         .glace-droite .glace-bulle { right:0; }
+        .glace-centre .glace-bulle { left:50%; transform:translateX(-50%) translateY(-6px) scale(.96); }
         .glace-st.open .glace-bulle { opacity:1; visibility:visible; transform:translateY(0) scale(1); }
+        .glace-centre.open .glace-bulle { transform:translateX(-50%) translateY(0) scale(1); }
         .glace-bulle::after { content:""; position:absolute; top:-9px; width:14px; height:14px;
             background:#fff; border-left:2px solid #2d5a37; border-top:2px solid #2d5a37; transform:rotate(45deg); }
         .glace-gauche .glace-bulle::after { left:24px; }
         .glace-droite .glace-bulle::after { right:24px; }
+        .glace-centre .glace-bulle::after { left:50%; margin-left:-7px; }
         .glace-bulle-t { font-weight:800; color:#2d5a37; font-size:.95rem; margin-bottom:3px; }
         .glace-bulle-x { color:#44566b; font-size:.86rem; line-height:1.45; }
 
