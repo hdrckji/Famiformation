@@ -68,11 +68,11 @@ $mHasVideoAny = !empty($module['video_path']) || $mVideoStatus === 'processing' 
 $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny && empty($module['pdf_path']);
 ?>
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?= currentLang() ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($module['nom']) ?> - FamiFormation</title>
+    <title><?= htmlspecialchars(moduleNom($module)) ?> — FamiFormation</title>
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>

@@ -108,7 +108,7 @@ if (!function_exists('_uniCoverHtml')) {
     /** Couverture plein écran + sommaire (page 0). */
     function _uniCoverHtml($hero, $secNum, $minutes, $toc, $docDate = '')
     {
-        $title = _uniInline(htmlspecialchars($hero['title'] ?? 'Formation'));
+        $title = _uniInline(htmlspecialchars($hero['title'] ?? t('Formation', 'Opleiding')));
         $sub = ($hero && ($hero['subtitle'] ?? '') !== '') ? '<p class="cover__subtitle">' . _uniInline(htmlspecialchars($hero['subtitle'])) . '</p>' : '';
         $meta = '<ul class="cover__meta">';
         if ($secNum > 0) { $meta .= '<li>' . $secNum . ' ' . ($secNum > 1 ? t('parties', 'delen') : t('partie', 'deel')) . '</li>'; }

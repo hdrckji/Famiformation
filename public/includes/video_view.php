@@ -16,7 +16,7 @@ if (!function_exists('renderVideoPage')) {
     /** Affiche la page vidéo d'un sous-module (ou d'un module vidéo). */
     function renderVideoPage(array $module, $isAdmin = false, $quizHref = '')
     {
-        $title = function_exists('moduleNom') ? moduleNom($module) : (string) ($module['nom'] ?? 'Formation');
+        $title = function_exists('moduleNom') ? moduleNom($module) : (string) ($module['nom'] ?? t('Formation', 'Opleiding'));
         $descRaw = function_exists('moduleDesc') ? moduleDesc($module) : (string) ($module['description'] ?? '');
         $status = (string) ($module['video_status'] ?? '');
         $hasVideo = !empty($module['video_path']);
@@ -116,12 +116,12 @@ if (!function_exists('renderVideoPage')) {
                             <video id="famiVideo" class="player__video" controls controlsList="nodownload" playsinline preload="metadata"<?= ($subFr !== '' || $subNl !== '') ? ' crossorigin="anonymous"' : '' ?>>
                                 <source src="<?= htmlspecialchars($videoUrl) ?>">
                                 <?php if ($subFr !== ''): ?>
-                                    <track kind="subtitles" srclang="fr" label="Français"
+                                    <track kind="subtitles" srclang="fr" label="<?= t('Français', 'Frans') ?>"
                                            src="<?= htmlspecialchars(moduleFileUrl($subFr)) ?>"
                                            <?= $isNl ? '' : 'default' ?>>
                                 <?php endif; ?>
                                 <?php if ($subNl !== ''): ?>
-                                    <track kind="subtitles" srclang="nl" label="Nederlands"
+                                    <track kind="subtitles" srclang="nl" label="<?= t('Néerlandais', 'Nederlands') ?>"
                                            src="<?= htmlspecialchars(moduleFileUrl($subNl)) ?>"
                                            <?= $isNl ? 'default' : '' ?>>
                                 <?php endif; ?>
