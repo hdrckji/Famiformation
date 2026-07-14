@@ -119,7 +119,7 @@ foreach ($questions as $q) { if (($q['type'] ?? 'single') === 'multiple') { $nbM
 </style>
 </head>
 <body>
-<form method="POST" action="module_quiz.php">
+<form method="POST" action="module_quiz.php" data-fee>
     <?= csrfField() ?>
     <input type="hidden" name="action" value="save_quiz">
     <input type="hidden" name="id" value="<?= (int) $id ?>">

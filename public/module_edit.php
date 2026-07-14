@@ -300,7 +300,7 @@ $sizePx = ['s' => 200, 'm' => 320, 'l' => 460];
         <button type="button" class="btn btn-save" onclick="veSubmit()">✅ Valider la relecture</button>
     </div>
 
-    <form id="veForm" method="POST" action="module_review.php" style="display:none;">
+    <form id="veForm" method="POST" action="module_review.php" style="display:none;" data-fee>
         <?= csrfField() ?>
         <input type="hidden" name="action" value="save_review">
         <input type="hidden" name="id" value="<?= (int) $id ?>">

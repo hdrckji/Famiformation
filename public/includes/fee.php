@@ -301,7 +301,7 @@ if (!function_exists('feeOverlay')) {
 </div>
 <style>
 .fee-back { position:fixed; inset:0; top:0; left:0; right:0; bottom:0; z-index:200000;
-    background:radial-gradient(circle at 50% 40%, rgba(255,255,255,.97), rgba(232,245,233,.97));
+    background:radial-gradient(circle at 50% 40%, #14261a, #070d09);
     display:none; align-items:center; justify-content:center;
     opacity:0; transition:opacity .25s; }
 .fee-back.on { display:flex; opacity:1; }
@@ -348,13 +348,13 @@ if (!function_exists('feeOverlay')) {
     100% { transform:translate(var(--dx), var(--dy)) scale(1.1) rotate(220deg); opacity:0; }
 }
 
-.fee-pct { font-size:2.4rem; font-weight:900; color:#1E6B33; margin-top:14px; line-height:1;
+.fee-pct { font-size:2.4rem; font-weight:900; color:#A9C96B; margin-top:14px; line-height:1;
     font-variant-numeric:tabular-nums; }
-.fee-barre { width:min(340px,80%); height:10px; margin:12px auto 0; background:#DCEBD6;
+.fee-barre { width:min(340px,80%); height:10px; margin:12px auto 0; background:rgba(255,255,255,.14);
     border-radius:999px; overflow:hidden; }
 .fee-barre span { display:block; height:100%; width:0%; border-radius:999px;
     background:linear-gradient(90deg,#8DC63F,#1E6B33); transition:width .4s ease; }
-.fee-txt { margin-top:12px; color:#4C6152; font-weight:700; font-size:.95rem; }
+.fee-txt { margin-top:12px; color:#DCEBD6; font-weight:700; font-size:.95rem; }
 
 @media (prefers-reduced-motion: reduce) {
     .fee-perso, .fee-ailes, .fee-bras, .fee-halo, .fee-yeux, .fee-fleur { animation:none; }
@@ -476,12 +476,23 @@ if (!function_exists('feeOverlay')) {
 
     /* ---------- 2) NAVIGATION : la fée SEULEMENT si la page traîne ---------- */
     var minuteur = null;
-    function attendrePage() {
+    // SEUIL : une page qui s'affiche en 2 secondes n'a pas besoin d'un écran d'attente —
+    // il ne ferait que clignoter et ralentir la perception. On n'affiche la fée QUE si la
+    // page traîne vraiment (5 s). Les opérations connues comme LONGUES (import, génération
+    // du quiz, validation finale) la montrent immédiatement : elles sont marquées data-fee.
+    var SEUIL_MS = 5000;
+    function attendrePage(immediat) {
         if (minuteur) { return; }
+        if (immediat) {
+            window.feeShow({$jsMagie});
+            window.feeCreep(95);
+            minuteur = true;
+            return;
+        }
         minuteur = setTimeout(function () {
             window.feeShow({$jsAttente});
             window.feeCreep(90);
-        }, 300); // < 300 ms : rien ne clignote, le site reste perçu comme rapide
+        }, SEUIL_MS);
     }
     document.addEventListener('click', function (e) {
         var a = e.target.closest ? e.target.closest('a') : null;
@@ -493,8 +504,15 @@ if (!function_exists('feeOverlay')) {
         attendrePage();
     }, true);
     document.addEventListener('submit', function (e) {
-        if (!e.defaultPrevented && !aDesFichiers(e.target)) { attendrePage(); }
+        if (e.defaultPrevented || aDesFichiers(e.target)) { return; }  // fichiers : géré plus haut
+        var f = e.target;
+        attendrePage(f && f.hasAttribute && f.hasAttribute('data-fee'));
     }, false);
+    // Un lien peut lui aussi lancer une opération longue (ex. relance d'une génération).
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest ? e.target.closest('a[data-fee]') : null;
+        if (a) { attendrePage(true); }
+    }, true);
 
     // Retour arrière du navigateur : la page revient du cache, la fée doit disparaître.
     window.addEventListener('pageshow', function () {

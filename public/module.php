@@ -536,7 +536,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     <span class="pill-quiz" style="background:#fff3e0; border-color:#f0d089; color:#8a5a00;">Aucun quiz</span>
                 <?php endif; ?>
 
-                <form method="POST" action="module_save.php" style="margin:0;" onsubmit="return confirm(<?= htmlspecialchars(json_encode($regenMsg, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>);">
+                <form method="POST" action="module_save.php" style="margin:0;" data-fee onsubmit="return confirm(<?= htmlspecialchars(json_encode($regenMsg, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>);">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="eval_generate">
                     <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
@@ -564,7 +564,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                             </div>
                         </div>
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <form method="POST" action="module_save.php" style="margin:0;" onsubmit="return confirm('Restaurer cette version ? Le contenu actuel sera archivé, puis remplacé.');">
+                            <form method="POST" action="module_save.php" style="margin:0;" data-fee onsubmit="return confirm('Restaurer cette version ? Le contenu actuel sera archivé, puis remplacé.');">
                                 <?= csrfField() ?>
                                 <input type="hidden" name="action" value="version_restore">
                                 <input type="hidden" name="version_id" value="<?= (int) $v['id'] ?>">

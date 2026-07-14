@@ -133,7 +133,7 @@ try {
                     <div style="font-weight:800; color:#244230;"><?= htmlspecialchars($nq['name']) ?></div>
                     <?php if ($nq['path'] !== ''): ?><div class="path">📍 <?= htmlspecialchars($nq['path']) ?></div><?php endif; ?>
                 </div>
-                <form method="POST" action="module_save.php" style="margin:0;" onsubmit="return confirm('Générer le quiz de cette formation ?');">
+                <form method="POST" action="module_save.php" style="margin:0;" data-fee onsubmit="return confirm('Générer le quiz de cette formation ?');">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="eval_generate">
                     <input type="hidden" name="id" value="<?= (int) $nq['id'] ?>">
