@@ -113,6 +113,7 @@ $evIcon = function ($t) {
 </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
     <div class="topbar">
         <a href="index.php">⬅ <?= t('Accueil', 'Start') ?></a>
         <strong>🔔 <?= t('Notifications', 'Meldingen') ?></strong>
@@ -121,9 +122,71 @@ $evIcon = function ($t) {
     <div class="wrap">
         <?php if ($flash): ?><div class="flash"><?= htmlspecialchars($flash) ?></div><?php endif; ?>
 
+        <?php
+            // TROIS BOÎTES DISTINCTES (cf. eventsCategory) :
+            //   À contrôler = ce que l'admin doit valider ; Événements = la vie du site ;
+            //   Erreurs = ce qui a mal tourné (doutes de l'IA, compression, API).
+            $evEvents = [];
+            $evErrors = [];
+            foreach ($recent as $e) {
+                if (eventsCategory($e['type'] ?? '') === 'error') { $evErrors[] = $e; } else { $evEvents[] = $e; }
+            }
+            $tabs = [];
+            if ($isAdmin) { $tabs['todo'] = ['📥 ' . t('À contrôler', 'Te controleren'), count($pending)]; }
+            $tabs['event'] = ['🔔 ' . t('Événements', 'Gebeurtenissen'), count($evEvents)];
+            $tabs['error'] = ['⚠️ ' . t('Erreurs', 'Fouten'), count($evErrors)];
+            $first = array_key_first($tabs);
+
+            // Barre de sélection/suppression (admin), propre à chaque boîte.
+            $evBar = function ($box) {
+                ?>
+                <div class="evbar">
+                    <label class="evchk"><input type="checkbox" id="evAll-<?= $box ?>"> <span><?= t('Tout sélectionner', 'Alles selecteren') ?></span></label>
+                    <span class="muted" id="evCount-<?= $box ?>">0</span>
+                    <span class="muted" style="margin-left:auto; font-size:.8rem;">💡 Maj+clic : sélectionner une plage</span>
+                    <button type="submit" class="btn btn-rej evdel" id="evDel-<?= $box ?>" disabled onclick="return confirm('Supprimer les notifications sélectionnées ?');">🗑️ <?= t('Supprimer la sélection', 'Selectie verwijderen') ?></button>
+                    <button type="submit" class="btn btn-rej" onclick="if (!confirm('Vider TOUT le fil de notifications ? Cette action est définitive.')) { return false; } document.getElementById('evAction').value = 'delete_all_events'; return true;">🗑️ <?= t('Tout supprimer', 'Alles verwijderen') ?></button>
+                </div>
+                <?php
+            };
+
+            // Rendu d'une liste (cases à cocher pour l'admin).
+            $renderList = function (array $list, $box) use ($isAdmin, $evIcon) {
+                if (empty($list)) {
+                    echo '<p class="muted">' . t("Rien pour l'instant.", 'Nog niets.') . ' 🌿</p>';
+                    return;
+                }
+                foreach ($list as $e) {
+                    $who = trim((string) (($e['prenom'] ?? '') . ' ' . ($e['unom'] ?? '')));
+                    $when = !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '';
+                    $isErr = (eventsCategory($e['type'] ?? '') === 'error');
+                    echo '<div class="ev' . ($isErr ? ' ev-err' : '') . '">';
+                    if ($isAdmin) {
+                        echo '<input type="checkbox" class="evbox" data-box="' . htmlspecialchars($box) . '" name="ev[]" value="' . (int) $e['id'] . '">';
+                    }
+                    echo '<span class="ic">' . $evIcon($e['type'] ?? '') . '</span><div class="txt">'
+                       . htmlspecialchars((string) ($e['message'] ?? ''));
+                    if (!empty($e['module_id'])) {
+                        echo ' — <a href="module.php?id=' . (int) $e['module_id'] . '" style="color:#2d5a37; font-weight:700; text-decoration:none;">'
+                           . htmlspecialchars((string) ($e['module_nom'] ?? 'voir')) . '</a>';
+                    }
+                    if ($who !== '') { echo '<span class="muted"> · ' . htmlspecialchars($who) . '</span>'; }
+                    echo '</div><span class="when">' . htmlspecialchars($when) . '</span></div>';
+                }
+            };
+        ?>
+
+        <div class="evtabs">
+            <?php foreach ($tabs as $k => $tb): ?>
+                <button type="button" class="evtab<?= $k === $first ? ' on' : '' ?>" data-tab="<?= $k ?>" onclick="evShow('<?= $k ?>')">
+                    <?= $tb[0] ?><?php if ($tb[1] > 0): ?> <span class="badge<?= $k === 'error' ? ' warn' : '' ?>"><?= (int) $tb[1] ?></span><?php endif; ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+
         <?php if ($isAdmin): ?>
-        <div class="card">
-            <h1 style="margin:0 0 10px;">📥 À contrôler <?php if (count($pending)): ?><span class="badge"><?= count($pending) ?></span><?php endif; ?></h1>
+        <div class="card evpane" id="pane-todo"<?= $first === 'todo' ? '' : ' hidden' ?>>
+            <p class="muted" style="margin-top:0;">Les contenus déposés par un teamcoach. Tant qu'ils ne sont pas publiés, personne ne les voit.</p>
             <?php if (empty($pending)): ?>
                 <p class="muted">Rien à contrôler pour l'instant. 🌿</p>
             <?php else: ?>
@@ -153,104 +216,76 @@ $evIcon = function ($t) {
         </div>
         <?php endif; ?>
 
-        <div class="card">
-            <h1 style="margin:0 0 10px;">🔔 <?= t('Événements récents', 'Recente gebeurtenissen') ?></h1>
-            <?php if (empty($recent)): ?>
-                <p class="muted"><?= t("Aucun événement pour l'instant.", 'Nog geen gebeurtenissen.') ?></p>
-            <?php elseif (!$isAdmin): ?>
-                <?php foreach ($recent as $e):
-                    $who = trim((string) (($e['prenom'] ?? '') . ' ' . ($e['unom'] ?? '')));
-                    $when = !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '';
-                ?>
-                <div class="ev">
-                    <span class="ic"><?= $evIcon($e['type'] ?? '') ?></span>
-                    <div class="txt">
-                        <?= htmlspecialchars((string) ($e['message'] ?? '')) ?>
-                        <?php if (!empty($e['module_id'])): ?> — <a href="module.php?id=<?= (int) $e['module_id'] ?>" style="color:#2d5a37; font-weight:700; text-decoration:none;"><?= htmlspecialchars((string) ($e['module_nom'] ?? 'voir')) ?></a><?php endif; ?>
-                        <?php if ($who !== ''): ?><span class="muted"> · <?= htmlspecialchars($who) ?></span><?php endif; ?>
-                    </div>
-                    <span class="when"><?= htmlspecialchars($when) ?></span>
-                </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <!-- ADMIN : sélection (clic, ou Maj+clic pour une plage) et suppression. -->
-                <form method="POST" action="events.php" id="evForm">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="action" id="evAction" value="delete_events">
-                    <div class="evbar">
-                        <label class="evchk"><input type="checkbox" id="evAll"> <span>Tout sélectionner</span></label>
-                        <span class="muted" id="evCount">0 sélectionnée</span>
-                        <span class="muted" style="margin-left:auto; font-size:.8rem;">💡 Maj+clic pour sélectionner une plage</span>
-                        <button type="submit" class="btn btn-rej" id="evDel" disabled onclick="return confirm('Supprimer les notifications sélectionnées ?');">🗑️ Supprimer la sélection</button>
-                        <button type="submit" class="btn btn-rej" onclick="if (!confirm('Vider TOUT le fil de notifications ? Cette action est définitive.')) { return false; } document.getElementById('evAction').value = 'delete_all_events'; return true;">🗑️ Tout supprimer</button>
-                    </div>
+        <form method="POST" action="events.php" id="evForm">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" id="evAction" value="delete_events">
 
-                    <?php foreach ($recent as $e):
-                        $who = trim((string) (($e['prenom'] ?? '') . ' ' . ($e['unom'] ?? '')));
-                        $when = !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '';
-                    ?>
-                    <div class="ev">
-                        <input type="checkbox" class="evbox" name="ev[]" value="<?= (int) $e['id'] ?>">
-                        <span class="ic"><?= $evIcon($e['type'] ?? '') ?></span>
-                        <div class="txt">
-                            <?= htmlspecialchars((string) ($e['message'] ?? '')) ?>
-                            <?php if (!empty($e['module_id'])): ?> — <a href="module.php?id=<?= (int) $e['module_id'] ?>" style="color:#2d5a37; font-weight:700; text-decoration:none;"><?= htmlspecialchars((string) ($e['module_nom'] ?? 'voir')) ?></a><?php endif; ?>
-                            <?php if ($who !== ''): ?><span class="muted"> · <?= htmlspecialchars($who) ?></span><?php endif; ?>
-                        </div>
-                        <span class="when"><?= htmlspecialchars($when) ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                </form>
+            <div class="card evpane" id="pane-event"<?= $first === 'event' ? '' : ' hidden' ?>>
+                <p class="muted" style="margin-top:0;"><?= t('La vie du site : modules créés, contenus ajoutés, contenus publiés.', 'Wat er op de site gebeurt: nieuwe modules, toegevoegde en gepubliceerde inhoud.') ?></p>
+                <?php if ($isAdmin) { $evBar('event'); } ?>
+                <?php $renderList($evEvents, 'event'); ?>
+            </div>
 
-                <style>
-                .evbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:#f4f7f5; border:1px solid #dde5e0; border-radius:12px; padding:10px 14px; margin-bottom:12px; }
-                .evchk { display:flex; align-items:center; gap:7px; font-weight:700; color:#244230; cursor:pointer; }
-                .ev .evbox { margin-right:2px; cursor:pointer; }
-                .ev.sel { background:#eef7f0; border-radius:8px; }
-                #evDel[disabled] { opacity:.45; cursor:not-allowed; }
-                </style>
-                <script>
-                (function () {
-                    var boxes = Array.prototype.slice.call(document.querySelectorAll('.evbox'));
-                    var all = document.getElementById('evAll');
-                    var del = document.getElementById('evDel');
-                    var cnt = document.getElementById('evCount');
-                    var last = -1; // dernière case cochée, pour la plage Maj+clic
+            <div class="card evpane" id="pane-error"<?= $first === 'error' ? '' : ' hidden' ?>>
+                <p class="muted" style="margin-top:0;"><?= t("Ce qui n'a pas fonctionné : doutes de l'IA sur un contenu, compression vidéo, service externe indisponible.", 'Wat misliep: twijfels van de AI, videocompressie, externe dienst niet bereikbaar.') ?></p>
+                <?php if ($isAdmin) { $evBar('error'); } ?>
+                <?php $renderList($evErrors, 'error'); ?>
+            </div>
+        </form>
 
-                    function refresh() {
-                        var n = 0;
-                        boxes.forEach(function (b) {
-                            b.closest('.ev').classList.toggle('sel', b.checked);
-                            if (b.checked) { n++; }
-                        });
-                        del.disabled = (n === 0);
-                        cnt.textContent = n + ' sélectionnée' + (n > 1 ? 's' : '');
-                        all.checked = (n === boxes.length && n > 0);
-                    }
-
-                    boxes.forEach(function (b, i) {
-                        b.addEventListener('click', function (e) {
-                            // Maj+clic : coche (ou décoche) toute la plage depuis la dernière case touchée.
-                            if (e.shiftKey && last > -1 && last !== i) {
-                                var a = Math.min(last, i), z = Math.max(last, i);
-                                for (var k = a; k <= z; k++) { boxes[k].checked = b.checked; }
-                            }
-                            last = i;
-                            refresh();
-                        });
-                    });
-
-                    all.addEventListener('change', function () {
-                        boxes.forEach(function (b) { b.checked = all.checked; });
-                        last = -1;
+        <style>
+        .evtabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+        .evtab { border:1px solid var(--line); background:#fff; color:#4a5a50; border-radius:999px; padding:9px 16px; font-weight:700; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:7px; }
+        .evtab.on { background:var(--forest); color:#fff; border-color:var(--forest); }
+        .evtab .badge { background:#c0392b; }
+        .evtab .badge.warn { background:#e8a13a; }
+        .evbar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:#f4f7f5; border:1px solid #dde5e0; border-radius:12px; padding:10px 14px; margin-bottom:12px; }
+        .evchk { display:flex; align-items:center; gap:7px; font-weight:700; color:#244230; cursor:pointer; }
+        .ev .evbox { margin-right:2px; cursor:pointer; }
+        .ev.sel { background:#eef7f0; border-radius:8px; }
+        .ev-err { background:#fffaf7; border-left:4px solid #e8a13a; border-radius:8px; padding-left:10px; }
+        .evdel[disabled] { opacity:.45; cursor:not-allowed; }
+        </style>
+        <script>
+        function evShow(k) {
+            document.querySelectorAll('.evpane').forEach(function (p) { p.hidden = (p.id !== 'pane-' + k); });
+            document.querySelectorAll('.evtab').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === k); });
+        }
+        (function () {
+            ['event', 'error'].forEach(function (box) {
+                var boxes = Array.prototype.slice.call(document.querySelectorAll('.evbox[data-box="' + box + '"]'));
+                var all = document.getElementById('evAll-' + box);
+                var del = document.getElementById('evDel-' + box);
+                var cnt = document.getElementById('evCount-' + box);
+                if (!boxes.length || !all) { return; }
+                var last = -1;
+                function refresh() {
+                    var n = 0;
+                    boxes.forEach(function (b) { b.closest('.ev').classList.toggle('sel', b.checked); if (b.checked) { n++; } });
+                    del.disabled = (n === 0);
+                    cnt.textContent = n + ' sélectionnée' + (n > 1 ? 's' : '');
+                    all.checked = (n === boxes.length && n > 0);
+                }
+                boxes.forEach(function (b, i) {
+                    b.addEventListener('click', function (e) {
+                        // Maj+clic : coche (ou décoche) toute la plage depuis la dernière case touchée.
+                        if (e.shiftKey && last > -1 && last !== i) {
+                            var a = Math.min(last, i), z = Math.max(last, i);
+                            for (var k = a; k <= z; k++) { boxes[k].checked = b.checked; }
+                        }
+                        last = i;
                         refresh();
                     });
-
+                });
+                all.addEventListener('change', function () {
+                    boxes.forEach(function (b) { b.checked = all.checked; });
+                    last = -1;
                     refresh();
-                }());
-                </script>
-            <?php endif; ?>
-        </div>
+                });
+                refresh();
+            });
+        }());
+        </script>
     </div>
 </body>
 </html>

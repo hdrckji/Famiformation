@@ -106,6 +106,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                 } else {
                     $quizFailed = true;
                     $quizMsg = ' ⚠️ Quiz non généré : ' . ($qz['error'] ?? 'erreur') . '.';
+                    require_once 'includes/events.php';
+                    if (function_exists('logSiteError')) {
+                        logSiteError($db, $id, (int) ($_SESSION['user_id'] ?? 0), 'quiz', (string) ($qz['error'] ?? ''));
+                    }
                 }
             } else {
                 $quizFailed = true;

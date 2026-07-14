@@ -48,6 +48,7 @@ $sel = quizPickRandom($allQs, $askMul, $askSin);
 </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
     <div class="topbar"><a href="module.php?id=<?= (int) $backId ?>" class="back-link">⬅ <?= t('Retour', 'Terug') ?></a></div>
     <div class="qhead"><h1>📝 <?= htmlspecialchars(moduleNom($module)) ?></h1></div>
     <?php renderQuizForm($quiz, (int) $id, $sel); ?>

@@ -38,6 +38,64 @@ if (!function_exists('logEvent')) {
     }
 }
 
+if (!function_exists('eventsCategory')) {
+    /**
+     * Trois boîtes distinctes dans les notifications :
+     *   'todo'   → à contrôler (admin) : contenus proposés, en attente de publication ;
+     *   'error'  → ce qui a mal tourné : doutes de l'IA, compression ratée, API en panne ;
+     *   'event'  → la vie du site : modules créés, contenus ajoutés/publiés.
+     */
+    function eventsCategory($type)
+    {
+        $type = (string) $type;
+        if ($type === 'content_submitted') { return 'todo'; }
+        if ($type === 'ai_doubt' || $type === 'error') { return 'error'; }
+        return 'event';
+    }
+}
+
+if (!function_exists('logSiteError')) {
+    /**
+     * Enregistre une ERREUR TECHNIQUE, écrite POUR UN HUMAIN.
+     * Le message brut (« cURL error 28 », « HTTP 429 ») ne doit jamais arriver tel quel
+     * dans la boîte : on le traduit ici en une phrase compréhensible + la marche à suivre.
+     *
+     * @param string $what  'video' | 'subtitles' | 'quiz' | 'guide' | 'api'
+     * @param string $raw   le message technique d'origine (analysé, jamais affiché brut)
+     */
+    function logSiteError($db, $moduleId, $actorId, $what, $raw = '')
+    {
+        $raw = (string) $raw;
+        $low = mb_strtolower($raw);
+
+        // On traduit les causes techniques connues en langage humain.
+        $cause = '';
+        if (strpos($low, 'clé') !== false || strpos($low, 'api_key') !== false || strpos($low, 'absente') !== false) {
+            $cause = "la clé de l'API n'est pas configurée (Railway → Variables).";
+        } elseif (strpos($low, 'timed out') !== false || strpos($low, 'timeout') !== false || strpos($low, 'délai') !== false) {
+            $cause = "le service a mis trop de temps à répondre. Réessaie dans quelques minutes.";
+        } elseif (strpos($low, '429') !== false || strpos($low, 'rate limit') !== false || strpos($low, 'quota') !== false) {
+            $cause = "le quota de l'API est atteint. Réessaie plus tard, ou vérifie le crédit du compte.";
+        } elseif (strpos($low, 'ffmpeg') !== false) {
+            $cause = "la conversion de la vidéo a échoué. La vidéo d'origine reste lisible.";
+        } elseif ($raw !== '') {
+            $cause = "cause : " . mb_substr($raw, 0, 90);
+        }
+
+        $lbl = [
+            'video'     => "La compression de la vidéo a échoué",
+            'subtitles' => "Les sous-titres n'ont pas pu être générés",
+            'quiz'      => "Le quiz n'a pas pu être généré",
+            'guide'     => "La mise en forme du guide a échoué",
+            'api'       => "Un service externe n'a pas répondu",
+        ];
+        $msg = ($lbl[$what] ?? "Une opération a échoué");
+        if ($cause !== '') { $msg .= ' — ' . $cause; }
+
+        logEvent($db, 'error', $actorId, $moduleId, '❌ ' . $msg);
+    }
+}
+
 if (!function_exists('logAiDoubts')) {
     /**
      * L'IA a signalé des doutes (champ "fix") : on le dit dans les notifications.

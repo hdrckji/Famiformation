@@ -200,10 +200,6 @@ if (!function_exists('renderApiUsageTab')) {
         };
         $eur = function ($v) { return number_format((float) $v, 4, ',', ' ') . ' €'; };
 
-        // Inventaire des clés RÉELLEMENT configurées (Railway → Variables) : ajouter une clé
-        // doit se voir ici tout de suite, sans attendre qu'elle ait servi.
-        require_once __DIR__ . '/api_services.php';
-        famiApiServicesPanel();
         ?>
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">

@@ -70,7 +70,16 @@ if (!function_exists('renderQuizForm')) {
         .qz-intro { color:#5a6b60; margin:0 0 18px; }
         .qz-q { border-top:1px solid #eef3f0; padding:18px 0 6px; }
         .qz-qh { font-weight:800; color:#243b2e; margin-bottom:10px; }
-        .qz-multi { color:#8a6d1a; font-weight:700; font-style:normal; font-size:.82rem; background:#fdf6e6; padding:2px 8px; border-radius:999px; margin-left:6px; }
+        /* Le TYPE de question (unique / multiple) ne doit PAS se deviner : sinon l'apprenant
+           sait d'avance combien de reponses cocher. Radios et cases sont donc STRICTEMENT
+           identiques a l'oeil (meme puce ronde) ; seule la mecanique differe. */
+        .qz-opt input[type=radio], .qz-opt input[type=checkbox] {
+            appearance:none; -webkit-appearance:none; width:19px; height:19px; flex:none; margin-top:2px;
+            border:2px solid #b9cdbf; border-radius:50%; background:#fff; cursor:pointer; transition:all .12s;
+        }
+        .qz-opt input:hover { border-color:#2d5a37; }
+        .qz-opt input:checked { border-color:#2d5a37; background:radial-gradient(circle, #2d5a37 0 45%, #fff 55% 100%); }
+        .qz-opt input:focus-visible { outline:2px solid #2d5a37; outline-offset:2px; }
         .qz-opt { display:flex; align-items:flex-start; gap:10px; padding:7px 10px; border-radius:9px; cursor:pointer; }
         .qz-opt:hover { background:#f3f8f4; }
         .qz-opt input { margin-top:3px; }
@@ -80,14 +89,14 @@ if (!function_exists('renderQuizForm')) {
         </style>
         <div class="qz-wrap">
             <h2 class="qz-title">📝 <?= t('Quiz d\'évaluation', 'Evaluatiequiz') ?> <span class="qz-sub">(<?= (int) $n ?> <?= t($n > 1 ? 'questions' : 'question', $n > 1 ? 'vragen' : 'vraag') ?>)</span></h2>
-            <p class="qz-intro"><?= t('Réponds à toutes les questions puis valide. La correction s\'affichera avec ton score.', 'Beantwoord alle vragen en bevestig daarna. De verbetering verschijnt met je score.') ?></p>
+            <p class="qz-intro"><?= t('Réponds à toutes les questions puis valide. Attention : certaines questions attendent plusieurs réponses — à toi de juger. La correction s\'affichera avec ton score.', 'Beantwoord alle vragen en bevestig daarna. Let op: bij sommige vragen zijn meerdere antwoorden juist — dat moet je zelf inschatten. De verbetering verschijnt met je score.') ?></p>
             <form method="POST" action="quiz_check.php" class="qz-form">
                 <?= csrfField() ?>
                 <input type="hidden" name="module_id" value="<?= (int) $moduleId ?>">
                 <?php foreach ($qs as $i => $q): $multi = (($q['type'] ?? 'single') === 'multiple'); $num++; ?>
                     <input type="hidden" name="sel[]" value="<?= (int) $i ?>">
                     <div class="qz-q">
-                        <div class="qz-qh"><?= (int) $num ?>. <?= htmlspecialchars((string) $q['q']) ?><?php if ($multi): ?><span class="qz-multi"><?= t('plusieurs réponses', 'meerdere antwoorden') ?></span><?php endif; ?></div>
+                        <div class="qz-qh"><?= (int) $num ?>. <?= htmlspecialchars((string) $q['q']) ?></div>
                         <?php foreach (($q['options'] ?? []) as $j => $opt): ?>
                             <label class="qz-opt">
                                 <input type="<?= $multi ? 'checkbox' : 'radio' ?>" name="a[<?= (int) $i ?>]<?= $multi ? '[]' : '' ?>" value="<?= (int) $j ?>">

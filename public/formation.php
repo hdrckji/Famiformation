@@ -279,6 +279,7 @@ $publicLabels = [
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
     <div class="container">
         <?php if ($vue === ''): ?>
         <h1>🎓 Formation</h1>

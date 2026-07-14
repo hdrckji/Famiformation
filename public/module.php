@@ -147,7 +147,8 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .lang-btn:hover { background:#fff; } .lang-btn.active:hover { background:#357a44; }
     </style>
 </head>
-<body class="<?= $emptyContentFocus ? 'fami-empty-content' : '' ?>">
+<body class="<?= $emptyContentFocus ? 'fami-empty-content' : '' ?>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>">
     <?= apercuBanner($db) ?>
     <?php
         require_once __DIR__ . '/includes/pdf_access.php';

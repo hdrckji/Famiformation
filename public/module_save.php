@@ -435,6 +435,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $uniformized = 0;
                         $flashMsg = "⚠️ Uniformisation IA échouée : " . $res['error'] . " — le PDF est enregistré tel quel.";
+                        if (function_exists('logSiteError')) {
+                            require_once __DIR__ . '/includes/events.php';
+                            logSiteError($db, (int) $id, (int) ($_SESSION['user_id'] ?? 0), 'guide', (string) $res['error']);
+                        }
                     }
                 }
 
@@ -551,6 +555,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $flashMsg .= " 💬 Sous-titres générés automatiquement (Whisper).";
                                 } else {
                                     $flashMsg .= " ⚠️ Sous-titres non générés : " . ($subs['error'] ?? 'erreur') . ".";
+                                    if (function_exists('logSiteError')) {
+                                        logSiteError($db, (int) $vidChildId, (int) ($_SESSION['user_id'] ?? 0), 'subtitles', (string) ($subs['error'] ?? ''));
+                                    }
                                 }
                             } elseif (function_exists('famiSttReady') && !famiSttReady()) {
                                 $flashMsg .= " ⚠️ Sous-titres non générés : aucune clé de transcription (Groq/OpenAI) configurée.";

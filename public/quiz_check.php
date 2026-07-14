@@ -89,6 +89,7 @@ $pct = $total > 0 ? round($score * 100 / $total) : 0;
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
 <div class="container">
     <a class="back" href="module.php?id=<?= (int) $id ?>">⬅ <?= t('Retour au module', 'Terug naar de module') ?></a>
     <div class="scorecard">

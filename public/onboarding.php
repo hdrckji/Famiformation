@@ -102,6 +102,7 @@ if (getCurrentRole() === 'etudiant' && !hasUnlockedOnboarding(getCurrentUserId()
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
 
     <div class="header">
         <img src="logo.png" alt="FamiFormation" class="logo">

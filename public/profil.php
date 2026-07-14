@@ -108,6 +108,7 @@ $currentPhoto = $currentUser['photo_profil'] ?? null;
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, false); ?>
 <div class="top-nav">
     <a href="index.php" class="btn-back">← <?= t('Retour accueil', 'Terug naar start') ?></a>
 </div>

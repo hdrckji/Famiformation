@@ -19,7 +19,7 @@ if (!function_exists('quizCfgGen')) {
     /** Part (%) de questions à réponses MULTIPLES à la génération. */
     function quizCfgGenPctMultiple($db)
     {
-        $p = (int) (function_exists('widgetGet') ? widgetGet($db, 'quiz_gen_pct_multiple', '75') : 75);
+        $p = (int) (function_exists('widgetGet') ? widgetGet($db, 'quiz_gen_pct_multiple', '50') : 50);
         return max(0, min(100, $p));
     }
 
@@ -45,7 +45,7 @@ if (!function_exists('quizCfgGen')) {
         $asked = quizCfgAsked($db);
         $raw = function_exists('widgetGet') ? widgetGet($db, 'quiz_asked_multiple', '') : '';
         if (trim((string) $raw) === '') {
-            return (int) round($asked * 0.7); // défaut historique : 7 multiples sur 10
+            return (int) round($asked * 0.5); // 50 / 50 : autant de multiples que d'uniques
         }
         return max(0, min($asked, (int) $raw));
     }
@@ -69,7 +69,7 @@ if (!function_exists('quizConfigHandlePost')) {
         $gen = max(5, min(100, (int) ($_POST['quiz_gen_total'] ?? 25)));
         $pct = max(0, min(100, (int) ($_POST['quiz_gen_pct_multiple'] ?? 75)));
         $asked = max(1, min($gen, (int) ($_POST['quiz_asked_total'] ?? 10)));
-        $askedMul = max(0, min($asked, (int) ($_POST['quiz_asked_multiple'] ?? 7)));
+        $askedMul = max(0, min($asked, (int) ($_POST['quiz_asked_multiple'] ?? 5)));
 
         widgetSet($db, 'quiz_gen_total', (string) $gen);
         widgetSet($db, 'quiz_gen_pct_multiple', (string) $pct);
