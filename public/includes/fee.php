@@ -459,7 +459,13 @@ if (!function_exists('feeOverlay')) {
         if (e.defaultPrevented) { return; }            // une validation a déjà refusé
         if (!form || form.method.toLowerCase() !== 'post') { return; }
         if (!aDesFichiers(form)) { return; }           // pas de fichier → chargement normal
-        if (form.hasAttribute && form.hasAttribute('data-nofee')) { return; } // upload gere en direct (admin)
+        if (form.hasAttribute && form.hasAttribute('data-nofee')) {
+            // Upload admin (habillage, intro/outro) : soumission NORMALE (pas de XHR), mais
+            // on affiche quand meme la fee pendant l'envoi -> elle reste visible jusqu'au
+            // rechargement de la page. On ne prend PAS la main (pas de preventDefault).
+            window.feeIndef({$jsMagie});
+            return;
+        }
         if (!window.FormData || !window.XMLHttpRequest) { return; }
 
         e.preventDefault();
