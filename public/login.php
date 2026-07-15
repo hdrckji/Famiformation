@@ -230,5 +230,13 @@ if (empty($isFamijobLogin) && function_exists('famiDefaultVectorBg')): ?>
     </div>
 </div>
 
+<?php
+// La FÉE FAMIFLORA. Sur les pages connectées elle est injectée automatiquement, mais
+// ici on n'est pas encore connecté : le buffer d'injection (config.php) ne tourne pas.
+// On la pose donc à la main. Le formulaire porte data-fee → la fée sort au clic sur
+// « Se connecter », le temps de vérifier le mot de passe.
+require_once __DIR__ . '/includes/fee.php';
+echo feeOverlay();
+?>
 </body>
 </html>
