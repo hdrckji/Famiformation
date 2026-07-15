@@ -203,11 +203,11 @@ if (!function_exists('renderVideoPage')) {
                         <?php if ($introUrl !== '' || $outroUrl !== ''): ?>
                         <nav class="player__segnav" id="famiSegNav" aria-label="<?= t('Navigation dans la vidéo', 'Navigatie in de video') ?>">
                             <?php if ($introUrl !== ''): ?>
-                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="intro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t('Accessible après validation du quiz', 'Beschikbaar na het slagen voor de quiz'), ENT_QUOTES) ?>">▶ <?= t('Introduction', 'Inleiding') ?></button>
+                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="intro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t("Regardez la vidéo jusqu'au bout pour débloquer la navigation", 'Bekijk de video tot het einde om de navigatie vrij te maken'), ENT_QUOTES) ?>">▶ <?= t('Introduction', 'Inleiding') ?></button>
                             <?php endif; ?>
                             <button type="button" class="segbtn segbtn--main" data-seg="main">🎬 <?= t('La formation', 'De opleiding') ?></button>
                             <?php if ($outroUrl !== ''): ?>
-                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="outro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t('Accessible après validation du quiz', 'Beschikbaar na het slagen voor de quiz'), ENT_QUOTES) ?>">🏁 <?= t('Fin', 'Slot') ?></button>
+                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="outro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t("Regardez la vidéo jusqu'au bout pour débloquer la navigation", 'Bekijk de video tot het einde om de navigatie vrij te maken'), ENT_QUOTES) ?>">🏁 <?= t('Fin', 'Slot') ?></button>
                             <?php endif; ?>
                         </nav>
                         <?php endif; ?>
@@ -288,6 +288,7 @@ if (!function_exists('renderVideoPage')) {
                     v.addEventListener('ended', function () {
                         if (seq[i].kind === 'main') { window._famiVideoDone = true; }
                         if (i + 1 < seq.length) { load(i + 1, true); }   // segment suivant, sans coupure
+                        else { unlockNav(); }                            // fin de l'outro -> navigation libre
                     });
 
                     // Avance rapide interdite : sur CHAQUE segment (on ne bricole pas la barre).
@@ -300,6 +301,16 @@ if (!function_exists('renderVideoPage')) {
                     // (Le compteur « vu » ne bouge que sur la formation : sauter l'intro ne
                     //  déverrouille rien, et revenir sur l'intro ne fait rien perdre.)
                     var nav = document.getElementById('famiSegNav');
+                    // Une fois la video regardee jusqu'au bout (fin de l'outro), on debloque les
+                    // onglets : l'apprenant peut alors revenir librement sur l'intro/la fin.
+                    function unlockNav() {
+                        if (!nav) { return; }
+                        nav.querySelectorAll('.segbtn.locked').forEach(function (b) {
+                            b.classList.remove('locked');
+                            b.disabled = false;
+                            b.removeAttribute('title');
+                        });
+                    }
                     function markNav() {
                         if (!nav) { return; }
                         nav.querySelectorAll('.segbtn').forEach(function (b) {
