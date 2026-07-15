@@ -1138,30 +1138,15 @@ if (!function_exists('ensureModulesTable')) {
             // 🌐 NÉERLANDAIS : aucune saisie manuelle. Le site traduit TOUT automatiquement
             // (titre, description, guide, quiz) via Claude à chaque enregistrement.
         ?>
-        <p class="muted" style="font-size:.82rem; margin:2px 0 10px; color:#6c7a70;">
-            🌐 La version <strong>néerlandaise</strong> est générée <strong>automatiquement</strong> — rien à saisir.
-        </p>
-
         <?php if ($isElement): ?>
             <input type="hidden" name="is_container" value="0">
             <div class="muted" style="font-size:.85rem; color:#7a8a80; margin:6px 0;">
                 📄 Module de contenu — il ne peut pas contenir d'autres modules. Tu peux modifier son nom, sa description, son icône et ses accès.
             </div>
         <?php else: ?>
-            <?php // Deux onglets = deux façons de créer. « Module » regroupe d'autres modules
-                  // (ancienne case cochée) ; « Contenu » portera un guide/une vidéo. ?>
-            <div class="type-tabs">
-                <label class="type-tab<?= $isContainer ? ' on' : '' ?>">
-                    <input type="radio" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>>
-                    <span>📦 <?= t('Module', 'Module') ?></span>
-                    <small><?= t('Regroupe d\'autres modules', 'Bevat andere modules') ?></small>
-                </label>
-                <label class="type-tab<?= $isContainer ? '' : ' on' ?>">
-                    <input type="radio" name="is_container" value="0" <?= $isContainer ? '' : 'checked' ?>>
-                    <span>📄 <?= t('Contenu', 'Inhoud') ?></span>
-                    <small><?= t('Portera un guide / une vidéo', 'Bevat een gids / video') ?></small>
-                </label>
-            </div>
+            <?php // Type choisi AVANT le formulaire (écran à 2 boutons dans « Créer ») : ici on
+                  // ne fait que conserver la valeur. L'id permet aux boutons de la fixer. ?>
+            <input type="hidden" name="is_container" id="<?= htmlspecialchars($formId) ?>_iscontainer" value="<?= $isContainer ? 1 : 0 ?>">
         <?php endif; ?>
 
         <label>Accès <small>(rien de coché = visible par tous)</small></label>
@@ -1275,6 +1260,27 @@ if (!function_exists('ensureModulesTable')) {
     /**
      * Script JS du sélecteur d'icône (à inclure une fois par page).
      */
+    function moduleCreateChoiceAssets()
+    {
+        static $done = false;
+        if ($done) { return ''; }
+        $done = true;
+        return '<style>'
+            . '.create-choice{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0;}'
+            . '.create-choice-btn{flex:1;min-width:150px;cursor:pointer;border:2px solid #dde7e1;border-radius:14px;padding:22px 16px;background:#fafcfb;text-align:center;transition:all .12s;font:inherit;}'
+            . '.create-choice-btn:hover{border-color:#3E8E4E;background:#eef7f0;transform:translateY(-2px);box-shadow:0 8px 20px rgba(30,90,55,.12);}'
+            . '.create-choice-btn .cc-ico{display:block;font-size:2.2rem;margin-bottom:6px;}'
+            . '.create-choice-btn strong{display:block;color:#244230;font-size:1.05rem;}'
+            . '.create-choice-btn small{display:block;color:#7a8a80;font-size:.8rem;margin-top:3px;}'
+            . '</style>'
+            . '<script>'
+            . 'function qcPick(prefix,val){var h=document.getElementById(prefix+"_iscontainer");if(h)h.value=val;'
+            . 'var s1=document.getElementById(prefix+"_step1"),s2=document.getElementById(prefix+"_step2");if(s1)s1.style.display="none";if(s2)s2.style.display="block";'
+            . 'var t=document.getElementById(prefix+"_title");if(t)t.textContent=(val==1?"Nouveau module":"Nouveau contenu");}'
+            . 'function qcBack(prefix){var s1=document.getElementById(prefix+"_step1"),s2=document.getElementById(prefix+"_step2");if(s2)s2.style.display="none";if(s1)s1.style.display="block";}'
+            . '</script>';
+    }
+
     function moduleFormScript()
     {
         return "<script>"

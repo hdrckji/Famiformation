@@ -1103,19 +1103,36 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 <!-- Modale création -->
 <div id="createModal" class="modal-backdrop">
     <div class="modal-card">
-        <h3>Nouveau module</h3>
+        <div id="create_step1">
+            <h3>Que veux-tu créer ?</h3>
+            <div class="create-choice">
+                <button type="button" class="create-choice-btn" onclick="qcPick('create', 1)">
+                    <span class="cc-ico">📦</span><strong>Module</strong><small>Regroupe d'autres modules</small>
+                </button>
+                <button type="button" class="create-choice-btn" onclick="qcPick('create', 0)">
+                    <span class="cc-ico">📄</span><strong>Contenu</strong><small>Portera un guide / une vidéo</small>
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-light" onclick="closeModal('createModal')">Annuler</button>
+            </div>
+        </div>
+        <div id="create_step2" style="display:none;">
+        <h3 id="create_title">Nouveau module</h3>
         <form method="POST" action="module_save.php" enctype="multipart/form-data">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="create">
             <input type="hidden" name="return" value="parametres.php">
             <?php renderModuleFields('create', [], $profiles, $icons); ?>
             <div class="modal-actions">
-                <button type="button" class="btn btn-light" onclick="closeModal('createModal')">Annuler</button>
-                <button type="submit" class="btn btn-primary">Créer le module</button>
+                <button type="button" class="btn btn-light" onclick="qcBack('create')">← Retour</button>
+                <button type="submit" class="btn btn-primary">Créer</button>
             </div>
         </form>
+        </div>
     </div>
 </div>
+<?= moduleCreateChoiceAssets() ?>
 
 <!-- Modales édition (une par module) -->
 <?php foreach ($orderedModules as $m): ?>

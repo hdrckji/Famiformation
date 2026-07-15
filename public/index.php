@@ -627,20 +627,43 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
 
     <div id="moduleCreateModal" class="mm-modal-backdrop">
         <div class="mm-modal-card">
-            <h3>Nouveau module</h3>
-            <form method="POST" action="module_save.php" enctype="multipart/form-data">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="create">
-                <input type="hidden" name="return" value="index.php">
-                <?php renderModuleFields('qcreate', [], moduleProfiles($db), moduleIconChoices()); ?>
-                <div class="mm-modal-actions">
-                    <button type="button" class="btn-cancel" onclick="document.getElementById('moduleCreateModal').style.display='none';">Annuler</button>
-                    <button type="submit" class="btn-mm-create">Créer le module</button>
+            <!-- Étape 1 : que veux-tu créer ? -->
+            <div id="qcreate_step1">
+                <h3><?= t('Que veux-tu créer ?', 'Wat wil je maken?') ?></h3>
+                <div class="create-choice">
+                    <button type="button" class="create-choice-btn" onclick="qcPick('qcreate', 1)">
+                        <span class="cc-ico">📦</span>
+                        <strong><?= t('Module', 'Module') ?></strong>
+                        <small><?= t('Regroupe d\'autres modules', 'Bevat andere modules') ?></small>
+                    </button>
+                    <button type="button" class="create-choice-btn" onclick="qcPick('qcreate', 0)">
+                        <span class="cc-ico">📄</span>
+                        <strong><?= t('Contenu', 'Inhoud') ?></strong>
+                        <small><?= t('Portera un guide / une vidéo', 'Bevat een gids / video') ?></small>
+                    </button>
                 </div>
-            </form>
+                <div class="mm-modal-actions">
+                    <button type="button" class="btn-cancel" onclick="document.getElementById('moduleCreateModal').style.display='none';"><?= t('Annuler', 'Annuleren') ?></button>
+                </div>
+            </div>
+            <!-- Étape 2 : le formulaire habituel -->
+            <div id="qcreate_step2" style="display:none;">
+                <h3 id="qcreate_title"><?= t('Nouveau module', 'Nieuwe module') ?></h3>
+                <form method="POST" action="module_save.php" enctype="multipart/form-data">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="create">
+                    <input type="hidden" name="return" value="index.php">
+                    <?php renderModuleFields('qcreate', [], moduleProfiles($db), moduleIconChoices()); ?>
+                    <div class="mm-modal-actions">
+                        <button type="button" class="btn-cancel" onclick="qcBack('qcreate')">← <?= t('Retour', 'Terug') ?></button>
+                        <button type="submit" class="btn-mm-create"><?= t('Créer', 'Maken') ?></button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     <?= moduleFormScript() ?>
+    <?= moduleCreateChoiceAssets() ?>
     <?php endif; ?>
 
 </body>
