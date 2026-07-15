@@ -50,16 +50,17 @@ if (!function_exists('renderVideoPage')) {
             $backdrop .= (strpos($backdrop, '?') !== false ? '&' : '?')
                 . 'l=' . (function_exists('currentLang') ? currentLang() : 'fr');
         }
-        // Le quiz est-il validé ? Tant qu'il ne l'est pas, l'apprenant ne peut pas SAUTER
-        // librement à l'intro ou à l'outro : il regarde le déroulé normal. Seul le bouton
-        // « La formation » reste actif (pour revenir à la vidéo depuis l'outro). L'admin passe.
-        $quizOk = !empty($isAdmin);
-        if (!$quizOk) {
-            require_once __DIR__ . '/quiz_pass.php';
-            global $db;
-            $pid = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) ($module['id'] ?? 0);
-            $quizOk = (isset($db) && $db instanceof PDO) ? quizUserPassed($db, $pid, (int) ($_SESSION['user_id'] ?? 0)) : true;
-        }
+        // Le quiz est-il validé ? Tant qu'il ne l'est pas, on ne peut pas SAUTER librement à
+        // l'intro ou à l'outro : on regarde le déroulé normal (intro → formation → fin). Seul
+        // le bouton « La formation » reste actif. La navigation se débloque de DEUX façons :
+        //  • on a regardé jusqu'au bout (fin de l'outro) → déblocage pour la session (JS) ;
+        //  • on a VALIDÉ le quiz → déblocage définitif (ci-dessous, côté serveur).
+        // NB : l'admin n'a PLUS de passe-droit ici — c'était pour ça que la navigation
+        // paraissait « libre » : en test admin, tout était déverrouillé d'emblée.
+        require_once __DIR__ . '/quiz_pass.php';
+        global $db;
+        $pid = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) ($module['id'] ?? 0);
+        $quizOk = (isset($db) && $db instanceof PDO) ? quizUserPassed($db, $pid, (int) ($_SESSION['user_id'] ?? 0)) : false;
 
         // INTRO / OUTRO : jouées avant et après la formation. On ne colle rien bout à bout —
         // le lecteur enchaîne les fichiers (voir plus bas). Changer l'intro change toutes les
@@ -184,7 +185,7 @@ if (!function_exists('renderVideoPage')) {
                                 $subNl = trim((string) ($module['sub_nl_path'] ?? ''));
                                 $isNl = (function_exists('currentLang') && currentLang() === 'nl');
                             ?>
-                            <video id="famiVideo" class="player__video"<?= $frameSty ?> controls controlsList="nodownload" playsinline preload="metadata"<?= ($subFr !== '' || $subNl !== '') ? ' crossorigin="anonymous"' : '' ?>>
+                            <video id="famiVideo" class="player__video"<?= $frameSty ?> controls controlsList="nodownload" playsinline preload="auto"<?= ($subFr !== '' || $subNl !== '') ? ' crossorigin="anonymous"' : '' ?>>
                                 <source src="<?= htmlspecialchars($videoUrl) ?>">
                                 <?php if ($subFr !== ''): ?>
                                     <track kind="subtitles" srclang="fr" label="<?= t('Français', 'Frans') ?>"
@@ -233,6 +234,11 @@ if (!function_exists('renderVideoPage')) {
                         v.style.backgroundImage = css;
                     }
                     v.addEventListener('loadedmetadata', applyBackdrop); // se rejoue a chaque segment
+                    // Course possible : si les métadonnées sont DÉJÀ chargées quand ce script
+                    // s'exécute (vidéo unique dont la <source> est dans le HTML), l'événement
+                    // est déjà passé — on applique donc le fond tout de suite. Sinon le fond
+                    // d'une 9:16 ne s'affichait jamais et on gardait des bandes noires.
+                    if (v.readyState >= 1) { applyBackdrop(); }
 
                     // ── LISTE DE LECTURE : intro → formation → outro.
                     // Les fichiers ne sont PAS collés (aucun ré-encodage) : on change la source

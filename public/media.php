@@ -108,14 +108,17 @@ if ($fp === false) {
 }
 fseek($fp, $start);
 $remaining = $end - $start + 1;
-$chunk = 8192;
+// Blocs de 512 Ko (et non 8 Ko) : lire/écrire une vidéo 8 Ko à la fois, avec un flush()
+// à chaque tour, saturait le CPU et faisait « ramer » la lecture (surtout l'intro/outro,
+// non transcodées et donc plus lourdes). Un gros bloc = bien moins d'aller-retours.
+$chunk = 512 * 1024;
 while ($remaining > 0 && !feof($fp)) {
     $read = ($remaining > $chunk) ? $chunk : $remaining;
     $buf = fread($fp, $read);
     if ($buf === false) { break; }
     echo $buf;
-    flush();
     $remaining -= strlen($buf);
+    // On laisse PHP/serveur gérer l'envoi (pas de flush par bloc : c'était le goulot).
 }
 fclose($fp);
 exit;
