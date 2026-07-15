@@ -33,6 +33,7 @@ if (!function_exists('famiTopbar')) {
 
         $back = (string) ($opts['back'] ?? 'index.php');
         $backLabel = (string) ($opts['back_label'] ?? t('Retour', 'Terug'));
+        $backFee = !empty($opts['back_fee']); // affiche la fée en quittant la page (ex. Paramètres)
         $title = (string) ($opts['title'] ?? '');
 
         // Pastille : ce qu'il y a de neuf POUR MOI.
@@ -123,12 +124,12 @@ if (!function_exists('famiTopbar')) {
         </style>
 
         <div class="fami-rib">
-            <a href="<?= htmlspecialchars($back) ?>" class="rb-back">⬅ <span><?= htmlspecialchars($backLabel) ?></span></a>
+            <a href="<?= htmlspecialchars($back) ?>" class="rb-back"<?= $backFee ? ' data-fee' : '' ?>>⬅ <span><?= htmlspecialchars($backLabel) ?></span></a>
             <div class="rb-title"><?= htmlspecialchars($title) ?></div>
             <div class="rb-right">
                 <div class="rb-row">
                     <a href="events.php" class="rb-btn" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="rb-dot"><?= (int) $n ?></span><?php endif; ?></a>
-                    <a href="parametres.php" class="rb-btn" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
+                    <a href="parametres.php" class="rb-btn" data-fee title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                     <a href="index.php" class="rb-btn" title="<?= t('Accueil', 'Start') ?>">🏠</a>
                     <button type="button" class="rb-btn rb-out" title="<?= t('Déconnexion', 'Afmelden') ?>" onclick="famiLogoutAsk()">⏻</button>
                 </div>
@@ -171,7 +172,7 @@ if (!function_exists('famiLogoutModal')) {
                 <p><?= t('Êtes-vous sûr de vouloir vous déconnecter ?', 'Weet je zeker dat je je wilt afmelden?') ?></p>
                 <div class="row">
                     <button type="button" style="background:#e9ecef; color:#333;" onclick="document.getElementById('famiLogoutModal').style.display='none';"><?= t('Annuler', 'Annuleren') ?></button>
-                    <a href="logout.php" style="background:#c0392b; color:#fff;"><?= t('Se déconnecter', 'Afmelden') ?></a>
+                    <a href="logout.php" data-fee style="background:#c0392b; color:#fff;"><?= t('Se déconnecter', 'Afmelden') ?></a>
                 </div>
             </div>
         </div>

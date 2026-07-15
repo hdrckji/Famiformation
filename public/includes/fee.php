@@ -196,15 +196,16 @@ if (!function_exists('feePlanteSvg')) {
     <ellipse cx="110" cy="84" rx="4" ry="3" fill="#FBD0A8"/>
   </g>
 
-  <!-- 3. ARBRE -->
+  <!-- 3. ARBRE (grand feuillage) -->
   <g class="fee-plant">
-    <rect x="103" y="106" width="14" height="64" rx="4" fill="#8A5B36"/>
-    <circle cx="110" cy="84" r="30" fill="#2E7D3B"/>
-    <circle cx="88" cy="98" r="20" fill="#3C9147"/>
-    <circle cx="132" cy="98" r="20" fill="#3C9147"/>
-    <circle cx="110" cy="96" r="24" fill="#5EA843"/>
-    <circle cx="98" cy="82" r="5" fill="#F2A9C4"/>
-    <circle cx="124" cy="90" r="5" fill="#F6BDD2"/>
+    <rect x="102" y="96" width="16" height="74" rx="5" fill="#8A5B36"/>
+    <circle cx="110" cy="64" r="40" fill="#2E7D3B"/>
+    <circle cx="78" cy="84" r="28" fill="#3C9147"/>
+    <circle cx="142" cy="84" r="28" fill="#3C9147"/>
+    <circle cx="110" cy="82" r="32" fill="#5EA843"/>
+    <circle cx="92" cy="58" r="6" fill="#F2A9C4"/>
+    <circle cx="130" cy="66" r="6" fill="#F6BDD2"/>
+    <circle cx="110" cy="44" r="5" fill="#F6BDD2"/>
   </g>
 
   <!-- 4. FLEUR BLEUE -->
@@ -239,27 +240,42 @@ if (!function_exists('feePlanteSvg')) {
     <circle cx="111" cy="64" r="11" fill="#6E4523"/>
   </g>
 
-  <!-- 6. ARBRE À GLACES (le clin d'œil) -->
+  <!-- 6. ARBRE À GLACES (le clin d'œil) : grand arbre dont pendent de VRAIES glaces —
+       un bâtonnet enrobé chocolat, une fusée tricolore, et un cornet à boules en vedette. -->
   <g class="fee-plant">
-    <rect x="103" y="108" width="14" height="62" rx="4" fill="#8A5B36"/>
-    <circle cx="110" cy="82" r="32" fill="#2E7D3B"/>
-    <circle cx="88" cy="94" r="19" fill="#3C9147"/>
-    <circle cx="132" cy="94" r="19" fill="#3C9147"/>
-    <g transform="translate(88,96)">
-      <line x1="0" y1="-14" x2="0" y2="2" stroke="#C98A4B" stroke-width="3"/>
-      <rect x="-8" y="-2" width="16" height="22" rx="7" fill="#F58AB0"/>
-      <rect x="-2" y="16" width="4" height="10" rx="2" fill="#C98A4B"/>
+    <rect x="102" y="98" width="16" height="72" rx="5" fill="#8A5B36"/>
+    <circle cx="110" cy="60" r="40" fill="#2E7D3B"/>
+    <circle cx="76" cy="80" r="27" fill="#3C9147"/>
+    <circle cx="144" cy="80" r="27" fill="#3C9147"/>
+    <circle cx="110" cy="78" r="31" fill="#4E9E52"/>
+
+    <!-- Bâtonnet enrobé chocolat (gauche) -->
+    <g transform="translate(80,92)">
+      <line x1="0" y1="-16" x2="0" y2="-2" stroke="#C98A4B" stroke-width="2.5"/>
+      <rect x="-9" y="-2" width="18" height="26" rx="6" fill="#5E3E22"/>
+      <rect x="-9" y="-2" width="18" height="7" rx="5" fill="#754B29"/>
+      <circle cx="-4" cy="6" r="1.4" fill="#EAD8B0"/><circle cx="4" cy="12" r="1.4" fill="#EAD8B0"/>
+      <rect x="-2.5" y="23" width="5" height="11" rx="2" fill="#E8CFA0"/>
     </g>
-    <g transform="translate(132,96)">
-      <line x1="0" y1="-14" x2="0" y2="2" stroke="#C98A4B" stroke-width="3"/>
-      <rect x="-8" y="-2" width="16" height="22" rx="7" fill="#6FC5E0"/>
-      <rect x="-2" y="16" width="4" height="10" rx="2" fill="#C98A4B"/>
+
+    <!-- Glace fusée tricolore (droite) -->
+    <g transform="translate(140,92)">
+      <line x1="0" y1="-16" x2="0" y2="-6" stroke="#C98A4B" stroke-width="2.5"/>
+      <path d="M-8 -6 Q 0 -18 8 -6 L 8 0 L -8 0 Z" fill="#E4483B"/>
+      <rect x="-8" y="0" width="16" height="9" fill="#FBF3E7"/>
+      <rect x="-8" y="9" width="16" height="9" fill="#4C8FD0"/>
+      <rect x="-2.5" y="18" width="5" height="11" rx="2" fill="#E8CFA0"/>
     </g>
-    <g transform="translate(110,102)">
-      <circle cx="0" cy="0" r="9" fill="#F7C6D9"/>
-      <circle cx="-4" cy="-3" r="6" fill="#FBE0EA"/>
-      <path d="M-8 4 L 8 4 L 0 22 Z" fill="#E0A24B"/>
-      <path d="M-4 8 L 0 16 M3 8 L -1 15" stroke="#B97C30" stroke-width="1"/>
+
+    <!-- Cornet à boules (centre, la vedette) -->
+    <g transform="translate(110,96)">
+      <path d="M-10 8 L 10 8 L 0 34 Z" fill="#E8A94B"/>
+      <path d="M-6 14 L 1 26 M2 14 L -3 22 M7 14 L 3 20" stroke="#C6852F" stroke-width="1" fill="none"/>
+      <circle cx="-5" cy="2" r="10" fill="#F7B7CE"/>
+      <circle cx="6" cy="0" r="9" fill="#FDF0DA"/>
+      <circle cx="0" cy="-8" r="8" fill="#B9E0A6"/>
+      <circle cx="0" cy="-18" r="3.6" fill="#D0342B"/>
+      <path d="M0 -20 Q 3 -26 7 -26" stroke="#6B3E1E" stroke-width="1.2" fill="none"/>
     </g>
   </g>
 

@@ -35,12 +35,12 @@ if (!$isAdmin) {
     <body>
 <?php
     require_once __DIR__ . '/includes/topbar.php';
-    famiTopbar($db, ['back' => 'index.php', 'title' => t('Préférences', 'Voorkeuren')]);
+    famiTopbar($db, ['back' => 'index.php', 'title' => t('Préférences', 'Voorkeuren'), 'back_fee' => true]);
 ?>
         <div class="container">
             <div class="topbar">
                 <h1><?= t('Préférences', 'Voorkeuren') ?></h1>
-                <a href="index.php">← <?= t('Retour à l\'accueil', 'Terug naar start') ?></a>
+                <a href="index.php" data-fee>← <?= t('Retour à l\'accueil', 'Terug naar start') ?></a>
             </div>
             <div class="card">
                 <h2 style="margin-top:0; color:#2d5a37;"><?= t('Paramètres utilisateur', 'Gebruikersinstellingen') ?></h2>
@@ -362,10 +362,10 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     </style>
 </head>
 <body>
-<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, ['back' => 'index.php', 'title' => t('Paramètres', 'Instellingen')]); ?>
+<?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, ['back' => 'index.php', 'title' => t('Paramètres', 'Instellingen'), 'back_fee' => true]); ?>
 <div class="container">
     <div class="topbar">
-        <a href="index.php">⬅ Retour à l'accueil</a>
+        <a href="index.php" data-fee>⬅ Retour à l'accueil</a>
         <h1>⚙️ Paramètres</h1>
         <span></span>
     </div>
