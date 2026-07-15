@@ -219,6 +219,21 @@ if (!function_exists('renderVideoPage')) {
                     var v = document.getElementById('famiVideo');
                     if (!v) { return; }
 
+                    // ── FOND (bandes) : UNIQUEMENT pour une vidéo VERTICALE (9:16). Avant, le
+                    // fond etait pose sur toutes les videos en comptant sur object-fit pour le
+                    // masquer en 16:9 — mais sur mobile, des arrondis de pixels le laissaient
+                    // depasser. On regarde donc les VRAIES dimensions : fond seulement si portrait.
+                    var BACKDROP = <?= json_encode($backdrop !== '' ? $backdrop : '', JSON_UNESCAPED_SLASHES) ?>;
+                    var frameEl = v.closest ? v.closest('.player__frame') : null;
+                    function applyBackdrop() {
+                        if (!BACKDROP) { return; }
+                        var portrait = v.videoWidth && v.videoHeight && (v.videoWidth / v.videoHeight) < 1.05;
+                        var css = portrait ? ('url("' + BACKDROP + '")') : 'none';
+                        if (frameEl) { frameEl.style.backgroundImage = css; }
+                        v.style.backgroundImage = css;
+                    }
+                    v.addEventListener('loadedmetadata', applyBackdrop); // se rejoue a chaque segment
+
                     // ── LISTE DE LECTURE : intro → formation → outro.
                     // Les fichiers ne sont PAS collés (aucun ré-encodage) : on change la source
                     // du lecteur à la fin de chaque segment. Les sous-titres n'appartiennent
