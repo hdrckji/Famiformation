@@ -6,8 +6,9 @@
 //     • IMAGES (icônes, photos de profil, habillage, images extraites des PDF) :
 //       redimensionnées (borne raisonnable) et ré-encodées (JPEG/WebP qualité ~82,
 //       PNG optimisé). Une photo de téléphone de 6 Mo tombe souvent sous 300 Ko.
-//     • VIDÉOS courtes (intro / outro) : ré-encodées en H.264 720p + « faststart »
-//       (démarrage instantané), comme les vidéos de formation.
+//     • VIDÉOS courtes (intro / outro) : « faststart » (index déplacé en tête pour un
+//       démarrage instantané). PAS de ré-encodage : un remux est quasi-immédiat et ne
+//       risque jamais de bloquer la requête d'upload.
 //
 //   Chaque compression est un BONUS : si l'outil manque (GD, ffmpeg) ou échoue, on
 //   garde le fichier d'origine — jamais on ne casse un upload pour l'alléger.
@@ -77,18 +78,20 @@ if (!function_exists('famiCompressImageFile')) {
 
 if (!function_exists('famiCompressVideoFile')) {
     /**
-     * Compresse une COURTE vidéo (intro/outro) SUR PLACE : H.264 720p + faststart.
-     * Synchrone (l'admin dépose un clip de quelques secondes, pas une formation).
+     * « faststart » d'une vidéo courte (intro/outro) SUR PLACE : remux instantané,
+     * sans ré-encodage. Démarrage immédiat à la lecture, sans jamais bloquer l'upload.
      * @return bool true si réécrit.
      */
     function famiCompressVideoFile($absPath)
     {
         if (!is_file($absPath) || !function_exists('exec')) { return false; }
+        // FASTSTART SEUL (remux, PAS de ré-encodage) : on deplace juste l'index (« moov »)
+        // en tete du fichier pour un demarrage instantane. C'est quasi-immediat, meme sur un
+        // gros fichier, et ca ne bloque donc jamais la requete d'upload. Un ré-encodage 720p
+        // complet, lui, prenait des minutes et cassait l'envoi.
         $tmp = $absPath . '.z.mp4';
         $cmd = 'ffmpeg -y -i ' . escapeshellarg($absPath)
-            . ' -vf ' . escapeshellarg('scale=-2:min(720\,ih)')      // au plus 720p, largeur paire
-            . ' -c:v libx264 -preset veryfast -crf 24 -c:a aac -b:a 128k -movflags +faststart '
-            . escapeshellarg($tmp) . ' 2>&1';
+            . ' -c copy -movflags +faststart ' . escapeshellarg($tmp) . ' 2>&1';
         @set_time_limit(0);
         $o = []; $code = 0;
         @exec($cmd, $o, $code);

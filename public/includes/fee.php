@@ -459,6 +459,7 @@ if (!function_exists('feeOverlay')) {
         if (e.defaultPrevented) { return; }            // une validation a déjà refusé
         if (!form || form.method.toLowerCase() !== 'post') { return; }
         if (!aDesFichiers(form)) { return; }           // pas de fichier → chargement normal
+        if (form.hasAttribute && form.hasAttribute('data-nofee')) { return; } // upload gere en direct (admin)
         if (!window.FormData || !window.XMLHttpRequest) { return; }
 
         e.preventDefault();

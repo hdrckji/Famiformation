@@ -270,7 +270,7 @@ if (!function_exists('brandingCard')) {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;" id="bdForm-<?= $lang ?>">
+                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;" id="bdForm-<?= $lang ?>" data-nofee>
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
@@ -373,7 +373,7 @@ if (!function_exists('brandingClipsCard')) {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;">
+                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;" data-nofee>
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="kind" value="clip">
