@@ -333,6 +333,57 @@ if (!function_exists('feeOverlay')) {
         $fee = feeSvg();
         $plante = feePlanteSvg();
 
+        // Messages qui défilent pendant l'attente : blagues + fun facts jardinage,
+        // auxquels on AJOUTE les phrases du widget d'accueil (base de données), pour ne
+        // pas afficher un plat « la fée prépare votre contenu ».
+        $feeLang = function_exists('currentLang') ? currentLang() : 'fr';
+        $feeJardin = [
+            ["Pourquoi les jardiniers sont-ils si zen ? Ils savent cultiver la patience. 🌱",
+             "Waarom zijn tuiniers zo zen? Ze weten geduld te kweken. 🌱"],
+            ["Que dit une fleur à une abeille ? « Butine-moi tant que je suis en fleur ! » 🐝",
+             "Wat zegt een bloem tegen een bij? « Kom langs zolang ik bloei! » 🐝"],
+            ["Quel est le comble pour un jardinier ? Raconter des salades. 🥬",
+             "Wat is het toppunt voor een tuinier? Praatjes (sla) verkopen. 🥬"],
+            ["Pourquoi les tomates rougissent-elles ? Elles ont vu la salade se déshabiller. 🍅",
+             "Waarom worden tomaten rood? Ze zagen de sla zich uitkleden. 🍅"],
+            ["Un jardinier ne part jamais à la retraite : il se met simplement au vert. 🌿",
+             "Een tuinier gaat nooit met pensioen: hij trekt gewoon de natuur in. 🌿"],
+            ["Une abeille visite jusqu'à 7 000 fleurs par jour. 🐝",
+             "Een bij bezoekt tot 7.000 bloemen per dag. 🐝"],
+            ["La lavande éloigne naturellement les moustiques. 💜",
+             "Lavendel houdt muggen op natuurlijke wijze weg. 💜"],
+            ["Les fraises ne sont pas des baies… mais les bananes, si ! 🍓",
+             "Aardbeien zijn geen bessen… bananen wél! 🍓"],
+            ["Le tournesol suit le soleil : on appelle ça l'héliotropisme. 🌻",
+             "De zonnebloem volgt de zon: dat heet heliotropie. 🌻"],
+            ["Les coccinelles dévorent les pucerons : la meilleure amie du jardinier. 🐞",
+             "Lieveheersbeestjes eten bladluizen: de beste vriend van de tuinier. 🐞"],
+            ["Le marc de café est un excellent engrais naturel. ☕",
+             "Koffiedik is een uitstekende natuurlijke meststof. ☕"],
+            ["Le basilic planté près des tomates renforce leur goût. 🌿",
+             "Basilicum naast tomaten versterkt hun smaak. 🌿"],
+            ["Certains bambous poussent de près d'un mètre par jour ! 🎋",
+             "Sommige bamboe groeit bijna een meter per dag! 🎋"],
+        ];
+        $feeMsgs = [];
+        foreach ($feeJardin as $g) {
+            $feeMsgs[] = ($feeLang === 'nl') ? $g[1] : $g[0];
+        }
+        global $db;
+        if (isset($db) && $db instanceof PDO && function_exists('widgetPhrases')) {
+            try {
+                foreach (widgetPhrases($db, true) as $p) {
+                    $txt = ($feeLang === 'nl' && !empty($p['texte_nl'])) ? $p['texte_nl'] : ($p['texte'] ?? '');
+                    $txt = trim((string) $txt);
+                    if ($txt !== '') { $feeMsgs[] = $txt; }
+                }
+            } catch (Exception $e) {
+                // base indisponible : on garde juste les blagues/fun facts.
+            }
+        }
+        $feeMsgs = array_values(array_unique($feeMsgs));
+        $jsMsgs = json_encode($feeMsgs, JSON_UNESCAPED_UNICODE);
+
         return <<<HTML
 <div class="fee-back" id="feeBack" aria-hidden="true">
   <div class="fee-scene">
@@ -423,6 +474,21 @@ if (!function_exists('feeOverlay')) {
 (function () {
     var back, pctEl, barEl, txtEl, etEl;
     var pct = 0, sparks = null, jardin = null, plantIdx = -1;
+    // Blagues + fun facts jardinage + phrases du widget (base de données).
+    var messages = {$jsMsgs};
+    var msgIdx = -1;
+
+    // Choisit un message AU HASARD (sans répéter le précédent) et l'affiche.
+    function prochainMessage() {
+        if (!txtEl || !messages.length) { return; }
+        if (messages.length === 1) { msgIdx = 0; }
+        else {
+            var n = msgIdx;
+            while (n === msgIdx) { n = Math.floor(Math.random() * messages.length); }
+            msgIdx = n;
+        }
+        txtEl.textContent = messages[msgIdx];
+    }
 
     function els() {
         if (!back) {
@@ -444,6 +510,7 @@ if (!function_exists('feeOverlay')) {
         all.forEach(function (g) { g.classList.remove('on'); });
         plantIdx = (plantIdx + 1) % all.length;
         all[plantIdx].classList.add('on');
+        prochainMessage();                           // une nouvelle blague/fun fact à chaque plante
     }
     function demarreJardin() {
         if (jardin) { return; }
@@ -461,15 +528,16 @@ if (!function_exists('feeOverlay')) {
         pct = Math.max(0, Math.min(100, p));
         pctEl.textContent = Math.round(pct) + ' %';
         barEl.style.width = pct + '%';
-        if (txt) { txtEl.textContent = txt; }
+        // Le texte n'est plus piloté ici : ce sont les blagues/fun facts qui défilent
+        // (voir prochainMessage / demarreJardin). Le paramètre txt est ignoré.
     };
 
     window.feeShow = function (txt) {
         if (!els() || back.classList.contains('on')) { return; }
         back.classList.add('on');
         back.setAttribute('aria-hidden', 'false');
-        window.feeSet(0, txt || {$jsAttente});
-        demarreJardin();                             // les plantes se relaient à l'écran
+        window.feeSet(0);
+        demarreJardin();                             // les plantes ET les messages se relaient
         // Étincelles : synchronisées sur le coup de baguette.
         if (!sparks) { sparks = setInterval(etincelle, 700); }
     };
