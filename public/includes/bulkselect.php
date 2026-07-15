@@ -145,6 +145,8 @@ if (!function_exists('bulkAssets')) {
                 var toggle = document.querySelector('[data-bulk-toggle="' + group + '"]');
                 window._bulkEntity = toggle ? (toggle.getAttribute('data-bulk-entity') || '') : '';
                 var lbl = toggle ? (toggle.getAttribute('data-bulk-label') || 'élément') : 'élément';
+                var noPass = toggle && toggle.hasAttribute('data-bulk-nopass');
+                document.getElementById('famiBulkPass').style.display = noPass ? 'none' : '';
                 document.getElementById('famiBulkText').textContent =
                     'Supprimer ' + c.length + ' ' + lbl + (c.length > 1 ? 's' : '') + ' ? Cette action est définitive.';
                 document.getElementById('famiBulkPass').value = '';

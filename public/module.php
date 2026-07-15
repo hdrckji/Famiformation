@@ -137,10 +137,17 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
         .btn-cancel { background:#e9ecef; color:#333; }
         /* Zones d'upload (PDF / vidéo) */
-        .drop-zone { position: relative; border: 2.5px dashed #b9cdbf; border-radius: 14px; background:#f6faf7; padding: 26px 16px; text-align:center; cursor:pointer; transition: all .15s ease; margin: 14px 0 4px; }
-        .drop-zone:hover { border-color:#2d5a37; background:#eef7f0; }
-        .drop-zone.over { border-color:#2d5a37; background:#e3f2e7; }
-        .drop-zone.has-file { border-style: solid; border-color:#2d5a37; background:#e8f5e9; }
+        .drop-zone { position: relative; border: 2px dashed #c3d5c8; border-radius: 18px;
+            background: linear-gradient(180deg,#fbfefb,#f2f8f3); padding: 30px 18px; text-align:center;
+            cursor:pointer; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease; margin: 14px 0 4px; }
+        .drop-zone:hover { border-color:#3E8E4E; box-shadow:0 10px 26px rgba(30,90,55,.10); transform:translateY(-2px); }
+        .drop-zone.over { border-color:#2d5a37; border-style:solid; background:#e3f2e7; transform:scale(1.01); box-shadow:0 12px 30px rgba(30,90,55,.18); }
+        /* L'icone dans une pastille ronde (rendu plus "carte"). */
+        .drop-zone .dz-icon { display:inline-flex; align-items:center; justify-content:center;
+            width:64px; height:64px; border-radius:50%; background:#eaf6ec; box-shadow:inset 0 0 0 1px #cfe3d5; margin-bottom:4px; }
+        .drop-zone.has-file { border-style: solid; border-color:#3E8E4E; background:#eef9f0; box-shadow:0 8px 22px rgba(30,90,55,.14); }
+        .drop-zone.has-file .dz-icon { background:#2d5a37; box-shadow:none; }
+        .drop-zone.has-file .dz-title, .drop-zone.has-file .dz-hint { opacity:.55; }
         .dz-input { position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; }
         .dz-icon { font-size:2.6rem; line-height:1; }
         .dz-title { font-weight:800; color:#2d5a37; font-size:1.15rem; margin-top:6px; }

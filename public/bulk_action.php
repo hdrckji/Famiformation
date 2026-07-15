@@ -36,7 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
         $_SESSION['module_flash'] = "❌ Aucun élément sélectionné.";
         header('Location: ' . $return); exit();
     }
-    if (!adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
+    // Les notifications sont a faible enjeu : suppression sans mot de passe (admin deja verifie).
+    // Tout le reste (modules, utilisateurs, agences...) exige le mot de passe admin.
+    if ($entity !== 'event' && !adminPasswordOk($db, (string) ($_POST['admin_password'] ?? ''))) {
         $_SESSION['module_flash'] = "❌ Mot de passe incorrect : rien supprimé.";
         header('Location: ' . $return); exit();
     }
@@ -90,6 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
             }
         } elseif ($entity === 'phrase') {
             $db->prepare("DELETE FROM widget_phrases WHERE id IN ($ph)")->execute($ids);
+            $done = count($ids);
+        } elseif ($entity === 'event') {
+            $db->prepare("DELETE FROM site_events WHERE id IN ($ph)")->execute($ids);
             $done = count($ids);
         } elseif ($entity === 'user') {
             // Utilisateurs : on ne supprime JAMAIS le compte « admin » (protection).

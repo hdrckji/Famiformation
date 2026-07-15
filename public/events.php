@@ -140,15 +140,13 @@ $evIcon = function ($t) {
             $tabs['error'] = ['⚠️ ' . t('Erreurs', 'Fouten'), count($evErrors)];
             $first = array_key_first($tabs);
 
-            // Barre de sélection/suppression (admin), propre à chaque boîte.
+            // Barre de selection : bouton "Selectionner" + "tout" (corbeille flottante unifiee).
             $evBar = function ($box) {
                 ?>
                 <div class="evbar">
-                    <label class="evchk"><input type="checkbox" id="evAll-<?= $box ?>"> <span><?= t('Tout sélectionner', 'Alles selecteren') ?></span></label>
-                    <span class="muted" id="evCount-<?= $box ?>">0</span>
-                    <span class="muted" style="margin-left:auto; font-size:.8rem;">💡 Maj+clic : sélectionner une plage</span>
-                    <button type="submit" class="btn btn-rej evdel" id="evDel-<?= $box ?>" disabled onclick="return confirm('Supprimer les notifications sélectionnées ?');">🗑️ <?= t('Supprimer la sélection', 'Selectie verwijderen') ?></button>
-                    <button type="submit" class="btn btn-rej" onclick="if (!confirm('Vider TOUT le fil de notifications ? Cette action est définitive.')) { return false; } document.getElementById('evAction').value = 'delete_all_events'; return true;">🗑️ <?= t('Tout supprimer', 'Alles verwijderen') ?></button>
+                    <button type="button" class="btn evtab bulk-toggle" data-bulk-toggle="events" data-bulk-entity="event" data-bulk-nopass data-bulk-label="notification">&#9745; <?= t('Sélectionner', 'Selecteren') ?></button>
+                    <label class="evchk"><input type="checkbox" class="bulk-all" data-bulk="events"> <span><?= t('Tout sélectionner', 'Alles selecteren') ?></span></label>
+                    <span class="muted" style="margin-left:auto; font-size:.8rem;">&#128161; <?= t('Maj+clic : une plage', 'Shift+klik: een reeks') ?></span>
                 </div>
                 <?php
             };
@@ -165,7 +163,7 @@ $evIcon = function ($t) {
                     $isErr = (eventsCategory($e['type'] ?? '') === 'error');
                     echo '<div class="ev' . ($isErr ? ' ev-err' : '') . '">';
                     if ($isAdmin) {
-                        echo '<input type="checkbox" class="evbox" data-box="' . htmlspecialchars($box) . '" name="ev[]" value="' . (int) $e['id'] . '">';
+                        echo '<input type="checkbox" class="bulk-cb" data-bulk="events" value="' . (int) $e['id'] . '">';
                     }
                     echo '<span class="ic">' . $evIcon($e['type'] ?? '') . '</span><div class="txt">'
                        . htmlspecialchars((string) ($e['message'] ?? ''));
@@ -219,22 +217,20 @@ $evIcon = function ($t) {
         </div>
         <?php endif; ?>
 
-        <form method="POST" action="events.php" id="evForm">
-            <?= csrfField() ?>
-            <input type="hidden" name="action" id="evAction" value="delete_events">
-
-            <div class="card evpane" id="pane-event"<?= $first === 'event' ? '' : ' hidden' ?>>
+        <div id="evForm">
+            <div class="card evpane bulk-scope" id="pane-event"<?= $first === 'event' ? '' : ' hidden' ?>>
                 <p class="muted" style="margin-top:0;"><?= t('La vie du site : modules créés, contenus ajoutés, contenus publiés.', 'Wat er op de site gebeurt: nieuwe modules, toegevoegde en gepubliceerde inhoud.') ?></p>
                 <?php if ($isAdmin) { $evBar('event'); } ?>
                 <?php $renderList($evEvents, 'event'); ?>
             </div>
 
-            <div class="card evpane" id="pane-error"<?= $first === 'error' ? '' : ' hidden' ?>>
+            <div class="card evpane bulk-scope" id="pane-error"<?= $first === 'error' ? '' : ' hidden' ?>>
                 <p class="muted" style="margin-top:0;"><?= t("Ce qui n'a pas fonctionné : doutes de l'IA sur un contenu, compression vidéo, service externe indisponible.", 'Wat misliep: twijfels van de AI, videocompressie, externe dienst niet bereikbaar.') ?></p>
                 <?php if ($isAdmin) { $evBar('error'); } ?>
                 <?php $renderList($evErrors, 'error'); ?>
             </div>
-        </form>
+        </div>
+        <?php require_once __DIR__ . '/includes/bulkselect.php'; echo bulkAssets(); ?>
 
         <style>
         .evtabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
@@ -254,40 +250,7 @@ $evIcon = function ($t) {
             document.querySelectorAll('.evpane').forEach(function (p) { p.hidden = (p.id !== 'pane-' + k); });
             document.querySelectorAll('.evtab').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === k); });
         }
-        (function () {
-            ['event', 'error'].forEach(function (box) {
-                var boxes = Array.prototype.slice.call(document.querySelectorAll('.evbox[data-box="' + box + '"]'));
-                var all = document.getElementById('evAll-' + box);
-                var del = document.getElementById('evDel-' + box);
-                var cnt = document.getElementById('evCount-' + box);
-                if (!boxes.length || !all) { return; }
-                var last = -1;
-                function refresh() {
-                    var n = 0;
-                    boxes.forEach(function (b) { b.closest('.ev').classList.toggle('sel', b.checked); if (b.checked) { n++; } });
-                    del.disabled = (n === 0);
-                    cnt.textContent = n + ' sélectionnée' + (n > 1 ? 's' : '');
-                    all.checked = (n === boxes.length && n > 0);
-                }
-                boxes.forEach(function (b, i) {
-                    b.addEventListener('click', function (e) {
-                        // Maj+clic : coche (ou décoche) toute la plage depuis la dernière case touchée.
-                        if (e.shiftKey && last > -1 && last !== i) {
-                            var a = Math.min(last, i), z = Math.max(last, i);
-                            for (var k = a; k <= z; k++) { boxes[k].checked = b.checked; }
-                        }
-                        last = i;
-                        refresh();
-                    });
-                });
-                all.addEventListener('change', function () {
-                    boxes.forEach(function (b) { b.checked = all.checked; });
-                    last = -1;
-                    refresh();
-                });
-                refresh();
-            });
-        }());
+        /* La selection (cases, Maj+clic, corbeille flottante) est geree par le composant unifie. */
         </script>
     </div>
 </body>
