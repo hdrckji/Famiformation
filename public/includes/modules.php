@@ -1148,7 +1148,20 @@ if (!function_exists('ensureModulesTable')) {
                 📄 Module de contenu — il ne peut pas contenir d'autres modules. Tu peux modifier son nom, sa description, son icône et ses accès.
             </div>
         <?php else: ?>
-            <label class="chk"><input type="checkbox" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>> Ce module contient d'autres modules</label>
+            <?php // Deux onglets = deux façons de créer. « Module » regroupe d'autres modules
+                  // (ancienne case cochée) ; « Contenu » portera un guide/une vidéo. ?>
+            <div class="type-tabs">
+                <label class="type-tab<?= $isContainer ? ' on' : '' ?>">
+                    <input type="radio" name="is_container" value="1" <?= $isContainer ? 'checked' : '' ?>>
+                    <span>📦 <?= t('Module', 'Module') ?></span>
+                    <small><?= t('Regroupe d\'autres modules', 'Bevat andere modules') ?></small>
+                </label>
+                <label class="type-tab<?= $isContainer ? '' : ' on' ?>">
+                    <input type="radio" name="is_container" value="0" <?= $isContainer ? '' : 'checked' ?>>
+                    <span>📄 <?= t('Contenu', 'Inhoud') ?></span>
+                    <small><?= t('Portera un guide / une vidéo', 'Bevat een gids / video') ?></small>
+                </label>
+            </div>
         <?php endif; ?>
 
         <label>Accès <small>(rien de coché = visible par tous)</small></label>
@@ -1199,6 +1212,13 @@ if (!function_exists('ensureModulesTable')) {
         ob_start();
         ?>
         <style>
+        /* Deux onglets « Module / Contenu » (a la place de la case is_container). */
+        .type-tabs { display:flex; gap:10px; margin:6px 0 4px; }
+        .type-tabs .type-tab { flex:1; cursor:pointer; border:2px solid #dde7e1; border-radius:12px; padding:12px 14px; background:#fafcfb; transition:all .12s; text-align:left; }
+        .type-tabs .type-tab input { position:absolute; opacity:0; width:0; height:0; }
+        .type-tabs .type-tab span { display:block; font-weight:800; color:#244230; }
+        .type-tabs .type-tab small { display:block; color:#7a8a80; font-size:.78rem; margin-top:2px; }
+        .type-tabs .type-tab.on { border-color:#3E8E4E; background:#eef7f0; box-shadow:0 2px 8px rgba(30,90,55,.10); }
         .adv-options { margin-top: 16px; border: 1px solid #e0e6e2; border-radius: 10px; padding: 2px 12px; background: #fafcfb; }
         .adv-options > summary { cursor: pointer; font-weight: 700; color: #2d5a37; padding: 10px 2px; list-style: none; }
         .adv-options > summary::-webkit-details-marker { display: none; }
@@ -1257,6 +1277,9 @@ if (!function_exists('ensureModulesTable')) {
      */
     function moduleFormScript()
     {
-        return "<script>function pickIcon(formId, emoji, btn){var f=document.getElementById(formId+'_icon');if(f)f.value=emoji;var w=document.getElementById(formId+'_iconwrap');if(w){var b=w.querySelectorAll('.icon-opt');for(var i=0;i<b.length;i++){b[i].classList.remove('sel');}}btn.classList.add('sel');}</script>";
+        return "<script>"
+            . "function pickIcon(formId, emoji, btn){var f=document.getElementById(formId+'_icon');if(f)f.value=emoji;var w=document.getElementById(formId+'_iconwrap');if(w){var b=w.querySelectorAll('.icon-opt');for(var i=0;i<b.length;i++){b[i].classList.remove('sel');}}btn.classList.add('sel');}"
+            . "document.addEventListener('change',function(e){if(e.target&&e.target.name==='is_container'){var tabs=e.target.closest('.type-tabs');if(tabs){tabs.querySelectorAll('.type-tab').forEach(function(t){t.classList.toggle('on',t.querySelector('input').checked);});}}});"
+            . "</script>";
     }
 }

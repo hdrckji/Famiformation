@@ -415,7 +415,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <h2 style="margin:0; color:#2d5a37;">Modules (<?= count($allModules) ?>)</h2>
-                <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer un module</button>
+                <button type="button" class="btn btn-primary" onclick="openModal('createModal')">➕ Créer</button>
             </div>
             <div style="display:flex; align-items:center; gap:8px; margin:12px 0 6px; font-size:0.85rem; flex-wrap:wrap;">
                 <span class="muted" style="font-weight:700;">Trier :</span>

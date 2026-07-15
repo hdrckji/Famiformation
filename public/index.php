@@ -623,7 +623,7 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
     </div>
 
     <?php if ($isAdmin): ?>
-    <button type="button" class="quick-create-btn" onclick="document.getElementById('moduleCreateModal').style.display='flex';">➕ Créer un module</button>
+    <button type="button" class="quick-create-btn" onclick="document.getElementById('moduleCreateModal').style.display='flex';">➕ Créer</button>
 
     <div id="moduleCreateModal" class="mm-modal-backdrop">
         <div class="mm-modal-card">
