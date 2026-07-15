@@ -364,12 +364,11 @@ if (!function_exists('famiInjectPageTheme')) {
         $inject = famiScrollRestoreScript();
 
         // Toujours : la FÉE FAMIFLORA (écran d'attente). Elle est posée sur toutes les
-        // pages mais reste INVISIBLE tant qu'il n'y a rien à attendre — elle ne sort que
-        // pour un import, ou pour une page qui met plus de 300 ms à venir.
-        if (!empty($_SESSION['user_id'])) {
-            require_once __DIR__ . '/fee.php';
-            $inject .= feeOverlay();
-        }
+        // pages — Y COMPRIS la page de connexion — mais reste INVISIBLE tant qu'il n'y a
+        // rien à attendre. Elle ne sort que pour un import, un envoi de formulaire long
+        // (data-fee), ou la connexion.
+        require_once __DIR__ . '/fee.php';
+        $inject .= feeOverlay();
 
         // Aperçu de thème actif (admin) : bandeau visible sur TOUTES les pages,
         // avec un bouton pour revenir à la normale d'où qu'on soit.

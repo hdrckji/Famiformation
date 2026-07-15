@@ -3,7 +3,7 @@
 // fee.php — LA FÉE FAMIFLORA : animation d'attente.
 //
 // La fée agite sa baguette au-dessus d'un pot et fait pousser une plante DIFFÉRENTE
-// toutes les 5 s (fleur, cactus, arbre, fleur bleue, tournesol, arbre à glaces…).
+// toutes les 6 s (fleur, cactus, arbre, fleur bleue, tournesol, arbre à glaces…).
 // Comme le serveur ne renvoie aucun avancement mesurable pendant qu'il travaille,
 // ce petit jardin qui défile occupe l'utilisateur sans prétendre à un pourcentage.
 //
@@ -146,7 +146,7 @@ if (!function_exists('feePlanteSvg')) {
      * LE POT + UNE COLLECTION DE PLANTES, toutes dessinées empilées mais masquées.
      * Le serveur ne nous dit RIEN de son avancement (mise en forme IA, quiz…), donc
      * plutôt qu'un faux pourcentage on OCCUPE l'utilisateur : la fée fait pousser une
-     * plante DIFFÉRENTE toutes les 5 s (le JS en révèle une à la fois, avec un effet
+     * plante DIFFÉRENTE toutes les 6 s (le JS en révèle une à la fois, avec un effet
      * de pousse). Une par une : fleur, cactus, arbre, fleur bleue, tournesol… et, pour
      * le clin d'œil, un ARBRE À GLACES. Toutes partent du même point (110,172 = terreau).
      */
@@ -364,7 +364,7 @@ if (!function_exists('feeOverlay')) {
 
 .fee-plante { width:min(160px, 30vw); height:auto; display:block; }
 /* Une seule plante visible à la fois. Elle SURGIT du terreau (pousse), puis se
-   balance doucement jusqu'à ce que la suivante la remplace (5 s plus tard). */
+   balance doucement jusqu'à ce que la suivante la remplace (6 s plus tard). */
 .fee-plant { display:none; }
 .fee-plant.on { display:block; animation:feePousse .55s cubic-bezier(.2,1.6,.4,1), feeBalance 3.2s ease-in-out .55s infinite; transform-origin:110px 172px; }
 @keyframes feePousse { from { transform:scale(.15) translateY(20px); opacity:0; } to { transform:scale(1) translateY(0); opacity:1; } }
@@ -433,7 +433,7 @@ if (!function_exists('feeOverlay')) {
         if (jardin) { return; }
         plantIdx = -1;
         poussePlante();                              // la première pousse tout de suite
-        jardin = setInterval(poussePlante, 5000);    // puis une nouvelle toutes les 5 s
+        jardin = setInterval(poussePlante, 6000);    // puis une nouvelle toutes les 6 s
     }
     function arreteJardin() {
         if (jardin) { clearInterval(jardin); jardin = null; }

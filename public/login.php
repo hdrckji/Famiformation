@@ -214,7 +214,7 @@ if (empty($isFamijobLogin) && function_exists('famiDefaultVectorBg')): ?>
         <div class="error"><?php echo $erreur; ?></div>
     <?php endif; ?>
 
-    <form method="POST">
+    <form method="POST" data-fee>
         <?php echo csrfField(); ?>
         <?php if ($postLoginRedirect !== ''): ?>
             <input type="hidden" name="redirect" value="<?php echo e($postLoginRedirect); ?>">
