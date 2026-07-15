@@ -8,23 +8,81 @@
 //   └────────────────────────────────────────────────────────────────────┘
 //
 //   Transparent, collé en haut (sticky) : il reste visible où qu'on soit dans la
-//   page. Avant, chaque page avait SON propre bandeau + mes boutons flottants
-//   par-dessus : deux barres qui se chevauchaient, un rendu différent partout.
-//   Ici, une seule barre, un seul style.
+//   page. Une seule barre, un seul style.
+//
+//   Il est posé de DEUX façons :
+//     • explicitement, quand une page appelle famiTopbar($db, [...]) ;
+//     • AUTOMATIQUEMENT sur toutes les autres pages HTML (sauf l'accueil), via
+//       l'injecteur famiInjectPageTheme (theme.php) qui appelle famiTopbarHtml().
+//   Pour permettre cette 2e voie, tout le rendu est fait par des fonctions qui
+//   RETOURNENT une chaîne (aucun ob_start : interdit dans un callback de buffer).
 //
 //   Déconnexion : modale de confirmation (jamais un clic accidentel).
 // ============================================================
 
-if (!function_exists('famiTopbar')) {
-    /**
-     * @param PDO   $db
-     * @param array $opts ['back' => url du retour (défaut index.php),
-     *                     'title' => titre affiché au centre,
-     *                     'back_label' => libellé du retour]
-     */
-    function famiTopbar(PDO $db, $opts = [])
+if (!function_exists('famiLogoutModalHtml')) {
+    /** Modale « Se déconnecter ? » — retournée en chaîne, une seule fois par requête. */
+    function famiLogoutModalHtml()
     {
-        if (empty($_SESSION['user_id'])) { return; }
+        if (empty($_SESSION['user_id'])) { return ''; }
+        static $done = false;
+        if ($done) { return ''; }
+        $done = true;
+
+        $tDeco    = htmlspecialchars(t('Se déconnecter ?', 'Afmelden?'));
+        $tSur     = htmlspecialchars(t('Êtes-vous sûr de vouloir vous déconnecter ?', 'Weet je zeker dat je je wilt afmelden?'));
+        $tAnnuler = htmlspecialchars(t('Annuler', 'Annuleren'));
+        $tDeco2   = htmlspecialchars(t('Se déconnecter', 'Afmelden'));
+
+        return <<<HTML
+        <style>
+        .fami-tb-mask { position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; padding:20px; }
+        .fami-tb-box { background:#fff; border-radius:16px; padding:26px; max-width:400px; width:100%; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+        .fami-tb-box h3 { margin:8px 0 6px; color:#2d5a37; }
+        .fami-tb-box p { color:#5a6b60; margin:0 0 18px; }
+        .fami-tb-box .row { display:flex; gap:10px; justify-content:center; }
+        .fami-tb-box .row a, .fami-tb-box .row button { border:none; border-radius:10px; padding:11px 20px; font-weight:700; cursor:pointer; text-decoration:none; font:inherit; }
+        </style>
+        <div class="fami-tb-mask" id="famiLogoutModal">
+            <div class="fami-tb-box">
+                <div style="font-size:2.2rem;">⏻</div>
+                <h3>{$tDeco}</h3>
+                <p>{$tSur}</p>
+                <div class="row">
+                    <button type="button" style="background:#e9ecef; color:#333;" onclick="document.getElementById('famiLogoutModal').style.display='none';">{$tAnnuler}</button>
+                    <a href="logout.php" data-fee style="background:#c0392b; color:#fff;">{$tDeco2}</a>
+                </div>
+            </div>
+        </div>
+        <script>
+        function famiLogoutAsk() { document.getElementById('famiLogoutModal').style.display = 'flex'; }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { var m = document.getElementById('famiLogoutModal'); if (m) { m.style.display = 'none'; } }
+        });
+        </script>
+HTML;
+    }
+}
+
+if (!function_exists('famiLogoutModal')) {
+    /** Écho de la modale (compat : anciennes pages qui l'appelaient directement). */
+    function famiLogoutModal()
+    {
+        echo famiLogoutModalHtml();
+    }
+}
+
+if (!function_exists('famiTopbarHtml')) {
+    /**
+     * Construit le ruban et le RETOURNE (pas d'écho) — pour pouvoir être injecté par
+     * famiInjectPageTheme (où ob_start est interdit).
+     *
+     * @param PDO   $db
+     * @param array $opts ['back', 'title', 'back_label', 'back_fee']
+     */
+    function famiTopbarHtml(PDO $db, $opts = [])
+    {
+        if (empty($_SESSION['user_id'])) { return ''; }
         if (!is_array($opts)) { $opts = []; } // ancien appel famiTopbar($db, false)
 
         require_once __DIR__ . '/events.php';
@@ -50,26 +108,30 @@ if (!function_exists('famiTopbar')) {
         $self = rtrim($self, '?&');
         $sep = (strpos($self, '?') !== false) ? '&' : '?';
         $lang = function_exists('currentLang') ? currentLang() : 'fr';
-        ?>
+
+        // Tout est pré-échappé : le heredoc ne fait qu'assembler.
+        $backAttr    = htmlspecialchars($back);
+        $backLabelH  = htmlspecialchars($backLabel);
+        $feeAttr     = $backFee ? ' data-fee' : '';
+        $titleBlock  = $title !== '' ? '<div class="rb-title">' . htmlspecialchars($title) . '</div>' : '';
+        $notifTitle  = htmlspecialchars(t('Notifications', 'Meldingen'));
+        $dotHtml     = $n > 0 ? '<span class="rb-dot">' . (int) $n . '</span>' : '';
+        $paramTitle  = htmlspecialchars($isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren'));
+        $homeTitle   = htmlspecialchars(t('Accueil', 'Start'));
+        $logoutTitle = htmlspecialchars(t('Déconnexion', 'Afmelden'));
+        $selfH       = htmlspecialchars($self . $sep);
+        $frActive    = $lang === 'fr' ? ' active' : '';
+        $nlActive    = $lang === 'nl' ? ' active' : '';
+        $modal       = famiLogoutModalHtml();
+
+        return <<<HTML
         <style>
-        /* MÊME STRUCTURE ET MÊMES STYLES QUE LE RUBAN DE L'ACCUEIL (.top-nav / .btn-param /
-           .lang-btn) : retour à gauche, titre au centre, boutons à droite avec FR-NL dessous.
-           Différence voulue : le ruban lui-même est TRANSPARENT (ce sont les pastilles blanches
-           qui portent le contraste), et il reste collé en haut. */
+        /* MÊME STRUCTURE/STYLES que le ruban de l'accueil, mais TRANSPARENT et collé en haut. */
         .fami-rib {
-            width: 100%;
-            box-sizing: border-box;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 14px;
-            padding: 8px 16px;
-            position: sticky;
-            top: 0;
-            z-index: 300;
-            background: transparent;
-            flex: none;
-            align-self: stretch;
+            width: 100%; box-sizing: border-box;
+            display: flex; justify-content: space-between; align-items: center; gap: 14px;
+            padding: 8px 16px; z-index: 300; background: transparent;
+            flex: none; align-self: stretch;
             position: relative;   /* repère pour le titre centré sur la page */
             order: -10;           /* TOUJOURS le premier élément de la page */
         }
@@ -80,8 +142,6 @@ if (!function_exists('famiTopbar')) {
             display: inline-flex; align-items: center; gap: 6px; flex: none; border: none; cursor: pointer; font-family: inherit;
         }
         .fami-rib .rb-back:hover { background: #fff; transform: scale(1.05); }
-        /* Titre centré sur la PAGE (et non entre le bouton retour et les boutons de droite,
-           qui n'ont pas la même largeur : le titre paraissait alors décalé). */
         .fami-rib .rb-title {
             position: absolute; left: 50%; transform: translateX(-50%);
             font-weight: 800; color: #2d5a37; font-size: 1.05rem;
@@ -122,66 +182,32 @@ if (!function_exists('famiTopbar')) {
             .fami-rib .rb-back, .fami-rib .rb-btn { padding: 10px 14px; }
         }
         </style>
-
         <div class="fami-rib">
-            <a href="<?= htmlspecialchars($back) ?>" class="rb-back"<?= $backFee ? ' data-fee' : '' ?>>⬅ <span><?= htmlspecialchars($backLabel) ?></span></a>
-            <div class="rb-title"><?= htmlspecialchars($title) ?></div>
+            <a href="{$backAttr}" class="rb-back"{$feeAttr}>⬅ <span>{$backLabelH}</span></a>
+            {$titleBlock}
             <div class="rb-right">
                 <div class="rb-row">
-                    <a href="events.php" class="rb-btn" title="<?= t('Notifications', 'Meldingen') ?>">🔔<?php if ($n > 0): ?><span class="rb-dot"><?= (int) $n ?></span><?php endif; ?></a>
-                    <a href="parametres.php" class="rb-btn" data-fee title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
-                    <a href="index.php" class="rb-btn" title="<?= t('Accueil', 'Start') ?>">🏠</a>
-                    <button type="button" class="rb-btn rb-out" title="<?= t('Déconnexion', 'Afmelden') ?>" onclick="famiLogoutAsk()">⏻</button>
+                    <a href="events.php" class="rb-btn" title="{$notifTitle}">🔔{$dotHtml}</a>
+                    <a href="parametres.php" class="rb-btn" data-fee title="{$paramTitle}">⚙️</a>
+                    <a href="index.php" class="rb-btn" title="{$homeTitle}">🏠</a>
+                    <button type="button" class="rb-btn rb-out" title="{$logoutTitle}" onclick="famiLogoutAsk()">⏻</button>
                 </div>
                 <div class="rb-row">
-                    <a href="<?= htmlspecialchars($self . $sep) ?>lang=fr" class="rb-lang<?= $lang === 'fr' ? ' active' : '' ?>">FR</a>
-                    <a href="<?= htmlspecialchars($self . $sep) ?>lang=nl" class="rb-lang<?= $lang === 'nl' ? ' active' : '' ?>">NL</a>
+                    <a href="{$selfH}lang=fr" class="rb-lang{$frActive}">FR</a>
+                    <a href="{$selfH}lang=nl" class="rb-lang{$nlActive}">NL</a>
                 </div>
             </div>
         </div>
-
-        <?php famiLogoutModal(); ?>
-        <?php
+        {$modal}
+HTML;
     }
 }
 
-if (!function_exists('famiLogoutModal')) {
-    /**
-     * Modale « Êtes-vous sûr de vouloir vous déconnecter ? ».
-     * Séparée du ruban : l'ACCUEIL garde son propre ruban et n'a besoin que de ça.
-     */
-    function famiLogoutModal()
+if (!function_exists('famiTopbar')) {
+    /** Écho du ruban + marque qu'il a été posé (l'auto-injecteur ne le remettra pas). */
+    function famiTopbar(PDO $db, $opts = [])
     {
-        if (empty($_SESSION['user_id'])) { return; }
-        static $done = false;
-        if ($done) { return; }
-        $done = true;
-        ?>
-        <style>
-        .fami-tb-mask { position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; padding:20px; }
-        .fami-tb-box { background:#fff; border-radius:16px; padding:26px; max-width:400px; width:100%; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,.3); }
-        .fami-tb-box h3 { margin:8px 0 6px; color:#2d5a37; }
-        .fami-tb-box p { color:#5a6b60; margin:0 0 18px; }
-        .fami-tb-box .row { display:flex; gap:10px; justify-content:center; }
-        .fami-tb-box .row a, .fami-tb-box .row button { border:none; border-radius:10px; padding:11px 20px; font-weight:700; cursor:pointer; text-decoration:none; font:inherit; }
-        </style>
-        <div class="fami-tb-mask" id="famiLogoutModal">
-            <div class="fami-tb-box">
-                <div style="font-size:2.2rem;">⏻</div>
-                <h3><?= t('Se déconnecter ?', 'Afmelden?') ?></h3>
-                <p><?= t('Êtes-vous sûr de vouloir vous déconnecter ?', 'Weet je zeker dat je je wilt afmelden?') ?></p>
-                <div class="row">
-                    <button type="button" style="background:#e9ecef; color:#333;" onclick="document.getElementById('famiLogoutModal').style.display='none';"><?= t('Annuler', 'Annuleren') ?></button>
-                    <a href="logout.php" data-fee style="background:#c0392b; color:#fff;"><?= t('Se déconnecter', 'Afmelden') ?></a>
-                </div>
-            </div>
-        </div>
-        <script>
-        function famiLogoutAsk() { document.getElementById('famiLogoutModal').style.display = 'flex'; }
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') { var m = document.getElementById('famiLogoutModal'); if (m) { m.style.display = 'none'; } }
-        });
-        </script>
-        <?php
+        $GLOBALS['__fami_topbar_done'] = true;
+        echo famiTopbarHtml($db, $opts);
     }
 }

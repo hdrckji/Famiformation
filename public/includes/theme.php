@@ -370,6 +370,23 @@ if (!function_exists('famiInjectPageTheme')) {
         require_once __DIR__ . '/fee.php';
         $inject .= feeOverlay();
 
+        // Le RUBAN transparent (retour, notif, param, accueil, déconnexion, langue) sur
+        // TOUTES les pages HTML sauf l'accueil (index.php, qui a son propre ruban) et
+        // sauf les pages qui l'ont déjà affiché elles-mêmes (flag posé par famiTopbar).
+        // On l'ajoute ici pour ne pas devoir modifier chaque page une par une.
+        $scriptBase = strtolower(basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')));
+        if ($scriptBase !== 'index.php' && empty($GLOBALS['__fami_topbar_done'])
+            && isset($GLOBALS['db']) && $GLOBALS['db'] instanceof PDO) {
+            require_once __DIR__ . '/topbar.php';
+            if (function_exists('famiTopbarHtml')) {
+                $tbTitle = '';
+                if (preg_match('#<title>(.*?)</title>#is', $buffer, $mT)) {
+                    $tbTitle = trim(html_entity_decode($mT[1], ENT_QUOTES, 'UTF-8'));
+                }
+                $inject .= famiTopbarHtml($GLOBALS['db'], ['title' => $tbTitle]);
+            }
+        }
+
         // Aperçu de thème actif (admin) : bandeau visible sur TOUTES les pages,
         // avec un bouton pour revenir à la normale d'où qu'on soit.
         if (!empty($_SESSION['theme_preview']) && (($_SESSION['role'] ?? '') === 'admin')) {
