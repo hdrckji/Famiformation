@@ -1088,12 +1088,14 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             var fe = document.querySelector('#contentForm input[name="a_evaluer"]');
             if (fe) { fe.checked = true; }
             document.getElementById('quizLossModal').style.display = 'none';
-            document.getElementById('contentForm').requestSubmit(qlSubmitter);
+            var _f = document.getElementById('contentForm');
+            if (window.feeUpload) { window.feeUpload(_f); } else { _f.requestSubmit(qlSubmitter); }
         }
         function qlDropQuiz() {
             document.getElementById('quizLossModal').style.display = 'none';
             qlConfirmed = true;
-            document.getElementById('contentForm').requestSubmit(qlSubmitter);
+            var _f2 = document.getElementById('contentForm');
+            if (window.feeUpload) { window.feeUpload(_f2); } else { _f2.requestSubmit(qlSubmitter); }
         }
         var qlConfirmed = false;
         var qlSubmitter = null;
@@ -1133,7 +1135,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             document.getElementById('uniConfirmModal').style.display = 'none';
             var f = document.getElementById('contentForm');
             var h = document.createElement('input'); h.type = 'hidden'; h.name = 'uniformize'; h.value = '1'; f.appendChild(h);
-            f.submit();
+            if (window.feeUpload) { window.feeUpload(f); } else { f.submit(); }
         }
         function toggleContentForm() {
             var w = document.getElementById('contentFormWrap');
@@ -1151,7 +1153,7 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
             h.name = 'uniformize';
             h.value = fcPendingUniformize;
             f.appendChild(h);
-            f.submit();
+            if (window.feeUpload) { window.feeUpload(f); } else { f.submit(); }
         }
         </script>
         <?php endif; ?>

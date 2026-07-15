@@ -454,42 +454,36 @@ if (!function_exists('feeOverlay')) {
         return false;
     }
 
+    // UPLOAD UNIFIÉ : envoie le formulaire EN ARRIÈRE-PLAN (XHR) avec le VRAI pourcentage
+    // d'envoi (0→100), puis mode indéterminé pendant que le serveur travaille, puis on va sur
+    // la page renvoyée. Appelable DIRECTEMENT — donc utilisable même quand un bouton de modale
+    // soumet le formulaire en JavaScript (form.submit() ne déclenche PAS l'événement submit,
+    // c'est pour ça que la fée ne sortait pas à l'import).
+    window.feeUpload = function (form) {
+        if (!form || !window.FormData || !window.XMLHttpRequest) {
+            if (form) { HTMLFormElement.prototype.submit.call(form); } // repli : envoi classique
+            return;
+        }
+        window.feeShow({$jsEnvoi});
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action || location.href, true);
+        xhr.upload.onprogress = function (ev) {
+            if (ev.lengthComputable) { window.feeSet((ev.loaded / ev.total) * 100, {$jsEnvoi}); }
+        };
+        xhr.upload.onload = function () { window.feeIndef({$jsMagie}); }; // serveur au travail
+        xhr.onload = function () { window.location = xhr.responseURL || window.location.href; };
+        xhr.onerror = function () { window.feeHide(); alert('Envoi interrompu. Réessaie.'); };
+        xhr.send(new FormData(form));
+    };
+
+    // Interception AUTOMATIQUE : tout formulaire POST avec un fichier passe par feeUpload.
     document.addEventListener('submit', function (e) {
         var form = e.target;
         if (e.defaultPrevented) { return; }            // une validation a déjà refusé
         if (!form || form.method.toLowerCase() !== 'post') { return; }
         if (!aDesFichiers(form)) { return; }           // pas de fichier → chargement normal
-        if (form.hasAttribute && form.hasAttribute('data-nofee')) {
-            // Upload admin (habillage, intro/outro) : soumission NORMALE (pas de XHR), mais
-            // on affiche quand meme la fee pendant l'envoi -> elle reste visible jusqu'au
-            // rechargement de la page. On ne prend PAS la main (pas de preventDefault).
-            window.feeIndef({$jsMagie});
-            return;
-        }
-        if (!window.FormData || !window.XMLHttpRequest) { return; }
-
         e.preventDefault();
-        window.feeShow({$jsEnvoi});
-
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', form.action || location.href, true);
-
-        // L'ENVOI : le navigateur donne le VRAI pourcentage → 0 à 100 %, aucune invention.
-        xhr.upload.onprogress = function (ev) {
-            if (ev.lengthComputable) { window.feeSet((ev.loaded / ev.total) * 100, {$jsEnvoi}); }
-        };
-        // Fichier parti, le serveur travaille (IA) : il ne nous dit RIEN de son avancement.
-        // On passe donc en mode INDÉTERMINÉ plutôt que de faire défiler un faux compteur.
-        xhr.upload.onload = function () { window.feeIndef({$jsMagie}); };
-
-        xhr.onload = function () {
-            location.href = xhr.responseURL || location.href;
-        };
-        // REPLI : si l'envoi par XHR échoue, on refait un envoi CLASSIQUE. L'import ne
-        // doit jamais être casse par l'animation — c'est le coeur du site.
-        xhr.onerror = function () { window.feeHide(); form.submit(); };
-
-        xhr.send(new FormData(form));
+        window.feeUpload(form);
     }, false);
 
     /* ---------- 2) OPÉRATIONS LONGUES (data-fee) : écran d'attente SANS pourcentage ----------

@@ -191,12 +191,11 @@ if (!function_exists('brandingHandlePost')) {
             if (!move_uploaded_file($cf['tmp_name'], $cdir . '/' . $cname)) {
                 $back("❌ Impossible d'enregistrer la vidéo.");
             }
-            // On ENREGISTRE d'abord (l'upload est acquis), on compresse ENSUITE. Si ffmpeg
-            // traine ou echoue, le clip reste enregistre.
+            // On stocke le clip TEL QUEL : aucun ffmpeg dans la requete web (c'est ca qui
+            // faisait « ramer » l'upload). Comme la video de contenu, le fichier est enregistre
+            // directement ; le clip est court, il se lit sans probleme.
             brandingUnlinkKey(brandingClipFor($db, $what, $lang));
             widgetSet($db, $setting, 'divers/branding/' . $cname);
-            require_once __DIR__ . '/compress.php';
-            famiCompressVideoFile($cdir . '/' . $cname);
             $back('🎬 ' . $wlbl . ' ' . $lbl . ' enregistrée — elle sera jouée sur toutes les formations vidéo.');
         }
 
@@ -270,7 +269,7 @@ if (!function_exists('brandingCard')) {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;" id="bdForm-<?= $lang ?>" data-nofee>
+                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;" id="bdForm-<?= $lang ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="lang" value="<?= htmlspecialchars($lang) ?>">
@@ -373,7 +372,7 @@ if (!function_exists('brandingClipsCard')) {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;" data-nofee>
+                <form method="POST" action="parametres.php#createur" enctype="multipart/form-data" style="margin-top:10px;">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="set_branding">
                     <input type="hidden" name="kind" value="clip">
