@@ -18,9 +18,9 @@
 //     La barre n'atteint jamais 95 % « pour faire joli » : elle ralentit, ce qui
 //     est le comportement honnête quand on ne sait pas.
 //
-//  2) NAVIGATION entre pages : la fée apparaît à CHAQUE changement de page (clic sur un
-//     lien interne ou envoi de formulaire qui navigue). Un filet de sécurité la retire
-//     si la navigation n'a finalement pas eu lieu (action annulée, formulaire AJAX…).
+//  2) RETOUR À L'ACCUEIL : la fée apparaît quand un lien ramène à l'accueil (index.php),
+//     quel que soit le bouton. Ailleurs, une navigation ordinaire n'affiche rien (comme
+//     avant). Un filet de sécurité la retire si la navigation n'a pas eu lieu.
 //
 // Le dessin de la fée vient du logo Famiflora (ailes = feuilles du symbole).
 // Autonome : SVG + CSS + JS ici. Injecté sur toutes les pages par config.php.
@@ -621,49 +621,33 @@ if (!function_exists('feeOverlay')) {
         if (a) { window.feeIndef({$jsMagie}); }
     }, true);
 
-    /* ---------- 3) NAVIGATION ORDINAIRE : la fée à CHAQUE changement de page ----------
-       L'utilisateur veut la voir à chaque chargement. On l'affiche donc sur tout clic de
-       lien interne et tout envoi de formulaire QUI NAVIGUE. Garde-fous indispensables :
-       on ne montre rien pour une ancre (#), un lien javascript:/mailto:, un téléchargement,
-       une ouverture dans un nouvel onglet, ou un clic déjà annulé (validation qui bloque) —
-       sinon l'écran resterait figé sur une action qui ne change pas de page. Un filet de
-       sécurité (watchdog) retire la fée si, malgré tout, la navigation n'a pas eu lieu. */
+    /* ---------- 3) RETOUR À L'ACCUEIL : la fée à chaque retour sur l'accueil ----------
+       Ailleurs on garde le comportement d'avant (la fée ne sort que pour les uploads et les
+       opérations longues data-fee). Ici, on la montre UNIQUEMENT quand un lien ramène à
+       l'accueil (index.php) — quel que soit le bouton emprunté (🏠, ⬅ retour, logo…). Un
+       filet de sécurité (watchdog) la retire si, malgré tout, la navigation n'a pas eu lieu. */
     var navWatchdog = null;
     function feeNav() {
         window.feeIndef({$jsMagie});
         if (navWatchdog) { clearTimeout(navWatchdog); }
         navWatchdog = setTimeout(function () { window.feeHide(); }, 15000);
     }
-    function lienNavigable(a) {
+    function versAccueil(a) {
         if (!a) { return false; }
-        if (a.hasAttribute('data-fee')) { return false; }          // déjà géré (sans watchdog)
-        if (a.hasAttribute('download')) { return false; }
         var tgt = a.getAttribute('target');
         if (tgt && tgt !== '' && tgt !== '_self') { return false; } // nouvel onglet
-        var href = a.getAttribute('href');
-        if (!href) { return false; }
-        var low = href.toLowerCase();
-        if (href.charAt(0) === '#') { return false; }
-        if (low.indexOf('javascript:') === 0 || low.indexOf('mailto:') === 0 || low.indexOf('tel:') === 0) { return false; }
         try {
             var u = new URL(a.href, location.href);
-            // simple ancre sur la même page (même chemin + même requête, juste un #) : pas une navigation
-            if (u.origin === location.origin && u.pathname === location.pathname && u.search === location.search && u.hash) { return false; }
-        } catch (e2) {}
-        return true;
+            if (u.origin !== location.origin) { return false; }
+            var p = u.pathname.replace(/\/+$/, '');                 // enlève un / final
+            return p === '' || /(^|\/)index\.php$/.test(p);         // "/", "/index.php", ".../index.php"
+        } catch (e2) { return false; }
     }
     document.addEventListener('click', function (e) {
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
         var a = e.target.closest ? e.target.closest('a[href]') : null;
-        if (!a || !lienNavigable(a)) { return; }
-        feeNav();
-    }, false);
-    document.addEventListener('submit', function (e) {
-        if (e.defaultPrevented) { return; }
-        var f = e.target;
-        if (!f) { return; }
-        if (aDesFichiers(f)) { return; }                           // upload : géré sans watchdog
-        if (f.hasAttribute && f.hasAttribute('data-fee')) { return; } // opération longue : idem
+        if (!a || a.hasAttribute('data-fee')) { return; }           // data-fee : déjà géré plus haut
+        if (!versAccueil(a)) { return; }
         feeNav();
     }, false);
 
