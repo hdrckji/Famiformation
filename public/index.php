@@ -444,7 +444,7 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
             <div style="display:flex; align-items:center; gap:10px;">
                 <a href="events.php" class="btn-param" title="<?= t('Notifications', 'Meldingen') ?>" style="position:relative;">🔔<?php $pc = $isAdmin ? eventsPendingCount($db) : eventsUnseenCount($db, (int) ($_SESSION['user_id'] ?? 0), $role); if ($pc > 0): ?><span style="position:absolute; top:-6px; right:-6px; background:#c0392b; color:#fff; border-radius:999px; font-size:0.7rem; font-weight:800; padding:1px 6px; line-height:1.4;"><?= (int) $pc ?></span><?php endif; ?></a>
-                <a href="parametres.php" class="btn-param" title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
+                <a href="parametres.php" class="btn-param" data-fee title="<?= $isAdmin ? t('Paramètres', 'Instellingen') : t('Préférences', 'Voorkeuren') ?>">⚙️</a>
                 <button type="button" class="btn-logout" onclick="famiLogoutAsk()">⏻ <?= t('Déconnexion', 'Afmelden') ?></button>
             </div>
             <div class="lang-switch">
@@ -649,7 +649,7 @@ if ($wcThemeOn && !empty($siteTheme) && is_array($siteTheme)) {
             <!-- Étape 2 : le formulaire habituel -->
             <div id="qcreate_step2" style="display:none;">
                 <h3 id="qcreate_title"><?= t('Nouveau module', 'Nieuwe module') ?></h3>
-                <form method="POST" action="module_save.php" enctype="multipart/form-data">
+                <form method="POST" action="module_save.php" enctype="multipart/form-data" data-fee>
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="create">
                     <input type="hidden" name="return" value="index.php">

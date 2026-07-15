@@ -2,9 +2,10 @@
 // ============================================================
 // fee.php — LA FÉE FAMIFLORA : animation d'attente.
 //
-// La fée agite sa baguette sur une GRAINE qui pousse au rythme de l'avancement :
-// un nouvel état de la plante tous les 10 % (11 états, de la graine enfouie à la
-// plante en fleur). Le pourcentage s'affiche dessous.
+// La fée agite sa baguette au-dessus d'un pot et fait pousser une plante DIFFÉRENTE
+// toutes les 5 s (fleur, cactus, arbre, fleur bleue, tournesol, arbre à glaces…).
+// Comme le serveur ne renvoie aucun avancement mesurable pendant qu'il travaille,
+// ce petit jardin qui défile occupe l'utilisateur sans prétendre à un pourcentage.
 //
 // DEUX USAGES, ET UNE HONNÊTETÉ DIFFÉRENTE POUR CHACUN :
 //
@@ -142,10 +143,12 @@ SVG;
 
 if (!function_exists('feePlanteSvg')) {
     /**
-     * La GRAINE qui devient une plante. Les 11 états (un par tranche de 10 %) sont
-     * tous dessinés ici, empilés ; le JS n'affiche que celui qui correspond.
-     * Dessiner puis masquer coûte moins cher que de reconstruire du SVG à chaque
-     * étape, et le changement d'état est instantané.
+     * LE POT + UNE COLLECTION DE PLANTES, toutes dessinées empilées mais masquées.
+     * Le serveur ne nous dit RIEN de son avancement (mise en forme IA, quiz…), donc
+     * plutôt qu'un faux pourcentage on OCCUPE l'utilisateur : la fée fait pousser une
+     * plante DIFFÉRENTE toutes les 5 s (le JS en révèle une à la fois, avec un effet
+     * de pousse). Une par une : fleur, cactus, arbre, fleur bleue, tournesol… et, pour
+     * le clin d'œil, un ARBRE À GLACES. Toutes partent du même point (110,172 = terreau).
      */
     function feePlanteSvg()
     {
@@ -165,91 +168,119 @@ if (!function_exists('feePlanteSvg')) {
   <rect x="48" y="150" width="124" height="24" rx="7" fill="#D98A57"/>
   <ellipse cx="110" cy="172" rx="52" ry="9" fill="#5C3A21"/>
 
-  <!-- Les 11 états. `data-p` = pourcentage à partir duquel l'état s'affiche. -->
-  <g class="fee-stage" data-p="0"></g>
-
-  <g class="fee-stage" data-p="10">
-    <ellipse cx="110" cy="166" rx="8" ry="6" fill="#B07A46"/>
-  </g>
-
-  <g class="fee-stage" data-p="20">
-    <ellipse cx="110" cy="164" rx="8.5" ry="6.5" fill="#C08A50"/>
-    <path d="M104 162 L110 166 L116 161" stroke="#6E4523" stroke-width="1.6" fill="none"/>
-  </g>
-
-  <g class="fee-stage" data-p="30">
-    <ellipse cx="110" cy="164" rx="8.5" ry="6.5" fill="#C08A50"/>
-    <path d="M110 160 Q 109 150 112 144" stroke="#8DC63F" stroke-width="4" stroke-linecap="round" fill="none"/>
-  </g>
-
-  <g class="fee-stage" data-p="40">
-    <path d="M110 168 Q 108 148 111 130" stroke="url(#feeTige)" stroke-width="5" stroke-linecap="round" fill="none"/>
-    <path d="M111 132 Q 98 122 96 134 Q 104 140 111 132 Z" fill="#8DC63F"/>
-  </g>
-
-  <g class="fee-stage" data-p="50">
-    <path d="M110 168 Q 108 142 111 118" stroke="url(#feeTige)" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-    <path d="M111 122 Q 92 110 88 126 Q 100 136 111 122 Z" fill="#8DC63F"/>
-    <path d="M111 128 Q 130 116 134 132 Q 122 142 111 128 Z" fill="#A9D454"/>
-  </g>
-
-  <g class="fee-stage" data-p="60">
-    <path d="M110 168 Q 107 134 111 104" stroke="url(#feeTige)" stroke-width="6" stroke-linecap="round" fill="none"/>
-    <path d="M110 110 Q 86 96 80 116 Q 96 128 110 110 Z" fill="#8DC63F"/>
-    <path d="M111 118 Q 136 104 142 124 Q 125 136 111 118 Z" fill="#A9D454"/>
-    <path d="M109 140 Q 90 132 88 146 Q 100 152 109 140 Z" fill="#2E7D3B"/>
-  </g>
-
-  <g class="fee-stage" data-p="70">
-    <path d="M110 168 Q 106 128 111 92" stroke="url(#feeTige)" stroke-width="6.5" stroke-linecap="round" fill="none"/>
-    <path d="M110 98 Q 82 82 76 104 Q 94 118 110 98 Z" fill="#8DC63F"/>
-    <path d="M111 108 Q 140 92 146 114 Q 127 128 111 108 Z" fill="#A9D454"/>
-    <path d="M109 134 Q 84 124 82 142 Q 98 150 109 134 Z" fill="#2E7D3B"/>
-    <path d="M112 142 Q 137 132 139 150 Q 123 158 112 142 Z" fill="#2E7D3B"/>
-  </g>
-
-  <g class="fee-stage" data-p="80">
-    <path d="M110 168 Q 106 122 111 82" stroke="url(#feeTige)" stroke-width="7" stroke-linecap="round" fill="none"/>
-    <path d="M110 96 Q 80 78 74 102 Q 93 118 110 96 Z" fill="#8DC63F"/>
-    <path d="M111 106 Q 142 88 148 112 Q 128 128 111 106 Z" fill="#A9D454"/>
-    <path d="M109 134 Q 82 122 80 142 Q 97 151 109 134 Z" fill="#2E7D3B"/>
-    <path d="M112 142 Q 139 130 141 150 Q 124 159 112 142 Z" fill="#2E7D3B"/>
-    <ellipse cx="111" cy="74" rx="11" ry="14" fill="#7FB539"/>
-    <path d="M111 60 Q 104 68 106 78" stroke="#5E9430" stroke-width="2" fill="none"/>
-  </g>
-
-  <g class="fee-stage" data-p="90">
-    <path d="M110 168 Q 106 120 111 78" stroke="url(#feeTige)" stroke-width="7" stroke-linecap="round" fill="none"/>
-    <path d="M110 96 Q 80 78 74 102 Q 93 118 110 96 Z" fill="#8DC63F"/>
-    <path d="M111 106 Q 142 88 148 112 Q 128 128 111 106 Z" fill="#A9D454"/>
-    <path d="M109 134 Q 82 122 80 142 Q 97 151 109 134 Z" fill="#2E7D3B"/>
-    <path d="M112 142 Q 139 130 141 150 Q 124 159 112 142 Z" fill="#2E7D3B"/>
-    <g transform="translate(111,68)">
-      <ellipse cx="-13" cy="0" rx="10" ry="7" fill="#F2A9C4"/>
-      <ellipse cx="13" cy="0" rx="10" ry="7" fill="#F2A9C4"/>
-      <ellipse cx="0" cy="-11" rx="7" ry="10" fill="#F6BDD2"/>
-      <circle r="6" fill="#E8C46B"/>
-    </g>
-  </g>
-
-  <!-- 100 % : la plante en pleine fleur -->
-  <g class="fee-stage" data-p="100">
-    <path d="M110 168 Q 106 118 111 74" stroke="url(#feeTige)" stroke-width="7.5" stroke-linecap="round" fill="none"/>
-    <path d="M110 94 Q 78 74 72 100 Q 92 118 110 94 Z" fill="#8DC63F"/>
-    <path d="M111 104 Q 144 84 150 110 Q 129 128 111 104 Z" fill="#A9D454"/>
-    <path d="M109 132 Q 80 118 78 140 Q 96 151 109 132 Z" fill="#2E7D3B"/>
-    <path d="M112 140 Q 141 126 143 148 Q 125 159 112 140 Z" fill="#2E7D3B"/>
-    <g class="fee-fleur" transform="translate(111,60)">
+  <!-- 1. FLEUR ROSE -->
+  <g class="fee-plant">
+    <path d="M110 170 Q 106 118 111 74" stroke="url(#feeTige)" stroke-width="7.5" stroke-linecap="round" fill="none"/>
+    <path d="M110 96 Q 78 76 72 102 Q 92 120 110 96 Z" fill="#8DC63F"/>
+    <path d="M111 108 Q 144 88 150 114 Q 129 132 111 108 Z" fill="#A9D454"/>
+    <g transform="translate(111,62)">
       <ellipse cx="-17" cy="0" rx="13" ry="9" fill="#F2A9C4"/>
       <ellipse cx="17" cy="0" rx="13" ry="9" fill="#F2A9C4"/>
       <ellipse cx="0" cy="-16" rx="9" ry="13" fill="#F6BDD2"/>
       <ellipse cx="0" cy="16" rx="9" ry="13" fill="#F6BDD2"/>
-      <ellipse cx="-12" cy="-12" rx="9" ry="9" fill="#F5B6CD" transform="rotate(-45)"/>
-      <circle r="9" fill="#E8C46B"/>
-      <circle r="4" fill="#D0A03F"/>
+      <ellipse cx="-12" cy="-12" rx="9" ry="9" fill="#F5B6CD"/>
+      <ellipse cx="12" cy="12" rx="9" ry="9" fill="#F5B6CD"/>
+      <circle r="9" fill="#E8C46B"/><circle r="4" fill="#D0A03F"/>
     </g>
-    <circle cx="150" cy="60" r="3.5" fill="#B5D95A"/>
-    <circle cx="70" cy="76" r="3" fill="#B5D95A"/>
+  </g>
+
+  <!-- 2. CACTUS -->
+  <g class="fee-plant">
+    <rect x="97" y="90" width="26" height="82" rx="13" fill="#4E9E52"/>
+    <path d="M97 126 Q 80 126 80 110 Q 80 102 87 102" stroke="#4E9E52" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <path d="M123 138 Q 140 138 140 122 Q 140 114 133 114" stroke="#4E9E52" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <g stroke="#2E6B38" stroke-width="1.6" stroke-linecap="round">
+      <path d="M110 104 v6 M110 124 v6 M110 144 v6 M102 114 h-4 M118 114 h4 M102 134 h-4 M118 134 h4"/>
+    </g>
+    <ellipse cx="110" cy="84" rx="10" ry="7.5" fill="#F26E7E"/>
+    <ellipse cx="110" cy="84" rx="4" ry="3" fill="#FBD0A8"/>
+  </g>
+
+  <!-- 3. ARBRE -->
+  <g class="fee-plant">
+    <rect x="103" y="106" width="14" height="64" rx="4" fill="#8A5B36"/>
+    <circle cx="110" cy="84" r="30" fill="#2E7D3B"/>
+    <circle cx="88" cy="98" r="20" fill="#3C9147"/>
+    <circle cx="132" cy="98" r="20" fill="#3C9147"/>
+    <circle cx="110" cy="96" r="24" fill="#5EA843"/>
+    <circle cx="98" cy="82" r="5" fill="#F2A9C4"/>
+    <circle cx="124" cy="90" r="5" fill="#F6BDD2"/>
+  </g>
+
+  <!-- 4. FLEUR BLEUE -->
+  <g class="fee-plant">
+    <path d="M110 170 Q 106 120 111 78" stroke="url(#feeTige)" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M110 100 Q 80 82 74 106 Q 93 122 110 100 Z" fill="#8DC63F"/>
+    <path d="M111 112 Q 140 94 146 118 Q 127 134 111 112 Z" fill="#A9D454"/>
+    <g transform="translate(111,66)">
+      <ellipse cx="-16" cy="0" rx="12" ry="8" fill="#6FA8DC"/>
+      <ellipse cx="16" cy="0" rx="12" ry="8" fill="#6FA8DC"/>
+      <ellipse cx="0" cy="-15" rx="8" ry="12" fill="#8EC5F0"/>
+      <ellipse cx="0" cy="15" rx="8" ry="12" fill="#8EC5F0"/>
+      <circle r="8" fill="#F5EFDF"/><circle r="3.5" fill="#E8C46B"/>
+    </g>
+  </g>
+
+  <!-- 5. TOURNESOL -->
+  <g class="fee-plant">
+    <path d="M110 170 Q 108 122 111 76" stroke="url(#feeTige)" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M110 116 Q 82 104 78 126 Q 96 136 110 116 Z" fill="#3C9147"/>
+    <path d="M112 126 Q 140 116 142 136 Q 124 144 112 126 Z" fill="#3C9147"/>
+    <g transform="translate(111,64)" fill="#F4B41A">
+      <ellipse cx="0" cy="-18" rx="6" ry="12"/>
+      <ellipse cx="0" cy="18" rx="6" ry="12"/>
+      <ellipse cx="-18" cy="0" rx="12" ry="6"/>
+      <ellipse cx="18" cy="0" rx="12" ry="6"/>
+      <ellipse cx="-13" cy="-13" rx="9" ry="7"/>
+      <ellipse cx="13" cy="-13" rx="9" ry="7"/>
+      <ellipse cx="-13" cy="13" rx="9" ry="7"/>
+      <ellipse cx="13" cy="13" rx="9" ry="7"/>
+    </g>
+    <circle cx="111" cy="64" r="11" fill="#6E4523"/>
+  </g>
+
+  <!-- 6. ARBRE À GLACES (le clin d'œil) -->
+  <g class="fee-plant">
+    <rect x="103" y="108" width="14" height="62" rx="4" fill="#8A5B36"/>
+    <circle cx="110" cy="82" r="32" fill="#2E7D3B"/>
+    <circle cx="88" cy="94" r="19" fill="#3C9147"/>
+    <circle cx="132" cy="94" r="19" fill="#3C9147"/>
+    <g transform="translate(88,96)">
+      <line x1="0" y1="-14" x2="0" y2="2" stroke="#C98A4B" stroke-width="3"/>
+      <rect x="-8" y="-2" width="16" height="22" rx="7" fill="#F58AB0"/>
+      <rect x="-2" y="16" width="4" height="10" rx="2" fill="#C98A4B"/>
+    </g>
+    <g transform="translate(132,96)">
+      <line x1="0" y1="-14" x2="0" y2="2" stroke="#C98A4B" stroke-width="3"/>
+      <rect x="-8" y="-2" width="16" height="22" rx="7" fill="#6FC5E0"/>
+      <rect x="-2" y="16" width="4" height="10" rx="2" fill="#C98A4B"/>
+    </g>
+    <g transform="translate(110,102)">
+      <circle cx="0" cy="0" r="9" fill="#F7C6D9"/>
+      <circle cx="-4" cy="-3" r="6" fill="#FBE0EA"/>
+      <path d="M-8 4 L 8 4 L 0 22 Z" fill="#E0A24B"/>
+      <path d="M-4 8 L 0 16 M3 8 L -1 15" stroke="#B97C30" stroke-width="1"/>
+    </g>
+  </g>
+
+  <!-- 7. CHAMPIGNON -->
+  <g class="fee-plant">
+    <path d="M100 170 Q 97 142 104 124 L 118 124 Q 125 142 122 170 Z" fill="#F3E9D6"/>
+    <path d="M72 126 Q 82 86 111 86 Q 140 86 150 126 Q 111 138 72 126 Z" fill="#D8483B"/>
+    <circle cx="96" cy="110" r="5" fill="#FBEFE0"/>
+    <circle cx="120" cy="104" r="6" fill="#FBEFE0"/>
+    <circle cx="132" cy="118" r="4" fill="#FBEFE0"/>
+    <circle cx="108" cy="120" r="4.5" fill="#FBEFE0"/>
+    <path d="M104 150 q 6 4 12 0" stroke="#D8B89A" stroke-width="1.5" fill="none"/>
+  </g>
+
+  <!-- 8. TULIPE -->
+  <g class="fee-plant">
+    <path d="M110 170 Q 108 128 110 96" stroke="url(#feeTige)" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+    <path d="M110 130 Q 84 118 82 90 Q 100 104 110 130 Z" fill="#5EA843"/>
+    <path d="M110 122 Q 138 112 140 86 Q 120 100 110 122 Z" fill="#7FB539"/>
+    <path d="M92 92 Q 92 66 110 60 Q 128 66 128 92 Q 118 100 110 92 Q 102 100 92 92 Z" fill="#E4572E"/>
+    <path d="M110 60 Q 110 78 110 92" stroke="#C63D1B" stroke-width="1.5" fill="none"/>
   </g>
 </svg>
 SVG;
@@ -332,11 +363,12 @@ if (!function_exists('feeOverlay')) {
 @keyframes feeCligne { 0%,94%,100% { transform:scaleY(1); } 97% { transform:scaleY(.1); } }
 
 .fee-plante { width:min(160px, 30vw); height:auto; display:block; }
-.fee-stage { display:none; }
-.fee-stage.on { display:block; animation:feePousse .5s cubic-bezier(.2,1.5,.4,1); transform-origin:110px 168px; }
-@keyframes feePousse { from { transform:scale(.5); opacity:0; } }
-.fee-fleur { animation:feeFleur 2.4s ease-in-out infinite; }
-@keyframes feeFleur { 0%,100% { transform:translate(111px,60px) scale(1); } 50% { transform:translate(111px,60px) scale(1.08); } }
+/* Une seule plante visible à la fois. Elle SURGIT du terreau (pousse), puis se
+   balance doucement jusqu'à ce que la suivante la remplace (5 s plus tard). */
+.fee-plant { display:none; }
+.fee-plant.on { display:block; animation:feePousse .55s cubic-bezier(.2,1.6,.4,1), feeBalance 3.2s ease-in-out .55s infinite; transform-origin:110px 172px; }
+@keyframes feePousse { from { transform:scale(.15) translateY(20px); opacity:0; } to { transform:scale(1) translateY(0); opacity:1; } }
+@keyframes feeBalance { 0%,100% { transform:rotate(-1.5deg); } 50% { transform:rotate(1.5deg); } }
 
 /* Les étincelles partent de la baguette vers la graine, au rythme du coup. */
 .fee-etincelles { position:absolute; left:52%; top:34%; width:1px; height:1px; }
@@ -368,13 +400,13 @@ if (!function_exists('feeOverlay')) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .fee-perso, .fee-ailes, .fee-bras, .fee-halo, .fee-yeux, .fee-fleur { animation:none; }
+    .fee-perso, .fee-ailes, .fee-bras, .fee-halo, .fee-yeux, .fee-plant.on { animation:none; }
 }
 </style>
 <script>
 (function () {
     var back, pctEl, barEl, txtEl, etEl;
-    var pct = 0, creep = null, sparks = null;
+    var pct = 0, sparks = null, jardin = null, plantIdx = -1;
 
     function els() {
         if (!back) {
@@ -387,13 +419,25 @@ if (!function_exists('feeOverlay')) {
         return back;
     }
 
-    // Un état de plante TOUS LES 10 % : on prend le palier inférieur.
-    function stage(p) {
-        var pal = Math.min(100, Math.floor(p / 10) * 10);
-        document.querySelectorAll('.fee-stage').forEach(function (g) {
-            var on = (parseInt(g.getAttribute('data-p'), 10) === pal);
-            if (on !== g.classList.contains('on')) { g.classList.toggle('on', on); }
-        });
+    // LE DÉFILÉ DE PLANTES : la fée fait pousser une plante différente toutes les 5 s
+    // pour occuper l'attente (le serveur ne renvoie aucun avancement mesurable). On
+    // révèle une seule plante à la fois, dans l'ordre où elles sont dessinées.
+    function poussePlante() {
+        var all = document.querySelectorAll('.fee-plant');
+        if (!all.length) { return; }
+        all.forEach(function (g) { g.classList.remove('on'); });
+        plantIdx = (plantIdx + 1) % all.length;
+        all[plantIdx].classList.add('on');
+    }
+    function demarreJardin() {
+        if (jardin) { return; }
+        plantIdx = -1;
+        poussePlante();                              // la première pousse tout de suite
+        jardin = setInterval(poussePlante, 5000);    // puis une nouvelle toutes les 5 s
+    }
+    function arreteJardin() {
+        if (jardin) { clearInterval(jardin); jardin = null; }
+        document.querySelectorAll('.fee-plant').forEach(function (g) { g.classList.remove('on'); });
     }
 
     window.feeSet = function (p, txt) {
@@ -402,7 +446,6 @@ if (!function_exists('feeOverlay')) {
         pctEl.textContent = Math.round(pct) + ' %';
         barEl.style.width = pct + '%';
         if (txt) { txtEl.textContent = txt; }
-        stage(pct);
     };
 
     window.feeShow = function (txt) {
@@ -410,7 +453,8 @@ if (!function_exists('feeOverlay')) {
         back.classList.add('on');
         back.setAttribute('aria-hidden', 'false');
         window.feeSet(0, txt || {$jsAttente});
-        // Étincelles : synchronisées sur le coup de baguette (toutes les 2 s).
+        demarreJardin();                             // les plantes se relaient à l'écran
+        // Étincelles : synchronisées sur le coup de baguette.
         if (!sparks) { sparks = setInterval(etincelle, 700); }
     };
 
@@ -419,7 +463,7 @@ if (!function_exists('feeOverlay')) {
         if (!els()) { return; }
         back.classList.remove('on');
         back.setAttribute('aria-hidden', 'true');
-        if (creep) { clearInterval(creep); creep = null; }
+        arreteJardin();
         if (sparks) { clearInterval(sparks); sparks = null; }
     };
 

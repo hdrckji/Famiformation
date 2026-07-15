@@ -426,6 +426,9 @@ function veBuild() {
 }
 function veSubmit() {
     document.getElementById('veJson').value = JSON.stringify({ blocks: veBuild() });
+    // submit() programmatique NE déclenche PAS l'événement submit → la fée ne sortirait
+    // pas toute seule. On l'affiche donc à la main avant d'envoyer la relecture.
+    if (window.feeIndef) { window.feeIndef(); }
     document.getElementById('veForm').submit();
 }
 // Verrou d'édition : la page démarre en LECTURE SEULE ; « Modifier » déverrouille.

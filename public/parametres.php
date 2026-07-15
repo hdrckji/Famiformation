@@ -1119,7 +1119,7 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
         </div>
         <div id="create_step2" style="display:none;">
         <h3 id="create_title">Nouveau module</h3>
-        <form method="POST" action="module_save.php" enctype="multipart/form-data">
+        <form method="POST" action="module_save.php" enctype="multipart/form-data" data-fee>
             <?= csrfField() ?>
             <input type="hidden" name="action" value="create">
             <input type="hidden" name="return" value="parametres.php">
