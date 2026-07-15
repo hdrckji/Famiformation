@@ -209,16 +209,21 @@ if (!function_exists('famiSttRun')) {
             : 'https://api.openai.com/v1/audio/transcriptions';
         $model = ($provider === 'groq') ? 'whisper-large-v3' : 'whisper-1';
 
+        // AUTO : on laisse Whisper DÉTECTER la langue parlée. Il faut alors « verbose_json »
+        // (qui renvoie la langue détectée + les segments horodatés), et on reconstruit le SRT.
+        $auto = ($lang === '' || $lang === 'auto');
+        $fields = [
+            'file' => new CURLFile($audioAbs),
+            'model' => $model,
+            'response_format' => $auto ? 'verbose_json' : 'srt',
+        ];
+        if (!$auto) { $fields['language'] = $lang; } // langue imposée : format SRT direct
+
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key],
-            CURLOPT_POSTFIELDS => [
-                'file' => new CURLFile($audioAbs),
-                'model' => $model,
-                'response_format' => 'srt', // ← timecodes indispensables aux sous-titres
-                'language' => $lang,
-            ],
+            CURLOPT_POSTFIELDS => $fields,
             CURLOPT_TIMEOUT => 900,
         ]);
         $resp = curl_exec($ch);
@@ -232,7 +237,18 @@ if (!function_exists('famiSttRun')) {
                 'error' => 'Transcription HTTP ' . $code . ' ' . $cErr . ' ' . substr((string) $resp, 0, 200),
             ];
         }
-        $srt = trim((string) $resp);
+        $detected = ($lang === 'nl') ? 'nl' : (($lang === 'fr') ? 'fr' : '');
+        if ($auto) {
+            // verbose_json → { language, segments:[{start,end,text}] }. On batit le SRT nous-memes.
+            $j = json_decode((string) $resp, true);
+            $srt = is_array($j) ? famiSegmentsToSrt($j['segments'] ?? []) : '';
+            $L = is_array($j) ? strtolower((string) ($j['language'] ?? '')) : '';
+            // Whisper renvoie un nom complet (« dutch », « french »…) ou un code.
+            if (strpos($L, 'dutch') !== false || strpos($L, 'nederlands') !== false || $L === 'nl') { $detected = 'nl'; }
+            else { $detected = 'fr'; } // par defaut le francais (langue la plus courante ici)
+        } else {
+            $srt = trim((string) $resp);
+        }
         if ($srt === '') {
             return ['ok' => false, 'srt' => '', 'error' => 'Transcription vide.'];
         }
@@ -255,7 +271,7 @@ if (!function_exists('famiSttRun')) {
             );
         }
 
-        return ['ok' => true, 'srt' => $srt, 'error' => ''];
+        return ['ok' => true, 'srt' => $srt, 'lang' => $detected, 'error' => ''];
     }
 }
 
@@ -357,6 +373,22 @@ if (!function_exists('famiSrtTranslateToNl')) {
      * Réutilise le traducteur en lot de i18n_nl.php (extraction → traduction →
      * réinjection), donc aucun risque de décalage des séquences.
      */
+    function famiSrtTranslate($db, $srt, $from = 'fr', $to = 'nl')
+    {
+        $cues = famiSrtParse($srt);
+        if (empty($cues)) { return ['ok' => false, 'srt' => '', 'error' => 'SRT vide']; }
+        if (!function_exists('aiTranslateStringsToNl')) { require_once __DIR__ . '/i18n_nl.php'; }
+        $src = [];
+        foreach ($cues as $c) { $src[] = $c['text']; }
+        $tr = aiTranslateStringsToNl($db, $src, $from, $to);
+        if (!$tr['ok']) { return ['ok' => false, 'srt' => '', 'error' => $tr['error']]; }
+        foreach ($cues as $i => $c) {
+            if (isset($tr['items'][$i])) { $cues[$i]['text'] = (string) $tr['items'][$i]; }
+        }
+        return ['ok' => true, 'srt' => famiSrtBuild($cues), 'error' => ''];
+    }
+
+    /** Compatibilite : FR -> NL. */
     function famiSrtTranslateToNl($db, $srt)
     {
         $cues = famiSrtParse($srt);
@@ -383,6 +415,30 @@ if (!function_exists('famiSrtTranslateToNl')) {
     }
 }
 
+if (!function_exists('famiSegmentsToSrt')) {
+    /** Construit un SRT a partir des segments verbose_json de Whisper. */
+    function famiSegmentsToSrt(array $segments)
+    {
+        $fmt = function ($sec) {
+            $sec = max(0.0, (float) $sec);
+            $h = (int) floor($sec / 3600);
+            $m = (int) floor(($sec - $h * 3600) / 60);
+            $s = (int) floor($sec - $h * 3600 - $m * 60);
+            $ms = (int) round(($sec - floor($sec)) * 1000);
+            return sprintf('%02d:%02d:%02d,%03d', $h, $m, $s, $ms);
+        };
+        $out = '';
+        $i = 1;
+        foreach ($segments as $seg) {
+            $txt = trim((string) ($seg['text'] ?? ''));
+            if ($txt === '') { continue; }
+            $out .= $i . "\n" . $fmt($seg['start'] ?? 0) . ' --> ' . $fmt($seg['end'] ?? 0) . "\n" . $txt . "\n\n";
+            $i++;
+        }
+        return trim($out);
+    }
+}
+
 if (!function_exists('famiVideoSubtitles')) {
     /**
      * PIPELINE COMPLET pour une vidéo.
@@ -406,7 +462,11 @@ if (!function_exists('famiVideoSubtitles')) {
             }
         }
 
-        // 2) Sinon : transcription automatique (l'utilisateur n'a RIEN à faire).
+        // Langue de la piste SOURCE. Un .srt fourni : on ne peut pas la deviner -> francais par
+        // defaut (le teamcoach qui fournit un .srt connait sa langue). Whisper, lui, la detecte.
+        $srcLang = 'fr';
+
+        // 2) Sinon : transcription automatique — Whisper DETECTE la langue parlee.
         if ($srtFr === '') {
             if (!famiSttReady()) {
                 return [
@@ -421,35 +481,41 @@ if (!function_exists('famiVideoSubtitles')) {
                     'error' => "Aucun son à transcrire (vidéo muette ou silencieuse) — rien n'a été facturé.",
                 ];
             }
-            $r = famiSttRun($audio, 'fr', $db); // $db → le coût entre dans le compteur API
-            @unlink($audio); // on ne garde pas l'audio temporaire
+            $r = famiSttRun($audio, 'auto', $db); // 'auto' -> detection de la langue parlee
+            @unlink($audio);
             if (!$r['ok']) {
                 return [
                     'ok' => false, 'srt_fr' => '', 'srt_nl' => '', 'text' => '', 'source' => 'none',
                     'error' => $r['error'],
                 ];
             }
-            $srtFr = $r['srt'];
+            $srtFr = $r['srt'];                       // (variable historique : contient la piste SOURCE)
+            $srcLang = ($r['lang'] ?? 'fr') === 'nl' ? 'nl' : 'fr';
             $source = 'whisper';
         }
 
-        // 3) Version néerlandaise (sous-titres bilingues) — appel IA, donc COÛTEUX en temps.
-        //    À l'import on passe $withNl = false : on ne produit que le FR (gratuit, instantané)
-        //    et la piste NL est générée plus tard, à la validation finale (famiEnsureNlSubtitles).
-        $srtNl = '';
+        // La piste SOURCE va dans le bon emplacement (fr ou nl) selon la langue detectee.
+        $srtSrc = $srtFr;
+        $sub = ['fr' => '', 'nl' => ''];
+        $sub[$srcLang] = $srtSrc;
+
+        // 3) Traduction vers l'AUTRE langue (bilingue). Coûteux -> a l'import $withNl = false ;
+        //    la 2e piste est generee a la validation finale (famiEnsureOtherSubtitles).
         $errNl = '';
+        $dstLang = ($srcLang === 'nl') ? 'fr' : 'nl';
         if ($withNl) {
-            $tr = famiSrtTranslateToNl($db, $srtFr);
-            if ($tr['ok']) { $srtNl = $tr['srt']; } else { $errNl = (string) $tr['error']; }
+            $tr = famiSrtTranslate($db, $srtSrc, $srcLang, $dstLang);
+            if ($tr['ok']) { $sub[$dstLang] = $tr['srt']; } else { $errNl = (string) $tr['error']; }
         }
 
         return [
             'ok' => true,
-            'srt_fr' => $srtFr,
-            'srt_nl' => $srtNl,
-            'text' => famiSrtToText($srtFr), // alimente le quiz
+            'srt_fr' => $sub['fr'],
+            'srt_nl' => $sub['nl'],
+            'lang' => $srcLang,                       // langue de la piste source (= langue parlee)
+            'text' => famiSrtToText($srtSrc),          // alimente le quiz (dans la langue parlee)
             'source' => $source,
-            'error' => ($withNl && $srtNl === '') ? 'Sous-titres NL non générés (' . $errNl . ')' : '',
+            'error' => ($withNl && $sub[$dstLang] === '') ? 'Sous-titres traduits non générés (' . $errNl . ')' : '',
         ];
     }
 }
@@ -477,18 +543,21 @@ if (!function_exists('famiPersistSubtitles')) {
             && @file_put_contents($dir . '/' . $stem . '_nl.vtt', famiSrtToVtt($subs['srt_nl'])) !== false) {
             $nlKey = 'modules/subs/' . $stem . '_nl.vtt';
         }
+        $srcLang = (($subs['lang'] ?? 'fr') === 'nl') ? 'nl' : 'fr';
         try {
-            $db->prepare("UPDATE modules SET sub_fr_path = ?, sub_nl_path = ?, transcript = ?, sub_status = 'ready' WHERE id = ?")
+            $db->prepare("UPDATE modules SET sub_fr_path = ?, sub_nl_path = ?, transcript = ?, source_lang = ?, sub_status = 'ready' WHERE id = ?")
                ->execute([
                    $frKey !== '' ? $frKey : null,
                    $nlKey !== '' ? $nlKey : null,
                    trim((string) ($subs['text'] ?? '')) !== '' ? $subs['text'] : null,
+                   $srcLang,
                    (int) $moduleId,
                ]);
         } catch (Exception $e) {
             return false;
         }
-        return $frKey !== '';
+        // Au moins UNE piste (la source) doit avoir ete ecrite.
+        return ($frKey !== '' || $nlKey !== '');
     }
 }
 
@@ -501,36 +570,46 @@ if (!function_exists('famiEnsureNlSubtitles')) {
      */
     function famiEnsureNlSubtitles(PDO $db, $videoModuleId)
     {
+        // Generalise : on complete la piste MANQUANTE en traduisant depuis celle qui existe,
+        // dans le BON SENS. Une video parlee en neerlandais a sa piste NL d'origine et sa
+        // piste FR traduite ; une video francaise, l'inverse. (Le nom historique est conserve.)
         $videoModuleId = (int) $videoModuleId;
         if ($videoModuleId <= 0) { return false; }
         try {
-            $st = $db->prepare("SELECT sub_fr_path, sub_nl_path FROM modules WHERE id = ? LIMIT 1");
+            $st = $db->prepare("SELECT sub_fr_path, sub_nl_path, source_lang FROM modules WHERE id = ? LIMIT 1");
             $st->execute([$videoModuleId]);
             $r = $st->fetch(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             return false;
         }
         if (!$r) { return false; }
-        if (trim((string) ($r['sub_nl_path'] ?? '')) !== '') { return true; } // déjà là
+
         $frKey = trim((string) ($r['sub_fr_path'] ?? ''));
-        if ($frKey === '') { return false; }
+        $nlKey = trim((string) ($r['sub_nl_path'] ?? ''));
+        if ($frKey !== '' && $nlKey !== '') { return true; } // les deux pistes existent deja
+
+        // La langue SOURCE = celle de la piste presente (ou source_lang par securite).
+        if ($frKey !== '' && $nlKey === '') { $from = 'fr'; $to = 'nl'; $srcKey = $frKey; }
+        elseif ($nlKey !== '' && $frKey === '') { $from = 'nl'; $to = 'fr'; $srcKey = $nlKey; }
+        else { return false; } // aucune piste : rien a traduire
 
         $base = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/../uploads');
-        $frAbs = $base . '/' . $frKey;
-        if (!is_file($frAbs)) { return false; }
-        $frVtt = @file_get_contents($frAbs);
-        if ($frVtt === false || trim((string) $frVtt) === '') { return false; }
+        $srcAbs = $base . '/' . $srcKey;
+        if (!is_file($srcAbs)) { return false; }
+        $srcVtt = @file_get_contents($srcAbs);
+        if ($srcVtt === false || trim((string) $srcVtt) === '') { return false; }
 
-        // famiSrtParse gère aussi le WebVTT (il ignore l'entête et garde les timecodes).
-        $tr = famiSrtTranslateToNl($db, (string) $frVtt);
+        // famiSrtParse gere aussi le WebVTT (entete ignore, timecodes conserves).
+        $tr = famiSrtTranslate($db, (string) $srcVtt, $from, $to);
         if (empty($tr['ok']) || trim((string) $tr['srt']) === '') { return false; }
 
         $dir = $base . '/modules/subs';
         if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
-        $name = 'sub_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '_nl.vtt';
+        $name = 'sub_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '_' . $to . '.vtt';
         if (@file_put_contents($dir . '/' . $name, famiSrtToVtt($tr['srt'])) === false) { return false; }
+        $col = ($to === 'nl') ? 'sub_nl_path' : 'sub_fr_path';
         try {
-            $db->prepare("UPDATE modules SET sub_nl_path = ? WHERE id = ?")
+            $db->prepare("UPDATE modules SET $col = ? WHERE id = ?")
                ->execute(['modules/subs/' . $name, $videoModuleId]);
         } catch (Exception $e) {
             return false;
