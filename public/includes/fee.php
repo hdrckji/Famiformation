@@ -152,7 +152,23 @@ if (!function_exists('feePlanteSvg')) {
      */
     function feePlanteSvg()
     {
-        return <<<'SVG'
+        // On réutilise le VRAI ticket glace (celui offert sur le widget quand il fait
+        // ≥ 30 °C ou le dimanche). On enlève son <svg> englobant et son <defs> (le dégradé
+        // est remis une fois dans le <defs> ci-dessous) pour pouvoir le poser, réduit,
+        // pendu aux branches de l'arbre à tickets. Ainsi il reste FIDÈLE à ton ticket.
+        $tk = '';
+        $glace = __DIR__ . '/glace.php';
+        if (is_file($glace)) {
+            require_once $glace;
+            if (function_exists('glaceTicketSvg')) {
+                $tk = glaceTicketSvg();
+                $tk = preg_replace('#</?svg\b[^>]*>#i', '', $tk);   // retire <svg …> et </svg>
+                $tk = preg_replace('#<defs>.*?</defs>#is', '', $tk); // retire son <defs>
+                $tk = trim((string) $tk);
+            }
+        }
+
+        return <<<SVG
 <svg class="fee-plante" viewBox="0 0 220 260" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="feePot" x1="0" y1="0" x2="0" y2="1">
@@ -160,6 +176,9 @@ if (!function_exists('feePlanteSvg')) {
     </linearGradient>
     <linearGradient id="feeTige" x1="0" y1="1" x2="0" y2="0">
       <stop offset="0" stop-color="#2E7D3B"/><stop offset="1" stop-color="#8DC63F"/>
+    </linearGradient>
+    <linearGradient id="glaceTg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b9bf5"/><stop offset="1" stop-color="#1e40af"/>
     </linearGradient>
   </defs>
 
@@ -184,7 +203,24 @@ if (!function_exists('feePlanteSvg')) {
     </g>
   </g>
 
-  <!-- 2. CACTUS -->
+  <!-- 2. ARBRE À TICKETS GLACE : grand arbre d'où pendent LES VRAIS tickets glace. -->
+  <g class="fee-plant">
+    <rect x="102" y="98" width="16" height="72" rx="5" fill="#8A5B36"/>
+    <circle cx="110" cy="60" r="40" fill="#2E7D3B"/>
+    <circle cx="76" cy="80" r="27" fill="#3C9147"/>
+    <circle cx="144" cy="80" r="27" fill="#3C9147"/>
+    <circle cx="110" cy="78" r="31" fill="#4E9E52"/>
+    <!-- ficelles -->
+    <line x1="71" y1="66" x2="71" y2="83" stroke="#6E4A2B" stroke-width="1.5"/>
+    <line x1="145" y1="70" x2="145" y2="87" stroke="#6E4A2B" stroke-width="1.5"/>
+    <line x1="109" y1="92" x2="109" y2="107" stroke="#6E4A2B" stroke-width="1.5"/>
+    <!-- tickets (le vrai ticket glace, réduit) -->
+    <g transform="translate(46,82) scale(0.29)">{$tk}</g>
+    <g transform="translate(120,86) scale(0.29)">{$tk}</g>
+    <g transform="translate(84,106) scale(0.29)">{$tk}</g>
+  </g>
+
+  <!-- 3. CACTUS -->
   <g class="fee-plant">
     <rect x="97" y="90" width="26" height="82" rx="13" fill="#4E9E52"/>
     <path d="M97 126 Q 80 126 80 110 Q 80 102 87 102" stroke="#4E9E52" stroke-width="12" stroke-linecap="round" fill="none"/>
@@ -196,7 +232,7 @@ if (!function_exists('feePlanteSvg')) {
     <ellipse cx="110" cy="84" rx="4" ry="3" fill="#FBD0A8"/>
   </g>
 
-  <!-- 3. ARBRE (grand feuillage) -->
+  <!-- 4. ARBRE (grand feuillage) -->
   <g class="fee-plant">
     <rect x="102" y="96" width="16" height="74" rx="5" fill="#8A5B36"/>
     <circle cx="110" cy="64" r="40" fill="#2E7D3B"/>
@@ -208,7 +244,7 @@ if (!function_exists('feePlanteSvg')) {
     <circle cx="110" cy="44" r="5" fill="#F6BDD2"/>
   </g>
 
-  <!-- 4. FLEUR BLEUE -->
+  <!-- 5. FLEUR BLEUE -->
   <g class="fee-plant">
     <path d="M110 170 Q 106 120 111 78" stroke="url(#feeTige)" stroke-width="7" stroke-linecap="round" fill="none"/>
     <path d="M110 100 Q 80 82 74 106 Q 93 122 110 100 Z" fill="#8DC63F"/>
@@ -222,7 +258,7 @@ if (!function_exists('feePlanteSvg')) {
     </g>
   </g>
 
-  <!-- 5. TOURNESOL -->
+  <!-- 6. TOURNESOL -->
   <g class="fee-plant">
     <path d="M110 170 Q 108 122 111 76" stroke="url(#feeTige)" stroke-width="7" stroke-linecap="round" fill="none"/>
     <path d="M110 116 Q 82 104 78 126 Q 96 136 110 116 Z" fill="#3C9147"/>
@@ -238,45 +274,6 @@ if (!function_exists('feePlanteSvg')) {
       <ellipse cx="13" cy="13" rx="9" ry="7"/>
     </g>
     <circle cx="111" cy="64" r="11" fill="#6E4523"/>
-  </g>
-
-  <!-- 6. ARBRE À GLACES (le clin d'œil) : grand arbre dont pendent de VRAIES glaces —
-       un bâtonnet enrobé chocolat, une fusée tricolore, et un cornet à boules en vedette. -->
-  <g class="fee-plant">
-    <rect x="102" y="98" width="16" height="72" rx="5" fill="#8A5B36"/>
-    <circle cx="110" cy="60" r="40" fill="#2E7D3B"/>
-    <circle cx="76" cy="80" r="27" fill="#3C9147"/>
-    <circle cx="144" cy="80" r="27" fill="#3C9147"/>
-    <circle cx="110" cy="78" r="31" fill="#4E9E52"/>
-
-    <!-- Bâtonnet enrobé chocolat (gauche) -->
-    <g transform="translate(80,92)">
-      <line x1="0" y1="-16" x2="0" y2="-2" stroke="#C98A4B" stroke-width="2.5"/>
-      <rect x="-9" y="-2" width="18" height="26" rx="6" fill="#5E3E22"/>
-      <rect x="-9" y="-2" width="18" height="7" rx="5" fill="#754B29"/>
-      <circle cx="-4" cy="6" r="1.4" fill="#EAD8B0"/><circle cx="4" cy="12" r="1.4" fill="#EAD8B0"/>
-      <rect x="-2.5" y="23" width="5" height="11" rx="2" fill="#E8CFA0"/>
-    </g>
-
-    <!-- Glace fusée tricolore (droite) -->
-    <g transform="translate(140,92)">
-      <line x1="0" y1="-16" x2="0" y2="-6" stroke="#C98A4B" stroke-width="2.5"/>
-      <path d="M-8 -6 Q 0 -18 8 -6 L 8 0 L -8 0 Z" fill="#E4483B"/>
-      <rect x="-8" y="0" width="16" height="9" fill="#FBF3E7"/>
-      <rect x="-8" y="9" width="16" height="9" fill="#4C8FD0"/>
-      <rect x="-2.5" y="18" width="5" height="11" rx="2" fill="#E8CFA0"/>
-    </g>
-
-    <!-- Cornet à boules (centre, la vedette) -->
-    <g transform="translate(110,96)">
-      <path d="M-10 8 L 10 8 L 0 34 Z" fill="#E8A94B"/>
-      <path d="M-6 14 L 1 26 M2 14 L -3 22 M7 14 L 3 20" stroke="#C6852F" stroke-width="1" fill="none"/>
-      <circle cx="-5" cy="2" r="10" fill="#F7B7CE"/>
-      <circle cx="6" cy="0" r="9" fill="#FDF0DA"/>
-      <circle cx="0" cy="-8" r="8" fill="#B9E0A6"/>
-      <circle cx="0" cy="-18" r="3.6" fill="#D0342B"/>
-      <path d="M0 -20 Q 3 -26 7 -26" stroke="#6B3E1E" stroke-width="1.2" fill="none"/>
-    </g>
   </g>
 
   <!-- 7. CHAMPIGNON -->
