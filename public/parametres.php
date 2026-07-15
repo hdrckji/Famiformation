@@ -73,8 +73,6 @@ require_once __DIR__ . '/includes/storage_admin.php';
 require_once __DIR__ . '/includes/transcription.php'; // état de Whisper pour l'onglet Outils
 require_once __DIR__ . '/includes/outils_tab.php';    // onglet Outils (informatif)
 storageHandlePost($db);
-require_once __DIR__ . '/includes/orphans.php';
-orphansHandlePost($db);
 require_once __DIR__ . '/includes/bulk.php';
 require_once __DIR__ . '/includes/ia_usage.php';
 iaUsageHandlePost($db);
@@ -405,9 +403,6 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
     <!-- ONGLET : Contenu (stockage) -->
     <div id="tab-contenu" class="tab-content">
         <?php renderStorageTab($db); ?>
-        <div class="card admin-settings" style="margin-top:20px;">
-            <?php orphansCard($db); ?>
-        </div>
     </div>
 
     <!-- ONGLET : Outils (informatif) -->

@@ -563,15 +563,20 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                     ? "Régénérer le quiz ? L'actuel sera remplacé, et tes corrections manuelles perdues."
                     : "Générer le quiz à partir du guide et de la vidéo ?";
         ?>
-        <div class="content-card" style="max-width:900px; text-align:left; margin:22px auto;">
+        <details class="content-card evalfold" style="max-width:900px; text-align:left; margin:22px auto;">
+            <summary>
+                📝 Évaluation de la formation
+                <span class="eval-badge<?= $ev['on'] ? ' on' : '' ?>"><?= $ev['on'] ? t('Activée', 'Actief') : t('Désactivée', 'Uit') ?></span>
+            </summary>
+            <div style="padding-top:14px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:12px; border-bottom:1px solid #e6efe9;">
-                <h3 style="margin:0; color:#2d5a37;">📝 Évaluation de la formation</h3>
+                <span style="font-weight:700; color:#244230;"><?= t('Cette formation est évaluée', 'Deze opleiding wordt geëvalueerd') ?></span>
                 <form method="POST" action="module_save.php" style="margin:0; line-height:0;">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="eval_toggle">
                     <input type="hidden" name="id" value="<?= (int) $module['id'] ?>">
                     <label class="fsw">
-                        <input type="checkbox" name="eval_on" value="1" <?= $ev['on'] ? 'checked' : '' ?> onchange="this.form.submit()">
+                        <input type="checkbox" name="eval_on" value="1" <?= $ev['on'] ? 'checked' : '' ?> onchange="if(!confirm(this.checked ? <?= htmlspecialchars(json_encode(t('Activer l\'évaluation de cette formation ?', 'De evaluatie van deze opleiding inschakelen?')), ENT_QUOTES) ?> : <?= htmlspecialchars(json_encode(t('Désactiver l\'évaluation ? Le quiz est conservé mais ne sera plus proposé aux apprenants.', 'Evaluatie uitschakelen? De quiz blijft bewaard maar wordt niet meer aangeboden.')), ENT_QUOTES) ?>)){this.checked=!this.checked;return;} this.form.submit();">
                         <span class="fsw-track"></span>
                     </label>
                 </form>
@@ -642,7 +647,8 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
                 </div>
             </details>
             <?php endif; ?>
-        </div>
+            </div>
+        </details>
 
         <?php if ($ev['nb'] > 0 && $isAdmin): ?>
         <div id="delQuizModal" class="fc-modal">
@@ -666,6 +672,13 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
 
         <style>
         .pill-quiz { display:inline-block; background:#eef7f0; border:1px solid #cfe3d5; color:#2d5a37; border-radius:999px; padding:7px 14px; font-weight:700; font-size:.86rem; }
+        /* Bloc evaluation : repliable (evite les manips accidentelles sur le switch). */
+        .evalfold > summary { cursor:pointer; list-style:none; font-weight:800; color:#2d5a37; font-size:1.1rem; display:flex; align-items:center; gap:10px; }
+        .evalfold > summary::-webkit-details-marker { display:none; }
+        .evalfold > summary::before { content:'B8'; color:#3E8E4E; transition:transform .15s; }
+        .evalfold[open] > summary::before { transform:rotate(90deg); }
+        .eval-badge { margin-left:auto; font-size:.72rem; font-weight:800; border-radius:999px; padding:3px 10px; background:#eef1ef; color:#8a968f; }
+        .eval-badge.on { background:#2d5a37; color:#fff; }
         .verfold { border:1px solid #dde7e1; border-radius:12px; background:#fbfdfc; }
         .verfold > summary { cursor:pointer; padding:12px 14px; font-weight:700; color:#244230; list-style:none; }
         .verfold > summary::-webkit-details-marker { display:none; }
