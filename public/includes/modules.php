@@ -160,6 +160,22 @@ if (!function_exists('ensureModulesTable')) {
                 $setFlag('seed_base_modules_v1');
             }
 
+            // 4bis) « Gestion Quiz » : ce module de base (page dédiée gestion_quiz.php) a été
+            //    ajouté APRÈS le seed initial ci-dessus — il n'a donc jamais été enregistré en
+            //    base et n'apparaissait pas dans la gestion des modules (alors que RH, Gestion
+            //    Questions… y sont). On l'ajoute ici s'il manque. Verrouillé + lien, comme les
+            //    autres tuiles admin : il apparaît dans le gestionnaire (dans l'ordre) sans
+            //    créer de doublon sur l'accueil (les modules avec lien y sont ignorés).
+            if (!$hasFlag('seed_gestion_quiz_v1')) {
+                $chkGq = $db->prepare("SELECT COUNT(*) FROM modules WHERE link = ?");
+                $chkGq->execute(['gestion_quiz.php']);
+                if ((int) $chkGq->fetchColumn() === 0) {
+                    $db->prepare("INSERT INTO modules (nom, description, is_container, parent_id, icon, roles, is_active, is_locked, link) VALUES ('Gestion Quiz', ?, 0, NULL, '🧩', 'admin', 1, 1, 'gestion_quiz.php')")
+                        ->execute(['Contrôler et corriger tous les quiz.']);
+                }
+                $setFlag('seed_gestion_quiz_v1');
+            }
+
             // 5) Place les VRAIS modules Becosoft / Logistique / Magasin dans « Aide »
             //    (au lieu des sous-modules vides créés au départ)
             if (!$hasFlag('reorg_aide_v2')) {
