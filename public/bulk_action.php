@@ -103,14 +103,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
                 $done = count($del);
             }
         } elseif ($entity === 'agence') {
-            // Agences intérim = comptes role='agence_interim'.
-            $st = $db->prepare("SELECT id FROM utilisateurs WHERE id IN ($ph) AND role = 'agence_interim'");
+            // Agences interim (table interim_agences). On PROTEGE celles qui ont encore des
+            // comptes utilisateurs lies (il faut retirer les comptes d'abord).
+            $keep = [];
+            $st = $db->prepare("SELECT DISTINCT agence_id FROM interim_agence_users WHERE agence_id IN ($ph)");
             $st->execute($ids);
-            $del = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $aid) { $keep[(int) $aid] = true; }
+            $del = array_values(array_filter($ids, function ($x) use ($keep) { return empty($keep[$x]); }));
             $skipped = count($ids) - count($del);
             if ($del) {
                 $p2 = implode(',', array_fill(0, count($del), '?'));
-                $db->prepare("DELETE FROM utilisateurs WHERE id IN ($p2)")->execute($del);
+                $db->prepare("DELETE FROM interim_agences WHERE id IN ($p2)")->execute($del);
                 $done = count($del);
             }
         } else {

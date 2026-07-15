@@ -638,11 +638,13 @@ try {
                 </div>
             </section>
 
-            <section class="panel">
+            <section class="panel bulk-scope">
+                <?php require_once __DIR__ . '/includes/bulkselect.php'; echo bulkAssets(); ?>
                 <div class="panel-head">Répertoire des agences</div>
                 <div class="panel-body">
-                    <div class="table-toolbar">
+                    <div class="table-toolbar" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                         <div class="table-meta"><?php echo count($agences); ?> agence<?php echo count($agences) > 1 ? 's' : ''; ?> enregistrée<?php echo count($agences) > 1 ? 's' : ''; ?></div>
+                        <?php if (!empty($agences)): ?><button type="button" class="btn-secondary bulk-toggle" data-bulk-toggle="agences" data-bulk-entity="agence" data-bulk-label="agence">☑️ Sélectionner</button><?php endif; ?>
                     </div>
 
                     <?php if (empty($agences)): ?>
@@ -652,6 +654,7 @@ try {
                             <table>
                                 <thead>
                                     <tr>
+                                        <th class="bulk-col"></th>
                                         <th class="sticky-col">Agence</th>
                                         <th>Contact</th>
                                         <th>Email 1</th>
@@ -662,6 +665,7 @@ try {
                                 <tbody>
                                     <?php foreach ($agences as $agence): ?>
                                         <tr>
+                                            <td class="bulk-col"><input type="checkbox" class="bulk-cb" data-bulk="agences" value="<?php echo (int) $agence['id']; ?>"></td>
                                             <td class="sticky-col">
                                                 <div class="agency-name"><?php echo e($agence['nom_agence']); ?></div>
                                                 <div class="muted">Mise à jour : <?php echo !empty($agence['updated_at']) ? date('d/m/Y H:i', strtotime($agence['updated_at'])) : '-'; ?></div>

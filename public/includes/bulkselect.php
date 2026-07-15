@@ -108,11 +108,19 @@ if (!function_exists('bulkAssets')) {
                 var t = e.target.closest ? e.target.closest('[data-bulk-toggle]') : null;
                 if (!t) { return; }
                 var group = t.getAttribute('data-bulk-toggle');
-                var cont = t.closest('.bulk-scope') || document;
+                var cont = t.closest('.bulk-scope') || t.closest('.tab-content') || document.body;
                 var on = !cont.classList.contains('bulk-on');
                 cont.classList.toggle('bulk-on', on);
                 t.classList.toggle('on', on);
                 if (!on) { boxes(group).forEach(function (b) { b.checked = false; }); refresh(); }
+            });
+
+            // « Tout selectionner » du groupe.
+            document.addEventListener('change', function (e) {
+                var a = e.target;
+                if (!a.classList || !a.classList.contains('bulk-all')) { return; }
+                boxes(a.getAttribute('data-bulk')).forEach(function (b) { b.checked = a.checked; });
+                refresh();
             });
 
             // Cases : clic simple + Maj+clic (intervalle).
