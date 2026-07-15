@@ -158,16 +158,30 @@ if (!function_exists('brandingHandlePost')) {
 
             $cf = $_FILES['clip'] ?? null;
             if (!$cf || ($cf['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                $errCode = (int) ($cf['error'] ?? UPLOAD_ERR_NO_FILE);
+                if (in_array($errCode, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                    $back('❌ Vidéo trop lourde pour le serveur. Réduis-la avant de la déposer.');
+                }
                 $back('❌ Aucune vidéo envoyée.');
             }
-            if ($cf['error'] !== UPLOAD_ERR_OK || $cf['size'] <= 0 || $cf['size'] > 100 * 1024 * 1024) {
-                $back('❌ Vidéo refusée (100 Mo maximum — une intro doit rester courte).');
+            if ($cf['error'] !== UPLOAD_ERR_OK || $cf['size'] <= 0) {
+                $back('❌ Envoi de la vidéo interrompu. Réessaie.');
             }
-            $cmap = ['video/mp4' => 'mp4', 'video/quicktime' => 'mov'];
+            if ($cf['size'] > 500 * 1024 * 1024) {
+                $back('❌ Vidéo refusée (500 Mo maximum). Une intro doit rester courte.');
+            }
+            // Format : type MIME, avec REPLI sur l'extension — certains .mov/.mp4 sont mal
+            // détectés (application/octet-stream) et étaient rejetés à tort.
+            $cmap = ['video/mp4' => 'mp4', 'video/quicktime' => 'mov', 'video/x-m4v' => 'mp4'];
             $cmime = function_exists('mime_content_type') ? @mime_content_type($cf['tmp_name']) : '';
             $cext = $cmap[$cmime] ?? '';
             if ($cext === '') {
-                $back('❌ Format refusé : MP4 ou MOV uniquement.');
+                $byName = strtolower(pathinfo((string) ($cf['name'] ?? ''), PATHINFO_EXTENSION));
+                if (in_array($byName, ['mp4', 'm4v'], true)) { $cext = 'mp4'; }
+                elseif ($byName === 'mov') { $cext = 'mov'; }
+            }
+            if ($cext === '') {
+                $back('❌ Format refusé (' . htmlspecialchars($cmime ?: 'inconnu') . ') : MP4 ou MOV uniquement.');
             }
 
             $cbase = defined('FAMI_STORAGE_BASE') ? rtrim(FAMI_STORAGE_BASE, '/') : (__DIR__ . '/../uploads');
