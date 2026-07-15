@@ -459,31 +459,25 @@ if (!function_exists('feeOverlay')) {
     // la page renvoyée. Appelable DIRECTEMENT — donc utilisable même quand un bouton de modale
     // soumet le formulaire en JavaScript (form.submit() ne déclenche PAS l'événement submit,
     // c'est pour ça que la fée ne sortait pas à l'import).
+    // Affiche la fee puis envoie le formulaire de facon NORMALE (fiable). Appelable
+    // directement (les boutons de modale l'utilisent, car form.submit() ne declenche pas
+    // l'evenement submit).
     window.feeUpload = function (form) {
-        if (!form || !window.FormData || !window.XMLHttpRequest) {
-            if (form) { HTMLFormElement.prototype.submit.call(form); } // repli : envoi classique
-            return;
-        }
-        window.feeShow({$jsEnvoi});
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', form.action || location.href, true);
-        xhr.upload.onprogress = function (ev) {
-            if (ev.lengthComputable) { window.feeSet((ev.loaded / ev.total) * 100, {$jsEnvoi}); }
-        };
-        xhr.upload.onload = function () { window.feeIndef({$jsMagie}); }; // serveur au travail
-        xhr.onload = function () { window.location = xhr.responseURL || window.location.href; };
-        xhr.onerror = function () { window.feeHide(); alert('Envoi interrompu. Réessaie.'); };
-        xhr.send(new FormData(form));
+        if (!form) { return; }
+        window.feeIndef({$jsMagie});
+        HTMLFormElement.prototype.submit.call(form); // envoi classique garanti
     };
 
-    // Interception AUTOMATIQUE : tout formulaire POST avec un fichier passe par feeUpload.
+    // Formulaire POST avec un fichier : on affiche la fee, MAIS on laisse la soumission
+    // NORMALE se faire (pas de XHR). L'envoi par XHR faisait « ramer » puis echouer certains
+    // uploads ; une soumission classique est fiable a 100 %. On perd le pourcentage exact,
+    // pas grave : la fee tourne pendant l'envoi et disparait au rechargement.
     document.addEventListener('submit', function (e) {
         var form = e.target;
-        if (e.defaultPrevented) { return; }            // une validation a déjà refusé
+        if (e.defaultPrevented) { return; }
         if (!form || form.method.toLowerCase() !== 'post') { return; }
-        if (!aDesFichiers(form)) { return; }           // pas de fichier → chargement normal
-        e.preventDefault();
-        window.feeUpload(form);
+        if (!aDesFichiers(form)) { return; }
+        window.feeIndef({$jsMagie});                   // pas de preventDefault : l'envoi continue
     }, false);
 
     /* ---------- 2) OPÉRATIONS LONGUES (data-fee) : écran d'attente SANS pourcentage ----------
