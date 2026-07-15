@@ -18,9 +18,9 @@
 //     La barre n'atteint jamais 95 % « pour faire joli » : elle ralentit, ce qui
 //     est le comportement honnête quand on ne sait pas.
 //
-//  2) NAVIGATION entre pages : la fée n'apparaît QUE si la page met plus de 300 ms
-//     à venir. Sur un clic instantané, rien ne clignote — sinon on ajouterait une
-//     sensation de lenteur à un site qui est rapide.
+//  2) NAVIGATION entre pages : la fée apparaît à CHAQUE changement de page (clic sur un
+//     lien interne ou envoi de formulaire qui navigue). Un filet de sécurité la retire
+//     si la navigation n'a finalement pas eu lieu (action annulée, formulaire AJAX…).
 //
 // Le dessin de la fée vient du logo Famiflora (ailes = feuilles du symbole).
 // Autonome : SVG + CSS + JS ici. Injecté sur toutes les pages par config.php.
@@ -620,6 +620,52 @@ if (!function_exists('feeOverlay')) {
         var a = e.target.closest ? e.target.closest('a[data-fee]') : null;
         if (a) { window.feeIndef({$jsMagie}); }
     }, true);
+
+    /* ---------- 3) NAVIGATION ORDINAIRE : la fée à CHAQUE changement de page ----------
+       L'utilisateur veut la voir à chaque chargement. On l'affiche donc sur tout clic de
+       lien interne et tout envoi de formulaire QUI NAVIGUE. Garde-fous indispensables :
+       on ne montre rien pour une ancre (#), un lien javascript:/mailto:, un téléchargement,
+       une ouverture dans un nouvel onglet, ou un clic déjà annulé (validation qui bloque) —
+       sinon l'écran resterait figé sur une action qui ne change pas de page. Un filet de
+       sécurité (watchdog) retire la fée si, malgré tout, la navigation n'a pas eu lieu. */
+    var navWatchdog = null;
+    function feeNav() {
+        window.feeIndef({$jsMagie});
+        if (navWatchdog) { clearTimeout(navWatchdog); }
+        navWatchdog = setTimeout(function () { window.feeHide(); }, 15000);
+    }
+    function lienNavigable(a) {
+        if (!a) { return false; }
+        if (a.hasAttribute('data-fee')) { return false; }          // déjà géré (sans watchdog)
+        if (a.hasAttribute('download')) { return false; }
+        var tgt = a.getAttribute('target');
+        if (tgt && tgt !== '' && tgt !== '_self') { return false; } // nouvel onglet
+        var href = a.getAttribute('href');
+        if (!href) { return false; }
+        var low = href.toLowerCase();
+        if (href.charAt(0) === '#') { return false; }
+        if (low.indexOf('javascript:') === 0 || low.indexOf('mailto:') === 0 || low.indexOf('tel:') === 0) { return false; }
+        try {
+            var u = new URL(a.href, location.href);
+            // simple ancre sur la même page (même chemin + même requête, juste un #) : pas une navigation
+            if (u.origin === location.origin && u.pathname === location.pathname && u.search === location.search && u.hash) { return false; }
+        } catch (e2) {}
+        return true;
+    }
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
+        var a = e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a || !lienNavigable(a)) { return; }
+        feeNav();
+    }, false);
+    document.addEventListener('submit', function (e) {
+        if (e.defaultPrevented) { return; }
+        var f = e.target;
+        if (!f) { return; }
+        if (aDesFichiers(f)) { return; }                           // upload : géré sans watchdog
+        if (f.hasAttribute && f.hasAttribute('data-fee')) { return; } // opération longue : idem
+        feeNav();
+    }, false);
 
     // Retour arrière du navigateur : la page revient du cache, la fée doit disparaître.
     window.addEventListener('pageshow', function () { window.feeHide(); });
