@@ -516,17 +516,22 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 
     <!-- ONGLET : Gestion des utilisateurs -->
     <div id="tab-histuser" class="tab-content">
-        <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+        <?php require_once __DIR__ . '/includes/bulkselect.php'; echo bulkAssets(); ?>
+        <div class="card bulk-scope">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <h2 style="margin:0; color:#2d5a37;">Utilisateurs (<?= count($usersList) ?>)</h2>
-                <a href="admin.php" class="btn btn-primary">Gérer dans RH</a>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="btn bulk-toggle" style="background:#eef7f0; color:#2d5a37; border:1px solid #cfe3d5;" data-bulk-toggle="users" data-bulk-entity="user" data-bulk-label="utilisateur">☑️ Sélectionner</button>
+                    <a href="admin.php" class="btn btn-primary">Gérer dans RH</a>
+                </div>
             </div>
             <input type="text" id="userSearch" onkeyup="filterUsers()" placeholder="🔍 Rechercher par nom, identifiant ou agence..." style="width:100%; box-sizing:border-box; margin:14px 0; padding:10px 12px; border:1px solid #cfdad3; border-radius:10px; font-size:0.95rem;">
             <table>
-                <thead><tr><th>Nom</th><th>Identifiant</th><th>Profil</th><th>Agence</th><th>Statut</th><th>Fiche</th></tr></thead>
+                <thead><tr><th class="bulk-col"></th><th>Nom</th><th>Identifiant</th><th>Profil</th><th>Agence</th><th>Statut</th><th>Fiche</th></tr></thead>
                 <tbody id="usersTbody">
                     <?php foreach ($usersList as $u): ?>
                     <tr data-search="<?= htmlspecialchars(strtolower(trim($u['nom'] . ' ' . $u['prenom'] . ' ' . $u['identifiant'] . ' ' . ($u['interim'] ?? '')))) ?>">
+                        <td class="bulk-col"><?php if (($u['identifiant'] ?? '') !== 'admin'): ?><input type="checkbox" class="bulk-cb" data-bulk="users" value="<?= (int) $u['id'] ?>"><?php endif; ?></td>
                         <td><?= htmlspecialchars(trim($u['nom'] . ' ' . $u['prenom'])) ?></td>
                         <td class="muted"><?= htmlspecialchars($u['identifiant']) ?></td>
                         <td><?= htmlspecialchars($profiles[$u['role']] ?? $u['role']) ?></td>

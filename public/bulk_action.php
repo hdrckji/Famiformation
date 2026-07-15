@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // bulk_action.php — suppression GROUPÉE réutilisable (admin only).
-//   POST action=bulk_delete, entity=<module|profile|phrase>, ids[]=..., admin_password
+//   POST action=bulk_delete, entity=<module|profile|phrase|user|agence>, ids[]=..., admin_password
 //   Protégé par le mot de passe admin. Sauvegardes par type (verrou / profils cœur).
 // ============================================================
 require_once 'config.php';
@@ -16,7 +16,7 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
 function bulkSafeReturn($value)
 {
     $value = (string) $value;
-    foreach (['parametres.php', 'index.php'] as $allowed) {
+    foreach (['parametres.php', 'index.php', 'admin_agences_interim.php', 'admin.php'] as $allowed) {
         if (strpos($value, $allowed) === 0) { return $value; }
     }
     return 'parametres.php';
@@ -91,6 +91,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
         } elseif ($entity === 'phrase') {
             $db->prepare("DELETE FROM widget_phrases WHERE id IN ($ph)")->execute($ids);
             $done = count($ids);
+        } elseif ($entity === 'user') {
+            // Utilisateurs : on ne supprime JAMAIS le compte « admin » (protection).
+            $st = $db->prepare("SELECT id FROM utilisateurs WHERE id IN ($ph) AND identifiant <> 'admin'");
+            $st->execute($ids);
+            $del = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+            $skipped = count($ids) - count($del);
+            if ($del) {
+                $p2 = implode(',', array_fill(0, count($del), '?'));
+                $db->prepare("DELETE FROM utilisateurs WHERE id IN ($p2)")->execute($del);
+                $done = count($del);
+            }
+        } elseif ($entity === 'agence') {
+            // Agences intérim = comptes role='agence_interim'.
+            $st = $db->prepare("SELECT id FROM utilisateurs WHERE id IN ($ph) AND role = 'agence_interim'");
+            $st->execute($ids);
+            $del = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+            $skipped = count($ids) - count($del);
+            if ($del) {
+                $p2 = implode(',', array_fill(0, count($del), '?'));
+                $db->prepare("DELETE FROM utilisateurs WHERE id IN ($p2)")->execute($del);
+                $done = count($del);
+            }
         } else {
             $_SESSION['module_flash'] = "❌ Type d'élément inconnu.";
             header('Location: ' . $return); exit();
