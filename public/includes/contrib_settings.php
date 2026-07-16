@@ -85,8 +85,6 @@ if (!function_exists('contribHandlePost')) {
             exit();
         }
 
-        widgetSet($db, 'contrib_enabled', !empty($_POST['contrib_enabled']) ? '1' : '0');
-
         $validRoles = array_keys(moduleProfiles($db));
         $roles = is_array($_POST['contrib_roles'] ?? null) ? $_POST['contrib_roles'] : [];
         $roles = array_values(array_intersect($validRoles, array_map('strval', $roles)));
@@ -97,7 +95,18 @@ if (!function_exists('contribHandlePost')) {
         $zones = array_values(array_unique(array_filter(array_map('intval', $zones), function ($z) { return $z > 0; })));
         widgetSet($db, 'contrib_zones', implode(',', $zones));
 
-        $_SESSION['module_flash'] = "✅ Droits de contribution enregistrés.";
+        // CONFIGURER = ACTIVER. L'interrupteur du titre se soumet SÉPARÉMENT du formulaire :
+        // on cochait un profil + des zones, on cliquait « Enregistrer », mais si l'interrupteur
+        // était resté coupé, l'ancien code remettait contrib_enabled=0 → plus AUCUN droit ne
+        // s'appliquait, alors que le message disait « enregistré ». Désormais : dès qu'il y a au
+        // moins un profil ET une zone, la contribution est active. (L'interrupteur du titre
+        // reste là pour couper vite sans perdre la configuration.)
+        $enabledNow = (!empty($roles) && !empty($zones));
+        widgetSet($db, 'contrib_enabled', $enabledNow ? '1' : '0');
+
+        $_SESSION['module_flash'] = $enabledNow
+            ? '✅ Droits de contribution enregistrés et ACTIVÉS.'
+            : '⚠️ Enregistré, mais la contribution reste coupée : il faut au moins un profil ET une zone.';
         header('Location: parametres.php#prefs');
         exit();
     }
