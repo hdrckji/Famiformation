@@ -364,6 +364,13 @@ foreach ($db->query("SELECT interim, COUNT(*) AS c FROM utilisateurs WHERE inter
 <body>
 <?php require_once __DIR__ . '/includes/topbar.php'; famiTopbar($db, ['back' => 'index.php', 'title' => t('Paramètres', 'Instellingen'), 'back_fee' => true]); ?>
 <div class="container">
+    <?php
+        // L'aperçu se lance DEPUIS cette page et y revient : sans cette bannière, on ne voyait pas
+        // qu'il était encore actif. Or en aperçu toute écriture est refusée (voir requireValidCSRF) :
+        // on réglait les droits de contribution, on cliquait « Enregistrer »… et rien n'était écrit,
+        // sans le moindre message. La bannière rend l'état visible et permet de sortir de l'aperçu.
+        echo apercuBanner($db);
+    ?>
     <div class="topbar">
         <a href="index.php" data-fee>⬅ Retour à l'accueil</a>
         <h1>⚙️ Paramètres</h1>

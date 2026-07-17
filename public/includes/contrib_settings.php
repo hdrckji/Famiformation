@@ -133,8 +133,14 @@ if (!function_exists('contribSettingsCard')) {
             <form method="POST" action="parametres.php">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="save_contrib">
-                <input type="hidden" name="contrib_enabled" value="<?= $c['enabled'] ? '1' : '0' ?>">
-                <div class="pref-body<?= $c['enabled'] ? '' : ' pref-off' ?>">
+                <style>
+                /* « Configurer = activer » : même quand la contribution est coupée, ce bloc doit rester
+                   MODIFIABLE — sinon les cases sont grisées ET incliquables (pointer-events:none), et il
+                   devient impossible de cocher un profil pour la réactiver. On grise pour dire « inactif »,
+                   sans jamais bloquer les clics. */
+                .contrib-body.pref-off { pointer-events:auto; opacity:.62; filter:none; }
+                </style>
+                <div class="pref-body contrib-body<?= $c['enabled'] ? '' : ' pref-off' ?>">
 
                 <div style="font-weight:700; color:#244230; margin:4px 0 6px;">Profils autorisés</div>
                 <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px;">

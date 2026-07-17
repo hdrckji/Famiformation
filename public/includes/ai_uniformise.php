@@ -459,14 +459,17 @@ if (!function_exists('aiGenerateQuiz')) {
      */
     function aiGenerateQuiz($db, $contentText, $nbMultiple = null, $nbSingle = null)
     {
+        // 'fatal' => true : échec DÉFINITIF (un réglage, pas une panne). Réessayer à l'identique
+        // ne pourra jamais marcher — c'est à l'appelant de passer outre plutôt que de boucler.
+        // Les erreurs SANS ce drapeau (API qui tousse, timeout…) sont passagères : réessayer a du sens.
         $contentText = trim((string) $contentText);
         if ($contentText === '') {
-            return ['ok' => false, 'quiz' => null, 'error' => 'Contenu vide', 'cost_eur' => 0.0];
+            return ['ok' => false, 'quiz' => null, 'error' => 'Contenu vide', 'fatal' => true, 'cost_eur' => 0.0];
         }
         // Quiz coupés dans les préférences → on ne génère rien (et on le dit clairement).
         require_once __DIR__ . '/quiz_config.php';
         if (function_exists('quizCfgEnabled') && !quizCfgEnabled($db)) {
-            return ['ok' => false, 'quiz' => null, 'error' => 'Les quiz sont désactivés dans les paramètres.', 'cost_eur' => 0.0];
+            return ['ok' => false, 'quiz' => null, 'error' => 'les quiz sont désactivés dans les paramètres', 'fatal' => true, 'cost_eur' => 0.0];
         }
 
         // Par défaut : ce qui est réglé dans Paramètres → Préférences (25 questions, 50 % de multiples).
@@ -478,12 +481,12 @@ if (!function_exists('aiGenerateQuiz')) {
         $apiKey = getenv('ANTHROPIC_API_KEY');
         if (!$apiKey && isset($_SERVER['ANTHROPIC_API_KEY'])) { $apiKey = $_SERVER['ANTHROPIC_API_KEY']; }
         if (!$apiKey) {
-            return ['ok' => false, 'quiz' => null, 'error' => 'Clé ANTHROPIC_API_KEY absente', 'cost_eur' => 0.0];
+            return ['ok' => false, 'quiz' => null, 'error' => 'la clé ANTHROPIC_API_KEY est absente', 'fatal' => true, 'cost_eur' => 0.0];
         }
         $model = function_exists('iaSelectedModel') ? iaSelectedModel($db) : 'claude-sonnet-5';
 
         $nbTotal = (int) $nbMultiple + (int) $nbSingle;
-        if ($nbTotal <= 0) { return ['ok' => false, 'quiz' => null, 'error' => 'Aucune question demandée', 'cost_eur' => 0.0]; }
+        if ($nbTotal <= 0) { return ['ok' => false, 'quiz' => null, 'error' => 'le nombre de questions à générer est réglé sur 0', 'fatal' => true, 'cost_eur' => 0.0]; }
         $ratioMul = $nbMultiple / $nbTotal;
 
         // GÉNÉRATION PAR LOTS + STREAMING.

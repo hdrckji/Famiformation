@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         //    puisqu'il faudra le relire avant la validation finale.
         $quizMsg = '';
         $quizFailed = false;
+        $quizFatal = false;   // échec dû à un RÉGLAGE : relancer à l'identique ne marchera jamais
         $hasQuiz = trim((string) ($module['quiz_json'] ?? '')) !== '';
         $needQuiz = !$hasQuiz && !empty($module['a_evaluer']);
         if ($needQuiz) {
@@ -105,25 +106,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                     }
                 } else {
                     $quizFailed = true;
-                    $quizMsg = ' ⚠️ Quiz non généré : ' . ($qz['error'] ?? 'erreur') . '.';
+                    $quizFatal = !empty($qz['fatal']);
+                    $quizErr = (string) ($qz['error'] ?? 'erreur');
+                    $quizMsg = ' ⚠️ Quiz non généré : ' . $quizErr . '.';
                     require_once 'includes/events.php';
                     if (function_exists('logSiteError')) {
-                        logSiteError($db, $id, (int) ($_SESSION['user_id'] ?? 0), 'quiz', (string) ($qz['error'] ?? ''));
+                        logSiteError($db, $id, (int) ($_SESSION['user_id'] ?? 0), 'quiz', $quizErr);
                     }
                 }
             } else {
                 $quizFailed = true;
+                $quizFatal = true;   // le moteur IA n'est pas chargé : relancer n'y changera rien
+                $quizErr = 'moteur IA indisponible';
                 $quizMsg = ' ⚠️ Quiz non généré : moteur IA indisponible.';
             }
         }
 
-        // 2bis) ÉCHEC de la génération : on NE PUBLIE SURTOUT PAS et on ne saute pas l'étape quiz.
-        //       Le guide est enregistré (rien de perdu), on revient dessus pour relancer.
-        if ($quizFailed) {
+        // 2bis) ÉCHEC PASSAGER (l'API a toussé) : on ne publie pas, on revient pour relancer.
+        //       Le guide est enregistré (rien de perdu), un nouveau clic a de vraies chances d'aboutir.
+        if ($quizFailed && !$quizFatal) {
             $_SESSION['module_flash'] = "✅ Guide enregistré, mais" . $quizMsg
                 . " Le contenu reste NON publié. Reclique sur « Valider » pour relancer la génération du quiz.";
             header('Location: module_edit.php?id=' . $id);
             exit();
+        }
+
+        // 2ter) ÉCHEC DÉFINITIF (un réglage, pas une panne) : quiz coupés dans les préférences, clé
+        //       API absente, 0 question demandée… Avant, on renvoyait ici vers « reclique sur Valider »
+        //       — un conseil qui ne pouvait JAMAIS aboutir : on relançait, ça échouait pour la même
+        //       raison, et le contenu restait bloqué en relecture, non publié, indéfiniment.
+        //       Désormais on ne bloque plus : on saute l'étape quiz et on publie le guide (comme
+        //       lorsque « à évaluer » est décoché), en disant clairement ce qui manque et comment
+        //       ajouter le quiz plus tard. $hasQuiz reste faux → on tombe dans l'étape 4 (validation
+        //       finale + publication) juste en dessous.
+        if ($quizFatal) {
+            $quizMsg = ' ⚠️ Quiz non généré : ' . $quizErr . '. Le guide est publié SANS quiz —'
+                . ' corrige ce réglage puis reviens sur ce module pour générer le quiz.';
         }
 
         // 3) S'IL Y A UN QUIZ À RELIRE : on s'arrête ici. Pas d'IA, pas de traduction, pas de
@@ -139,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         // 4) PAS DE QUIZ DEMANDÉ (case « à évaluer » décochée) → cette validation EST l'étape
         //    finale : l'IA revérifie tout, traduit dans l'autre langue, et publie le contenu.
         $final = famiFinalValidation($db, $id, (int) ($_SESSION['user_id'] ?? 0), $isAdmin);
-        $_SESSION['module_flash'] = "✅ Relecture validée." . $final;
+        $_SESSION['module_flash'] = "✅ Relecture validée." . $quizMsg . $final;
         header('Location: module.php?id=' . $id);
         exit();
     }

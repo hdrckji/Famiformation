@@ -11,9 +11,11 @@ $isAdminActor = ($actorRole === 'admin');
 $reqAction = $_POST['action'] ?? '';
 
 // L'admin a tous les droits. Un contributeur autorisé (profil coché) ne peut faire QUE
-// « create » ou « content » — et seulement dans une zone autorisée, vérifié par action ci-dessous.
+// « create », « content » ou « create_blank_guide » — et seulement dans une zone autorisée,
+// vérifié par action ci-dessous (voir le contrôle contribCanAddContent du bloc create_blank_guide).
 if (!$isAdminActor) {
-    if (!in_array($reqAction, ['create', 'content'], true) || !contribRoleAllowed($db, $actorRole)) {
+    if (!in_array($reqAction, ['create', 'content', 'create_blank_guide'], true) || !contribRoleAllowed($db, $actorRole)) {
+        $_SESSION['module_flash'] = "❌ Vous n'avez pas le droit de contribuer ici.";
         header('Location: index.php');
         exit();
     }

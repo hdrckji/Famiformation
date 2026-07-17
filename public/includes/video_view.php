@@ -50,17 +50,13 @@ if (!function_exists('renderVideoPage')) {
             $backdrop .= (strpos($backdrop, '?') !== false ? '&' : '?')
                 . 'l=' . (function_exists('currentLang') ? currentLang() : 'fr');
         }
-        // Le quiz est-il validé ? Tant qu'il ne l'est pas, on ne peut pas SAUTER librement à
-        // l'intro ou à l'outro : on regarde le déroulé normal (intro → formation → fin). Seul
-        // le bouton « La formation » reste actif. La navigation se débloque de DEUX façons :
-        //  • on a regardé jusqu'au bout (fin de l'outro) → déblocage pour la session (JS) ;
-        //  • on a VALIDÉ le quiz → déblocage définitif (ci-dessous, côté serveur).
-        // NB : l'admin n'a PLUS de passe-droit ici — c'était pour ça que la navigation
-        // paraissait « libre » : en test admin, tout était déverrouillé d'emblée.
-        require_once __DIR__ . '/quiz_pass.php';
-        global $db;
-        $pid = !empty($module['parent_id']) ? (int) $module['parent_id'] : (int) ($module['id'] ?? 0);
-        $quizOk = (isset($db) && $db instanceof PDO) ? quizUserPassed($db, $pid, (int) ($_SESSION['user_id'] ?? 0)) : false;
+        // NAVIGATION LIBRE (choix explicite) : Introduction / La formation / Fin sont toujours
+        // cliquables, pour tout le monde. On a essayé de verrouiller l'intro et l'outro tant que
+        // le quiz n'était pas validé ; c'était plus gênant qu'utile — et le compteur « vidéo vue »
+        // n'avance que sur le segment « La formation », donc sauter à l'intro ou à la fin n'a
+        // jamais rien fait gagner.
+        // Restent en place, indépendamment d'ici : l'interdiction d'avancer en accéléré, l'avertissement
+        // avant de passer le quiz sans avoir vu la vidéo, et le contrôle du téléchargement (côté serveur).
 
         // INTRO / OUTRO : jouées avant et après la formation. On ne colle rien bout à bout —
         // le lecteur enchaîne les fichiers (voir plus bas). Changer l'intro change toutes les
@@ -204,11 +200,11 @@ if (!function_exists('renderVideoPage')) {
                         <?php if ($introUrl !== '' || $outroUrl !== ''): ?>
                         <nav class="player__segnav" id="famiSegNav" aria-label="<?= t('Navigation dans la vidéo', 'Navigatie in de video') ?>">
                             <?php if ($introUrl !== ''): ?>
-                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="intro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t("Regardez la vidéo jusqu'au bout pour débloquer la navigation", 'Bekijk de video tot het einde om de navigatie vrij te maken'), ENT_QUOTES) ?>">▶ <?= t('Introduction', 'Inleiding') ?></button>
+                                <button type="button" class="segbtn" data-seg="intro">▶ <?= t('Introduction', 'Inleiding') ?></button>
                             <?php endif; ?>
                             <button type="button" class="segbtn segbtn--main" data-seg="main">🎬 <?= t('La formation', 'De opleiding') ?></button>
                             <?php if ($outroUrl !== ''): ?>
-                                <button type="button" class="segbtn<?= $quizOk ? '' : ' locked' ?>" data-seg="outro"<?= $quizOk ? '' : ' disabled' ?> title="<?= $quizOk ? '' : htmlspecialchars(t("Regardez la vidéo jusqu'au bout pour débloquer la navigation", 'Bekijk de video tot het einde om de navigatie vrij te maken'), ENT_QUOTES) ?>">🏁 <?= t('Fin', 'Slot') ?></button>
+                                <button type="button" class="segbtn" data-seg="outro">🏁 <?= t('Fin', 'Slot') ?></button>
                             <?php endif; ?>
                         </nav>
                         <?php endif; ?>

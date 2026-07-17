@@ -33,7 +33,10 @@ $children = $isContainer ? getModules($db, $moduleId, !$isAdmin) : [];
 // Structure « contenu » : ce module est-il un sous-module écrit/vidéo, ou un conteneur qui en regroupe ?
 // Droits de contribution (non-admin autorisé dans une zone) — voir includes/contrib_settings.php.
 require_once __DIR__ . '/includes/contrib_settings.php';
-$actorRole = (string) ($_SESSION['role'] ?? '');
+// Rôle d'AFFICHAGE (comme les autres contrôles de cette page) : en mode aperçu, l'admin doit voir
+// la page avec les droits du profil prévisualisé, pas avec son propre rôle « admin » — qui n'est
+// jamais listé dans les profils autorisés et faisait donc disparaître le bouton de contribution.
+$actorRole = currentDisplayRole();
 $canContribHere = !$isAdmin && contribRoleAllowed($db, $actorRole) && contribModuleInZone($db, (int) $module['id']);
 
 $isContentChild = in_array((string) ($module['content_kind'] ?? ''), ['ecrit', 'video'], true);
@@ -121,6 +124,9 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         .btn { border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn-create { background: #2d5a37; color: #fff; }
         .btn-danger { background: #c94a42; color: #fff; }
+        /* Bouton « Créer » flottant — identique à celui de l'accueil, même place, même geste. */
+        .quick-create-btn { position: fixed; bottom: 20px; right: 20px; background: #2d5a37; color: #fff; border: none; border-radius: 30px; padding: 12px 20px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,0.2); z-index: 1500; }
+        .quick-create-btn:hover { background: #357a44; }
         /* Modale */
         .modal-backdrop { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
         .modal-card { background: #fff; border-radius: 14px; padding: 28px; max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
@@ -440,14 +446,15 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
     <?php endif; ?>
 
     <?php if ($isAdmin || $canContribHere): ?>
+        <?php if ($isAdmin): ?>
         <div class="admin-actions">
-            <?php if ($isAdmin): ?>
             <button type="button" class="btn btn-create" onclick="document.getElementById('editModal').style.display='flex';">✏️ Modifier ce module</button>
-            <?php endif; ?>
-            <?php if ($isContainer): ?>
-                <button type="button" class="btn btn-create" onclick="document.getElementById('createModal').style.display='flex';">➕ Ajouter un sous-module</button>
-            <?php endif; ?>
         </div>
+        <?php endif; ?>
+        <?php if ($isContainer): ?>
+        <!-- Même bouton qu'à l'accueil : flottant, en bas à droite, libellé « Créer ». -->
+        <button type="button" class="quick-create-btn" onclick="document.getElementById('createModal').style.display='flex';">➕ <?= t('Créer', 'Maken') ?></button>
+        <?php endif; ?>
         <?php if ($isAdmin): ?>
         <div style="color:#fff; background:rgba(0,0,0,0.3); padding:8px 14px; border-radius:10px; font-size:0.85rem; margin-top:8px;">ℹ️ La suppression se fait dans ⚙️ Paramètres → Gestion des modules.</div>
 
@@ -471,23 +478,49 @@ $isVideoPage = !$isContainer && empty($module['is_booking']) && $mHasVideoAny &&
         <?php endif; ?>
 
         <?php if ($isContainer): ?>
-        <!-- Modale : ajouter un sous-module -->
+        <!-- Modale « Créer » : même déroulé qu'à l'accueil. On choisit d'abord CE QU'ON CRÉE —
+             un module qui en regroupe d'autres, ou un contenu — puis on remplit le formulaire.
+             Sans cette étape, is_container restait figé à 0 : on ne pouvait créer QUE du contenu,
+             jamais un sous-conteneur. -->
         <div id="createModal" class="modal-backdrop">
             <div class="modal-card">
-                <h3>Nouveau sous-module</h3>
-                <form method="POST" action="module_save.php" enctype="multipart/form-data">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="action" value="create">
-                    <input type="hidden" name="parent_id" value="<?= (int) $module['id'] ?>">
-                    <input type="hidden" name="return" value="module.php?id=<?= (int) $module['id'] ?>">
-                    <?php renderModuleFields('mcreate', [], moduleProfiles($db), moduleIconChoices()); ?>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-cancel" onclick="document.getElementById('createModal').style.display='none';">Annuler</button>
-                        <button type="submit" class="btn btn-create">Créer</button>
+                <!-- Étape 1 : que veux-tu créer ? -->
+                <div id="mcreate_step1">
+                    <h3><?= t('Que veux-tu créer ?', 'Wat wil je maken?') ?></h3>
+                    <div class="create-choice">
+                        <button type="button" class="create-choice-btn" onclick="qcPick('mcreate', 1)">
+                            <span class="cc-ico">📦</span>
+                            <strong><?= t('Module', 'Module') ?></strong>
+                            <small><?= t('Regroupe d\'autres modules', 'Bevat andere modules') ?></small>
+                        </button>
+                        <button type="button" class="create-choice-btn" onclick="qcPick('mcreate', 0)">
+                            <span class="cc-ico">📄</span>
+                            <strong><?= t('Contenu', 'Inhoud') ?></strong>
+                            <small><?= t('Portera un guide / une vidéo', 'Bevat een gids / video') ?></small>
+                        </button>
                     </div>
-                </form>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-cancel" onclick="document.getElementById('createModal').style.display='none';"><?= t('Annuler', 'Annuleren') ?></button>
+                    </div>
+                </div>
+                <!-- Étape 2 : le formulaire habituel -->
+                <div id="mcreate_step2" style="display:none;">
+                    <h3 id="mcreate_title"><?= t('Nouveau module', 'Nieuwe module') ?></h3>
+                    <form method="POST" action="module_save.php" enctype="multipart/form-data">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="create">
+                        <input type="hidden" name="parent_id" value="<?= (int) $module['id'] ?>">
+                        <input type="hidden" name="return" value="module.php?id=<?= (int) $module['id'] ?>">
+                        <?php renderModuleFields('mcreate', [], moduleProfiles($db), moduleIconChoices()); ?>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-cancel" onclick="qcBack('mcreate')">← <?= t('Retour', 'Terug') ?></button>
+                            <button type="submit" class="btn btn-create"><?= t('Créer', 'Maken') ?></button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
+        <?= moduleCreateChoiceAssets() ?>
 
         <?php if (!empty($children)): ?>
         <!-- Édition d'un sous-module par CLIC DROIT sur sa tuile : une modale par enfant. -->
