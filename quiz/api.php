@@ -61,6 +61,34 @@ if (!is_dir($dataDir)) {
 $scoresFile    = $dataDir . '/scores.json';
 $codesFile     = $dataDir . '/codes.json';
 $questionsFile = $dataDir . '/questions.json';
+$jardinFile    = $dataDir . '/jardin.json';
+
+/* ============================================================
+   🌼 LE JARDIN COLLECTIF
+   Les joueurs dépensent leurs graines (= leurs points, qu'ils gardent au
+   classement : planter ne fait PAS reculer au classement) pour poser des
+   plantes sur une grille commune. Chaque case ne se plante qu'une fois.
+   ============================================================ */
+
+// Catalogue : clé => [emoji, nom affiché, coût en graines].
+// Les coûts sont pensés pour un score max d'environ 340 graines :
+// un bon joueur plante 3-5 fois, un joueur moyen 2-3 fois.
+$PLANTES = [
+  'paquerette' => ['emoji' => '🌼', 'nom' => 'Pâquerette',  'cout' => 20],
+  'tulipe'     => ['emoji' => '🌷', 'nom' => 'Tulipe',      'cout' => 35],
+  'lavande'    => ['emoji' => '💜', 'nom' => 'Lavande',     'cout' => 50],
+  'tournesol'  => ['emoji' => '🌻', 'nom' => 'Tournesol',   'cout' => 80],
+  'rosier'     => ['emoji' => '🌹', 'nom' => 'Rosier',      'cout' => 120],
+  'arbre'      => ['emoji' => '🌳', 'nom' => 'Petit arbre', 'cout' => 200],
+];
+
+// Taille de la grille (8 colonnes × 6 lignes = 48 cases).
+$JARDIN_CASES = 48;
+
+/** Solde de graines d'un participant : récoltées (score) moins dépensées. */
+function soldeDe($p) {
+  return max(0, intval($p['score'] ?? 0) - intval($p['depensees'] ?? 0));
+}
 
 // ❓ QUESTIONS PAR DÉFAUT. Elles ne servent qu'AU TOUT PREMIER lancement : dès que
 // tu enregistres tes questions depuis /quiz/admin, c'est questions.json qui fait
@@ -212,12 +240,13 @@ switch ($action) {
       break;
     }
     $entree = [
-      'name'    => $name,
-      'score'   => max(0, intval($input['score'] ?? 0)),
-      'correct' => max(0, intval($input['correct'] ?? 0)),
-      'codes'   => max(0, intval($input['codes'] ?? 0)),
-      'time'    => max(0, intval($input['time'] ?? 0)),
-      'date'    => date('c'),
+      'name'      => $name,
+      'score'     => max(0, intval($input['score'] ?? 0)),   // graines récoltées, définitives
+      'depensees' => 0,                                       // graines déjà plantées au jardin
+      'correct'   => max(0, intval($input['correct'] ?? 0)),
+      'codes'     => max(0, intval($input['codes'] ?? 0)),
+      'time'      => max(0, intval($input['time'] ?? 0)),
+      'date'      => date('c'),
     ];
 
     $res = withLock($scoresFile, function (&$board, &$write) use ($name, $entree) {
@@ -282,6 +311,96 @@ switch ($action) {
     break;
   }
 
+  // 🌼 Le catalogue des plantes (public : affiché sur la page du jardin).
+  case 'plantes': {
+    echo json_encode(['plantes' => $PLANTES, 'cases' => $JARDIN_CASES], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🌳 La grille du jardin collectif (lecture seule).
+  case 'jardin': {
+    $j = readJson($jardinFile);
+    echo json_encode(['cases' => (object)($j['cases'] ?? [])], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 💰 Le solde d'un joueur qui revient (rechargement de page, autre appareil).
+  case 'solde': {
+    $name = mb_strtolower(trim($input['name'] ?? ''));
+    $board = readJson($scoresFile);
+    foreach ($board as $p) {
+      if (mb_strtolower($p['name'] ?? '') === $name) {
+        echo json_encode([
+          'exists'    => true,
+          'name'      => $p['name'],
+          'recoltees' => intval($p['score'] ?? 0),
+          'depensees' => intval($p['depensees'] ?? 0),
+          'solde'     => soldeDe($p),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
+    }
+    echo json_encode(['exists' => false]);
+    break;
+  }
+
+  // 🌱 Planter : débiter les graines PUIS poser la plante.
+  // Deux fichiers sont touchés (scores + jardin) : on prend les verrous l'un
+  // APRÈS l'autre, jamais imbriqués (deux verrous imbriqués pris dans des ordres
+  // différents par deux requêtes = blocage mutuel). Si la case est prise entre
+  // les deux étapes, on rembourse — le joueur ne perd jamais de graines pour rien.
+  case 'planter': {
+    $name   = trim($input['name'] ?? '');
+    $idx    = intval($input['case'] ?? -1);
+    $plante = trim($input['plante'] ?? '');
+
+    if (!isset($PLANTES[$plante])) { echo json_encode(['ok' => false, 'reason' => 'plante_inconnue']); break; }
+    if ($idx < 0 || $idx >= $JARDIN_CASES) { echo json_encode(['ok' => false, 'reason' => 'case_invalide']); break; }
+    $cout = $PLANTES[$plante]['cout'];
+
+    // Étape 1 : débit des graines, sous verrou des scores.
+    $debit = withLock($scoresFile, function (&$board, &$write) use ($name, $cout) {
+      foreach ($board as &$p) {
+        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+          $solde = soldeDe($p);
+          if ($solde < $cout) { return ['ok' => false, 'reason' => 'solde_insuffisant', 'solde' => $solde]; }
+          $p['depensees'] = intval($p['depensees'] ?? 0) + $cout;
+          $write = true;
+          return ['ok' => true, 'solde' => $solde - $cout];
+        }
+      }
+      return ['ok' => false, 'reason' => 'joueur_inconnu'];
+    });
+    if (empty($debit['ok'])) { echo json_encode($debit, JSON_UNESCAPED_UNICODE); break; }
+
+    // Étape 2 : pose de la plante, sous verrou du jardin.
+    $pose = withLock($jardinFile, function (&$j, &$write) use ($idx, $plante, $name) {
+      if (!isset($j['cases']) || !is_array($j['cases'])) { $j['cases'] = []; }
+      if (isset($j['cases'][$idx])) { return ['ok' => false, 'reason' => 'case_prise']; }
+      $j['cases'][$idx] = ['plante' => $plante, 'par' => $name, 'date' => date('c')];
+      $write = true;
+      return ['ok' => true];
+    });
+
+    if (empty($pose['ok'])) {
+      // La case a été prise entre-temps : on rembourse le débit de l'étape 1.
+      withLock($scoresFile, function (&$board, &$write) use ($name, $cout) {
+        foreach ($board as &$p) {
+          if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+            $p['depensees'] = max(0, intval($p['depensees'] ?? 0) - $cout);
+            $write = true;
+            break;
+          }
+        }
+        return null;
+      });
+      echo json_encode($pose, JSON_UNESCAPED_UNICODE);
+      break;
+    }
+    echo json_encode(['ok' => true, 'solde' => $debit['solde']], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
   // 🔐 Connexion admin. La vérification se fait ICI, côté serveur : ainsi le mot
   // de passe n'apparaît PAS dans le code source de la page (contrairement à
   // l'ancien PIN, que n'importe qui pouvait lire avec « afficher la source »).
@@ -337,11 +456,59 @@ switch ($action) {
         'date' => $pris[$c]['date'] ?? null,
       ];
     }
+    $j = readJson($jardinFile);
     echo json_encode([
       'board'     => $board,
       'codes'     => $codes,
       'questions' => lesQuestions($questionsFile, $QUESTIONS_DEFAUT),
+      'jardin'    => ['cases' => (object)($j['cases'] ?? []), 'total' => $JARDIN_CASES],
+      'plantes'   => $PLANTES,
     ], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🧹 Vider une case du jardin (admin) : la plante disparaît, le planteur est
+  // remboursé de son coût — c'est une correction, pas une punition.
+  case 'jardin_vider': {
+    exigeAdmin($input);
+    global $PLANTES;
+    $idx = intval($input['case'] ?? -1);
+
+    $retiree = withLock($jardinFile, function (&$j, &$write) use ($idx) {
+      if (!isset($j['cases'][$idx])) { return null; }
+      $c = $j['cases'][$idx];
+      unset($j['cases'][$idx]);
+      $write = true;
+      return $c;
+    });
+
+    if (!$retiree) { echo json_encode(['ok' => false, 'reason' => 'case_vide']); break; }
+    $cout = $PLANTES[$retiree['plante']]['cout'] ?? 0;
+    withLock($scoresFile, function (&$board, &$write) use ($retiree, $cout) {
+      foreach ($board as &$p) {
+        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($retiree['par'] ?? '')) {
+          $p['depensees'] = max(0, intval($p['depensees'] ?? 0) - $cout);
+          $write = true;
+          break;
+        }
+      }
+      return null;
+    });
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🧹 Réinitialiser tout le jardin (admin) : grille vidée, tout le monde
+  // récupère l'intégralité de ses graines (depensees remis à zéro).
+  case 'jardin_reset': {
+    exigeAdmin($input);
+    writeJson($jardinFile, ['cases' => (object)[]]);
+    withLock($scoresFile, function (&$board, &$write) {
+      foreach ($board as &$p) { $p['depensees'] = 0; }
+      $write = count($board) > 0;
+      return null;
+    });
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     break;
   }
 
@@ -370,7 +537,8 @@ switch ($action) {
     }
     writeJson($scoresFile, []);
     writeJson($codesFile, (object)[]);
-    echo json_encode(['ok' => true, 'message' => 'Scores et codes remis à zéro']);
+    writeJson($jardinFile, ['cases' => (object)[]]);
+    echo json_encode(['ok' => true, 'message' => 'Scores, codes et jardin remis à zéro']);
     break;
   }
 

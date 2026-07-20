@@ -94,3 +94,20 @@ BON À SAVOIR
   Pour un quiz interne bon enfant, c'est largement suffisant —
   et le mélange aléatoire des questions/réponses complique déjà
   la copie entre collègues.
+
+LE JARDIN COLLECTIF 🌼 (nouveau)
+--------------------------------
+• Les points sont devenus des GRAINES. Le classement se base sur les
+  graines RÉCOLTÉES au quiz : elles ne diminuent jamais.
+• Après le quiz, chacun peut « planter ses graines » : il dépense son
+  solde pour poser des plantes sur la grille commune (48 cases).
+  Planter ne fait PAS reculer au classement.
+• Catalogue et coûts : à modifier dans api.php ($PLANTES).
+  🌼 20 · 🌷 35 · 💜 50 · 🌻 80 · 🌹 120 · 🌳 200 graines.
+• Un joueur qui revient plus tard retrouve son solde avec son prénom
+  (onglet « Le jardin » → « Retrouver mes graines »).
+• Dans l'admin, onglet 🌼 Jardin : retirer une plante (le planteur est
+  remboursé) ou vider tout le jardin (tout le monde récupère tout).
+• La remise à zéro générale vide aussi le jardin.
+• Stades de croissance (selon les graines récoltées) :
+  🌰 0 · 🌱 50 · 🪴 100 · 🌿 150 · 🌸 200 · 🌳 260

@@ -159,7 +159,9 @@ function rendre() {
   const onglets = [
     ["questions", "❓ Questions"],
     ["classement", "🏆 Classement"],
+    ["jardin", "🌼 Jardin"],
     ["codes", "🎁 Codes bonus"],
+    ["simulation", "🎬 Simulation"],
   ];
   app.innerHTML = `
     <div class="tabs">
@@ -175,6 +177,8 @@ function rendre() {
 
   if (vue === "questions") vueQuestions();
   else if (vue === "classement") vueClassement();
+  else if (vue === "jardin") vueJardin();
+  else if (vue === "simulation") vueSimulation();
   else vueCodes();
 }
 
@@ -296,12 +300,14 @@ function vueClassement() {
       ${b.length ? `
       <div style="overflow-x:auto">
       <table>
-        <tr><th>#</th><th>Prénom</th><th>Points</th><th>Bonnes réponses</th><th>Codes</th><th>Temps</th><th></th></tr>
+        <tr><th>#</th><th>Prénom</th><th>Récoltées 🌱</th><th>Plantées</th><th>Solde</th><th>Bonnes réponses</th><th>Codes</th><th>Temps</th><th></th></tr>
         ${b.map((p, i) => `
           <tr>
             <td class="num">${i + 1}</td>
-            <td>${esc(p.name)}</td>
+            <td>${esc(p.name)} ${stadeEmoji(p.score)}</td>
             <td class="num"><strong>${p.score}</strong></td>
+            <td class="num">${p.depensees || 0}</td>
+            <td class="num">${Math.max(0, p.score - (p.depensees || 0))}</td>
             <td class="num">${p.correct}</td>
             <td class="num">${p.codes}</td>
             <td class="num">${Math.floor(p.time / 60)} min ${p.time % 60} s</td>
@@ -311,7 +317,8 @@ function vueClassement() {
     </div>
     <div class="card">
       <h2>Remise à zéro</h2>
-      <p class="hint">Efface <strong>tous</strong> les scores et libère <strong>tous</strong> les codes bonus.
+      <p class="hint">Efface <strong>tous</strong> les scores, libère <strong>tous</strong> les codes bonus
+      et vide <strong>tout</strong> le jardin.
       À réserver aux tests : après le lancement, ça effacerait le classement réel, sans retour possible.</p>
       <button class="btn danger" id="c-reset">Tout remettre à zéro</button>
     </div>`;
@@ -332,6 +339,105 @@ function vueClassement() {
     if (!r || !r.ok) { message = { ok: false, texte: "La remise à zéro a échoué." }; rendre(); return; }
     message = { ok: true, texte: "Scores et codes remis à zéro." };
     await charger();
+  });
+}
+
+/* ---------------------- ONGLET JARDIN ---------------------- */
+
+// Mêmes seuils que la page joueur : le stade dépend des graines récoltées.
+function stadeEmoji(graines) {
+  if (graines >= 260) return "🌳";
+  if (graines >= 200) return "🌸";
+  if (graines >= 150) return "🌿";
+  if (graines >= 100) return "🪴";
+  if (graines >= 50) return "🌱";
+  return "🌰";
+}
+
+function vueJardin() {
+  const c = $("#contenu");
+  const cases = (data.jardin && data.jardin.cases) || {};
+  const total = (data.jardin && data.jardin.total) || 48;
+  const plantes = data.plantes || {};
+  const nb = Object.keys(cases).length;
+
+  c.innerHTML = `
+    <div class="card">
+      <h2>Le jardin collectif — ${nb} plante(s) sur ${total} cases</h2>
+      <p class="hint">Clique sur une plante pour la retirer (son planteur est <strong>remboursé</strong> de ses graines).
+      Les coûts se modifient dans <strong>api.php</strong> ($PLANTES).</p>
+      <div style="display:grid; grid-template-columns:repeat(8,1fr); gap:6px; background:#D9C7A7; border-radius:16px; padding:10px; max-width:520px;">
+        ${Array.from({ length: total }, (_, i) => {
+          const p = cases[i];
+          return p
+            ? `<button data-vider="${i}" title="${esc((plantes[p.plante]?.nom || p.plante) + " — " + p.par)}" style="aspect-ratio:1; border:none; border-radius:9px; background:#A7C79B; font-size:1.3rem; cursor:pointer;">${plantes[p.plante]?.emoji || "🌿"}</button>`
+            : `<div style="aspect-ratio:1; border-radius:9px; background:#CDB894;"></div>`;
+        }).join("")}
+      </div>
+    </div>
+    <div class="card">
+      <h2>Réinitialiser le jardin</h2>
+      <p class="hint">Vide toute la grille et rend à chacun l'<strong>intégralité</strong> de ses graines.
+      Les scores du classement ne bougent pas.</p>
+      <button class="btn danger" id="j-reset">Vider tout le jardin</button>
+    </div>`;
+
+  c.querySelectorAll("[data-vider]").forEach((el) => el.addEventListener("click", async () => {
+    const i = +el.dataset.vider;
+    const p = cases[i];
+    const nom = plantes[p.plante]?.nom || p.plante;
+    const cout = plantes[p.plante]?.cout || 0;
+    if (!confirm(`Retirer « ${nom} » planté par ${p.par} ?\n\n${p.par} sera remboursé de ${cout} graines.`)) return;
+    const r = await post("jardin_vider", { case: i });
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    message = { ok: true, texte: `${nom} retiré, ${p.par} remboursé de ${cout} graines.` };
+    await charger();
+  }));
+
+  $("#j-reset").addEventListener("click", async () => {
+    if (!confirm("Vider TOUT le jardin ?\n\nChaque joueur récupérera toutes ses graines.")) return;
+    if (!confirm("Confirmation : toutes les plantes seront retirées. Continuer ?")) return;
+    const r = await post("jardin_reset");
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    message = { ok: true, texte: "Jardin vidé, graines rendues à tous les joueurs." };
+    await charger();
+  });
+}
+
+/* ---------------------- ONGLET SIMULATION ---------------------- */
+
+// Format d'aperçu retenu entre deux affichages de l'onglet.
+let simFormat = "mobile";
+
+function vueSimulation() {
+  const c = $("#contenu");
+  c.innerHTML = `
+    <div class="card">
+      <h2>Vivre l'expérience joueur</h2>
+      <p class="hint">Ci-dessous, la <strong>vraie</strong> page des joueurs en mode simulation :
+      le quiz est jouable même avant le lancement, avec les vraies questions et le vrai jardin en décor —
+      mais <strong>rien n'est enregistré</strong> (ni score, ni plantation, ni code).
+      Le code bonus de test est <strong>FAMI-TEST</strong>.
+      Recharge la simulation pour tout effacer et recommencer autant de fois que tu veux.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="btn ${simFormat === "mobile" ? "" : "ghost"}" id="s-mobile">📱 Format téléphone</button>
+        <button class="btn ${simFormat === "large" ? "" : "ghost"}" id="s-large">🖥️ Format borne / grand écran</button>
+        <button class="btn ghost" id="s-restart">🔄 Recommencer à zéro</button>
+      </div>
+      <div style="display:flex; justify-content:center; background:#DDE9E0; border-radius:16px; padding:14px;">
+        <iframe id="s-frame" src="../index.html?simulation=1"
+          style="border:none; border-radius:14px; background:var(--brume); height:72vh; min-height:520px;
+                 width:${simFormat === "mobile" ? "390px" : "100%"}; max-width:100%;
+                 box-shadow:0 8px 30px rgba(14,59,36,.18);"></iframe>
+      </div>
+    </div>`;
+
+  const frame = $("#s-frame");
+  $("#s-mobile").addEventListener("click", () => { simFormat = "mobile"; vueSimulation(); });
+  $("#s-large").addEventListener("click", () => { simFormat = "large"; vueSimulation(); });
+  // Recharger l'iframe efface toute la simulation (elle ne vit qu'en mémoire).
+  $("#s-restart").addEventListener("click", () => {
+    frame.src = `../index.html?simulation=1&_=${Date.now()}`;
   });
 }
 
