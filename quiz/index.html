@@ -1092,10 +1092,10 @@ const FEE = (() => {
     "Bienvenue dans mon petit jardin enchanté 🌸",
   ];
   const PHRASES_EVENT = [
-    "Le 29 juillet à midi, ça démarre ici — reste dans le coin ! 🚀",
-    "30 questions et un jardin à faire fleurir ensemble… prêt·e ? 🌼",
-    "Des codes bonus se cachent en magasin, ouvre l'œil ! 👀",
-    "Reviens le 29 : il va pleuvoir des graines ! 🌱",
+    "Hâte d'être le jour J… je me demande quelles récompenses sont à gagner ! hihi ✨",
+    "J'ai trop hâte ! Il paraît qu'il y a de belles surprises à la clé… 🎁",
+    "Vivement le 29 ! Qui repartira avec les plus jolies récompenses ? hihi 🌟",
+    "Je brûle de curiosité… quels cadeaux se cachent pour les gagnants ? 🎁",
   ];
   const auHasard = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -1237,15 +1237,16 @@ const FEE = (() => {
     t = faitPousser(plantes[2], SPOTS[2], t);
     t = faitPousser(plantes[3], SPOTS[3], t);
 
-    // 4) retour au centre : UNE phrase qui donne envie de rester, puis 7 s d'attente
+    // 4) retour au centre : UNE phrase qui titille sur les recompenses, affichee 10 s
     timers.push(setTimeout(() => basCentre(), t));
     timers.push(setTimeout(() => parle(auHasard(PHRASES_EVENT)), t + 1500));
-    timers.push(setTimeout(() => seTait(), t + 1500 + 7000));
-    t += 1500 + 7000 + 500;
+    timers.push(setTimeout(() => seTait(), t + 1500 + 10000));
+    t += 1500 + 10000;
 
-    // 5) elle repart dans le coin, le jardin s'efface, la boucle recommence
-    timers.push(setTimeout(() => { coin(); semis.forEach(fane); semis = []; }, t));
-    timers.push(setTimeout(cycle, t + 2000));
+    // 5) elle repart dans le coin, le jardin s'efface, puis elle patiente 10 s
+    //    dans le coin avant que toute la boucle recommence.
+    timers.push(setTimeout(() => { coin(); semis.forEach(fane); semis = []; }, t + 300));
+    timers.push(setTimeout(cycle, t + 300 + 10000));
   }
 
   function start() {
