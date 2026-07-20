@@ -227,7 +227,7 @@ body {
    bras-baguette qui pivote, yeux qui clignent)
    ============================================================ */
 #feeFly {
-  position: fixed; z-index: 60; width: min(140px, 26vw); pointer-events: none;
+  position: fixed; z-index: 60; width: min(116px, 22vw); pointer-events: none;
   transition: left 1.4s cubic-bezier(.45,.05,.35,1), top 1.4s cubic-bezier(.45,.05,.35,1);
   filter: drop-shadow(0 6px 14px rgba(14,59,36,.25));
 }
@@ -275,14 +275,19 @@ body {
   100% { transform: translate(var(--dx), var(--dy)) scale(1.1) rotate(220deg); opacity: 0; }
 }
 
-/* Les plantes semées sur la page : elles SURGISSENT puis se balancent. */
-.fee-semis { position: fixed; z-index: 55; width: min(110px, 22vw); pointer-events: none;
-  filter: drop-shadow(0 4px 10px rgba(14,59,36,.2)); }
-.fee-semis svg { width: 100%; height: auto; display: block; animation: feePousse .6s cubic-bezier(.2,1.6,.4,1), feeBalance 3.2s ease-in-out .6s infinite; transform-origin: 110px 240px; }
-@keyframes feePousse { from { transform: scale(.12) translateY(26px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
-@keyframes feeBalance { 0%,100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
-.fee-semis.fane svg { animation: feeFane .8s ease-in forwards; }
-@keyframes feeFane { to { transform: scale(.2) translateY(30px); opacity: 0; } }
+/* Les plantes poussent le long du BAS de l'écran (elles ont un pot, c'est leur
+   place). D'abord une GRAINE tombe, puis elle devient la plante en grandissant
+   depuis le sol. Volontairement petites pour tenir ENTIÈREMENT dans l'écran. */
+.fee-semis { position: fixed; z-index: 55; bottom: 16px; width: min(64px, 13vw); pointer-events: none;
+  filter: drop-shadow(0 4px 8px rgba(14,59,36,.18)); }
+.fee-semis svg { width: 100%; height: auto; display: block; transform-origin: 50% 100%; }
+.fee-semis.graine svg { animation: graineTombe .5s ease-out; }
+@keyframes graineTombe { 0% { transform: translateY(-28px) scale(.6); opacity: 0; } 60% { opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+.fee-semis.grandit svg { animation: feeGrandit 1.9s cubic-bezier(.22,1,.32,1), feeBalance 3.4s ease-in-out 1.9s infinite; }
+@keyframes feeGrandit { 0% { transform: scale(.04); } 70% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes feeBalance { 0%,100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
+.fee-semis.fane svg { animation: feeFane .7s ease-in forwards; }
+@keyframes feeFane { to { transform: scale(.15) translateY(24px); opacity: 0; } }
 
 /* La bulle quand la fée parle (phase finale, en bas au milieu). */
 #feeBulle {
@@ -1078,84 +1083,126 @@ const FEE = (() => {
   const planteSvg = (cle) =>
     `<svg viewBox="40 20 140 240" xmlns="http://www.w3.org/2000/svg">${POT}${FEE_PLANTES[cle]}</svg>`;
 
-  // --- Les phrases de la fée (phase finale). À enrichir à volonté ! ---
-  const PHRASES = [
-    "Psst… le 29 juillet à midi, il va pleuvoir des graines ici ! 🌱",
-    "30 questions, un jardin collectif à faire fleurir… vous êtes prêts ? 🌼",
-    "Des sachets d'engrais sont cachés dans le magasin… premier arrivé, premier servi ! 👀",
-    "Ma baguette me chuchote qu'il y a des tickets glace dans les branches… 🍦",
-    "Qui décrochera le titre d'Arbre majestueux ? J'ai déjà ma petite idée… 🌳",
+  // --- Deux registres de phrases (elle ne dit qu'UNE phrase a la fois) ---
+  // 1) elle se presente / fait la maligne  2) elle donne envie de rester pour l'evenement.
+  const PHRASES_PRESENTE = [
+    "Coucou ! Moi c'est la fée Famiflora 🧚 je réveille les graines ✨",
+    "Un petit coup de baguette et hop, ça pousse ! 🌱",
+    "J'adore jardiner en attendant le grand jour… 🌷",
+    "Bienvenue dans mon petit jardin enchanté 🌸",
   ];
+  const PHRASES_EVENT = [
+    "Le 29 juillet à midi, ça démarre ici — reste dans le coin ! 🚀",
+    "30 questions et un jardin à faire fleurir ensemble… prêt·e ? 🌼",
+    "Des codes bonus se cachent en magasin, ouvre l'œil ! 👀",
+    "Reviens le 29 : il va pleuvoir des graines ! 🌱",
+  ];
+  const auHasard = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  // Les étapes du vol (positions en % de l'écran) et où poser chaque plante.
-  // Toutes en bordure : le compte à rebours et le texte restent dégagés.
-  const VOL = [
-    { fee: [8, 14],  plante: [2, 26] },
-    { fee: [6, 58],  plante: [1, 72] },
-    { fee: [78, 52], plante: [88, 66] },
-    { fee: [40, 74], plante: [30, 84] },
-    { fee: [66, 76], plante: [76, 84] },
-  ];
+  // La GRAINE : ce qui apparait AVANT la plante, dans le meme repere (viewBox)
+  // que les plantes, pour que la pousse jaillisse pile d'ou etait posee la graine.
+  const GRAINE_SVG = `<svg viewBox="40 20 140 240" xmlns="http://www.w3.org/2000/svg"><ellipse cx="110" cy="250" rx="34" ry="6" fill="#5C3A21" opacity=".45"/><g transform="translate(110,234)"><ellipse cx="0" cy="0" rx="11" ry="15" fill="#7A4A24"/><path d="M0 -15 Q 5 0 0 15 Q -5 0 0 -15 Z" fill="#8A5A2E"/><ellipse cx="-4" cy="-5" rx="3" ry="4.5" fill="#B07A45" opacity=".7"/></g></svg>`;
+
+  // Les 4 emplacements au sol (en vw), choisis pour que chaque plante tienne
+  // ENTIEREMENT a l'ecran (largeur d'une plante = 14vw, donc jamais au-dela de 90vw).
+  const SPOTS = [18, 38, 58, 76];
 
   let racine = null, bulle = null, timers = [], semis = [], actif = false;
   const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function poseFee(xPct, yPct) {
-    racine.style.left = xPct + "vw";
-    racine.style.top = yPct + "vh";
-  }
-  function coinDroit() { // le coin en haut à droite, quelle que soit la largeur d'écran
+  // BAS A DROITE : la position de repos de la fee.
+  function coin() {
     racine.style.left = `calc(100vw - ${racine.offsetWidth + 14}px)`;
-    racine.style.top = "14px";
+    racine.style.top  = `calc(100vh - ${racine.offsetHeight + 14}px)`;
+  }
+  // Centre en bas : quand elle s'adresse au public.
+  function basCentre() {
+    racine.style.left = `calc(50vw - ${racine.offsetWidth / 2}px)`;
+    racine.style.top  = `calc(100vh - ${racine.offsetHeight + 12}px)`;
+  }
+  // Juste a GAUCHE d'un emplacement : la plante poussera donc a sa DROITE, du
+  // cote de la baguette (fini les plantes posees n'importe ou sur la gauche).
+  function feePres(spotVw) {
+    const spotPx = spotVw / 100 * window.innerWidth;
+    let left = spotPx - racine.offsetWidth * 0.78;
+    left = Math.max(6, Math.min(left, window.innerWidth - racine.offsetWidth - 6));
+    racine.style.left = left + "px";
+    racine.style.top  = (window.innerHeight - racine.offsetHeight - 20) + "px";
   }
 
   function coupDeBaguette() {
     racine.classList.remove("cast");
-    void racine.offsetWidth;              // relance l'animation même si déjà jouée
+    void racine.offsetWidth;              // relance l'animation meme si deja jouee
     racine.classList.add("cast");
-    // les étincelles giclent depuis la baguette (en haut à droite de la fée)
     const r = racine.getBoundingClientRect();
     for (let i = 0; i < 7; i++) {
       const s = document.createElement("span");
       s.className = "fee-et";
-      s.style.left = (r.right - r.width * 0.12) + "px";
-      s.style.top = (r.top + r.height * 0.32) + "px";
-      s.style.setProperty("--dx", (30 + Math.random() * 80) * (Math.random() < 0.5 ? -1 : 1) + "px");
-      s.style.setProperty("--dy", (20 + Math.random() * 70) + "px");
+      s.style.left = (r.right - r.width * 0.14) + "px";
+      s.style.top = (r.top + r.height * 0.30) + "px";
+      s.style.setProperty("--dx", (30 + Math.random() * 70) * (Math.random() < 0.5 ? -1 : 1) + "px");
+      s.style.setProperty("--dy", (20 + Math.random() * 60) + "px");
       document.body.appendChild(s);
       setTimeout(() => s.remove(), 1400);
     }
   }
 
-  function seme(cle, xPct, yPct) {
+  // Seme : d'abord une GRAINE, qui devient la plante en ~1 s (puis grandit ~2 s).
+  function seme(cle, spotVw) {
     const d = document.createElement("div");
-    d.className = "fee-semis";
-    d.style.left = xPct + "vw";
-    d.style.top = yPct + "vh";
-    d.innerHTML = planteSvg(cle);
+    d.className = "fee-semis graine";
+    d.style.left = spotVw + "vw";
+    d.innerHTML = GRAINE_SVG;
     document.body.appendChild(d);
     semis.push(d);
-    // Jamais plus de 6 plantes : la plus ancienne se fane pour laisser la place.
-    while (semis.length > 6) { fane(semis.shift()); }
+    while (semis.length > 4) { fane(semis.shift()); }   // jamais plus de 4 : l'ecran respire
+    timers.push(setTimeout(() => {
+      if (!d.isConnected) return;
+      d.classList.remove("graine");
+      d.classList.add("grandit");
+      d.innerHTML = planteSvg(cle);
+    }, 1050));
   }
   function fane(el) {
     if (!el) return;
     el.classList.add("fane");
-    setTimeout(() => el.remove(), 900);
+    setTimeout(() => el.remove(), 800);
   }
 
   function parle(txt) {
     bulle.textContent = txt;
+    bulle.style.top = "";
+    bulle.style.bottom = (racine.offsetHeight + 16) + "px";
     bulle.classList.add("on");
-    // la bulle se pose juste au-dessus de la fée (elle est en bas au milieu)
-    bulle.style.bottom = (racine.offsetHeight + 26) + "px";
+    // Securite : la bulle ne doit JAMAIS recouvrir le texte « Quelque chose se
+    // prepare... ». Si elle remonte trop haut, on la redescend juste ce qu'il faut.
+    const info = document.querySelector(".cd-info");
+    if (info) {
+      const ib = info.getBoundingClientRect();
+      const bb = bulle.getBoundingClientRect();
+      if (bb.top < ib.bottom + 12) {
+        const trop = (ib.bottom + 12) - bb.top;
+        const bas = Math.max(6, racine.offsetHeight + 16 - trop);
+        bulle.style.bottom = bas + "px";
+      }
+    }
   }
   function seTait() { bulle.classList.remove("on"); }
 
-  // La tournée : plantes mélangées, mais l'ARBRE À TICKETS GLACE toujours dedans.
-  function tournee() {
-    const autres = shuffle(Object.keys(FEE_PLANTES).filter((k) => k !== "arbreGlace")).slice(0, VOL.length - 1);
+  // Une tournee = 4 plantes melangees, l'ARBRE A TICKETS GLACE toujours dedans.
+  function tournee4() {
+    const autres = shuffle(Object.keys(FEE_PLANTES).filter((k) => k !== "arbreGlace")).slice(0, 3);
     return shuffle([...autres, "arbreGlace"]);
+  }
+
+  // Fait pousser une plante a son emplacement : la fee s'y place, donne un coup
+  // de baguette, la graine tombe puis devient la plante. Renvoie l'instant OU la
+  // pousse est finie, pour enchainer proprement.
+  function faitPousser(cle, spotVw, t) {
+    timers.push(setTimeout(() => feePres(spotVw), t));
+    timers.push(setTimeout(() => coupDeBaguette(), t + 1500));
+    timers.push(setTimeout(() => seme(cle, spotVw), t + 1500 + 650));
+    return t + 1500 + 650 + 3200;
   }
 
   function cycle() {
@@ -1163,46 +1210,42 @@ const FEE = (() => {
     semis.forEach(fane); semis = [];
     seTait();
 
-    // Écrans "mouvement réduit" : la fée reste sagement dans son coin et tease.
+    // Ecrans « mouvement reduit » : la fee reste dans son coin et se contente de parler.
     if (reduit) {
-      coinDroit();
-      let i = 0;
-      bulle.style.bottom = "";
-      bulle.style.top = "16px";
-      parle(PHRASES[0]);
-      timers.push(setInterval(() => { i = (i + 1) % PHRASES.length; parle(PHRASES[i]); }, 6000));
+      coin();
+      let i = 0; const pool = PHRASES_PRESENTE.concat(PHRASES_EVENT);
+      parle(pool[0]);
+      timers.push(setInterval(() => { i = (i + 1) % pool.length; parle(pool[i]); }, 7000));
       return;
     }
 
-    // 0 s : dans le coin en haut à droite — le regard curieux tourne tout seul (CSS).
-    coinDroit();
+    const plantes = tournee4();
+    let t = 700;                 // un temps de repos dans le coin d'abord
+    coin();
 
-    // 15 → 35 s : la tournée magique (un vol + un coup de baguette + une plante toutes les 4 s).
-    const plantes = tournee();
-    VOL.forEach((etape, i) => {
-      timers.push(setTimeout(() => { poseFee(etape.fee[0], etape.fee[1]); }, 15000 + i * 4000));
-      timers.push(setTimeout(() => {
-        coupDeBaguette();
-        timers.push(setTimeout(() => seme(plantes[i], etape.plante[0], etape.plante[1]), 450));
-      }, 15000 + i * 4000 + 1500));
-    });
+    // 1) elle fait pousser 2 plantes (chacune a cote d'elle)
+    t = faitPousser(plantes[0], SPOTS[0], t);
+    t = faitPousser(plantes[1], SPOTS[1], t);
 
-    // 35 → 60 s : posée en bas au milieu, elle tease l'événement dans sa bulle.
-    timers.push(setTimeout(() => {
-      racine.style.left = `calc(50vw - ${racine.offsetWidth / 2}px)`;
-      racine.style.top = `calc(100vh - ${racine.offsetHeight + 12}px)`;
-    }, 35000));
-    PHRASES.forEach((ph, i) => {
-      timers.push(setTimeout(() => parle(ph), 36500 + i * 4700));
-    });
+    // 2) elle va au centre en bas et se presente : UNE phrase, ~5 s
+    timers.push(setTimeout(() => basCentre(), t));
+    timers.push(setTimeout(() => parle(auHasard(PHRASES_PRESENTE)), t + 1500));
+    timers.push(setTimeout(() => seTait(), t + 1500 + 5000));
+    t += 1500 + 5000 + 400;
 
-    // 60 s : tout s'efface en douceur, et la boucle repart.
-    timers.push(setTimeout(() => {
-      seTait();
-      semis.forEach(fane); semis = [];
-      coinDroit();
-      timers.push(setTimeout(cycle, 1600));
-    }, 60000));
+    // 3) elle fait pousser 2 nouvelles plantes
+    t = faitPousser(plantes[2], SPOTS[2], t);
+    t = faitPousser(plantes[3], SPOTS[3], t);
+
+    // 4) retour au centre : UNE phrase qui donne envie de rester, puis 7 s d'attente
+    timers.push(setTimeout(() => basCentre(), t));
+    timers.push(setTimeout(() => parle(auHasard(PHRASES_EVENT)), t + 1500));
+    timers.push(setTimeout(() => seTait(), t + 1500 + 7000));
+    t += 1500 + 7000 + 500;
+
+    // 5) elle repart dans le coin, le jardin s'efface, la boucle recommence
+    timers.push(setTimeout(() => { coin(); semis.forEach(fane); semis = []; }, t));
+    timers.push(setTimeout(cycle, t + 2000));
   }
 
   function start() {
@@ -1218,9 +1261,9 @@ const FEE = (() => {
       document.body.appendChild(bulle);
     }
     racine.style.display = "block";
-    // premier placement sans glissade : on coupe la transition un instant
+    // Premier placement sans glissade : on coupe la transition un instant.
     racine.style.transition = "none";
-    coinDroit();
+    coin();
     void racine.offsetWidth;
     racine.style.transition = "";
     cycle();
