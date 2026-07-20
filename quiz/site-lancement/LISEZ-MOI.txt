@@ -1,0 +1,70 @@
+═══════════════════════════════════════════════════════
+  🌱 SITE ÉVÉNEMENT — GUIDE D'INSTALLATION SUR IONOS
+═══════════════════════════════════════════════════════
+
+CONTENU DU DOSSIER
+------------------
+index.html        → le site (compte à rebours + quiz + classement)
+api.php           → le serveur (enregistre les scores et les codes bonus)
+data/.htaccess    → protège les fichiers de scores contre l'accès direct
+data/             → les scores (scores.json) et codes utilisés (codes.json)
+                    y seront créés automatiquement au premier passage
+
+INSTALLATION (5 MINUTES)
+------------------------
+1. Connecte-toi à ton espace IONOS → "Hébergement" → gestionnaire
+   de fichiers (ou via FTP avec FileZilla).
+2. Envoie TOUT le dossier tel quel dans le répertoire de ton site
+   (souvent la racine, ou un sous-dossier genre /quiz si tu préfères
+   une adresse comme tonsite.be/quiz).
+3. Ouvre l'adresse dans ton navigateur → ça doit fonctionner direct.
+   (PHP est activé par défaut sur les hébergements IONOS.)
+
+À PERSONNALISER AVANT LE 29/07
+------------------------------
+Dans index.html (ouvre-le avec VS Code) :
+  → les QUESTIONS (bloc "QUESTIONS" vers le haut du fichier)
+    "correct: 0" = la 1re option est la bonne, "correct: 1" = la 2e, etc.
+  → les dates si elles changent (CONFIG)
+  → le PIN admin (CONFIG.adminPin)
+
+Dans api.php :
+  → les CODES BONUS ($BONUS_CODES) — les mêmes que sur tes QR codes
+  → le PIN admin ($ADMIN_PIN) — mets le même que dans index.html
+
+MODE ADMIN
+----------
+Clique 5 fois rapidement sur le point orange à côté du logo,
+puis entre le PIN (2907 par défaut). Tu retrouves la navigation
+complète entre les 3 vues. C'est aussi comme ça que tu configures
+la télé : mode admin → vue "Compte à rebours" → plein écran.
+
+REMETTRE LES SCORES À ZÉRO (pour tes tests)
+-------------------------------------------
+Ouvre dans ton navigateur :
+  tonsite.be/api.php?action=reset&pin=2907
+⚠️ À ne PAS faire après le 29/07, ça efface tout le classement !
+
+QR CODES BONUS
+--------------
+Génère un QR code par code (ex : avec un générateur gratuit en ligne)
+qui affiche simplement le texte du code (FAMI-A7K2...).
+Le premier qui l'entre dans le quiz le "grille" pour les autres.
+
+TÉLÉ EN MODE KIOSQUE
+--------------------
+Sur le PC branché à la télé, lance Chrome ainsi (touche Windows + R) :
+  chrome --kiosk https://tonsite.be
+Plein écran verrouillé, sans barre d'adresse. Pense à désactiver
+la mise en veille du PC et de la télé.
+
+BON À SAVOIR
+------------
+• Le classement est commun à tout le monde et se rafraîchit
+  automatiquement toutes les 30 secondes (pratique pour la télé).
+• Une seule participation par prénom (vérifiée côté serveur).
+• Les réponses du quiz sont dans le code de la page : un collègue
+  très malin qui ouvre le code source pourrait les trouver.
+  Pour un quiz interne bon enfant, c'est largement suffisant —
+  et le mélange aléatoire des questions/réponses complique déjà
+  la copie entre collègues.
