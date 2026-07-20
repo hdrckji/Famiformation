@@ -23,6 +23,11 @@ if (!function_exists('mb_strlen')) {
 if (!function_exists('mb_strtolower')) {
   function mb_strtolower($s, $enc = null) { return strtolower((string)$s); }
 }
+if (!function_exists('mb_substr')) {
+  function mb_substr($s, $debut, $len = null, $enc = null) {
+    return $len === null ? substr((string)$s, $debut) : substr((string)$s, $debut, $len);
+  }
+}
 
 // 🔑 Codes bonus à usage unique (les mêmes que sur tes QR codes)
 $BONUS_CODES = [
@@ -53,8 +58,60 @@ if (!is_dir($dataDir)) {
   echo json_encode(['error' => 'Dossier de données inaccessible']);
   exit;
 }
-$scoresFile = $dataDir . '/scores.json';
-$codesFile  = $dataDir . '/codes.json';
+$scoresFile    = $dataDir . '/scores.json';
+$codesFile     = $dataDir . '/codes.json';
+$questionsFile = $dataDir . '/questions.json';
+
+// ❓ QUESTIONS PAR DÉFAUT. Elles ne servent qu'AU TOUT PREMIER lancement : dès que
+// tu enregistres tes questions depuis /quiz/admin, c'est questions.json qui fait
+// foi et cette liste n'est plus jamais consultée.
+$QUESTIONS_DEFAUT = [
+  ['q' => "En quelle année l'entreprise a-t-elle été fondée ?", 'options' => ["1995", "2001", "2008", "2015"], 'correct' => 1],
+  ['q' => "Combien de collègues travaillent chez nous aujourd'hui ?", 'options' => ["Moins de 30", "Entre 30 et 60", "Entre 60 et 100", "Plus de 100"], 'correct' => 2],
+  ['q' => "Quel est le rayon le plus visité du magasin ?", 'options' => ["Rayon A", "Rayon B", "Rayon C", "Rayon D"], 'correct' => 0],
+];
+
+/** Nettoie une question venant du navigateur (on ne fait jamais confiance à l'envoi). */
+function nettoieQuestion($item) {
+  $q = trim((string)($item['q'] ?? ''));
+  $opts = [];
+  foreach ((array)($item['options'] ?? []) as $o) {
+    $o = trim((string)$o);
+    if ($o !== '') { $opts[] = mb_substr($o, 0, 120); }
+  }
+  $correct = (int)($item['correct'] ?? 0);
+  if ($q === '' || count($opts) < 2) { return null; }          // inutilisable
+  if ($correct < 0 || $correct >= count($opts)) { $correct = 0; } // index hors liste
+  return ['q' => mb_substr($q, 0, 300), 'options' => $opts, 'correct' => $correct];
+}
+
+/** Les questions en vigueur (fichier si présent, sinon la liste par défaut). */
+function lesQuestions($fichier, $defaut) {
+  $d = readJson($fichier);
+  $out = [];
+  foreach ($d as $item) {
+    $c = nettoieQuestion($item);
+    if ($c) { $out[] = $c; }
+  }
+  return $out ?: $defaut;
+}
+
+/**
+ * Porte d'entrée des actions d'administration.
+ * Les identifiants sont revérifiés À CHAQUE appel : le « mode admin » du
+ * navigateur n'est qu'un affichage, il ne protège rien. Sans cette vérification
+ * ici, n'importe qui pourrait appeler l'action directement et vider le classement.
+ */
+function exigeAdmin($input) {
+  global $ADMIN_ID, $ADMIN_PWD;
+  $id  = trim($input['id'] ?? '');
+  $pwd = (string)($input['pwd'] ?? '');
+  if (!hash_equals($ADMIN_ID, $id) || !hash_equals($ADMIN_PWD, $pwd)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Acces refuse']);
+    exit;
+  }
+}
 
 /**
  * LECTURE SEULE (verrou partagé : plusieurs lecteurs en même temps, c'est permis).
@@ -238,6 +295,69 @@ switch ($action) {
       break;
     }
     echo json_encode(['ok' => true]);
+    break;
+  }
+
+  // ❓ Les questions du quiz (appelé par la page joueur au chargement).
+  case 'questions': {
+    echo json_encode(lesQuestions($questionsFile, $QUESTIONS_DEFAUT), JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // ✏️ Enregistrer les questions (admin). Remplace la liste entière.
+  case 'questions_save': {
+    exigeAdmin($input);
+    $propres = [];
+    foreach ((array)($input['questions'] ?? []) as $item) {
+      $c = nettoieQuestion($item);
+      if ($c) { $propres[] = $c; }
+    }
+    if (!$propres) {
+      http_response_code(400);
+      echo json_encode(['error' => 'Il faut au moins une question valide (un intitulé et deux réponses).']);
+      break;
+    }
+    writeJson($questionsFile, $propres);
+    echo json_encode(['ok' => true, 'total' => count($propres)]);
+    break;
+  }
+
+  // 📋 Tableau de bord admin : classement détaillé + état des codes + questions.
+  case 'admin_data': {
+    exigeAdmin($input);
+    $board = readJson($scoresFile);
+    sortBoard($board);
+    $pris = readJson($codesFile);
+    $codes = [];
+    foreach ($BONUS_CODES as $c) {
+      $codes[] = [
+        'code' => $c,
+        'pris' => isset($pris[$c]),
+        'par'  => $pris[$c]['par'] ?? null,
+        'date' => $pris[$c]['date'] ?? null,
+      ];
+    }
+    echo json_encode([
+      'board'     => $board,
+      'codes'     => $codes,
+      'questions' => lesQuestions($questionsFile, $QUESTIONS_DEFAUT),
+    ], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🗑️ Retirer un participant du classement (erreur de prénom, test, doublon…).
+  case 'player_delete': {
+    exigeAdmin($input);
+    $nom = trim($input['name'] ?? '');
+    $res = withLock($scoresFile, function (&$board, &$write) use ($nom) {
+      $avant = count($board);
+      $board = array_values(array_filter($board, function ($p) use ($nom) {
+        return mb_strtolower($p['name'] ?? '') !== mb_strtolower($nom);
+      }));
+      $write = count($board) !== $avant;
+      return ['ok' => $write, 'board' => $board];
+    });
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
     break;
   }
 

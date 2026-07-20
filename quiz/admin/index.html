@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Quiz — Administration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --pousse: #1E7A46;
+  --foret: #0E3B24;
+  --brume: #EAF4EC;
+  --soleil: #FFC53D;
+  --craie: #FFFFFF;
+  --corail: #FF6B5E;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh; background: var(--brume);
+  font-family: 'Nunito Sans', system-ui, sans-serif; color: var(--foret);
+  padding: 24px 16px 80px;
+}
+.wrap { max-width: 900px; margin: 0 auto; }
+h1 { font-family: 'Fredoka', sans-serif; font-size: 1.6rem; color: var(--pousse); }
+h2 { font-family: 'Fredoka', sans-serif; font-size: 1.2rem; margin-bottom: 14px; }
+.sub { opacity: .75; font-weight: 600; font-size: .95rem; margin-bottom: 22px; }
+.card { background: var(--craie); border-radius: 20px; padding: 24px; margin-bottom: 20px;
+        box-shadow: 0 6px 24px rgba(14,59,36,.09); }
+.btn { border: none; cursor: pointer; background: var(--pousse); color: var(--craie);
+       font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1rem;
+       padding: 11px 24px; border-radius: 999px; }
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--pousse); border: 2px solid var(--pousse); }
+.btn.danger { background: var(--corail); }
+.btn.small { font-size: .85rem; padding: 7px 14px; }
+.field { width: 100%; padding: 11px 14px; border-radius: 12px; border: 2px solid #cfe3d4;
+         font: inherit; font-weight: 600; background: #fbfdfb; color: var(--foret); margin-bottom: 12px; }
+.field:focus { outline: none; border-color: var(--pousse); }
+.alert { background: #FFF3E8; border-radius: 12px; padding: 12px 16px; font-weight: 700;
+         color: #A34A00; margin-bottom: 14px; }
+.alert.ok { background: #E7F6EC; color: var(--pousse); }
+.hint { font-size: .88rem; opacity: .72; line-height: 1.55; margin-bottom: 14px; }
+.tabs { display: flex; gap: 8px; background: var(--craie); padding: 6px; border-radius: 999px;
+        margin-bottom: 22px; flex-wrap: wrap; box-shadow: 0 4px 18px rgba(14,59,36,.09); }
+.tabs button { border: none; background: transparent; cursor: pointer; font-family: 'Fredoka', sans-serif;
+               font-weight: 600; color: var(--foret); padding: 10px 18px; border-radius: 999px; }
+.tabs button.on { background: var(--pousse); color: var(--craie); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e3eee6; font-weight: 600; }
+th { font-family: 'Fredoka', sans-serif; color: var(--pousse); font-size: .9rem; }
+td.num { font-variant-numeric: tabular-nums; }
+.qbloc { border: 2px solid #e3eee6; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+.qbloc .qtitre { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.qbloc .qnum { font-family: 'Fredoka', sans-serif; color: var(--pousse); font-weight: 700; }
+.opt { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.opt input[type=text] { flex: 1; margin-bottom: 0; }
+.opt label { font-size: .82rem; font-weight: 700; opacity: .8; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+.barre-bas { position: sticky; bottom: 0; background: var(--craie); border-radius: 16px;
+             padding: 14px 18px; margin-top: 18px; display: flex; gap: 12px; align-items: center;
+             flex-wrap: wrap; box-shadow: 0 -4px 20px rgba(14,59,36,.12); }
+.pris { color: var(--corail); font-weight: 800; }
+.libre { color: var(--pousse); font-weight: 800; }
+.center { text-align: center; }
+.login { max-width: 380px; margin: 60px auto; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Quiz — Administration</h1>
+  <div class="sub">Famiformation · gestion des questions et du classement</div>
+  <div id="app"></div>
+</div>
+
+<script>
+/* ============================================================
+   ⚙️ PAGE D'ADMINISTRATION DU QUIZ
+
+   Elle est SÉPARÉE de la page des joueurs (/quiz) : plus de clic secret,
+   plus de mode caché dans la page publique.
+
+   ⚠️ Ce que cette page protège vraiment : RIEN par elle-même. Le mot de passe
+   n'ouvre que l'affichage. Ce sont les actions d'api.php qui revérifient les
+   identifiants à chaque appel — c'est là qu'est la vraie serrure.
+   ============================================================ */
+
+const API = "../api.php";
+const $ = (s, r = document) => r.querySelector(s);
+const app = $("#app");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Identifiants gardés en mémoire le temps de la session (jamais dans le stockage
+// du navigateur : sur un PC de magasin partagé, ça resterait après le départ).
+let auth = null;
+let vue = "questions";
+let data = { board: [], codes: [], questions: [] };
+let brouillon = [];      // les questions en cours d'édition
+let message = null;
+
+async function post(action, corps = {}) {
+  const r = await fetch(`${API}?action=${action}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...(auth || {}), ...corps }),
+  });
+  let d = null;
+  try { d = await r.json(); } catch { d = null; }
+  return { ok: r.ok, status: r.status, data: d };
+}
+
+/* ---------------------- CONNEXION ---------------------- */
+
+function vueConnexion(err) {
+  app.innerHTML = `
+    <div class="card login">
+      <h2>Connexion</h2>
+      ${err ? `<div class="alert">${esc(err)}</div>` : ""}
+      <input class="field" id="l-id" autocomplete="username" placeholder="Identifiant">
+      <input class="field" id="l-pwd" type="password" autocomplete="current-password" placeholder="Mot de passe">
+      <button class="btn" id="l-ok" style="width:100%">Entrer</button>
+    </div>`;
+  $("#l-id").focus();
+  const go = (e) => e.key === "Enter" && $("#l-ok").click();
+  $("#l-id").addEventListener("keydown", go);
+  $("#l-pwd").addEventListener("keydown", go);
+  $("#l-ok").addEventListener("click", async () => {
+    $("#l-ok").disabled = true;
+    const id = $("#l-id").value.trim(), pwd = $("#l-pwd").value;
+    const r = await fetch(`${API}?action=login`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, pwd }),
+    }).catch(() => null);
+    if (r && r.ok) {
+      auth = { id, pwd };
+      await charger();
+      return;
+    }
+    // On ne dit pas LEQUEL des deux est faux : inutile d'aider qui tâtonne.
+    vueConnexion("Identifiant ou mot de passe incorrect.");
+  });
+}
+
+/* ---------------------- CHARGEMENT ---------------------- */
+
+async function charger() {
+  const r = await post("admin_data");
+  if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+  if (!r.ok || !r.data) { app.innerHTML = `<div class="card"><div class="alert">Le serveur ne répond pas. Réessaie dans un instant.</div></div>`; return; }
+  data = r.data;
+  brouillon = JSON.parse(JSON.stringify(data.questions));   // copie : on édite sans toucher à l'original
+  rendre();
+}
+
+/* ---------------------- MISE EN PAGE ---------------------- */
+
+function rendre() {
+  const onglets = [
+    ["questions", "❓ Questions"],
+    ["classement", "🏆 Classement"],
+    ["codes", "🎁 Codes bonus"],
+  ];
+  app.innerHTML = `
+    <div class="tabs">
+      ${onglets.map(([k, l]) => `<button data-v="${k}" class="${vue === k ? "on" : ""}">${l}</button>`).join("")}
+      <button data-v="deconnexion">🚪 Déconnexion</button>
+    </div>
+    ${message ? `<div class="alert ${message.ok ? "ok" : ""}">${esc(message.texte)}</div>` : ""}
+    <div id="contenu"></div>`;
+  app.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.v === "deconnexion") { auth = null; vueConnexion(); return; }
+    vue = b.dataset.v; message = null; rendre();
+  }));
+
+  if (vue === "questions") vueQuestions();
+  else if (vue === "classement") vueClassement();
+  else vueCodes();
+}
+
+/* ---------------------- ONGLET QUESTIONS ---------------------- */
+
+function vueQuestions() {
+  const c = $("#contenu");
+  c.innerHTML = `
+    <div class="card">
+      <h2>Les questions du quiz</h2>
+      <p class="hint">Coche la bonne réponse de chaque question. Une question a besoin d'un
+      intitulé et d'au moins deux réponses ; les cases laissées vides sont ignorées.
+      <br><strong>Rien n'est enregistré tant que tu n'as pas cliqué sur « Enregistrer ».</strong></p>
+      <div id="liste"></div>
+      <button class="btn ghost" id="q-ajouter">+ Ajouter une question</button>
+    </div>
+    <div class="barre-bas">
+      <button class="btn" id="q-save">💾 Enregistrer les questions</button>
+      <button class="btn ghost" id="q-annuler">Annuler mes modifications</button>
+      <span class="hint" style="margin:0;" id="q-compte"></span>
+    </div>`;
+
+  dessineListe();
+
+  $("#q-ajouter").addEventListener("click", () => {
+    brouillon.push({ q: "", options: ["", "", "", ""], correct: 0 });
+    dessineListe();
+  });
+  $("#q-annuler").addEventListener("click", () => {
+    brouillon = JSON.parse(JSON.stringify(data.questions));
+    message = null;
+    dessineListe();
+  });
+  $("#q-save").addEventListener("click", async () => {
+    $("#q-save").disabled = true;
+    const r = await post("questions_save", { questions: brouillon });
+    $("#q-save").disabled = false;
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    if (!r.ok) {
+      message = { ok: false, texte: (r.data && r.data.error) || "Enregistrement impossible." };
+      rendre(); return;
+    }
+    message = { ok: true, texte: `${r.data.total} question(s) enregistrée(s). Les joueurs les verront immédiatement.` };
+    await charger();
+  });
+}
+
+function dessineListe() {
+  const liste = $("#liste");
+  if (!liste) return;
+  liste.innerHTML = brouillon.map((q, i) => `
+    <div class="qbloc">
+      <div class="qtitre">
+        <span class="qnum">Question ${i + 1}</span>
+        <span>
+          <button class="btn ghost small" data-monte="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button class="btn ghost small" data-descend="${i}" ${i === brouillon.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="btn danger small" data-suppr="${i}">Supprimer</button>
+        </span>
+      </div>
+      <input class="field" data-q="${i}" placeholder="Intitulé de la question" value="${esc(q.q)}">
+      ${q.options.map((o, j) => `
+        <div class="opt">
+          <label><input type="radio" name="bonne${i}" data-bonne="${i}-${j}" ${q.correct === j ? "checked" : ""}> bonne</label>
+          <input type="text" class="field" data-opt="${i}-${j}" placeholder="Réponse ${j + 1}" value="${esc(o)}">
+          <button class="btn ghost small" data-optsuppr="${i}-${j}" ${q.options.length <= 2 ? "disabled" : ""}>✕</button>
+        </div>`).join("")}
+      <button class="btn ghost small" data-optadd="${i}">+ réponse</button>
+    </div>`).join("") || `<p class="hint">Aucune question pour l'instant. Clique sur « Ajouter une question ».</p>`;
+
+  const cpt = $("#q-compte");
+  if (cpt) cpt.textContent = `${brouillon.length} question(s) dans le quiz`;
+
+  // Saisie : on met à jour le brouillon sans redessiner (sinon on perdrait le
+  // curseur à chaque lettre tapée).
+  liste.querySelectorAll("[data-q]").forEach((el) => el.addEventListener("input", () => {
+    brouillon[+el.dataset.q].q = el.value;
+  }));
+  liste.querySelectorAll("[data-opt]").forEach((el) => el.addEventListener("input", () => {
+    const [i, j] = el.dataset.opt.split("-").map(Number);
+    brouillon[i].options[j] = el.value;
+  }));
+  liste.querySelectorAll("[data-bonne]").forEach((el) => el.addEventListener("change", () => {
+    const [i, j] = el.dataset.bonne.split("-").map(Number);
+    brouillon[i].correct = j;
+  }));
+  liste.querySelectorAll("[data-suppr]").forEach((el) => el.addEventListener("click", () => {
+    brouillon.splice(+el.dataset.suppr, 1); dessineListe();
+  }));
+  liste.querySelectorAll("[data-monte]").forEach((el) => el.addEventListener("click", () => {
+    const i = +el.dataset.monte;
+    [brouillon[i - 1], brouillon[i]] = [brouillon[i], brouillon[i - 1]]; dessineListe();
+  }));
+  liste.querySelectorAll("[data-descend]").forEach((el) => el.addEventListener("click", () => {
+    const i = +el.dataset.descend;
+    [brouillon[i + 1], brouillon[i]] = [brouillon[i], brouillon[i + 1]]; dessineListe();
+  }));
+  liste.querySelectorAll("[data-optadd]").forEach((el) => el.addEventListener("click", () => {
+    brouillon[+el.dataset.optadd].options.push(""); dessineListe();
+  }));
+  liste.querySelectorAll("[data-optsuppr]").forEach((el) => el.addEventListener("click", () => {
+    const [i, j] = el.dataset.optsuppr.split("-").map(Number);
+    brouillon[i].options.splice(j, 1);
+    // La bonne réponse suivait peut-être l'option supprimée : on la recale.
+    if (brouillon[i].correct >= brouillon[i].options.length) brouillon[i].correct = 0;
+    else if (brouillon[i].correct > j) brouillon[i].correct--;
+    dessineListe();
+  }));
+}
+
+/* ---------------------- ONGLET CLASSEMENT ---------------------- */
+
+function vueClassement() {
+  const c = $("#contenu");
+  const b = data.board;
+  c.innerHTML = `
+    <div class="card">
+      <h2>Classement complet — ${b.length} participant(s)</h2>
+      ${b.length ? `
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>#</th><th>Prénom</th><th>Points</th><th>Bonnes réponses</th><th>Codes</th><th>Temps</th><th></th></tr>
+        ${b.map((p, i) => `
+          <tr>
+            <td class="num">${i + 1}</td>
+            <td>${esc(p.name)}</td>
+            <td class="num"><strong>${p.score}</strong></td>
+            <td class="num">${p.correct}</td>
+            <td class="num">${p.codes}</td>
+            <td class="num">${Math.floor(p.time / 60)} min ${p.time % 60} s</td>
+            <td><button class="btn danger small" data-del="${esc(p.name)}">Retirer</button></td>
+          </tr>`).join("")}
+      </table></div>` : `<p class="hint">Personne n'a encore joué.</p>`}
+    </div>
+    <div class="card">
+      <h2>Remise à zéro</h2>
+      <p class="hint">Efface <strong>tous</strong> les scores et libère <strong>tous</strong> les codes bonus.
+      À réserver aux tests : après le lancement, ça effacerait le classement réel, sans retour possible.</p>
+      <button class="btn danger" id="c-reset">Tout remettre à zéro</button>
+    </div>`;
+
+  c.querySelectorAll("[data-del]").forEach((el) => el.addEventListener("click", async () => {
+    const nom = el.dataset.del;
+    if (!confirm(`Retirer « ${nom} » du classement ?\n\nCette personne pourra rejouer.`)) return;
+    const r = await post("player_delete", { name: nom });
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    message = { ok: true, texte: `« ${nom} » retiré du classement.` };
+    await charger();
+  }));
+
+  $("#c-reset").addEventListener("click", async () => {
+    if (!confirm("Effacer TOUS les scores et libérer TOUS les codes bonus ?\n\nCette action est irréversible.")) return;
+    if (!confirm("Confirmation : le classement sera définitivement vidé. Continuer ?")) return;
+    const r = await fetch(`${API}?action=reset&pin=${encodeURIComponent(auth.pwd)}`).catch(() => null);
+    if (!r || !r.ok) { message = { ok: false, texte: "La remise à zéro a échoué." }; rendre(); return; }
+    message = { ok: true, texte: "Scores et codes remis à zéro." };
+    await charger();
+  });
+}
+
+/* ---------------------- ONGLET CODES BONUS ---------------------- */
+
+function vueCodes() {
+  const c = $("#contenu");
+  const libres = data.codes.filter((x) => !x.pris).length;
+  c.innerHTML = `
+    <div class="card">
+      <h2>Codes bonus — ${libres} libre(s) sur ${data.codes.length}</h2>
+      <p class="hint">Chaque code ne peut être utilisé qu'une fois : le premier qui le saisit le prend
+      pour de bon. Les codes se modifient dans <strong>api.php</strong> ($BONUS_CODES), pour qu'ils
+      correspondent à tes QR codes.</p>
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>Code</th><th>État</th><th>Récupéré par</th><th>Quand</th></tr>
+        ${data.codes.map((x) => `
+          <tr>
+            <td><strong>${esc(x.code)}</strong></td>
+            <td class="${x.pris ? "pris" : "libre"}">${x.pris ? "Pris" : "Libre"}</td>
+            <td>${x.par ? esc(x.par) : "—"}</td>
+            <td>${x.date ? esc(new Date(x.date).toLocaleString("fr-BE")) : "—"}</td>
+          </tr>`).join("")}
+      </table></div>
+    </div>`;
+}
+
+/* ---------------------- DÉMARRAGE ---------------------- */
+vueConnexion();
+</script>
+</body>
+</html>

@@ -2,13 +2,21 @@
   🌱 SITE ÉVÉNEMENT — GUIDE D'INSTALLATION SUR IONOS
 ═══════════════════════════════════════════════════════
 
+DEUX ADRESSES, DEUX PAGES
+-------------------------
+  tonsite.be/quiz/         → LES JOUEURS. Compte à rebours, quiz, classement.
+                             Rien d'autre : aucun accès caché.
+  tonsite.be/quiz/admin/   → TOI. Identifiant + mot de passe, puis la gestion
+                             des questions, le classement et les codes bonus.
+
 CONTENU DU DOSSIER
 ------------------
-index.html        → le site (compte à rebours + quiz + classement)
-api.php           → le serveur (enregistre les scores et les codes bonus)
-data/.htaccess    → protège les fichiers de scores contre l'accès direct
-data/             → les scores (scores.json) et codes utilisés (codes.json)
-                    y seront créés automatiquement au premier passage
+index.html        → la page des joueurs
+admin/index.html  → la page d'administration
+api.php           → le serveur (scores, codes bonus, questions)
+data/.htaccess    → protège les fichiers de données contre l'accès direct
+data/             → scores.json, codes.json et questions.json y sont créés
+                    automatiquement (ne pas les mettre dans le dépôt Git)
 
 INSTALLATION (5 MINUTES)
 ------------------------
@@ -20,33 +28,48 @@ INSTALLATION (5 MINUTES)
 3. Ouvre l'adresse dans ton navigateur → ça doit fonctionner direct.
    (PHP est activé par défaut sur les hébergements IONOS.)
 
-À PERSONNALISER AVANT LE 29/07
-------------------------------
-Dans index.html (ouvre-le avec VS Code) :
-  → les QUESTIONS (bloc "QUESTIONS" vers le haut du fichier)
-    "correct: 0" = la 1re option est la bonne, "correct: 1" = la 2e, etc.
-  → les dates si elles changent (CONFIG)
+LES QUESTIONS : PLUS BESOIN DE TOUCHER AU CODE
+----------------------------------------------
+Va sur tonsite.be/quiz/admin/ → onglet "Questions".
+Tu ajoutes, modifies, réordonnes et supprimes tes questions,
+tu coches la bonne réponse, tu cliques "Enregistrer".
+Les joueurs voient les nouvelles questions immédiatement.
+
+Elles sont stockées dans data/questions.json. Tant que tu n'as rien
+enregistré, ce sont trois questions d'exemple qui s'affichent.
+
+À PERSONNALISER DANS LE CODE (le reste)
+---------------------------------------
+Dans index.html :
+  → les DATES si elles changent (bloc CONFIG en haut du script)
 
 Dans api.php :
   → les CODES BONUS ($BONUS_CODES) — les mêmes que sur tes QR codes
   → les IDENTIFIANTS ADMIN ($ADMIN_ID / $ADMIN_PWD)
 
-MODE ADMIN
-----------
-Clique 5 fois rapidement sur le point orange à côté du logo,
-puis entre l'identifiant et le mot de passe (admin / a par défaut).
-Tu retrouves la navigation complète entre les 3 vues. C'est aussi
-comme ça que tu configures la télé : mode admin → vue "Compte à
-rebours" → plein écran.
+⚠️ Le mot de passe livré est "a" : parfait pour tes tests, beaucoup
+trop faible pour le jour J. Il donne accès à la remise à zéro, donc
+à l'effacement de tout le classement. Change-le avant le 29/07.
 
-Les identifiants ne sont PLUS dans index.html : ils sont vérifiés
-par api.php, donc invisibles dans le code source de la page.
+ADMINISTRATION
+--------------
+tonsite.be/quiz/admin/ — trois onglets :
+  → Questions   : l'éditeur décrit ci-dessus
+  → Classement  : tous les participants (score, bonnes réponses, temps),
+                  retrait d'une personne, remise à zéro complète
+  → Codes bonus : quels QR codes sont pris, par qui et quand
+
+Les identifiants ne sont écrits dans AUCUNE page : api.php les
+revérifie à chaque action. Le mot de passe n'est donc pas visible
+via "afficher le code source", et personne ne peut appeler une
+action d'administration sans le connaître.
 
 REMETTRE LES SCORES À ZÉRO (pour tes tests)
 -------------------------------------------
-Ouvre dans ton navigateur (le "pin" = le mot de passe admin) :
-  tonsite.be/api.php?action=reset&pin=a
+Bouton dans l'onglet "Classement" (double confirmation), ou :
+  tonsite.be/quiz/api.php?action=reset&pin=LE_MOT_DE_PASSE
 ⚠️ À ne PAS faire après le 29/07, ça efface tout le classement !
+Les questions, elles, ne sont pas touchées par la remise à zéro.
 
 QR CODES BONUS
 --------------

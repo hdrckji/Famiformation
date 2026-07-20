@@ -35,6 +35,13 @@
 		@quizIndex path /quiz /quiz/
 		rewrite @quizIndex /quiz/index.html
 
+		# Meme chose pour la page d'administration. Le / final est impose d'abord :
+		# la page appelle "../api.php", qui ne pointe au bon endroit que depuis
+		# /quiz/admin/ (depuis /quiz/admin, ".." remonterait a la racine du site).
+		redir /quiz/admin /quiz/admin/ 308
+		@quizAdmin path /quiz/admin/
+		rewrite @quizAdmin /quiz/admin/index.html
+
 		# Bloque les fichiers caches (.env, .htaccess, .gitignore, ...)
 		@dotfiles path_regexp dotfiles /\.[^/]+$
 		respond @dotfiles 403

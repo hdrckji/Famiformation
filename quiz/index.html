@@ -155,12 +155,10 @@ body {
 <body>
 
 <header class="fami-head">
-  <div class="fami-logo">Famiformation <span id="secret-dot">●</span></div>
+  <div class="fami-logo">Famiformation <span>●</span></div>
   <div class="fami-tag">Le grand quiz de lancement</div>
 </header>
 
-<div id="pin-box" style="display:none" class="card" ></div>
-<nav id="admin-nav" class="fami-nav" style="display:none" aria-label="Sections (admin)"></nav>
 <main id="app" style="width:100%; display:flex; flex-direction:column; align-items:center;"></main>
 
 <script>
@@ -180,9 +178,11 @@ const CONFIG = {
   api: "api.php",
 };
 
-// ❓ QUESTIONS — remplace-les par les tiennes
-// "correct" = index de la bonne réponse (0 = première option)
-const QUESTIONS = [
+// ❓ LES QUESTIONS NE SONT PLUS ÉCRITES ICI.
+// Elles se modifient depuis /quiz/admin et sont servies par api.php. La liste
+// ci-dessous n'est qu'un SECOURS : elle ne s'affiche que si le serveur ne répond
+// pas, pour qu'un incident réseau ne laisse jamais un joueur devant une page vide.
+let QUESTIONS = [
   { q: "En quelle année l'entreprise a-t-elle été fondée ?", options: ["1995", "2001", "2008", "2015"], correct: 1 },
   { q: "Combien de collègues travaillent chez nous aujourd'hui ?", options: ["Moins de 30", "Entre 30 et 60", "Entre 60 et 100", "Plus de 100"], correct: 2 },
   { q: "Quel est le rayon le plus visité du magasin ?", options: ["Rayon A", "Rayon B", "Rayon C", "Rayon D"], correct: 0 },
@@ -229,14 +229,15 @@ async function apiClaimCode(code, name) {
   });
   return await r.json();
 }
-async function apiLogin(id, pwd) {
+// Récupère les questions saisies dans /quiz/admin. En cas d'échec on garde la
+// liste de secours déjà chargée : mieux vaut un quiz de secours qu'un écran vide.
+async function apiQuestions() {
   try {
-    const r = await fetch(`${CONFIG.api}?action=login`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, pwd }),
-    });
-    return r.ok && (await r.json()).ok === true;
-  } catch { return false; }
+    const r = await fetch(`${CONFIG.api}?action=questions`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (Array.isArray(d) && d.length) ? d : null;
+  } catch { return null; }
 }
 async function apiSubmit(entry) {
   const r = await fetch(`${CONFIG.api}?action=submit`, {
@@ -282,8 +283,6 @@ function phaseNow() {
    ============================================================ */
 
 let board = [];
-let admin = false;
-let adminView = "countdown";
 let userView = "auto";       // auto | board (après avoir joué)
 let quiz = null;             // état de la partie en cours
 let tickTimer = null;
@@ -294,10 +293,12 @@ async function refreshBoard() {
   const v = currentView();
   if (v === "countdown" || v === "board") render();
 }
-setInterval(refreshBoard, 30000); // auto-refresh (mode TV)
+setInterval(refreshBoard, 30000); // auto-refresh
 
+// Cette page ne montre QUE ce que voit un joueur : le compte à rebours avant
+// l'ouverture, le quiz pendant, le classement après avoir joué. La gestion se
+// fait sur une page séparée (/quiz/admin), plus de clic secret ici.
 function currentView() {
-  if (admin) return adminView;
   const phase = phaseNow();
   if (phase === "avant") return "countdown";
   if (phase === "termine") return "countdown";
@@ -364,15 +365,8 @@ function renderCountdown() {
 
 function renderQuiz() {
   clearInterval(tickTimer);
-  if (phaseNow() !== "ouvert" && !admin) { render(); return; }
-
-  if (phaseNow() !== "ouvert" && admin) {
-    app.innerHTML = `<div class="card center">
-      <h2 class="q-text">🔒 Le quiz n'est pas encore ouvert</h2>
-      <p class="hint">Il sera disponible du 29 juillet au 30 août.<br>
-      Garde l'œil ouvert en magasin, des codes bonus s'y cachent... 👀</p></div>`;
-    return;
-  }
+  // Hors période d'ouverture, on repasse au compte à rebours.
+  if (phaseNow() !== "ouvert") { render(); return; }
 
   if (!quiz) quiz = { step: "intro", name: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, codes: [], codeMsg: null, start: 0, score: 0 };
 
@@ -466,7 +460,7 @@ function renderQuiz() {
     <button class="btn" id="q-board">Voir le classement 🏆</button>
   </div>`;
   $("#q-board").addEventListener("click", () => {
-    if (admin) adminView = "board"; else userView = "board";
+    userView = "board";
     quiz = null;
     render();
   });
@@ -510,73 +504,6 @@ function renderBoard() {
 }
 
 /* ============================================================
-   🔐 ADMIN (5 clics sur le point du logo + PIN)
-   ============================================================ */
-
-let clicks = 0, clickTimer = null;
-$("#secret-dot").addEventListener("click", () => {
-  clicks++;
-  clearTimeout(clickTimer);
-  clickTimer = setTimeout(() => { clicks = 0; }, 1500);
-  if (clicks >= 5) { clicks = 0; showPin(); }
-});
-
-function showPin() {
-  const box = $("#pin-box");
-  box.style.display = "block";
-  box.style.maxWidth = "340px";
-  box.style.marginBottom = "22px";
-  box.style.textAlign = "center";
-  box.innerHTML = `
-    <p class="hint">Accès admin</p>
-    <div id="pin-err"></div>
-    <input class="field" id="pin-id" autocomplete="username" placeholder="Identifiant">
-    <input class="field" id="pin-pwd" type="password" autocomplete="current-password" placeholder="Mot de passe">
-    <div style="display:flex; gap:8px; justify-content:center;">
-      <button class="btn ghost" id="pin-cancel">Annuler</button>
-      <button class="btn" id="pin-ok">Entrer</button>
-    </div>`;
-  $("#pin-id").focus();
-  const valide = (e) => e.key === "Enter" && $("#pin-ok").click();
-  $("#pin-id").addEventListener("keydown", valide);
-  $("#pin-pwd").addEventListener("keydown", valide);
-  $("#pin-cancel").addEventListener("click", () => { box.style.display = "none"; });
-  $("#pin-ok").addEventListener("click", async () => {
-    $("#pin-ok").disabled = true;
-    const ok = await apiLogin($("#pin-id").value.trim(), $("#pin-pwd").value);
-    if (ok) {
-      admin = true; box.style.display = "none"; renderAdminNav(); render();
-      return;
-    }
-    // Échec : on vide le mot de passe et on le dit, sans préciser lequel des deux
-    // est faux (inutile d'aider quelqu'un qui tâtonne).
-    $("#pin-err").innerHTML = `<div class="alert">Identifiant ou mot de passe incorrect.</div>`;
-    $("#pin-pwd").value = "";
-    $("#pin-ok").disabled = false;
-    $("#pin-pwd").focus();
-  });
-}
-
-function renderAdminNav() {
-  const nav = $("#admin-nav");
-  if (!admin) { nav.style.display = "none"; return; }
-  nav.style.display = "flex";
-  nav.innerHTML = `
-    <button data-v="countdown">⏱ Compte à rebours</button>
-    <button data-v="quiz">❓ Quiz</button>
-    <button data-v="board">🏆 Classement</button>
-    <button data-v="exit">🚪 Quitter</button>`;
-  nav.querySelectorAll("button").forEach((b) => {
-    if (b.dataset.v === adminView) b.classList.add("on");
-    b.addEventListener("click", () => {
-      if (b.dataset.v === "exit") { admin = false; renderAdminNav(); render(); return; }
-      adminView = b.dataset.v;
-      renderAdminNav(); render();
-    });
-  });
-}
-
-/* ============================================================
    🌳 ROUTEUR
    ============================================================ */
 
@@ -588,7 +515,11 @@ function render() {
 }
 
 (async () => {
-  board = await apiGetBoard();
+  // Les questions viennent du serveur (saisies dans /quiz/admin). Si l'appel
+  // échoue, QUESTIONS garde la liste de secours définie plus haut.
+  const [dist, bd] = await Promise.all([apiQuestions(), apiGetBoard()]);
+  if (dist) { QUESTIONS = dist; }
+  board = bd;
   render();
 })();
 </script>

@@ -3,6 +3,7 @@
 # classement en cours par le contenu du depot).
 scores.json
 codes.json
+questions.json
 
 # En revanche on VERSIONNE .htaccess (protection) et ce fichier :
 !.htaccess
