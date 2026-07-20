@@ -28,6 +28,13 @@
 		@quizdata path /quiz/data/*
 		respond @quizdata 403
 
+		# Le quiz est un site STATIQUE : son index est index.html. Or php_server ne
+		# reconnait que index.php comme index de dossier : /quiz/ ne trouvait donc
+		# rien et retombait sur le index.php de l'app principale, qui redirige vers
+		# la connexion -> boucle de redirection. On sert explicitement index.html.
+		@quizIndex path /quiz /quiz/
+		rewrite @quizIndex /quiz/index.html
+
 		# Bloque les fichiers caches (.env, .htaccess, .gitignore, ...)
 		@dotfiles path_regexp dotfiles /\.[^/]+$
 		respond @dotfiles 403
