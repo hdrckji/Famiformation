@@ -1,0 +1,9 @@
+# Les scores appartiennent au serveur, pas au depot : ils sont crees au premier
+# passage et ne doivent jamais etre pousses (sinon un deploiement ecraserait le
+# classement en cours par le contenu du depot).
+scores.json
+codes.json
+
+# En revanche on VERSIONNE .htaccess (protection) et ce fichier :
+!.htaccess
+!.gitignore

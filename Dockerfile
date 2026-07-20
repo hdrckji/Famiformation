@@ -16,6 +16,13 @@ COPY public/ /app/public/
 # Copie l'app FamiJob comme sous-dossier de la racine web (accessible via /famijob/)
 COPY Famijob/ /app/public/famijob/
 
+# Copie le site du quiz de lancement (accessible via /quiz/)
+COPY quiz/ /app/public/quiz/
+
+# Le quiz ecrit ses scores dans quiz/data/ : le dossier doit exister et etre
+# accessible en ecriture par le serveur (sinon api.php ne peut rien enregistrer).
+RUN mkdir -p /app/public/quiz/data && chown -R www-data:www-data /app/public/quiz/data
+
 # Configuration du serveur : port dynamique Railway + blocage des fichiers sensibles
 COPY Caddyfile /etc/frankenphp/Caddyfile
 

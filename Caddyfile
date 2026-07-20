@@ -23,6 +23,11 @@
 		@testfiles path_regexp testfiles ^/test[^/]*\.(php|xlsx)$
 		respond @testfiles 403
 
+		# Bloque l'acces direct aux scores du quiz (/quiz/data/scores.json contient
+		# les prenoms des participants ; seul api.php doit les lire)
+		@quizdata path /quiz/data/*
+		respond @quizdata 403
+
 		# Bloque les fichiers caches (.env, .htaccess, .gitignore, ...)
 		@dotfiles path_regexp dotfiles /\.[^/]+$
 		respond @dotfiles 403

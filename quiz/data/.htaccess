@@ -1,0 +1,15 @@
+# Interdit l'acces DIRECT aux fichiers de scores depuis le navigateur.
+# Sans ce fichier, n'importe qui ouvrant tonsite.be/quiz/data/scores.json
+# verrait tous les prenoms et tous les scores.
+# api.php lit ces fichiers depuis le disque : il n'est pas concerne par ce blocage.
+
+# Apache 2.4 (IONOS aujourd'hui)
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+# Apache 2.2 (vieux hebergements)
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>

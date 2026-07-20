@@ -174,7 +174,9 @@ const CONFIG = {
   dateResultats: "31 août",
   pointsParBonneReponse: 10,
   pointsParCodeBonus: 20,
-  adminPin: "2907", // ⚠️ mets le même que dans api.php
+  // 🔐 Les identifiants admin ne sont PLUS ici : ils sont vérifiés par api.php
+  // (action=login). Les écrire dans cette page les rendrait lisibles par
+  // n'importe qui avec « afficher le code source ».
   api: "api.php",
 };
 
@@ -226,6 +228,15 @@ async function apiClaimCode(code, name) {
     body: JSON.stringify({ code, name }),
   });
   return await r.json();
+}
+async function apiLogin(id, pwd) {
+  try {
+    const r = await fetch(`${CONFIG.api}?action=login`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, pwd }),
+    });
+    return r.ok && (await r.json()).ok === true;
+  } catch { return false; }
 }
 async function apiSubmit(entry) {
   const r = await fetch(`${CONFIG.api}?action=submit`, {
@@ -517,19 +528,32 @@ function showPin() {
   box.style.marginBottom = "22px";
   box.style.textAlign = "center";
   box.innerHTML = `
-    <p class="hint">Code d'accès admin</p>
-    <input class="field" id="pin-input" type="password" inputmode="numeric" placeholder="••••">
+    <p class="hint">Accès admin</p>
+    <div id="pin-err"></div>
+    <input class="field" id="pin-id" autocomplete="username" placeholder="Identifiant">
+    <input class="field" id="pin-pwd" type="password" autocomplete="current-password" placeholder="Mot de passe">
     <div style="display:flex; gap:8px; justify-content:center;">
       <button class="btn ghost" id="pin-cancel">Annuler</button>
       <button class="btn" id="pin-ok">Entrer</button>
     </div>`;
-  $("#pin-input").focus();
-  $("#pin-input").addEventListener("keydown", (e) => e.key === "Enter" && $("#pin-ok").click());
+  $("#pin-id").focus();
+  const valide = (e) => e.key === "Enter" && $("#pin-ok").click();
+  $("#pin-id").addEventListener("keydown", valide);
+  $("#pin-pwd").addEventListener("keydown", valide);
   $("#pin-cancel").addEventListener("click", () => { box.style.display = "none"; });
-  $("#pin-ok").addEventListener("click", () => {
-    if ($("#pin-input").value === CONFIG.adminPin) {
+  $("#pin-ok").addEventListener("click", async () => {
+    $("#pin-ok").disabled = true;
+    const ok = await apiLogin($("#pin-id").value.trim(), $("#pin-pwd").value);
+    if (ok) {
       admin = true; box.style.display = "none"; renderAdminNav(); render();
-    } else { $("#pin-input").value = ""; }
+      return;
+    }
+    // Échec : on vide le mot de passe et on le dit, sans préciser lequel des deux
+    // est faux (inutile d'aider quelqu'un qui tâtonne).
+    $("#pin-err").innerHTML = `<div class="alert">Identifiant ou mot de passe incorrect.</div>`;
+    $("#pin-pwd").value = "";
+    $("#pin-ok").disabled = false;
+    $("#pin-pwd").focus();
   });
 }
 

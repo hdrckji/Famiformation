@@ -26,23 +26,26 @@ Dans index.html (ouvre-le avec VS Code) :
   → les QUESTIONS (bloc "QUESTIONS" vers le haut du fichier)
     "correct: 0" = la 1re option est la bonne, "correct: 1" = la 2e, etc.
   → les dates si elles changent (CONFIG)
-  → le PIN admin (CONFIG.adminPin)
 
 Dans api.php :
   → les CODES BONUS ($BONUS_CODES) — les mêmes que sur tes QR codes
-  → le PIN admin ($ADMIN_PIN) — mets le même que dans index.html
+  → les IDENTIFIANTS ADMIN ($ADMIN_ID / $ADMIN_PWD)
 
 MODE ADMIN
 ----------
 Clique 5 fois rapidement sur le point orange à côté du logo,
-puis entre le PIN (2907 par défaut). Tu retrouves la navigation
-complète entre les 3 vues. C'est aussi comme ça que tu configures
-la télé : mode admin → vue "Compte à rebours" → plein écran.
+puis entre l'identifiant et le mot de passe (admin / a par défaut).
+Tu retrouves la navigation complète entre les 3 vues. C'est aussi
+comme ça que tu configures la télé : mode admin → vue "Compte à
+rebours" → plein écran.
+
+Les identifiants ne sont PLUS dans index.html : ils sont vérifiés
+par api.php, donc invisibles dans le code source de la page.
 
 REMETTRE LES SCORES À ZÉRO (pour tes tests)
 -------------------------------------------
-Ouvre dans ton navigateur :
-  tonsite.be/api.php?action=reset&pin=2907
+Ouvre dans ton navigateur (le "pin" = le mot de passe admin) :
+  tonsite.be/api.php?action=reset&pin=a
 ⚠️ À ne PAS faire après le 29/07, ça efface tout le classement !
 
 QR CODES BONUS
