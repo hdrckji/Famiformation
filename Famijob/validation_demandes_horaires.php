@@ -339,25 +339,33 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
 </div>
 <div class="fjv-modal-mask" id="fjvRejectModal">
-    <div class="fjv-modal">
+    <div class="fjv-modal" role="dialog" aria-modal="true">
+        <div class="fjv-modal-ic">⛔</div>
         <h3><?php echo e(fjvT('Refuser la demande', 'Aanvraag weigeren')); ?></h3>
         <p><?php echo e(fjvT('Motif du refus (optionnel) — la personne le recevra dans sa notification.', 'Reden van weigering (optioneel) — de persoon ontvangt dit in zijn melding.')); ?></p>
         <textarea id="fjvRejectReason" rows="4" maxlength="500" placeholder="<?php echo e(fjvT('Ex. : créneau annulé, doublon, erreur de date…', 'Bv.: geannuleerd, dubbel, verkeerde datum…')); ?>"></textarea>
         <div class="fjv-modal-actions">
-            <button type="button" class="btn btn-soft" onclick="fjvCloseRejectModal()"><?php echo e(fjvT('Annuler', 'Annuleren')); ?></button>
-            <button type="button" class="btn btn-ko" onclick="fjvConfirmReject()"><?php echo e(fjvT('Confirmer le refus', 'Weigering bevestigen')); ?></button>
+            <button type="button" class="fjv-mbtn fjv-mbtn-cancel" onclick="fjvCloseRejectModal()"><?php echo e(fjvT('Annuler', 'Annuleren')); ?></button>
+            <button type="button" class="fjv-mbtn fjv-mbtn-danger" onclick="fjvConfirmReject()"><?php echo e(fjvT('Confirmer le refus', 'Weigering bevestigen')); ?></button>
         </div>
     </div>
 </div>
 
 <style>
-    .fjv-modal-mask { position:fixed; inset:0; background:rgba(15,36,29,.55); display:none; align-items:center; justify-content:center; z-index:9000; padding:20px; }
+    .fjv-modal-mask { position:fixed; inset:0; background:rgba(15,36,29,.5); display:none; align-items:center; justify-content:center; z-index:9000; padding:16px; }
     .fjv-modal-mask.show { display:flex; }
-    .fjv-modal { background:#fff; border-radius:18px; padding:22px 22px 18px; max-width:460px; width:100%; box-shadow:0 24px 60px rgba(8,22,17,.35); }
-    .fjv-modal h3 { margin:0 0 6px; color:#21362a; }
-    .fjv-modal p { margin:0 0 12px; color:#64756a; font-size:.9rem; line-height:1.45; }
-    .fjv-modal textarea { width:100%; border:1px solid #cfdad3; border-radius:10px; padding:11px 12px; font-family:inherit; font-size:.95rem; resize:vertical; }
-    .fjv-modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+    .fjv-modal { background:#fff; border-radius:20px; padding:26px 24px 20px; max-width:430px; width:100%; box-shadow:0 30px 70px rgba(8,22,17,.4); text-align:center; animation:fjvPop .18s ease; }
+    @keyframes fjvPop { from { transform:scale(.94); opacity:.5; } to { transform:scale(1); opacity:1; } }
+    .fjv-modal-ic { width:56px; height:56px; margin:0 auto 12px; border-radius:50%; background:#fae4e1; color:#a13e35; display:flex; align-items:center; justify-content:center; font-size:1.7rem; }
+    .fjv-modal h3 { margin:0 0 6px; color:#21362a; font-size:1.2rem; }
+    .fjv-modal p { margin:0 0 16px; color:#64756a; font-size:.9rem; line-height:1.5; }
+    .fjv-modal textarea { width:100%; border:1px solid #cfdad3; border-radius:12px; padding:12px 14px; font-family:inherit; font-size:.95rem; resize:vertical; min-height:92px; text-align:left; }
+    .fjv-modal-actions { display:flex; gap:10px; margin-top:18px; }
+    .fjv-mbtn { flex:1; border:none; border-radius:12px; padding:13px 14px; font-weight:800; font-size:.95rem; cursor:pointer; font-family:inherit; }
+    .fjv-mbtn-cancel { background:#eef2f0; color:#3a4a42; }
+    .fjv-mbtn-cancel:hover { background:#e2e8e5; }
+    .fjv-mbtn-danger { background:#c0392b; color:#fff; }
+    .fjv-mbtn-danger:hover { background:#a5301f; }
 </style>
 
 <script>

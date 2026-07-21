@@ -1376,16 +1376,33 @@ if (isset($_POST['create_requests']) && $createFailed) {
             alert(<?php echo json_encode(fjdT('Ajoute au moins un horaire avant d’enregistrer un bloc.', 'Voeg minstens één uurrooster toe voordat je een blok opslaat.')); ?>);
             return;
         }
-        var name = prompt(<?php echo json_encode(fjdT('Nom du bloc ?', 'Naam van het blok?')); ?>);
-        if (name === null) { return; }
-        name = name.trim();
-        if (name === '') { return; }
         var deptSel = document.getElementById('department_name');
         document.getElementById('blockDeptField').value = deptSel ? deptSel.value : '';
-        document.getElementById('blockNameField').value = name;
         document.getElementById('blockPayloadField').value = JSON.stringify(rows);
+        fjdOpenBlockModal();
+    };
+    window.fjdOpenBlockModal = function () {
+        var inp = document.getElementById('fjdBlockName');
+        if (inp) { inp.value = ''; }
+        document.getElementById('fjdBlockModal').classList.add('show');
+        if (inp) { inp.focus(); }
+    };
+    window.fjdCloseBlockModal = function () {
+        document.getElementById('fjdBlockModal').classList.remove('show');
+    };
+    window.fjdConfirmBlock = function () {
+        var inp = document.getElementById('fjdBlockName');
+        var name = inp ? inp.value.trim() : '';
+        if (name === '') { if (inp) { inp.focus(); } return; }
+        document.getElementById('blockNameField').value = name;
         document.getElementById('saveBlockForm').submit();
     };
+    document.addEventListener('keydown', function (e) {
+        var m = document.getElementById('fjdBlockModal');
+        if (!m || !m.classList.contains('show')) { return; }
+        if (e.key === 'Escape') { fjdCloseBlockModal(); }
+        else if (e.key === 'Enter') { e.preventDefault(); fjdConfirmBlock(); }
+    });
 
     window.deleteBlock = function (id) {
         if (!confirm(<?php echo json_encode(fjdT('Supprimer ce bloc ?', 'Dit blok verwijderen?')); ?>)) { return; }
@@ -1407,5 +1424,34 @@ if (isset($_POST['create_requests']) && $createFailed) {
     }
 })();
 </script>
+
+<div class="fjd-modal-mask" id="fjdBlockModal">
+    <div class="fjd-modal" role="dialog" aria-modal="true">
+        <div class="fjd-modal-ic">🧩</div>
+        <h3><?php echo e(fjdT('Enregistrer ce bloc', 'Blok opslaan')); ?></h3>
+        <p><?php echo e(fjdT('Donnez un nom à ce bloc pour le réutiliser plus tard.', 'Geef dit blok een naam om het later te hergebruiken.')); ?></p>
+        <input type="text" id="fjdBlockName" maxlength="120" placeholder="<?php echo e(fjdT('Nom du bloc (ex. Caisse matin)', 'Naam van het blok (bv. Kassa ochtend)')); ?>" autocomplete="off">
+        <div class="fjd-modal-actions">
+            <button type="button" class="fjd-mbtn fjd-mbtn-cancel" onclick="fjdCloseBlockModal()"><?php echo e(fjdT('Annuler', 'Annuleren')); ?></button>
+            <button type="button" class="fjd-mbtn fjd-mbtn-ok" onclick="fjdConfirmBlock()"><?php echo e(fjdT('Enregistrer', 'Opslaan')); ?></button>
+        </div>
+    </div>
+</div>
+<style>
+    .fjd-modal-mask { position:fixed; inset:0; background:rgba(15,36,29,.5); display:none; align-items:center; justify-content:center; z-index:9000; padding:16px; }
+    .fjd-modal-mask.show { display:flex; }
+    .fjd-modal { background:#fff; border-radius:20px; padding:26px 24px 20px; max-width:430px; width:100%; box-shadow:0 30px 70px rgba(8,22,17,.4); text-align:center; animation:fjdPop .18s ease; font-family:inherit; }
+    @keyframes fjdPop { from { transform:scale(.94); opacity:.5; } to { transform:scale(1); opacity:1; } }
+    .fjd-modal-ic { width:56px; height:56px; margin:0 auto 12px; border-radius:50%; background:#e8f4ef; color:#2d5a37; display:flex; align-items:center; justify-content:center; font-size:1.6rem; }
+    .fjd-modal h3 { margin:0 0 6px; color:#21362a; font-size:1.2rem; }
+    .fjd-modal p { margin:0 0 16px; color:#64756a; font-size:.9rem; line-height:1.5; }
+    .fjd-modal input[type=text] { width:100%; border:1px solid #cfdad3; border-radius:12px; padding:13px 14px; font-family:inherit; font-size:1rem; }
+    .fjd-modal-actions { display:flex; gap:10px; margin-top:18px; }
+    .fjd-mbtn { flex:1; border:none; border-radius:12px; padding:13px 14px; font-weight:800; font-size:.95rem; cursor:pointer; font-family:inherit; }
+    .fjd-mbtn-cancel { background:#eef2f0; color:#3a4a42; }
+    .fjd-mbtn-cancel:hover { background:#e2e8e5; }
+    .fjd-mbtn-ok { background:#2d5a37; color:#fff; }
+    .fjd-mbtn-ok:hover { background:#24492c; }
+</style>
 </body>
 </html>

@@ -400,5 +400,6 @@ function fjaFmtDate($value)
         <?php endforeach; ?>
     <?php endif; ?>
 </div>
+<?php require_once __DIR__ . "/includes/topbar.php"; echo famijobScrollKeeperHtml(); ?>
 </body>
 </html>

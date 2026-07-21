@@ -289,10 +289,32 @@ function fjxBuildXlsx(array $days, array $deptNames, array $byDept, callable $da
                 'borders' => ['allBorders' => ['borderStyle' => $thin, 'color' => ['rgb' => 'DDE6DF']]],
                 'font' => ['size' => 10],
             ]);
+            // Couleur alternee : on teinte les jours impairs (mardi, jeudi, samedi) pour
+            // distinguer visuellement les colonnes de jours (comme dans le planning).
+            for ($dayIdx = 1; $dayIdx < 7; $dayIdx += 2) {
+                $c1 = fjxCol($dayIdx * 6 + 1);
+                $c2 = fjxCol($dayIdx * 6 + 6);
+                $sheet->getStyle($c1 . $firstDataRow . ':' . $c2 . ($r - 1))
+                    ->getFill()->setFillType($fillSolid)->getStartColor()->setRGB('FBF1E8');
+            }
         }
 
         $r++; // ligne vide de separation
     }
+
+    $lastRow = max($headerRows, $r - 1);
+
+    // Separateurs verticaux entre les jours (bordure moyenne a gauche de chaque jour).
+    for ($d = 1; $d < 7; $d++) {
+        $col = fjxCol($d * 6 + 1);
+        $sheet->getStyle($col . '1:' . $col . $lastRow)->getBorders()->getLeft()
+            ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM)
+            ->getColor()->setRGB('9BB0A3');
+    }
+    // Cadre exterieur du tableau.
+    $sheet->getStyle('A1:' . fjxCol(42) . $lastRow)->getBorders()->getOutline()
+        ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM)
+        ->getColor()->setRGB('264E35');
 
     // Fige les colonnes/lignes d'en-tete.
     $sheet->freezePane('A' . ($headerRows + 1));

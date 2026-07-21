@@ -85,6 +85,10 @@ ini_set('display_errors', $appDebug ? '1' : '0');
 ini_set('display_startup_errors', $appDebug ? '1' : '0');
 error_reporting($appDebug ? E_ALL : 0);
 
+// Fuseau horaire local (Mouscron / Belgique) : sinon le serveur (UTC sur Railway)
+// affiche des heures decalees dans les notifications, dates, etc.
+date_default_timezone_set(famiGetEnv('APP_TIMEZONE', 'Europe/Brussels'));
+
 // 3. CONFIGURATION STRICTE DES SESSIONS (AVANT session_start)
 $session_timeout = (int) famiGetEnv('SESSION_TIMEOUT', 7200); // 7200 secondes = 2 heures d'inactivité
 if (session_status() === PHP_SESSION_NONE) {
@@ -454,4 +458,16 @@ if (isset($connectionException)) {
 
     http_response_code(500);
     die('Erreur de connexion à la base de données.');
+}
+
+// Aligne le fuseau horaire de la session MySQL sur l'heure locale (offset courant,
+// ce qui gere automatiquement l'heure d'ete). Ainsi NOW()/CURRENT_TIMESTAMP sont a
+// l'heure de Mouscron, coherents avec l'affichage PHP.
+if (isset($db) && $db instanceof PDO) {
+    try {
+        $localTzOffset = (new DateTime('now', new DateTimeZone(date_default_timezone_get())))->format('P');
+        $db->exec("SET time_zone = '" . $localTzOffset . "'");
+    } catch (Exception $e) {
+        // Sans droit sur time_zone, on garde le fuseau serveur par defaut.
+    }
 }

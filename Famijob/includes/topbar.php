@@ -123,6 +123,81 @@ HTML;
     }
 }
 
+if (!function_exists('famijobScrollKeeperHtml')) {
+    /**
+     * Conserve la position de defilement quand une action recharge la page.
+     * On memorise le scroll au moment d'un envoi de formulaire, et on le restaure
+     * apres le rechargement (meme URL), puis on l'efface. Une navigation par lien
+     * normale n'est pas affectee. A poser une seule fois par page.
+     */
+    function famijobScrollKeeperHtml()
+    {
+        if (!empty($GLOBALS['__famijob_scrollkeeper_done'])) {
+            return '';
+        }
+        $GLOBALS['__famijob_scrollkeeper_done'] = true;
+        return <<<'HTML'
+        <script>
+        (function () {
+            var KEY = 'fjScrollY', KP = 'fjScrollPath';
+            try { if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } } catch (e) {}
+            function save() {
+                try {
+                    sessionStorage.setItem(KEY, String(window.scrollY || window.pageYOffset || 0));
+                    sessionStorage.setItem(KP, location.pathname);
+                } catch (e) {}
+            }
+            // Envoi normal d'un formulaire (clic sur un bouton submit).
+            document.addEventListener('submit', save, true);
+            // Envoi programmatique (form.submit()) : on patche pour memoriser aussi.
+            try {
+                var _submit = HTMLFormElement.prototype.submit;
+                HTMLFormElement.prototype.submit = function () { save(); return _submit.apply(this, arguments); };
+            } catch (e) {}
+            window.addEventListener('load', function () {
+                try {
+                    if (sessionStorage.getItem(KP) === location.pathname) {
+                        var y = sessionStorage.getItem(KEY);
+                        if (y !== null) { window.scrollTo(0, parseInt(y, 10) || 0); }
+                    }
+                    sessionStorage.removeItem(KEY);
+                    sessionStorage.removeItem(KP);
+                } catch (e) {}
+            });
+
+            // --- Cloche "live" : met a jour la pastille sans recharger la page ---
+            function fjUpdateBell(count) {
+                var bells = document.querySelectorAll('a[href="notifications.php"]');
+                for (var i = 0; i < bells.length; i++) {
+                    var a = bells[i];
+                    var dotClass = a.classList.contains('nav-bell') ? 'nav-bell-dot' : 'fjr-dot';
+                    var dot = a.querySelector('.' + dotClass);
+                    if (count > 0) {
+                        if (!dot) { dot = document.createElement('span'); dot.className = dotClass; a.appendChild(dot); }
+                        dot.textContent = count;
+                    } else if (dot) {
+                        dot.parentNode.removeChild(dot);
+                    }
+                }
+            }
+            function fjPollBell() {
+                try {
+                    fetch('notif_count.php', { cache: 'no-store', credentials: 'same-origin' })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (d) { if (d && typeof d.unread !== 'undefined') { fjUpdateBell(parseInt(d.unread, 10) || 0); } })
+                        .catch(function () {});
+                } catch (e) {}
+            }
+            if (document.querySelector('a[href="notifications.php"]')) {
+                setInterval(fjPollBell, 20000);
+                document.addEventListener('visibilitychange', function () { if (!document.hidden) { fjPollBell(); } });
+            }
+        })();
+        </script>
+HTML;
+    }
+}
+
 if (!function_exists('famijobRibbon')) {
     function famijobRibbon(PDO $db, $opts = [])
     {
@@ -131,5 +206,6 @@ if (!function_exists('famijobRibbon')) {
         }
         $GLOBALS['__famijob_ribbon_done'] = true;
         echo famijobRibbonHtml($db, $opts);
+        echo famijobScrollKeeperHtml();
     }
 }

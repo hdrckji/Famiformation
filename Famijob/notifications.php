@@ -172,5 +172,6 @@ function fjnTypeMeta($type)
         </div>
     <?php endif; ?>
 </div>
+<?php require_once __DIR__ . "/includes/topbar.php"; echo famijobScrollKeeperHtml(); ?>
 </body>
 </html>

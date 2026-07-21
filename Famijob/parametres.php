@@ -237,5 +237,6 @@ $inactiveDepartments = $db->query(
         </div>
     </div>
 </div>
+<?php require_once __DIR__ . "/includes/topbar.php"; echo famijobScrollKeeperHtml(); ?>
 </body>
 </html>
