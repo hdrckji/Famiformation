@@ -93,19 +93,8 @@ $departmentStmt = $db->query(
      ORDER BY department_name ASC"
 );
 $departmentOptions = $departmentStmt->fetchAll(PDO::FETCH_COLUMN);
-
-// Departements ajoutes manuellement (absents de la base planning synchronisee)
-$manualDepartments = ['Pots extérieur', "Feux d'artifice", 'Info prix'];
-$manualAdded = false;
-foreach ($manualDepartments as $manualDepartment) {
-    if (!in_array($manualDepartment, $departmentOptions, true)) {
-        $departmentOptions[] = $manualDepartment;
-        $manualAdded = true;
-    }
-}
-if ($manualAdded) {
-    sort($departmentOptions, SORT_NATURAL | SORT_FLAG_CASE);
-}
+// La liste des departements est desormais 100% en base (gestion via admin_departements.php) :
+// plus aucun ajout code en dur ici.
 
 $today = new DateTimeImmutable('today');
 $startMonday = $today->modify('monday this week');
@@ -149,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $weekEndStr = $selectedWeek['end']->format('Y-m-d');
 
         if (!in_array($departmentName, $departmentOptions, true)) {
-            $message = "<div class='alert error'>" . e(fjdT('Département invalide. Utilise un département de la liste synchronisée.', 'Ongeldige afdeling. Gebruik een afdeling uit de gesynchroniseerde lijst.')) . "</div>";
+            $message = "<div class='alert error'>" . e(fjdT('Département invalide. Choisis un département de la liste.', 'Ongeldige afdeling. Kies een afdeling uit de lijst.')) . "</div>";
             $createFailed = true;
         } else {
             $upsertStmt = $db->prepare(
@@ -234,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $weekEndStr = $selectedWeek['end']->format('Y-m-d');
 
         if (!in_array($departmentName, $departmentOptions, true)) {
-            $message = "<div class='alert error'>" . e(fjdT('Département invalide. Utilise un département de la liste synchronisée.', 'Ongeldige afdeling. Gebruik een afdeling uit de gesynchroniseerde lijst.')) . "</div>";
+            $message = "<div class='alert error'>" . e(fjdT('Département invalide. Choisis un département de la liste.', 'Ongeldige afdeling. Kies een afdeling uit de lijst.')) . "</div>";
             $createFailedByday = true;
         } else {
             $upsertBydayStmt = $db->prepare(
@@ -947,6 +936,7 @@ if (isset($_POST['create_requests']) && $createFailed) {
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . "/includes/topbar.php"; famijobRibbon($db); ?>
     <div class="page">
         <section class="hero">
             <div class="hero-top">

@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once __DIR__ . '/includes/notifications.php';
 verifierConnexion($db);
 
 $pageLang = famiLang();
@@ -100,46 +101,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $selectedDepartment = 'all';
     }
 
+    // Valide/refuse une liste de demandes et previent chaque createur via la boite a notif.
+    $bulkDecide = static function (array $ids, $decision) use ($db, $currentUserId) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static function ($n) { return $n > 0; })));
+        if (empty($ids)) {
+            return 0;
+        }
+        $status = ($decision === 'rejected') ? 'rejected' : 'approved';
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $db->prepare(
+            "UPDATE interim_shift_requests
+             SET validation_status = '$status', validated_by_user_id = ?, validated_at = NOW()
+             WHERE id IN ($ph)"
+        );
+        $stmt->execute(array_merge([$currentUserId], $ids));
+        foreach ($ids as $rid) {
+            famijobNotifyRequestValidated($db, $rid, $currentUserId, $decision);
+        }
+        return $stmt->rowCount();
+    };
+
+    // Recupere les ids en attente correspondant au filtre (avant validation groupee).
+    $pendingIdsForScope = static function ($department) use ($db, $selectedWeek) {
+        $sql = "SELECT id FROM interim_shift_requests
+                WHERE shift_date BETWEEN ? AND ? AND validation_status = 'pending'";
+        $params = [$selectedWeek['start']->format('Y-m-d'), $selectedWeek['end']->format('Y-m-d')];
+        if ($department !== 'all') {
+            $sql .= ' AND department_name = ?';
+            $params[] = $department;
+        }
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    };
+
     $requestId = (int) ($_POST['request_id'] ?? 0);
     if ($requestId > 0 && isset($_POST['approve_request'])) {
-        $stmt = $db->prepare("UPDATE interim_shift_requests SET validation_status = 'approved', validated_by_user_id = ?, validated_at = NOW() WHERE id = ?");
-        $stmt->execute([$currentUserId, $requestId]);
+        $bulkDecide([$requestId], 'approved');
         $message = "<div class='alert success'>" . e(fjvT('Demande validée.', 'Aanvraag goedgekeurd.')) . "</div>";
     } elseif ($requestId > 0 && isset($_POST['reject_request'])) {
-        $stmt = $db->prepare("UPDATE interim_shift_requests SET validation_status = 'rejected', validated_by_user_id = ?, validated_at = NOW() WHERE id = ?");
-        $stmt->execute([$currentUserId, $requestId]);
+        $bulkDecide([$requestId], 'rejected');
         $message = "<div class='alert error'>" . e(fjvT('Demande refusée.', 'Aanvraag geweigerd.')) . "</div>";
     } elseif (isset($_POST['approve_all'])) {
-        $params = [$currentUserId, $selectedWeek['start']->format('Y-m-d'), $selectedWeek['end']->format('Y-m-d')];
-        $sql = "UPDATE interim_shift_requests
-                SET validation_status = 'approved', validated_by_user_id = ?, validated_at = NOW()
-                WHERE shift_date BETWEEN ? AND ?
-                  AND validation_status = 'pending'";
-        if ($selectedDepartment !== 'all') {
-            $sql .= ' AND department_name = ?';
-            $params[] = $selectedDepartment;
-        }
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $message = "<div class='alert success'>" . e(fjvT('Validation globale effectuée :', 'Globale validatie uitgevoerd:')) . ' ' . (int) $stmt->rowCount() . ' ' . e(fjvT('demande(s).', 'aanvraag/aanvragen.')) . "</div>";
+        $ids = $pendingIdsForScope($selectedDepartment);
+        $count = $bulkDecide($ids, 'approved');
+        $message = "<div class='alert success'>" . e(fjvT('Validation globale effectuée :', 'Globale validatie uitgevoerd:')) . ' ' . (int) $count . ' ' . e(fjvT('demande(s).', 'aanvraag/aanvragen.')) . "</div>";
     } elseif (isset($_POST['approve_department'])) {
         if ($selectedDepartment === 'all') {
             $message = "<div class='alert error'>" . e(fjvT('Sélectionne un département pour la validation par département.', 'Selecteer een afdeling voor validatie per afdeling.')) . "</div>";
         } else {
-            $stmt = $db->prepare(
-                "UPDATE interim_shift_requests
-                 SET validation_status = 'approved', validated_by_user_id = ?, validated_at = NOW()
-                 WHERE shift_date BETWEEN ? AND ?
-                   AND validation_status = 'pending'
-                   AND department_name = ?"
-            );
-            $stmt->execute([
-                $currentUserId,
-                $selectedWeek['start']->format('Y-m-d'),
-                $selectedWeek['end']->format('Y-m-d'),
-                $selectedDepartment,
-            ]);
-            $message = "<div class='alert success'>" . e(fjvT('Validation du département', 'Validatie van afdeling')) . ' ' . e($selectedDepartment) . ': ' . (int) $stmt->rowCount() . ' ' . e(fjvT('demande(s).', 'aanvraag/aanvragen.')) . "</div>";
+            $ids = $pendingIdsForScope($selectedDepartment);
+            $count = $bulkDecide($ids, 'approved');
+            $message = "<div class='alert success'>" . e(fjvT('Validation du département', 'Validatie van afdeling')) . ' ' . e($selectedDepartment) . ': ' . (int) $count . ' ' . e(fjvT('demande(s).', 'aanvraag/aanvragen.')) . "</div>";
         }
     }
 }
@@ -194,9 +207,14 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
         th { background:#f7fbf8; color:var(--muted); font-size:.78rem; text-transform:uppercase; }
         .actions { display:flex; gap:8px; }
         .empty { background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:18px; color:var(--muted); }
+        .seat-badge { display:inline-block; min-width:34px; text-align:center; background:#edf5ef; color:var(--accent); font-weight:800; font-size:.82rem; padding:3px 8px; border-radius:999px; }
+        tr.req-first td { border-top:2px solid #cddccf; }
+        tr.req-row:not(.req-last) td:nth-child(-n+4) { border-bottom:1px dashed #e6eee8; }
+        tbody tr:hover td { background:#f9fdfa; }
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . "/includes/topbar.php"; famijobRibbon($db); ?>
 <div class="page">
     <div class="hero">
         <a href="index.php"><?php echo e(fjvT('Retour FamiJob', 'Terug naar FamiJob')); ?></a>
@@ -255,28 +273,42 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
             </thead>
             <tbody>
                 <?php foreach ($pendingRequests as $request): ?>
-                    <tr>
-                        <td><?php echo e((new DateTimeImmutable((string) $request['shift_date']))->format('d/m/Y')); ?></td>
-                        <td><?php echo e($request['department_name']); ?></td>
-                        <td><?php echo e($request['time_slot']); ?></td>
-                        <td><?php echo (int) $request['seats_required']; ?></td>
-                        <td><?php echo e(trim((string) ($request['creator_prenom'] ?? '')) . ' ' . trim((string) ($request['creator_nom'] ?? ''))); ?></td>
-                        <td><?php echo e((string) ($request['comment'] ?? '')); ?></td>
-                        <td>
-                            <div class="actions">
-                                <form method="post">
-                                    <?php echo csrfField(); ?>
-                                    <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
-                                    <button class="btn btn-ok" type="submit" name="approve_request" value="1"><?php echo e(fjvT('Valider', 'Goedkeuren')); ?></button>
-                                </form>
-                                <form method="post" onsubmit="return confirm('<?php echo e(fjvT('Refuser cette demande ?', 'Deze aanvraag weigeren?')); ?>');">
-                                    <?php echo csrfField(); ?>
-                                    <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
-                                    <button class="btn btn-ko" type="submit" name="reject_request" value="1"><?php echo e(fjvT('Refuser', 'Weigeren')); ?></button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
+                    <?php
+                        $seats = max(1, (int) $request['seats_required']);
+                        $dateLabel = e((new DateTimeImmutable((string) $request['shift_date']))->format('d/m/Y'));
+                        $deptLabel = e((string) $request['department_name']);
+                        $slotLabel = e((string) $request['time_slot']);
+                        $creatorLabel = e(trim(trim((string) ($request['creator_prenom'] ?? '')) . ' ' . trim((string) ($request['creator_nom'] ?? ''))));
+                        $commentLabel = e((string) ($request['comment'] ?? ''));
+                    ?>
+                    <?php for ($seat = 1; $seat <= $seats; $seat++): ?>
+                        <tr class="req-row <?php echo $seat === 1 ? 'req-first' : ''; ?><?php echo $seat === $seats ? ' req-last' : ''; ?>">
+                            <td><?php echo $dateLabel; ?></td>
+                            <td><?php echo $deptLabel; ?></td>
+                            <td><?php echo $slotLabel; ?></td>
+                            <td>
+                                <span class="seat-badge"><?php echo $seat; ?><?php echo $seats > 1 ? ' / ' . $seats : ''; ?></span>
+                            </td>
+                            <?php if ($seat === 1): ?>
+                                <td rowspan="<?php echo $seats; ?>"><?php echo $creatorLabel; ?></td>
+                                <td rowspan="<?php echo $seats; ?>"><?php echo $commentLabel; ?></td>
+                                <td rowspan="<?php echo $seats; ?>">
+                                    <div class="actions">
+                                        <form method="post">
+                                            <?php echo csrfField(); ?>
+                                            <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
+                                            <button class="btn btn-ok" type="submit" name="approve_request" value="1"><?php echo e(fjvT('Valider', 'Goedkeuren')); ?></button>
+                                        </form>
+                                        <form method="post" onsubmit="return confirm('<?php echo e(fjvT('Refuser cette demande ?', 'Deze aanvraag weigeren?')); ?>');">
+                                            <?php echo csrfField(); ?>
+                                            <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
+                                            <button class="btn btn-ko" type="submit" name="reject_request" value="1"><?php echo e(fjvT('Refuser', 'Weigeren')); ?></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            <?php endif; ?>
+                        </tr>
+                    <?php endfor; ?>
                 <?php endforeach; ?>
             </tbody>
         </table>

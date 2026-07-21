@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once __DIR__ . '/includes/notifications.php';
 verifierConnexion($db);
 
 $pageLang = famiLang();
@@ -596,6 +597,9 @@ if (!function_exists('interimAutoAssignRequest')) {
             }
 
             $db->commit();
+            if ($assignedCount > 0) {
+                famijobNotifyRequestMatched($db, $requestId, $currentUserId, '', $assignedCount);
+            }
             return ['assigned' => $assignedCount, 'reason' => ''];
         } catch (Exception $e) {
             if ($db->inTransaction()) {
@@ -847,6 +851,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 $db->commit();
+                famijobNotifyRequestMatched($db, $requestId, $currentUserId, $externalName, 1);
                 $message = "<div class='alert success'>Personne (non inscrite) assignée avec succès.</div>";
             } catch (Exception $e) {
                 if ($db->inTransaction()) {
@@ -1027,6 +1032,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 $db->commit();
+                famijobNotifyRequestMatched($db, $requestId, $currentUserId, (string) ($studentName ?? ''), 1);
                 $message = "<div class='alert success'>Étudiant assigné avec succès.</div>";
             } catch (Exception $e) {
                 if ($db->inTransaction()) {
@@ -1728,6 +1734,7 @@ foreach ($weekDays as $weekDay) {
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . "/includes/topbar.php"; famijobRibbon($db); ?>
     <div class="page">
         <section class="hero">
             <div class="hero-top">

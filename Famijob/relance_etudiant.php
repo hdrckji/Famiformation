@@ -263,6 +263,7 @@ code{background:#edf5ef;padding:1px 5px;border-radius:5px;font-size:.85em}
 </style>
 </head>
 <body>
+<?php require_once __DIR__ . "/includes/topbar.php"; famijobRibbon($db); ?>
 <div class="page">
 
 <div class="hero">

@@ -508,20 +508,159 @@ if (!function_exists('ensureDepartmentsTable')) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
 
-        // Departements ajoutes manuellement (absents de la base planning) : semes ici pour
-        // qu'ils soient disponibles PARTOUT (Demandes, Matching, Disponibilites, Vue horaire...).
-        $manualDepartments = ['Pots extérieur', "Feux d'artifice", 'Info prix'];
-        $seedStmt = $db->prepare(
-            "INSERT INTO departments (department_name, is_active)
-             VALUES (?, 1)
-             ON DUPLICATE KEY UPDATE is_active = 1, updated_at = CURRENT_TIMESTAMP"
-        );
-        foreach ($manualDepartments as $manualDepartment) {
-            $seedStmt->execute([$manualDepartment]);
-        }
+        // La liste des departements n'est PLUS codee en dur : tout vit en base et se gere
+        // depuis le site (admin_departements.php). La migration unique ci-dessous ne fait que :
+        //   - semer les departements attendus s'ils sont absents (installation neuve) ;
+        //   - dedoublonner les entrees identiques a la casse/aux accents/aux espaces pres.
+        // Elle ne s'execute qu'UNE seule fois (marqueur en base), pour qu'une suppression
+        // faite par l'admin ne soit jamais rejouee.
+        famijobDepartmentsMigrationOnce($db);
 
         $tableReady = true;
         return true;
+    }
+}
+
+if (!function_exists('famijobAppFlagIsSet')) {
+    /** Petit registre de marqueurs (migrations one-shot) stocke en base. */
+    function famijobAppFlagIsSet(PDO $db, $flagKey)
+    {
+        try {
+            $db->exec(
+                "CREATE TABLE IF NOT EXISTS interim_app_flags (
+                    flag_key VARCHAR(80) NOT NULL PRIMARY KEY,
+                    set_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+            $stmt = $db->prepare("SELECT 1 FROM interim_app_flags WHERE flag_key = ? LIMIT 1");
+            $stmt->execute([(string) $flagKey]);
+            return (bool) $stmt->fetchColumn();
+        } catch (Exception $e) {
+            return true; // en cas de doute, on ne rejoue pas la migration
+        }
+    }
+}
+
+if (!function_exists('famijobAppFlagSet')) {
+    function famijobAppFlagSet(PDO $db, $flagKey)
+    {
+        try {
+            $db->prepare("INSERT IGNORE INTO interim_app_flags (flag_key, set_at) VALUES (?, NOW())")
+               ->execute([(string) $flagKey]);
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('famijobNormalizeDepartmentName')) {
+    /** Forme comparable d'un nom de departement : minuscules, sans accents, espaces normalises. */
+    function famijobNormalizeDepartmentName($name)
+    {
+        $name = trim((string) $name);
+        $name = preg_replace('/\s+/', ' ', $name);
+        $lower = function_exists('mb_strtolower') ? mb_strtolower($name, 'UTF-8') : strtolower($name);
+        $folded = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $lower);
+        if ($folded !== false && $folded !== null) {
+            $lower = $folded;
+        }
+        return trim($lower);
+    }
+}
+
+if (!function_exists('famijobDedupeDepartments')) {
+    /**
+     * Fusionne les departements dont le nom normalise est identique
+     * (ex. "Polyvalence" apparaissant deux fois a cause d'un espace ou d'un accent).
+     * On garde une ligne canonique (active de preference, sinon la plus ancienne),
+     * on repointe les liaisons etudiants dessus, puis on supprime les doublons.
+     */
+    function famijobDedupeDepartments(PDO $db)
+    {
+        try {
+            $rows = $db->query("SELECT id, department_name, is_active FROM departments")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return;
+        }
+
+        $groups = [];
+        foreach ($rows as $row) {
+            $key = famijobNormalizeDepartmentName($row['department_name']);
+            if ($key === '') {
+                continue;
+            }
+            $groups[$key][] = $row;
+        }
+
+        foreach ($groups as $group) {
+            if (count($group) < 2) {
+                continue;
+            }
+            // Choix de la ligne a garder : active d'abord, puis id le plus petit.
+            usort($group, static function ($a, $b) {
+                $aActive = (int) $a['is_active'];
+                $bActive = (int) $b['is_active'];
+                if ($aActive !== $bActive) {
+                    return $bActive <=> $aActive;
+                }
+                return ((int) $a['id']) <=> ((int) $b['id']);
+            });
+            $keep = array_shift($group);
+            $keepId = (int) $keep['id'];
+
+            foreach ($group as $dup) {
+                $dupId = (int) $dup['id'];
+                // Repointer les liaisons etudiants vers la ligne conservee (en evitant les collisions).
+                try {
+                    $db->prepare(
+                        "UPDATE IGNORE student_department_links SET department_id = ? WHERE department_id = ?"
+                    )->execute([$keepId, $dupId]);
+                    $db->prepare("DELETE FROM student_department_links WHERE department_id = ?")->execute([$dupId]);
+                } catch (Exception $e) {}
+                // Supprimer le doublon (independamment du sort des liaisons).
+                try {
+                    $db->prepare("DELETE FROM departments WHERE id = ?")->execute([$dupId]);
+                } catch (Exception $e) {}
+            }
+        }
+    }
+}
+
+if (!function_exists('famijobDepartmentsMigrationOnce')) {
+    function famijobDepartmentsMigrationOnce(PDO $db)
+    {
+        // 1) Dedoublonnage : sur (re)deploiement, on nettoie systematiquement les doublons
+        //    (idempotent, sans effet si tout est deja propre).
+        famijobDedupeDepartments($db);
+
+        // 2) Semis initial des departements attendus — une seule fois.
+        if (famijobAppFlagIsSet($db, 'departments_seed_v2')) {
+            return;
+        }
+
+        $expectedDepartments = [
+            'Pots extérieur',
+            "Feux d'artifice",
+            'Info prix',
+            'Abbaye',
+            'Leonidas',
+            'Bain',
+        ];
+
+        try {
+            $seedStmt = $db->prepare(
+                "INSERT INTO departments (department_name, is_active)
+                 VALUES (?, 1)
+                 ON DUPLICATE KEY UPDATE is_active = 1, updated_at = CURRENT_TIMESTAMP"
+            );
+            foreach ($expectedDepartments as $departmentName) {
+                if (famijobNormalizeDepartmentName($departmentName) === '') {
+                    continue;
+                }
+                $seedStmt->execute([$departmentName]);
+            }
+        } catch (Exception $e) {}
+
+        famijobDedupeDepartments($db);
+        famijobAppFlagSet($db, 'departments_seed_v2');
     }
 }
 

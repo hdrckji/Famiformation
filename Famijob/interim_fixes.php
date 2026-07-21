@@ -856,6 +856,7 @@ $csrfField = csrfField();
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . "/includes/topbar.php"; famijobRibbon($db); ?>
 
 <!-- ─── Nav ─────────────────────────────────────────────────────────────── -->
 <div class="top-nav">

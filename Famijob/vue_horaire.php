@@ -245,6 +245,7 @@ foreach ($byDeptDay as $departmentName => $byDay) {
     </style>
 </head>
 <body>
+<?php require_once __DIR__ . "/includes/topbar.php"; famijobRibbon($db); ?>
 <div class="page">
     <div class="hero">
         <div class="hero-top">

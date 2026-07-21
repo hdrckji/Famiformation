@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once __DIR__ . '/includes/notifications.php';
 verifierConnexion($db);
 
 // Contrôle d'accès : uniquement admin et teamcoach
@@ -12,6 +13,14 @@ if (!in_array($role, ['admin', 'teamcoach'], true)) {
 // Récupérer les infos de l'utilisateur
 $user_id = $_SESSION['user_id'];
 $roleLabel = $role === 'admin' ? famiT('role.admin') : famiT('role.teamcoach');
+$unreadNotifications = famijobNotifUnreadCount($db, (int) $user_id);
+
+if (!function_exists('fjT')) {
+    function fjT($fr, $nl = null)
+    {
+        return famiLang() === 'nl' && $nl !== null ? $nl : $fr;
+    }
+}
 
 function resolvePublicAssetUrl(array $absoluteCandidates, string $fallbackUrl): string {
     $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? realpath((string) $_SERVER['DOCUMENT_ROOT']) : false;
@@ -108,7 +117,7 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
             width: min(1240px, calc(100% - 32px));
             margin: 14px auto 0;
             display: flex;
-            justify-content: flex-start;
+            justify-content: space-between;
             align-items: center;
             gap: 12px;
             padding: 10px 12px;
@@ -116,6 +125,48 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
             background: rgba(8, 28, 22, 0.5);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-bell {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.94);
+            text-decoration: none;
+            font-size: 1.05rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+            transition: transform 0.2s ease;
+        }
+
+        .nav-bell:hover { transform: translateY(-1px) scale(1.05); }
+
+        .nav-bell-dot {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            box-sizing: border-box;
+            background: #c0392b;
+            color: #fff;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 0 2px #fff;
         }
 
         .top-nav-left {
@@ -386,7 +437,12 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
             <span class="brand-pill"><span class="brand-dot"></span> <?= e(famiT('index.workspace')) ?></span>
             <a href="logout.php" class="btn-back"><?= e(famiT('index.logout')) ?></a>
         </div>
-        <?= famiRenderLanguageSwitcher() ?>
+        <div class="top-nav-right">
+            <a href="notifications.php" class="nav-bell" title="Notifications">
+                🔔<?php if ($unreadNotifications > 0): ?><span class="nav-bell-dot"><?= (int) $unreadNotifications ?></span><?php endif; ?>
+            </a>
+            <?= famiRenderLanguageSwitcher() ?>
+        </div>
     </div>
 
     <div class="container">
@@ -440,6 +496,18 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
                 <div class="tile-title"><?= e(famiT('tile.interim_fixes.title')) ?></div>
                 <div class="tile-desc"><?= e(famiT('tile.interim_fixes.desc')) ?></div>
             </a>
+
+            <a href="admin_departements.php" class="tile">
+                <div class="tile-icon">🏷️</div>
+                <div class="tile-title"><?= e(fjT('Gestion des départements', 'Afdelingen beheren')) ?></div>
+                <div class="tile-desc"><?= e(fjT('Ajouter ou retirer des départements, directement depuis le site. Appliqué partout.', 'Afdelingen toevoegen of verwijderen, rechtstreeks vanaf de site. Overal toegepast.')) ?></div>
+            </a>
+
+            <a href="avis.php" class="tile">
+                <div class="tile-icon">💬</div>
+                <div class="tile-title"><?= e(fjT('Avis & suggestions', 'Feedback & suggesties')) ?></div>
+                <div class="tile-desc"><?= e(fjT('Consulter tous les avis, questions et suggestions envoyés par les utilisateurs.', 'Alle feedback, vragen en suggesties van gebruikers bekijken.')) ?></div>
+            </a>
             <?php else: ?>
             <!-- TeamCoach : accès limité à 2 modules (Demande d'horaire + Matching intérim) -->
             <a href="interim_horaires_demandes.php" class="tile">
@@ -452,6 +520,12 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
                 <div class="tile-icon">🤝</div>
                 <div class="tile-title"><?= e(famiT('tile.matching.title')) ?></div>
                 <div class="tile-desc"><?= e(famiT('tile.matching.desc.teamcoach')) ?></div>
+            </a>
+
+            <a href="avis.php" class="tile">
+                <div class="tile-icon">💬</div>
+                <div class="tile-title"><?= e(fjT('Avis & suggestions', 'Feedback & suggesties')) ?></div>
+                <div class="tile-desc"><?= e(fjT('Une question, une idée, un souci ? Envoyez votre avis à l\'équipe.', 'Een vraag, een idee, een probleem? Stuur je feedback naar het team.')) ?></div>
             </a>
             <?php endif; ?>
         </div>
