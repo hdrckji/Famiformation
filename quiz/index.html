@@ -360,6 +360,15 @@ body.mode-borne #app { width: 100%; }
   display: flex; align-items: center; justify-content: center; font-size: 1.5rem; text-decoration: none;
   cursor: pointer; transition: transform .12s; }
 .home-borne:hover { transform: scale(1.07); }
+
+/* Site externe (page mail) affiché dans la borne, avec une barre de retour. */
+.ext-overlay { position: fixed; inset: 0; z-index: 100060; background: var(--brume); display: flex; flex-direction: column; }
+.ext-bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #0E3B24; color: #fff; }
+.ext-home { background: var(--soleil); color: #0E3B24; border: none; border-radius: 999px; font-weight: 800;
+  font-size: clamp(1rem, 2.2vw, 1.2rem); padding: 12px 24px; cursor: pointer; }
+.ext-home:hover { filter: brightness(1.06); }
+.ext-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.1rem; opacity: .9; }
+.ext-frame { flex: 1; width: 100%; border: 0; }
 .borne-mod { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
   background: var(--craie); border: 3px solid transparent; border-radius: 24px; padding: clamp(30px, 6vh, 60px) 24px;
   min-height: clamp(200px, 34vh, 340px); box-shadow: 0 6px 24px rgba(14,59,36,.1);
@@ -1959,11 +1968,28 @@ function renderBorne() {
       </button>
     </div>
   </div>`;
-  const dest = { quiz: base, code: base + "code", mail: "https://famiformation.com/emails" };
+  const dest = { quiz: base, code: base + "code", mail: "https://famiformation.com/emails/" };
   app.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => {
+    const go = b.dataset.go;
+    // Le module « mail » mène à un AUTRE site : on l'ouvre dans un cadre plein
+    // écran AVEC un bouton retour, pour que la borne garde toujours une sortie.
+    if (go === "mail") { ouvreExterne(dest.mail); return; }
     try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {}   // on se souvient qu'on vient de la borne
-    location.href = dest[b.dataset.go];
+    location.href = dest[go];
   }));
+}
+
+// Ouvre un site externe DANS la borne (cadre plein écran) avec un bouton retour.
+function ouvreExterne(url) {
+  const o = document.createElement("div");
+  o.className = "ext-overlay";
+  o.innerHTML = `<div class="ext-bar">
+      <button class="ext-home" id="ext-retour">🏠 Retour à l'accueil</button>
+      <span class="ext-titre">Famiflora</span>
+    </div>
+    <iframe class="ext-frame" src="${esc(url)}" title="Famiflora"></iframe>`;
+  document.body.appendChild(o);
+  o.querySelector("#ext-retour").addEventListener("click", () => o.remove());
 }
 
 // 🏠 Bouton maison permanent : visible sur les pages atteintes DEPUIS la borne,
