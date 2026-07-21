@@ -368,6 +368,21 @@ body.mode-borne #app { width: 100%; }
 .borne-sous { font-weight: 700; opacity: .72; margin-bottom: 30px; font-size: clamp(1.1rem, 2.6vw, 1.45rem); }
 .borne-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
 
+/* --- Accueil /quiz (téléphone/ordi) = même chose que la borne, MAIS avec le
+   compte à rebours en haut. À zéro il disparaît et « Participer » s'active. --- */
+.home { width: 100%; max-width: 1000px; margin: 0 auto; text-align: center; padding: 0 2vw; }
+.home-cd { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 auto 26px;
+  background: linear-gradient(100deg, #0B3320, #1E6238); color: #fff; border-radius: 22px;
+  padding: 16px clamp(18px, 4vw, 30px); max-width: 640px; box-shadow: 0 8px 26px rgba(11,51,32,.22); }
+.hcd-lab { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(.95rem, 2.4vw, 1.25rem); opacity: .95; }
+.hcd-digits { display: flex; gap: clamp(10px, 3vw, 24px); }
+.hcd-cell { display: flex; flex-direction: column; align-items: center; min-width: 46px; }
+.hcd-cell b { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(1.5rem, 5vw, 2.6rem); line-height: 1; }
+.hcd-cell span { font-size: .72rem; text-transform: uppercase; letter-spacing: 1px; opacity: .82; margin-top: 2px; }
+.borne-mod.mod-inactif { opacity: .55; filter: grayscale(.35); }
+.borne-mod.mod-inactif:hover, .borne-mod.mod-inactif:active { transform: none; border-color: transparent;
+  box-shadow: 0 6px 24px rgba(14,59,36,.1); }
+
 /* Bouton « maison » permanent quand on est arrivé par la borne. */
 .home-borne { position: fixed; top: 12px; right: 12px; z-index: 100050; width: 48px; height: 48px;
   border-radius: 50%; background: var(--craie); box-shadow: 0 3px 12px rgba(14,59,36,.22);
@@ -1046,7 +1061,7 @@ async function refreshBoard() {
   if (v === "herbes") return;
   if (v === "jardin") { jardin = await apiJardin(); }
   // si on affiche le compte à rebours, le classement ou le jardin, on met à jour
-  if (v === "countdown" || v === "board" || v === "jardin") render();
+  if (v === "board" || v === "jardin") render();
 }
 setInterval(refreshBoard, 30000); // auto-refresh
 
@@ -1058,13 +1073,14 @@ function currentView() {
   // code bonus, on montre l'écran du code, pas le compte à rebours.
   if (userView === "reclamer") return "reclamer";
   if (userView === "retrouver") return "retrouver";
-  const phase = phaseNow();
-  if (phase === "avant") return "countdown";
-  if (phase === "termine") return "countdown";
+  // Hors période d'ouverture (avant le lancement / après la clôture), on montre
+  // l'accueil : compte à rebours (téléphone) + modules, quiz non jouable.
+  if (phaseNow() !== "ouvert") return "home";
+  if (userView === "quiz") return "quiz";
   if (userView === "board") return "board";
   if (userView === "jardin") return "jardin";
   if (userView === "herbes") return "herbes";
-  return "quiz";
+  return "home";
 }
 
 /* ============================================================
@@ -2002,17 +2018,35 @@ async function renderTeleBoard() {
    • J'ai trouvé un code       → /quiz/code
    • Je n'ai pas donné mon mail → https://famiformation.com/emails
    ============================================================ */
-function renderBorne() {
-  document.body.classList.add("mode-borne");
-  const base = quizBase();
-  app.innerHTML = `<div class="borne">
+// 🏠 ACCUEIL unifié — même écran pour la borne, le téléphone et l'ordi. SEULE
+// différence : le téléphone/ordi affichent le compte à rebours en haut tant qu'on
+// n'a pas atteint le lancement ; la borne, jamais. À zéro le compte à rebours
+// disparaît partout et le module « Participer au quiz » s'active tout seul.
+function renderHome() {
+  clearInterval(tickTimer);
+  const borne = (ECRAN === "borne");
+  document.body.classList.toggle("mode-borne", borne);
+  const phase = phaseNow();
+  const ouvert = (phase === "ouvert");
+  const cd = (!borne && phase === "avant");   // compte à rebours : hors borne, avant le lancement
+
+  app.innerHTML = `<div class="home">
+    ${cd ? `<div class="home-cd" id="home-cd">
+        <div class="hcd-lab">🚀 Lancement du quiz dans</div>
+        <div class="hcd-digits">
+          <div class="hcd-cell"><b id="hcd-j">--</b><span>Jours</span></div>
+          <div class="hcd-cell"><b id="hcd-h">--</b><span>Heures</span></div>
+          <div class="hcd-cell"><b id="hcd-m">--</b><span>Min</span></div>
+          <div class="hcd-cell"><b id="hcd-s">--</b><span>Sec</span></div>
+        </div>
+      </div>` : ""}
     <h2 class="borne-titre">Bienvenue chez Famiflora 🌱</h2>
     <p class="borne-sous">Que veux-tu faire ?</p>
     <div class="borne-modules">
-      <button class="borne-mod" data-go="quiz">
+      <button class="borne-mod${ouvert ? "" : " mod-inactif"}" data-go="quiz">
         <span class="bm-emo">🎯</span>
         <span class="bm-titre">Participer au quiz</span>
-        <span class="bm-desc">Réponds aux questions et récolte des graines</span>
+        <span class="bm-desc">${ouvert ? "Réponds aux questions et récolte des graines" : "🔒 Bientôt disponible"}</span>
       </button>
       <button class="borne-mod" data-go="code">
         <span class="bm-emo">🎁</span>
@@ -2021,20 +2055,66 @@ function renderBorne() {
       </button>
       <button class="borne-mod" data-go="mail">
         <span class="bm-emo">✉️</span>
-        <span class="bm-titre">Je n'ai pas encore donné mon mail</span>
-        <span class="bm-desc">Laisse ton adresse e-mail</span>
+        <span class="bm-titre">Je ne suis pas encore inscrit sur Famiformation</span>
+        <span class="bm-desc">🍦 Ticket glace à gagner</span>
       </button>
     </div>
   </div>`;
-  const dest = { quiz: base, code: base + "code", mail: "https://famiformation.com/emails/" };
+
+  // Compte à rebours du haut : à zéro, on ré-affiche l'accueil (le quiz devient
+  // jouable) sans que la personne ait à recharger la page.
+  if (cd) {
+    const tick = () => {
+      const diff = Math.max(0, CONFIG.dateLancement.getTime() - Date.now());
+      if (diff === 0) { render(); return; }
+      const set = (id, v) => { const n = document.getElementById(id); if (n) n.textContent = v; };
+      set("hcd-j", Math.floor(diff / 86400000));
+      set("hcd-h", pad(Math.floor((diff % 86400000) / 3600000)));
+      set("hcd-m", pad(Math.floor((diff % 3600000) / 60000)));
+      set("hcd-s", pad(Math.floor((diff % 60000) / 1000)));
+    };
+    tick();
+    tickTimer = setInterval(tick, 1000);
+  }
+
+  const base = quizBase();
   app.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => {
     const go = b.dataset.go;
-    // Le module « mail » mène à un AUTRE site : on l'ouvre dans un cadre plein
-    // écran AVEC un bouton retour, pour que la borne garde toujours une sortie.
+    if (go === "quiz") {
+      if (!ouvert) { modaleQuizVerrouille(); return; }   // avant le lancement : message
+      if (borne) { try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {} location.href = base + "?play=1"; return; }
+      userView = "quiz"; quiz = null; render(); return;
+    }
+    // Module « mail » : cadre emails + formulaire (jamais de nouvel onglet), borne ET téléphone.
     if (go === "mail") { ouvreMailBorne(); return; }
-    try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {}   // on se souvient qu'on vient de la borne
-    location.href = dest[go];
+    if (go === "code") {
+      if (borne) { try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {} location.href = base + "code"; return; }
+      codeAReclamer = null; userView = "reclamer"; quiz = null; render();
+    }
   }));
+}
+
+// 🔒 Message affiché quand on tente « Participer au quiz » avant l'ouverture.
+function modaleQuizVerrouille() {
+  const o = document.createElement("div");
+  o.className = "modal-fond";
+  o.innerHTML = `<div class="modal code-modal">
+    <div class="cm-emoji">🔒</div>
+    <h2 class="cm-titre">Le quiz n'est pas encore ouvert</h2>
+    <p class="cm-sous">Rendez-vous le <b>${labelLancement()}</b> pour jouer et récolter tes graines 🌱</p>
+    <button class="btn" id="cm-ok" style="min-width:180px;">J'ai hâte ! 🌱</button>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => o.remove();
+  o.querySelector("#cm-ok").addEventListener("click", ferme);
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
+}
+
+// Date de lancement lisible, ex. « 29/07 à 12h » (réglée dans /quiz/admin).
+function labelLancement() {
+  const d = CONFIG.dateLancement;
+  const heure = d.getMinutes() ? `${d.getHours()}h${pad(d.getMinutes())}` : `${d.getHours()}h`;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} à ${heure}`;
 }
 
 // 📧 Le module e-mail DANS la borne : la page emails ET le formulaire s'affichent
@@ -2533,11 +2613,11 @@ function render() {
     stopSim();
   }
   const v = currentView();
-  // La fée n'accompagne QUE le compte à rebours : ailleurs elle range sa baguette.
-  if (v === "countdown") { FEE.start(); } else { FEE.stop(); }
+  // La fée n'accompagne QUE l'écran télé : sur le téléphone/ordi, pas de fée.
+  FEE.stop();
   // On quitte le mini-jeu : couper la partie en cours (timers d'apparition).
   if (v !== "herbes") stopHerbes();
-  if (v === "countdown") renderCountdown();
+  if (v === "home") renderHome();
   else if (v === "quiz") renderQuiz();
   else if (v === "jardin") renderJardin();
   else if (v === "herbes") renderHerbes();
@@ -2562,20 +2642,32 @@ function render() {
   }
   board = bd;
 
-  // 🖥️ La BORNE a son propre affichage. La TÉLÉ passe par render() (elle réutilise
-  // le vrai compte à rebours avec la fée, puis bascule sur le classement).
-  if (ECRAN === "borne") { renderBorne(); return; }
+  // 📺 La TÉLÉ garde son spectacle (compte à rebours + fée, puis classement).
+  if (ECRAN === "tele") { render(); return; }
+
+  // 🖥️ La BORNE : appareil partagé → pas d'auto-reconnaissance (chacun repart de
+  // zéro) et accueil SANS compte à rebours. Le même render() que le téléphone.
+  if (ECRAN === "borne") {
+    try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {}
+    render();
+    return;
+  }
+
   injecteHomeBorne();   // bouton maison si on vient de la borne
-  if (ECRAN === "tele")  { render(); return; }
 
   // 🎁 Page /quiz/code : appareil potentiellement PARTAGÉ (borne) → pas d'auto-
   // reconnaissance. On ouvre directement la saisie du code ; l'identification
   // (créer un compte / se connecter) se fait au moment de récupérer les graines.
   if (ECRAN === "code") { codeAReclamer = null; userView = "reclamer"; render(); return; }
 
+  // 🎯 Depuis la borne, « Participer au quiz » ouvre /quiz?play=1 : on lance direct.
+  if (SIM_PARAMS.get("play")) userView = "quiz";
+
   // 🌱 Auto-reconnaissance : si ce téléphone a déjà une carte de jardinier, on
-  // identifie la personne sans qu'elle ait à retaper quoi que ce soit.
-  const moi = chargeMoi();
+  // identifie la personne sans qu'elle ait à retaper quoi que ce soit. Sur une
+  // borne (appareil partagé : fj_borne posé), on NE reconnaît jamais — chacun
+  // repart de zéro pour ne pas hériter du compte du visiteur précédent.
+  const moi = estBorne() ? null : chargeMoi();
   if (moi && moi.name && moi.code) {
     const res = await apiLoginJoueur(moi.name, moi.code).catch(() => null);
     if (res && res.exists && !res.mauvais_code) {
