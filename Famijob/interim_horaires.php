@@ -861,7 +861,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             $rhBlockMessage = fjhT(
-                "Ce n'est pas possible : cette personne n'est pas disponible pour ce creneau et l'ajouter poserait probleme au niveau du planning. Si vous avez vraiment besoin d'elle, merci de voir directement avec les RH.",
+                "Ce n'est pas possible : cette personne n'est pas disponible pour ce créneau et l'ajouter poserait problème au niveau du planning. Si vous avez vraiment besoin d'elle, merci de voir directement avec les RH.",
                 'Dit is niet mogelijk: deze persoon is niet beschikbaar voor dit tijdsblok en toevoegen zou voor problemen in de planning zorgen. Heeft u deze persoon echt nodig, neem dan rechtstreeks contact op met HR.'
             );
             try {

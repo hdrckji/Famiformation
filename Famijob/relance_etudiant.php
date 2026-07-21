@@ -355,7 +355,7 @@ code{background:#edf5ef;padding:1px 5px;border-radius:5px;font-size:.85em}
         </div>
 
         <div class="dispo-box">
-          <div class="dispo-legend">Affiner par disponibilité <span class="small">(optionnel — si aucun statut coché, tous les étudiants du groupe sont ciblés)</span></div>
+          <div class="dispo-legend">Affiner par disponibilité <span class="small">(optionnel — si aucun statut n'est coché, tous les étudiants du groupe sont ciblés)</span></div>
           <div class="dispo-row">
             <div>
               <div class="field" style="margin-bottom:0">
