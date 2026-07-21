@@ -220,6 +220,80 @@ body {
 .case.pleine { background: #A7C79B; cursor: help; }
 .case.neuve { animation: pousse-pop .5s ease-out; }
 .jardin-info { margin-top: 12px; font-weight: 700; font-size: .92rem; min-height: 1.4em; }
+.btn.small { font-size: .9rem; padding: 8px 16px; }
+.btn.mini { font-size: .82rem; padding: 6px 12px; }
+
+/* --- Revente d'une plante (dans la barre d'info du jardin) --- */
+.revente { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* --- Mini-jeu : la chasse aux mauvaises herbes --- */
+.herbe-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 12px; font-family: 'Fredoka', sans-serif; font-weight: 600; }
+.herbe-top .chrono, .herbe-top .butin { font-variant-numeric: tabular-nums; }
+.herbe-top .butin { color: var(--pousse); }
+.herbe-zone { position: relative; width: 100%; height: min(54vh, 440px);
+  background: linear-gradient(#E4F2DE, #CFE8C7); border-radius: 18px; overflow: hidden;
+  border: 3px solid #BBD9AE; touch-action: manipulation; user-select: none; }
+.herbe { position: absolute; transform: translate(-50%,-50%) scale(0); border: none; cursor: pointer;
+  width: 58px; height: 58px; border-radius: 50%; padding: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 1.85rem; line-height: 1; box-shadow: 0 3px 8px rgba(14,59,36,.25);
+  animation: herbePop 1.15s ease forwards; }
+@keyframes herbePop {
+  0%   { transform: translate(-50%,-50%) scale(0); }
+  12%  { transform: translate(-50%,-50%) scale(1.08); }
+  22%,78% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(.5); opacity: 0; }
+}
+.herbe .val { position: absolute; bottom: -7px; right: -7px; font-size: .68rem; font-weight: 900;
+  background: var(--foret); color: #fff; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.herbe.h-normale { background: radial-gradient(circle at 35% 30%, #C4E79E, #7FB55E); }
+.herbe.h-bronze  { background: radial-gradient(circle at 35% 30%, #EBC095, #B87333); }
+.herbe.h-argent  { background: radial-gradient(circle at 35% 30%, #F4F5F8, #A7AEB9); }
+.herbe.h-or      { background: radial-gradient(circle at 35% 30%, #FFE9A0, #E9B21E); box-shadow: 0 0 16px rgba(233,178,30,.75); }
+.herbe.crunch { animation: herbeCrunch .28s ease forwards; }
+@keyframes herbeCrunch { to { transform: translate(-50%,-50%) scale(1.7); opacity: 0; } }
+.herbe-gain { position: absolute; transform: translate(-50%,-50%); font-weight: 900; color: var(--pousse);
+  pointer-events: none; animation: herbeGain .7s ease forwards; text-shadow: 0 1px 2px #fff; }
+@keyframes herbeGain { 0% { opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-50%,-160%); opacity: 0; } }
+.herbe-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center; gap: 12px; padding: 18px; background: rgba(255,255,255,.82); }
+
+/* ============================================================
+   🥚 EASTER EGGS — "graine", "famiflora", "2026"
+   ============================================================ */
+.egg-layer { position: fixed; inset: 0; z-index: 100000; pointer-events: none; overflow: hidden; }
+.egg-fall { position: absolute; top: -10vh; will-change: transform; animation: eggFall linear forwards; }
+@keyframes eggFall { to { transform: translateY(124vh) rotate(var(--rot, 360deg)); } }
+.egg-fairy { position: fixed; left: 50%; top: 50%; width: min(220px, 60vw); z-index: 100001; pointer-events: none;
+  transform: translate(-50%,-50%) scale(0); animation: eggFairy 3.8s ease forwards;
+  filter: drop-shadow(0 10px 24px rgba(14,59,36,.35)); }
+.egg-fairy svg { width: 100%; height: auto; display: block; }
+@keyframes eggFairy {
+  0%   { transform: translate(-50%,-50%) scale(0) rotate(-20deg); opacity: 0; }
+  15%  { transform: translate(-50%,-50%) scale(1.1) rotate(6deg); opacity: 1; }
+  30%  { transform: translate(-50%,-50%) scale(1) rotate(-4deg); }
+  70%  { transform: translate(-50%,-50%) scale(1) rotate(4deg); opacity: 1; }
+  100% { transform: translate(-50%,-52%) scale(.9) rotate(0); opacity: 0; }
+}
+.egg-badge { position: fixed; left: 50%; top: 50%; z-index: 100001; pointer-events: none;
+  transform: translate(-50%,-50%) scale(0); animation: eggBadge 4s cubic-bezier(.2,1.4,.4,1) forwards; }
+@keyframes eggBadge {
+  0%   { transform: translate(-50%,-50%) scale(0) rotate(-12deg); opacity: 0; }
+  16%  { transform: translate(-50%,-50%) scale(1.12) rotate(4deg); opacity: 1; }
+  30%  { transform: translate(-50%,-50%) scale(1) rotate(0); }
+  82%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-52%) scale(.94); }
+}
+.egg-badge .disque { position: relative; width: min(240px,68vw); height: min(240px,68vw); border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #FFE9A0, #E9B21E 60%, #C9901A);
+  box-shadow: 0 0 0 8px rgba(255,255,255,.55), 0 14px 40px rgba(14,59,36,.4);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #5A3E00; }
+.egg-badge .an { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(2.4rem,10vw,4rem); line-height: 1; }
+.egg-badge .marque { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: clamp(.85rem,3.2vw,1.2rem); letter-spacing: 1px; }
+.egg-badge .halo { position: absolute; inset: -13%; border-radius: 50%; border: 4px dashed rgba(255,197,61,.85);
+  animation: eggSpin 4s linear infinite; }
+@keyframes eggSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .herbe { animation-duration: 1.6s; } }
 
 /* ============================================================
    🧚 LA FÉE FAMIFLORA — le spectacle du compte à rebours
@@ -457,7 +531,7 @@ async function apiSolde(name) {
   if (SIMULATION) {
     const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
     return p
-      ? { exists: true, name: p.name, recoltees: p.score, depensees: p.depensees || 0, solde: p.score - (p.depensees || 0) }
+      ? { exists: true, name: p.name, recoltees: p.score, depensees: p.depensees || 0, solde: p.score + (p.bonus || 0) - (p.depensees || 0) }
       : { exists: false };
   }
   const r = await fetch(`${CONFIG.api}?action=solde`, {
@@ -472,7 +546,7 @@ async function apiPlanter(name, caseIdx, plante) {
     if (jardin[caseIdx]) return { ok: false, reason: "case_prise" };
     const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
     if (!p) return { ok: false, reason: "joueur_inconnu" };
-    const solde = p.score - (p.depensees || 0);
+    const solde = p.score + (p.bonus || 0) - (p.depensees || 0);
     const cout = PLANTES[plante]?.cout ?? Infinity;
     if (solde < cout) return { ok: false, reason: "solde_insuffisant", solde };
     p.depensees = (p.depensees || 0) + cout;
@@ -481,6 +555,42 @@ async function apiPlanter(name, caseIdx, plante) {
   const r = await fetch(`${CONFIG.api}?action=planter`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, case: caseIdx, plante }),
+  });
+  return await r.json();
+}
+// 💸 Revendre une plante que j'ai plantée (je récupère mes graines).
+async function apiRevendre(name, caseIdx) {
+  if (SIMULATION) {
+    const c = jardin[caseIdx];
+    if (!c) return { ok: false, reason: "case_vide" };
+    if (c.par.toLowerCase() !== name.toLowerCase()) return { ok: false, reason: "pas_la_mienne" };
+    const cout = PLANTES[c.plante]?.cout ?? 0;
+    const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (p) p.depensees = Math.max(0, (p.depensees || 0) - cout);
+    delete jardin[caseIdx];
+    return { ok: true, rendu: cout, solde: p ? p.score + (p.bonus || 0) - (p.depensees || 0) : null };
+  }
+  const r = await fetch(`${CONFIG.api}?action=revendre`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, case: caseIdx }),
+  });
+  return await r.json();
+}
+// 🌿 Envoyer le butin du mini-jeu (le serveur recalcule et plafonne le gain).
+async function apiRecolteHerbes(name, herbes) {
+  if (SIMULATION) {
+    const GAIN = { normale: 1, bronze: 3, argent: 6, or: 12 };
+    let gain = 0;
+    for (const k in GAIN) gain += Math.min(300, herbes[k] || 0) * GAIN[k];
+    gain = Math.min(gain, 80);
+    const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (!p || gain <= 0) return { ok: false, reason: "rien" };
+    p.bonus = (p.bonus || 0) + gain;
+    return { ok: true, gain, solde: p.score + (p.bonus || 0) - (p.depensees || 0) };
+  }
+  const r = await fetch(`${CONFIG.api}?action=recolte_herbes`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, herbes }),
   });
   return await r.json();
 }
@@ -572,10 +682,13 @@ let jardin = {};             // cases plantées {index: {plante, par, date}}
 let joueur = null;           // {name, solde} — le joueur identifié (a joué ou s'est retrouvé)
 let planteChoisie = null;    // clé du catalogue sélectionnée dans la vue jardin
 let jardinMsg = null;        // petit message sous la grille
+let HG = null;               // partie de mini-jeu en cours (chasse aux herbes)
 
 async function refreshBoard() {
   board = await apiGetBoard();
   const v = currentView();
+  // On ne rafraîchit JAMAIS pendant le mini-jeu : ça remettrait la partie à zéro.
+  if (v === "herbes") return;
   if (v === "jardin") { jardin = await apiJardin(); }
   // si on affiche le compte à rebours, le classement ou le jardin, on met à jour
   if (v === "countdown" || v === "board" || v === "jardin") render();
@@ -591,6 +704,7 @@ function currentView() {
   if (phase === "termine") return "countdown";
   if (userView === "board") return "board";
   if (userView === "jardin") return "jardin";
+  if (userView === "herbes") return "herbes";
   return "quiz";
 }
 
@@ -659,16 +773,14 @@ function renderQuiz() {
   if (!quiz) quiz = { step: "intro", name: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, codes: [], codeMsg: null, start: 0, score: 0 };
 
   if (quiz.step === "intro") {
-    app.innerHTML = `<div class="card">
-      <h2 class="q-text">Prêt·e à récolter des graines ? 🌱</h2>
-      <p class="hint">${quiz.questions.length} questions sur l'entreprise et les collègues · chaque bonne réponse rapporte des graines,
-      qui font grandir ta plante et se plantent ensuite dans le jardin collectif · une seule participation par personne ·
-      ton prénom et tes graines seront visibles dans le classement commun.</p>
+    app.innerHTML = `<div class="card center">
+      <div style="font-size:3rem; line-height:1;">🌱</div>
+      <h2 class="q-text" style="margin:10px 0 18px;">Ton prénom pour commencer</h2>
       ${quiz.error ? `<div class="alert">${esc(quiz.error)}</div>` : ""}
-      <input class="field" id="q-name" placeholder="Ton prénom (ex : Marie D.)" maxlength="24" value="${esc(quiz.name)}">
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn" id="q-start">C'est parti ! 🚀</button>
-        ${quiz.dejaJoue ? `<button class="btn ghost" id="q-mon-jardin">🌼 J'ai déjà joué → mon jardin</button>` : ""}
+      <input class="field" id="q-name" placeholder="Ex : Marie D." maxlength="24" value="${esc(quiz.name)}" style="text-align:center;">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+        <button class="btn" id="q-start">Commencer 🚀</button>
+        ${quiz.dejaJoue ? `<button class="btn ghost" id="q-mon-jardin">🌼 Mon jardin</button>` : ""}
       </div>
     </div>`;
     $("#q-name").addEventListener("keydown", (e) => e.key === "Enter" && $("#q-start").click());
@@ -677,7 +789,7 @@ function renderQuiz() {
         const name = $("#q-name").value.trim();
         const s = await apiSolde(name).catch(() => null);
         if (s && s.exists) {
-          joueur = { name: s.name, solde: s.solde };
+          joueur = { name: s.name, solde: s.solde, recoltees: s.recoltees };
           jardin = await apiJardin();
           quiz = null;
           userView = "jardin";
@@ -766,7 +878,7 @@ function renderQuiz() {
       quiz.score = quiz.correct * CONFIG.pointsParBonneReponse + quiz.codes.length * CONFIG.pointsParCodeBonus;
       await apiSubmit({ name: quiz.name, score: quiz.score, correct: quiz.correct, codes: quiz.codes.length, time }).catch(() => {});
       // Le joueur est maintenant identifié : il pourra planter ses graines.
-      joueur = { name: quiz.name, solde: quiz.score };
+      joueur = { name: quiz.name, solde: quiz.score, recoltees: quiz.score };
       board = await apiGetBoard();
       quiz.step = "done";
       renderQuiz();
@@ -896,14 +1008,16 @@ function renderJardin() {
         renderJardin(); return;
       }
       jardinMsg = null;
-      joueur = { name: s.name, solde: s.solde };
+      joueur = { name: s.name, solde: s.solde, recoltees: s.recoltees };
       jardin = await apiJardin();
       renderJardin();
     });
     return;
   }
 
-  const stade = stadeDe(joueur.solde + soldeDepense());
+  // Le stade (🌰🌱🪴…) suit les graines RÉCOLTÉES au quiz — jamais le solde
+  // disponible, sinon planter ferait « rapetisser » le joueur.
+  const stade = stadeDe(joueur.recoltees ?? (joueur.solde + soldeDepense()));
   const nbPlantees = Object.keys(jardin).length;
 
   app.innerHTML = `<div class="board-wrap">${pillsHtml("jardin")}<div class="card">
@@ -911,8 +1025,9 @@ function renderJardin() {
       <span style="display:flex; align-items:center; gap:8px;">${avatarDe(joueur.name)} <strong>${esc(joueur.name)}</strong> <span title="${esc(stade.nom)}" style="font-size:1.3rem;">${stade.emoji}</span></span>
       <span class="montant">${joueur.solde} 🌱 à planter</span>
     </div>
-    <p class="hint">Choisis une plante puis tape une case libre du jardin. ${nbPlantees} plante${nbPlantees > 1 ? "s" : ""} déjà en terre —
-    planter ne change rien à ton classement, alors fais-toi plaisir !</p>
+    <p class="hint">Choisis une plante puis tape une case libre. ${nbPlantees} plante${nbPlantees > 1 ? "s" : ""} déjà en terre —
+    planter ne change rien à ton classement. Plus de graines ? Chasse les mauvaises herbes ! 🌿</p>
+    <div style="margin-bottom:14px;"><button class="btn small" id="j-herbes">🌿 Gagner des graines</button></div>
     <div class="catalogue">
       ${Object.entries(PLANTES).map(([cle, p]) => `
         <button class="plt ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${p.cout > joueur.solde ? "disabled" : ""}>
@@ -931,6 +1046,9 @@ function renderJardin() {
   </div></div>`;
   bindPills();
 
+  // Aller au mini-jeu pour récolter des graines.
+  $("#j-herbes").addEventListener("click", () => { userView = "herbes"; render(); });
+
   // Choisir une plante dans le catalogue
   app.querySelectorAll("[data-plt]").forEach((b) => b.addEventListener("click", () => {
     planteChoisie = planteChoisie === b.dataset.plt ? null : b.dataset.plt;
@@ -938,11 +1056,33 @@ function renderJardin() {
     renderJardin();
   }));
 
-  // Une case occupée : afficher qui a planté quoi (utile sur mobile, sans survol)
+  // Une case occupée : afficher qui a planté quoi. Si c'est MA plante, je peux
+  // la revendre pour récupérer mes graines.
   app.querySelectorAll("[data-info]").forEach((b) => b.addEventListener("click", () => {
-    const c = jardin[b.dataset.info];
+    const idx = b.dataset.info;
+    const c = jardin[idx];
     if (!c) return;
-    $("#j-info").textContent = `${PLANTES[c.plante]?.emoji || "🌿"} ${PLANTES[c.plante]?.nom || c.plante} — planté par ${c.par}`;
+    const p = PLANTES[c.plante];
+    const info = $("#j-info");
+    const aMoi = joueur && c.par.toLowerCase() === joueur.name.toLowerCase();
+    info.innerHTML = `<span class="revente">${p?.emoji || "🌿"} ${esc(p?.nom || c.plante)} — planté par ${esc(c.par)}`
+      + (aMoi ? ` <button class="btn mini" id="j-revendre">Revendre +${p?.cout ?? 0} 🌱</button>` : "")
+      + `</span>`;
+    if (aMoi) {
+      $("#j-revendre").addEventListener("click", async () => {
+        $("#j-revendre").disabled = true;
+        const res = await apiRevendre(joueur.name, +idx).catch(() => ({ ok: false }));
+        if (res.ok) {
+          delete jardin[idx];
+          if (res.solde != null) joueur.solde = res.solde;
+          jardinMsg = `Plante revendue, +${res.rendu} 🌱 récupérées. Tu as ${joueur.solde} graines.`;
+        } else {
+          jardin = await apiJardin();
+          jardinMsg = res.reason === "pas_la_mienne" ? "On ne peut revendre que ses propres plantes." : "Petit souci, réessaie.";
+        }
+        renderJardin();
+      });
+    }
   }));
 
   // Une case libre : planter la plante choisie
@@ -977,6 +1117,148 @@ function renderJardin() {
 function soldeDepense() {
   const p = board.find((x) => x.name.toLowerCase() === (joueur?.name || "").toLowerCase());
   return p ? (p.depensees || 0) : 0;
+}
+
+/* ============================================================
+   🌿 MINI-JEU — LA CHASSE AUX MAUVAISES HERBES
+   Une fois le quiz fini on ne récolte plus de graines au quiz : ce petit jeu
+   permet d'en gagner d'AUTRES à planter (elles ne comptent pas au classement).
+   Des herbes surgissent ~25 s ; on tape dessus. Les bronze/argent/or sont
+   rares mais rapportent plus. Le serveur recalcule et plafonne le gain.
+   ============================================================ */
+
+const HERBE_DUREE = 25;
+const HERBE_TIERS = [
+  { k: "normale", val: 1,  p: 0.68 },
+  { k: "bronze",  val: 3,  p: 0.22 },
+  { k: "argent",  val: 6,  p: 0.08 },
+  { k: "or",      val: 12, p: 0.02 },
+];
+
+// Coupe une partie en cours (changement d'écran, rejeu…) : sans ça, les timers
+// continueraient de faire apparaître des herbes en arrière-plan.
+function stopHerbes() {
+  if (!HG) return;
+  HG.timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
+  HG.timers = [];
+  HG.running = false;
+}
+
+function renderHerbes() {
+  clearInterval(tickTimer);
+  stopHerbes();
+  if (!joueur) { userView = "jardin"; render(); return; }  // pas identifié : retour jardin
+
+  app.innerHTML = `<div class="board-wrap"><div class="card">
+    <div class="herbe-top">
+      <button class="btn ghost mini" id="h-retour">← Jardin</button>
+      <span class="chrono" id="h-chrono">⏱ ${HERBE_DUREE} s</span>
+      <span class="butin" id="h-butin">🌱 0</span>
+    </div>
+    <div class="herbe-zone" id="h-zone">
+      <div id="h-overlay" class="herbe-overlay">
+        <div style="font-size:2.4rem;">🌿</div>
+        <h2 class="q-text" style="margin:0;">Chasse aux mauvaises herbes</h2>
+        <p class="hint" style="margin:0; max-width:340px;">Tape un maximum de mauvaises herbes en ${HERBE_DUREE} s !
+        Les <b style="color:#B87333;">bronze</b>, <b style="color:#8A9099;">argent</b> et <b style="color:#E9B21E;">or</b> sont rares mais rapportent gros.</p>
+        <button class="btn" id="h-go">Commencer 🌱</button>
+      </div>
+    </div>
+    <div class="jardin-info" id="h-info"></div>
+  </div></div>`;
+  $("#h-retour").addEventListener("click", () => { userView = "jardin"; render(); });
+  $("#h-go").addEventListener("click", demarreHerbes);
+}
+
+function demarreHerbes() {
+  const zone = $("#h-zone");
+  const overlay = $("#h-overlay");
+  if (!zone) return;
+  if (overlay) overlay.remove();
+
+  HG = { timers: [], counts: { normale: 0, bronze: 0, argent: 0, or: 0 }, butin: 0, restant: HERBE_DUREE, running: true };
+  const chrono = $("#h-chrono"), butinEl = $("#h-butin");
+
+  // Le décompte.
+  HG.timers.push(setInterval(() => {
+    HG.restant--;
+    if (chrono) chrono.textContent = "⏱ " + Math.max(0, HG.restant) + " s";
+    if (HG.restant <= 0) finHerbes();
+  }, 1000));
+
+  const tire = () => {
+    let r = Math.random(), acc = 0;
+    for (const t of HERBE_TIERS) { acc += t.p; if (r < acc) return t; }
+    return HERBE_TIERS[0];
+  };
+
+  const spawn = () => {
+    if (!HG || !HG.running || !zone.isConnected) return;
+    const t = tire();
+    const b = document.createElement("button");
+    b.className = "herbe h-" + t.k;
+    b.innerHTML = `🌿<span class="val">+${t.val}</span>`;
+    const marge = 38;
+    const x = marge + Math.random() * Math.max(1, zone.clientWidth - marge * 2);
+    const y = marge + Math.random() * Math.max(1, zone.clientHeight - marge * 2);
+    b.style.left = x + "px";
+    b.style.top = y + "px";
+    let vive = true;
+    const enleve = setTimeout(() => { if (vive) b.remove(); }, 1150);
+    HG.timers.push(enleve);
+    b.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (!vive || !HG || !HG.running) return;
+      vive = false;
+      clearTimeout(enleve);
+      HG.counts[t.k]++;
+      HG.butin += t.val;
+      if (butinEl) butinEl.textContent = "🌱 " + HG.butin;
+      b.classList.add("crunch");
+      const g = document.createElement("div");
+      g.className = "herbe-gain";
+      g.textContent = "+" + t.val;
+      g.style.left = x + "px"; g.style.top = y + "px";
+      zone.appendChild(g);
+      setTimeout(() => g.remove(), 700);
+      setTimeout(() => b.remove(), 280);
+    });
+    zone.appendChild(b);
+  };
+
+  HG.timers.push(setInterval(spawn, 620));
+  spawn();
+}
+
+async function finHerbes() {
+  if (!HG || !HG.running) return;
+  HG.running = false;
+  HG.timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
+  HG.timers = [];
+  const zone = $("#h-zone");
+  if (zone) zone.querySelectorAll(".herbe").forEach((e) => e.remove());
+
+  const counts = HG.counts;
+  const res = await apiRecolteHerbes(joueur.name, counts).catch(() => ({ ok: false }));
+  const gagne = res.ok ? res.gain : 0;
+  if (res.ok && res.solde != null) joueur.solde = res.solde;
+
+  if (zone && zone.isConnected) {
+    const o = document.createElement("div");
+    o.id = "h-overlay";
+    o.className = "herbe-overlay";
+    o.innerHTML = `<div style="font-size:2.6rem;">🌱</div>
+      <h2 class="q-text" style="margin:0;">+${gagne} graines récoltées !</h2>
+      <p class="hint" style="margin:0;">${res.ok ? `Tu as maintenant <b>${joueur.solde}</b> graines à planter.` : "La récolte n'a pas pu être enregistrée, réessaie."}
+      ${gagne >= 80 ? "<br>Plafond de la partie atteint 🌟" : ""}</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+        <button class="btn" id="h-rejouer">Rejouer 🌿</button>
+        <button class="btn ghost" id="h-aujardin">Planter mes graines 🌼</button>
+      </div>`;
+    zone.appendChild(o);
+    $("#h-rejouer").addEventListener("click", renderHerbes);
+    $("#h-aujardin").addEventListener("click", () => { userView = "jardin"; render(); });
+  }
 }
 
 /* ============================================================
@@ -1280,7 +1562,120 @@ const FEE = (() => {
     document.querySelectorAll(".fee-et").forEach((el) => el.remove());
   }
 
-  return { start, stop };
+  return { start, stop, svg: FEE_SVG };
+})();
+
+/* ============================================================
+   🥚 EASTER EGGS
+   • "graine"    → pluie de graines.        Mobile : secouer le téléphone.
+   • "famiflora" → la fée fait un p'tit show. Mobile : taper 5 fois.
+   • "2026"      → badge Famiformation 2026.  Mobile : glisser ↑ ↓ → ←.
+   ============================================================ */
+const EGG = (() => {
+  let occupe = false;   // un seul effet à la fois
+
+  function layer() {
+    const l = document.createElement("div");
+    l.className = "egg-layer";
+    document.body.appendChild(l);
+    return l;
+  }
+  // Pluie d'emojis qui tombent du haut de l'écran.
+  function pluie(emojis, n, duree, cible) {
+    const l = cible || layer();
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement("div");
+      s.className = "egg-fall";
+      s.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+      s.style.left = Math.random() * 100 + "vw";
+      s.style.fontSize = (1.1 + Math.random() * 1.7) + "rem";
+      s.style.animationDuration = (duree * (0.7 + Math.random() * 0.6)) + "s";
+      s.style.animationDelay = (Math.random() * duree * 0.5) + "s";
+      s.style.setProperty("--rot", (Math.random() * 720 - 360) + "deg");
+      l.appendChild(s);
+    }
+    return l;
+  }
+  function ferme(l, ms) { setTimeout(() => l.remove(), ms); }
+
+  function grainePluie() {
+    if (occupe) return; occupe = true;
+    const l = pluie(["🌱", "🌰", "🍀"], 64, 3.4);
+    ferme(l, 5200); setTimeout(() => occupe = false, 3600);
+  }
+  function famiflora() {
+    if (occupe) return; occupe = true;
+    const l = pluie(["✨", "🌸", "🌼", "💫", "🦋", "🌷"], 72, 3.6);
+    const f = document.createElement("div");
+    f.className = "egg-fairy";
+    f.innerHTML = (typeof FEE !== "undefined" && FEE.svg) ? FEE.svg : "🧚";
+    l.appendChild(f);
+    ferme(l, 5400); setTimeout(() => occupe = false, 4200);
+  }
+  function badge() {
+    if (occupe) return; occupe = true;
+    const l = pluie(["✨", "🎉", "⭐", "🌟"], 52, 3.6);
+    const b = document.createElement("div");
+    b.className = "egg-badge";
+    b.innerHTML = `<div class="disque"><div class="halo"></div><div class="an">2026</div><div class="marque">FAMIFORMATION</div></div>`;
+    l.appendChild(b);
+    ferme(l, 5600); setTimeout(() => occupe = false, 4400);
+  }
+
+  const MOTS = { "graine": grainePluie, "famiflora": famiflora, "2026": badge };
+
+  // Clavier (ordinateur) : on retient les dernières frappes.
+  let buf = "";
+  window.addEventListener("keydown", (e) => {
+    if (e.target && /input|textarea/i.test(e.target.tagName)) return;  // pas pendant une saisie
+    if (!e.key || e.key.length !== 1) return;
+    buf = (buf + e.key.toLowerCase()).slice(-14);
+    for (const mot in MOTS) { if (buf.endsWith(mot)) { buf = ""; MOTS[mot](); break; } }
+  });
+
+  // Mobile — « famiflora » : 5 tapes rapides (hors boutons/liens/champs).
+  let taps = 0, tapT = null;
+  window.addEventListener("pointerdown", (e) => {
+    if (e.target && e.target.closest && e.target.closest("button, a, input")) return;
+    taps++;
+    clearTimeout(tapT);
+    tapT = setTimeout(() => { taps = 0; }, 1200);
+    if (taps >= 5) { taps = 0; famiflora(); }
+  });
+
+  // Mobile — « 2026 » : glisser ↑ ↓ → ← dans l'ordre.
+  const SEQ = ["haut", "bas", "droite", "gauche"];
+  let seqPos = 0, sx = 0, sy = 0;
+  window.addEventListener("touchstart", (e) => {
+    const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY;
+  }, { passive: true });
+  window.addEventListener("touchend", (e) => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) < 45 && Math.abs(dy) < 45) return;   // simple tape, pas un glissé
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "droite" : "gauche") : (dy > 0 ? "bas" : "haut");
+    if (dir === SEQ[seqPos]) { seqPos++; if (seqPos === SEQ.length) { seqPos = 0; badge(); } }
+    else { seqPos = (dir === SEQ[0]) ? 1 : 0; }
+  }, { passive: true });
+
+  // Mobile — « graine » : secouer le téléphone. Sur Android/desktop le capteur
+  // est accessible directement. Sur iOS, il faudrait une permission déclenchée
+  // par un geste : on NE la demande PAS automatiquement (ce serait une pop-up
+  // dès la première tape, pour tout le monde). La secousse reste donc en veille
+  // sur iPhone — le clavier « graine » et les autres easter eggs marchent partout.
+  let dernSecousse = 0;
+  function onShake(e) {
+    const a = e.accelerationIncludingGravity;
+    if (!a) return;
+    const force = Math.abs(a.x || 0) + Math.abs(a.y || 0) + Math.abs(a.z || 0);
+    const now = Date.now();
+    if (force > 34 && now - dernSecousse > 1500) { dernSecousse = now; grainePluie(); }
+  }
+  if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission !== "function") {
+    window.addEventListener("devicemotion", onShake);
+  }
+
+  return { grainePluie, famiflora, badge };
 })();
 
 /* ============================================================
@@ -1291,9 +1686,12 @@ function render() {
   const v = currentView();
   // La fée n'accompagne QUE le compte à rebours : ailleurs elle range sa baguette.
   if (v === "countdown") { FEE.start(); } else { FEE.stop(); }
+  // On quitte le mini-jeu : couper la partie en cours (timers d'apparition).
+  if (v !== "herbes") stopHerbes();
   if (v === "countdown") renderCountdown();
   else if (v === "quiz") renderQuiz();
   else if (v === "jardin") renderJardin();
+  else if (v === "herbes") renderHerbes();
   else renderBoard();
 }
 

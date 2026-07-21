@@ -95,6 +95,38 @@ BON À SAVOIR
   et le mélange aléatoire des questions/réponses complique déjà
   la copie entre collègues.
 
+MINI-JEU « CHASSE AUX MAUVAISES HERBES » 🌿
+--------------------------------------------
+Une fois le quiz fini, on ne récolte plus de graines au quiz.
+Depuis le jardin, bouton « Gagner des graines » : on tape les
+mauvaises herbes pendant 25 s. Les herbes bronze / argent / or
+sont plus rares mais rapportent plus (1 / 3 / 6 / 12 graines).
+Ces graines servent UNIQUEMENT à planter — elles ne comptent PAS
+dans le classement (les prix restent basés sur le quiz). Rejouable
+autant qu'on veut ; gain plafonné à 80 par partie (anti-triche).
+Réglages dans api.php : $HERBE_GAIN, $HERBE_MAX_GAIN.
+
+REVENTE ET PETITES PLANTES
+--------------------------
+• Le catalogue a des plantes à 1 graine (🍀 Trèfle, 🌱 Brin d'herbe).
+• On peut REVENDRE une plante qu'on a soi-même plantée (tape ta
+  plante dans le jardin → « Revendre ») : la case se libère et tu
+  récupères tes graines. On ne peut revendre que SES plantes.
+
+EASTER EGGS (petits bonus cachés) 🥚
+------------------------------------
+• « graine »    : au clavier, tape le mot → pluie de graines.
+                  Sur téléphone : secoue l'appareil (Android ; sur
+                  iPhone la secousse reste en veille, cf. ci-dessous).
+• « famiflora » : au clavier → la fée fait un petit show.
+                  Sur téléphone : tape 5 fois l'écran (hors boutons).
+• « 2026 »      : au clavier → badge Famiformation 2026.
+                  Sur téléphone : glisse ↑ puis ↓ puis → puis ←.
+Note iPhone : la secousse exige une autorisation « mouvement » qui
+ferait une pop-up dès l'arrivée sur le site — on ne l'impose pas.
+Elle marche donc sur Android ; sur iPhone, utilise le clavier si
+besoin. Les deux autres easter eggs marchent partout.
+
 LE JARDIN COLLECTIF 🌼 (nouveau)
 --------------------------------
 • Les points sont devenus des GRAINES. Le classement se base sur les

@@ -74,6 +74,8 @@ $jardinFile    = $dataDir . '/jardin.json';
 // Les coûts sont pensés pour un score max d'environ 340 graines :
 // un bon joueur plante 3-5 fois, un joueur moyen 2-3 fois.
 $PLANTES = [
+  'trefle'     => ['emoji' => '🍀', 'nom' => 'Trèfle',      'cout' => 1],
+  'brin'       => ['emoji' => '🌱', 'nom' => 'Brin d\'herbe', 'cout' => 1],
   'paquerette' => ['emoji' => '🌼', 'nom' => 'Pâquerette',  'cout' => 20],
   'tulipe'     => ['emoji' => '🌷', 'nom' => 'Tulipe',      'cout' => 35],
   'lavande'    => ['emoji' => '💜', 'nom' => 'Lavande',     'cout' => 50],
@@ -85,9 +87,22 @@ $PLANTES = [
 // Taille de la grille (8 colonnes × 6 lignes = 48 cases).
 $JARDIN_CASES = 48;
 
-/** Solde de graines d'un participant : récoltées (score) moins dépensées. */
+// 🌿 MINI-JEU « chasse aux mauvaises herbes » : combien rapporte chaque herbe.
+// Le serveur ne fait JAMAIS confiance au total envoyé par la page : il recalcule
+// les graines avec CETTE table, à partir du nombre d'herbes de chaque sorte, et
+// plafonne le gain par partie (anti-triche raisonnable pour un jeu bon enfant).
+$HERBE_GAIN = ['normale' => 1, 'bronze' => 3, 'argent' => 6, 'or' => 12];
+$HERBE_MAX_PAR_HERBE = 300;   // borne le nombre d'herbes d'une sorte par partie
+$HERBE_MAX_GAIN = 80;         // gain maximum crédité en une partie
+
+/**
+ * Solde de graines DISPONIBLES pour planter :
+ *   récoltées au quiz (score) + gagnées au mini-jeu (bonus) − déjà dépensées.
+ * Le « bonus » n'entre PAS dans le classement (score) : le classement, et donc
+ * les prix, restent basés sur le quiz uniquement.
+ */
 function soldeDe($p) {
-  return max(0, intval($p['score'] ?? 0) - intval($p['depensees'] ?? 0));
+  return max(0, intval($p['score'] ?? 0) + intval($p['bonus'] ?? 0) - intval($p['depensees'] ?? 0));
 }
 
 // ❓ QUESTIONS PAR DÉFAUT. Elles ne servent qu'AU TOUT PREMIER lancement : dès que
@@ -398,6 +413,73 @@ switch ($action) {
       break;
     }
     echo json_encode(['ok' => true, 'solde' => $debit['solde']], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 💸 REVENDRE une plante que J'AI plantée : la case se libère et je récupère
+  // exactement ce que j'avais payé. On ne peut revendre QUE ses propres plantes
+  // (vérifié par le prénom), pas celles des autres.
+  case 'revendre': {
+    $name = trim($input['name'] ?? '');
+    $idx  = intval($input['case'] ?? -1);
+
+    // Étape 1 : retirer la plante SI elle m'appartient, sous verrou du jardin.
+    $retiree = withLock($jardinFile, function (&$j, &$write) use ($idx, $name) {
+      if (!isset($j['cases'][$idx])) { return ['ok' => false, 'reason' => 'case_vide']; }
+      $c = $j['cases'][$idx];
+      if (mb_strtolower($c['par'] ?? '') !== mb_strtolower($name)) {
+        return ['ok' => false, 'reason' => 'pas_la_mienne'];
+      }
+      unset($j['cases'][$idx]);
+      $write = true;
+      return ['ok' => true, 'plante' => $c['plante']];
+    });
+    if (empty($retiree['ok'])) { echo json_encode($retiree, JSON_UNESCAPED_UNICODE); break; }
+
+    // Étape 2 : rembourser le coût (on diminue les graines dépensées), sous
+    // verrou des scores. On renvoie le nouveau solde disponible.
+    $cout = $PLANTES[$retiree['plante']]['cout'] ?? 0;
+    $res = withLock($scoresFile, function (&$board, &$write) use ($name, $cout) {
+      foreach ($board as &$p) {
+        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+          $p['depensees'] = max(0, intval($p['depensees'] ?? 0) - $cout);
+          $write = true;
+          return ['ok' => true, 'solde' => soldeDe($p), 'rendu' => $cout];
+        }
+      }
+      return ['ok' => true, 'solde' => null, 'rendu' => $cout];  // plante retirée quand même
+    });
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🌿 RÉCOLTE DES MAUVAISES HERBES (mini-jeu) : la page envoie combien d'herbes
+  // de chaque sorte ont été tapées ; le serveur RECALCULE les graines avec sa
+  // propre table et plafonne le total, puis les crédite au « bonus » du joueur
+  // (graines à planter, sans impact sur le classement).
+  case 'recolte_herbes': {
+    $name = trim($input['name'] ?? '');
+    $h = is_array($input['herbes'] ?? null) ? $input['herbes'] : [];
+
+    $gain = 0;
+    foreach ($HERBE_GAIN as $sorte => $valeur) {
+      $n = max(0, min($HERBE_MAX_PAR_HERBE, intval($h[$sorte] ?? 0)));
+      $gain += $n * $valeur;
+    }
+    $gain = min($gain, $HERBE_MAX_GAIN);
+    if ($gain <= 0) { echo json_encode(['ok' => false, 'reason' => 'rien']); break; }
+
+    $res = withLock($scoresFile, function (&$board, &$write) use ($name, $gain) {
+      foreach ($board as &$p) {
+        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+          $p['bonus'] = intval($p['bonus'] ?? 0) + $gain;
+          $write = true;
+          return ['ok' => true, 'gain' => $gain, 'solde' => soldeDe($p)];
+        }
+      }
+      return ['ok' => false, 'reason' => 'joueur_inconnu'];
+    });
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
     break;
   }
 
