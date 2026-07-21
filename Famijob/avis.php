@@ -156,7 +156,7 @@ function fjaCategoryLabel($cat, array $categories)
 }
 ?>
 <!DOCTYPE html>
-<html lang="<?= e(famiLocale()) ?>">
+<html lang="<?= e(famiLang()) ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

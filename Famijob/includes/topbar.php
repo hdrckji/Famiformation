@@ -43,6 +43,7 @@ if (!function_exists('famijobRibbonHtml')) {
 
         $unread = famijobNotifUnreadCount($db, $userId);
 
+        $isAdmin = ($role === 'admin');
         $showHome = !empty($opts['home']);
         $homeHref = (string) ($opts['home_href'] ?? 'index.php');
 
@@ -54,6 +55,9 @@ if (!function_exists('famijobRibbonHtml')) {
 
         $homeBtn = $showHome
             ? '<a href="' . $homeHrefH . '" class="fjr-btn" title="Accueil FamiJob">🏠</a>'
+            : '';
+        $settingsBtn = $isAdmin
+            ? '<a href="parametres.php" class="fjr-btn" title="Paramètres">⚙️</a>'
             : '';
 
         return <<<HTML
@@ -111,6 +115,7 @@ if (!function_exists('famijobRibbonHtml')) {
                 </span>
             </div>
             <a href="notifications.php" class="fjr-btn" title="Notifications">🔔{$dotHtml}</a>
+            {$settingsBtn}
             {$homeBtn}
             <a href="logout.php" class="fjr-btn fjr-out" title="Déconnexion">⏻</a>
         </div>

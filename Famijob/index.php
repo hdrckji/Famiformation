@@ -441,6 +441,9 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
             <a href="notifications.php" class="nav-bell" title="Notifications">
                 🔔<?php if ($unreadNotifications > 0): ?><span class="nav-bell-dot"><?= (int) $unreadNotifications ?></span><?php endif; ?>
             </a>
+            <?php if ($role === 'admin'): ?>
+            <a href="parametres.php" class="nav-bell" title="<?= e(fjT('Paramètres', 'Instellingen')) ?>">⚙️</a>
+            <?php endif; ?>
             <?= famiRenderLanguageSwitcher() ?>
         </div>
     </div>
@@ -497,10 +500,10 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
                 <div class="tile-desc"><?= e(famiT('tile.interim_fixes.desc')) ?></div>
             </a>
 
-            <a href="admin_departements.php" class="tile">
-                <div class="tile-icon">🏷️</div>
-                <div class="tile-title"><?= e(fjT('Gestion des départements', 'Afdelingen beheren')) ?></div>
-                <div class="tile-desc"><?= e(fjT('Ajouter ou retirer des départements, directement depuis le site. Appliqué partout.', 'Afdelingen toevoegen of verwijderen, rechtstreeks vanaf de site. Overal toegepast.')) ?></div>
+            <a href="parametres.php" class="tile">
+                <div class="tile-icon">⚙️</div>
+                <div class="tile-title"><?= e(fjT('Paramètres', 'Instellingen')) ?></div>
+                <div class="tile-desc"><?= e(fjT('Gérer les départements et la configuration de l\'app — tout en base, sans toucher au code.', 'Afdelingen en app-configuratie beheren — alles in de database, zonder code.')) ?></div>
             </a>
 
             <a href="avis.php" class="tile">
