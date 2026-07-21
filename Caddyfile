@@ -42,6 +42,16 @@
 		@quizAdmin path /quiz/admin/
 		rewrite @quizAdmin /quiz/admin/index.html
 
+		# Ecrans dedies : /quiz/tele (affichage TV), /quiz/borne (borne) et
+		# /quiz/code (recuperation d'un code bonus). Ils servent la MEME page que
+		# /quiz ; c'est la page qui detecte le mode selon l'URL. On garde la forme
+		# SANS slash final pour que le relatif "api.php" reste a la racine /quiz/.
+		redir /quiz/tele/ /quiz/tele 308
+		redir /quiz/borne/ /quiz/borne 308
+		redir /quiz/code/ /quiz/code 308
+		@quizEcrans path /quiz/tele /quiz/borne /quiz/code
+		rewrite @quizEcrans /quiz/index.html
+
 		# Bloque les fichiers caches (.env, .htaccess, .gitignore, ...)
 		@dotfiles path_regexp dotfiles /\.[^/]+$
 		respond @dotfiles 403

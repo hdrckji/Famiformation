@@ -236,19 +236,37 @@ body {
 .case.neuve { animation: pousse-pop .5s ease-out; }
 .jardin-info { margin-top: 12px; font-weight: 700; font-size: .92rem; min-height: 1.4em; }
 
-/* --- Plantes RARES : reflets métalliques + brillance qui balaie --- */
-.plt.rare-bronze, .case.rare-bronze { background: linear-gradient(135deg, #E8C79B, #B87333 60%, #8A5A28); color: #fff; }
-.plt.rare-argent, .case.rare-argent { background: linear-gradient(135deg, #FBFCFE, #C4CAD4 55%, #949BA8); color: #33383F; }
-.plt.rare-or,     .case.rare-or     { background: linear-gradient(135deg, #FFE9A0, #E9B21E 55%, #C9901A); color: #5A3E00; }
-.plt[class*="rare-"], .case[class*="rare-"] { position: relative; overflow: hidden; border-color: rgba(255,255,255,.6); box-shadow: 0 3px 10px rgba(14,59,36,.25); }
-.plt[class*="rare-"] .cout { opacity: .95; }
-.case.pleine[class*="rare-"] { box-shadow: 0 0 12px rgba(255,220,120,.6), 0 3px 10px rgba(14,59,36,.25); }
-.plt[class*="rare-"]::after, .case[class*="rare-"]::after {
-  content: ""; position: absolute; top: 0; left: -60%; width: 45%; height: 100%;
-  background: linear-gradient(100deg, transparent, rgba(255,255,255,.75), transparent);
-  transform: skewX(-18deg); animation: brille 2.6s ease-in-out infinite;
+/* --- Plantes RARES : de vraies fleurs entièrement métalliques (or/argent/bronze)
+   posées sur un fond sombre discret pour que le métal ressorte, avec un halo
+   coloré et un reflet qui balaie. --- */
+.case.pleine[class*="rare-"] { background: radial-gradient(circle at 50% 42%, #3C5646, #23342B); position: relative; overflow: hidden; }
+.case.pleine.rare-or     { box-shadow: 0 0 14px rgba(233,178,30,.85), inset 0 0 8px rgba(255,225,120,.4); }
+.case.pleine.rare-argent { box-shadow: 0 0 14px rgba(190,200,215,.85), inset 0 0 8px rgba(255,255,255,.4); }
+.case.pleine.rare-bronze { box-shadow: 0 0 14px rgba(184,115,51,.85), inset 0 0 8px rgba(240,190,130,.35); }
+.plt[class*="rare-"] { position: relative; overflow: hidden; }
+.plt.rare-or     { box-shadow: 0 0 10px rgba(233,178,30,.6); }
+.plt.rare-argent { box-shadow: 0 0 10px rgba(190,200,215,.6); }
+.plt.rare-bronze { box-shadow: 0 0 10px rgba(184,115,51,.6); }
+
+/* La fleur métallique : elle occupe la case, brille (halo pulsé) et son reflet
+   spéculaire scintille doucement. */
+.case .fleur-rare { width: 84%; height: 84%; }
+.plt .emo .fleur-rare { display: inline-block; width: 34px; height: 34px; }
+.fleur-rare { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); animation: fleurBrille 2.6s ease-in-out infinite; }
+@keyframes fleurBrille {
+  0%, 100% { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)) drop-shadow(0 0 1px rgba(255,255,255,.4)); }
+  50%      { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)) drop-shadow(0 0 6px rgba(255,255,255,.95)); }
 }
-@keyframes brille { 0%, 60% { left: -60%; } 100% { left: 130%; } }
+.fleur-rare .glint { animation: glintBouge 2.6s ease-in-out infinite; transform-origin: 50px 50px; }
+@keyframes glintBouge { 0%,100% { opacity: .55; transform: translate(0,0); } 50% { opacity: 1; transform: translate(4px, -3px); } }
+
+/* Le reflet qui balaie la case rare. */
+.case.pleine[class*="rare-"]::after {
+  content: ""; position: absolute; top: 0; left: -60%; width: 45%; height: 100%; z-index: 2;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  transform: skewX(-18deg); animation: brille 3s ease-in-out infinite; pointer-events: none;
+}
+@keyframes brille { 0%, 55% { left: -60%; } 100% { left: 130%; } }
 
 /* Les étincelles projetées quand on plante une plante rare. */
 .scintille { position: fixed; z-index: 100002; pointer-events: none; font-size: 1.1rem;
@@ -323,6 +341,10 @@ body {
   animation: tvPulse 1s ease-in-out infinite; }
 @keyframes tvPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 .tv-sub { font-weight: 700; font-size: clamp(1rem, 2.4vw, 1.5rem); opacity: .8; margin-top: 12px; }
+.tv-tree { font-size: clamp(3rem, 11vw, 8rem); line-height: 1; margin-top: 18px;
+  animation: grow 2.4s ease-in-out infinite; }
+body.mode-tele { justify-content: center; }
+body.mode-tele .fami-head { margin-bottom: 8px; }
 .tv-cols { display: flex; gap: 30px; align-items: center; justify-content: center; flex-wrap: wrap; }
 .tv-board { flex: 1 1 320px; max-width: 520px; text-align: left; }
 .tv-row { display: flex; justify-content: space-between; gap: 12px; background: var(--craie); border-radius: 14px;
@@ -498,6 +520,26 @@ const CONFIG = {
 const SIM_PARAMS = new URLSearchParams(location.search);
 const SIMULATION = SIM_PARAMS.has("simulation");
 let simMode = SIMULATION ? (SIM_PARAMS.get("simulation") || "menu") : "";
+
+/* ============================================================
+   🖥️ ÉCRAN — selon l'URL, la MÊME page se comporte différemment :
+   • /quiz/tele  → affichage TÉLÉ (chrono + classement en boucle, avec QR)
+   • /quiz/borne → borne (à configurer plus tard)
+   • /quiz/code  → récupération d'un code bonus
+   • /quiz       → la vue des joueurs
+   (Pour tester en local sans réécriture d'URL : ?ecran=tele / borne / code)
+   ============================================================ */
+const _ecranParam = SIM_PARAMS.get("ecran") || "";
+const _path = location.pathname;
+const ECRAN =
+  (/\/tele\/?$/.test(_path)  || _ecranParam === "tele")  ? "tele"  :
+  (/\/borne\/?$/.test(_path) || _ecranParam === "borne") ? "borne" :
+  (/\/code\/?$/.test(_path)  || _ecranParam === "code")  ? "code"  : "user";
+// Adresse du quiz des joueurs (pour le QR / les redirections), sans /tele /borne /code.
+function quizBase() {
+  let p = location.pathname.replace(/\/(tele|borne|code)\/?$/, "/").replace(/[^/]*$/, "");
+  return location.origin + p;
+}
 let simPret = { board: false, jardin: false };   // 1er chargement réel, ensuite local
 let simTimers = [];
 function stopSim() { simTimers.forEach((t) => { clearTimeout(t); clearInterval(t); }); simTimers = []; }
@@ -903,6 +945,9 @@ async function reclamerEnAttente() {
 }
 
 async function refreshBoard() {
+  // Les écrans télé/borne gèrent leur propre affichage (la télé recharge le
+  // classement toute seule à chaque boucle) : on ne touche pas au rendu ici.
+  if (ECRAN !== "user") return;
   board = await apiGetBoard();
   const v = currentView();
   // On ne rafraîchit JAMAIS pendant le mini-jeu : ça remettrait la partie à zéro.
@@ -949,7 +994,7 @@ function renderCountdown() {
   const top5 = board.slice(0, 5);
   const top5Html = (phase !== "avant" && top5.length)
     ? `<div class="cd-top5"><h3>🌟 Top 5 de la récolte</h3>${top5.map((p, i) =>
-        `<div class="cd-top5-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)} ${stadeDe(p.score).emoji}</span><span>${p.score} 🌱</span></div>`
+        `<div class="cd-top5-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`
       ).join("")}</div>`
     : "";
 
@@ -1009,7 +1054,7 @@ function renderQuiz() {
       <label class="lbl">Ton code secret de jardinier 🌱 (4 chiffres)</label>
       <input class="field" id="q-code" inputmode="numeric" maxlength="4" placeholder="Ex : ton année de naissance" value="${esc(quiz.code)}">
       <p class="mini-warn">⚠️ N'oublie pas ton pseudo et ton code : c'est ce qui te permet de retrouver ton jardin sur un autre téléphone.</p>
-      <details class="plus"><summary>✨ Peaufiner mon compte (optionnel)</summary>
+      <details class="plus"><summary>🌿 Compléter ma fiche (optionnel)</summary>
         <p class="hint" style="margin-top:8px;">Donne ton nom et prénom : ça permettra aux organisateurs de retrouver ton compte si tu oublies ton code — et de te remettre ton prix si tu gagnes. Pas obligatoire !</p>
         <input class="field" id="q-nom" placeholder="Nom Prénom (facultatif)" maxlength="60" value="${esc(quiz.nom)}">
       </details>
@@ -1165,7 +1210,7 @@ function renderBoard() {
       ${order.map((pos) => top3[pos] ? `
         <div class="pod p${pos + 1}">
           <div class="pod-medal">${medals[pos]}</div>
-          <div class="pod-name">${esc(top3[pos].name)} ${stadeDe(top3[pos].score).emoji}</div>
+          <div class="pod-name">${esc(top3[pos].name)}</div>
           <div class="pod-pts">${top3[pos].score} 🌱</div>
         </div>` : "").join("")}
     </div>
@@ -1173,7 +1218,7 @@ function renderBoard() {
       <div class="rank-row">
         <span class="rank-pos">${i + 4}.</span>
         ${avatarDe(p.name)}
-        <span class="rank-nom"><span class="qui">${esc(p.name)}</span><span class="rank-stade">${stadeDe(p.score).emoji}</span></span>
+        <span class="rank-nom"><span class="qui">${esc(p.name)}</span></span>
         <span class="rank-pts">${p.score} 🌱</span>
       </div>`).join("")}
     <div class="center" style="margin-top:18px;">
@@ -1190,6 +1235,39 @@ function renderBoard() {
    Les graines récoltées (le classement) ne bougent pas : seul le
    solde disponible diminue.
    ============================================================ */
+
+// 💎 Les plantes RARES sont de vraies fleurs entièrement métalliques (or, argent,
+// bronze) qui brillent. Les dégradés sont définis une fois, et chaque fleur les
+// réutilise. La forme : 10 pétales autour d'un cœur, avec un reflet spéculaire.
+const DEFS_METAL = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <radialGradient id="mfl-or" cx="38%" cy="30%" r="80%">
+    <stop offset="0" stop-color="#FFFAD6"/><stop offset="30%" stop-color="#FFE06A"/>
+    <stop offset="66%" stop-color="#E8A61A"/><stop offset="100%" stop-color="#8F620A"/></radialGradient>
+  <radialGradient id="mfl-argent" cx="38%" cy="30%" r="80%">
+    <stop offset="0" stop-color="#FFFFFF"/><stop offset="30%" stop-color="#EAEFF5"/>
+    <stop offset="66%" stop-color="#AEB8C6"/><stop offset="100%" stop-color="#727C8B"/></radialGradient>
+  <radialGradient id="mfl-bronze" cx="38%" cy="30%" r="80%">
+    <stop offset="0" stop-color="#F9E2C4"/><stop offset="30%" stop-color="#E3A468"/>
+    <stop offset="66%" stop-color="#B87333"/><stop offset="100%" stop-color="#6F4318"/></radialGradient>
+</defs></svg>`;
+
+function fleurRareSvg(tier) {
+  const g = `url(#mfl-${tier})`;
+  let petales = "";
+  for (let i = 0; i < 10; i++) {
+    petales += `<ellipse cx="50" cy="21" rx="9" ry="19" fill="${g}" stroke="rgba(0,0,0,.14)" stroke-width="1" transform="rotate(${i * 36} 50 50)"/>`;
+  }
+  return `<svg class="fleur-rare" viewBox="0 0 100 100">${petales}
+    <circle cx="50" cy="50" r="16" fill="${g}" stroke="rgba(0,0,0,.18)" stroke-width="1"/>
+    <circle cx="50" cy="50" r="8" fill="rgba(0,0,0,.12)"/>
+    <ellipse class="glint" cx="43" cy="42" rx="6" ry="4" fill="rgba(255,255,255,.85)"/>
+  </svg>`;
+}
+// Ce qui s'affiche dans une case : la fleur métallique pour les rares, sinon l'emoji.
+function visuelPlante(cle) {
+  const p = PLANTES[cle];
+  return p && p.rare ? fleurRareSvg(p.rare) : (p?.emoji || "🌿");
+}
 
 // Classement des plus beaux jardins : par VALEUR totale des plantes posées.
 function classementJardins() {
@@ -1227,7 +1305,7 @@ function renderJardin() {
   const stade = stadeDe(joueur.recoltees ?? (joueur.solde + soldeDepense()));
   const nbPlantees = Object.keys(jardin).length;
 
-  app.innerHTML = `<div class="board-wrap">${pillsHtml("jardin")}<div class="card">
+  app.innerHTML = `${DEFS_METAL}<div class="board-wrap">${pillsHtml("jardin")}<div class="card">
     <div class="jardin-solde">
       <span style="display:flex; align-items:center; gap:8px;">${avatarDe(joueur.name)} <strong>${esc(joueur.name)}</strong> <span title="${esc(stade.nom)}" style="font-size:1.3rem;">${stade.emoji}</span></span>
       <span class="montant">${joueur.solde} 🌱 à planter</span>
@@ -1238,7 +1316,7 @@ function renderJardin() {
     <div class="catalogue">
       ${Object.entries(PLANTES).map(([cle, p]) => `
         <button class="plt ${p.rare ? "rare-" + p.rare : ""} ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${p.cout > joueur.solde ? "disabled" : ""}>
-          <span class="emo">${p.emoji}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌱</span>
+          <span class="emo">${p.rare ? fleurRareSvg(p.rare) : p.emoji}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌱</span>
         </button>`).join("")}
     </div>
     <div class="grille">
@@ -1246,7 +1324,7 @@ function renderJardin() {
         const c = jardin[i];
         if (!c) return `<button class="case vide" data-case="${i}" aria-label="Case libre ${i + 1}"></button>`;
         const p = PLANTES[c.plante];
-        return `<button class="case pleine ${p?.rare ? "rare-" + p.rare : ""}" data-info="${i}" title="${esc((p?.nom || c.plante) + " — planté par " + c.par)}">${p?.emoji || "🌿"}</button>`;
+        return `<button class="case pleine ${p?.rare ? "rare-" + p.rare : ""}" data-info="${i}" title="${esc((p?.nom || c.plante) + " — planté par " + c.par)}">${visuelPlante(c.plante)}</button>`;
       }).join("")}
     </div>
     <div class="jardin-info" id="j-info">${jardinMsg ? esc(jardinMsg) : (planteChoisie ? `${PLANTES[planteChoisie].emoji} ${esc(PLANTES[planteChoisie].nom)} sélectionné — tape une case libre !` : "")}</div>
@@ -1643,7 +1721,7 @@ function chargeQR() {
 async function qrQuiz() {
   if (qrCache) return qrCache;
   await chargeQR();
-  const url = location.origin + location.pathname.replace(/[^/]*$/, "");   // .../quiz/
+  const url = quizBase();   // toujours l'adresse des joueurs (.../quiz/)
   const qr = qrcode(0, "M");
   qr.addData(url);
   qr.make();
@@ -1685,19 +1763,37 @@ function renderSimTele() {
     { name: "Tom", score: 180 }, { name: "Nadia", score: 150 }, { name: "Luc", score: 120 },
   ];
 
+  // La plante grandit AU RYTHME du décompte : on voit la graine devenir un arbre,
+  // qui fleurit puis donne son fruit à la fin (le fameux « arbre qui a fini de grandir »).
+  function arbreCourt(s) {
+    if (s <= 0)  return "🌳🍎";   // fruit : c'est parti !
+    if (s <= 2)  return "🌳🌸";   // l'arbre fleurit
+    if (s <= 4)  return "🌳";     // grand arbre
+    if (s <= 7)  return "🌿";
+    if (s <= 10) return "🪴";
+    if (s <= 13) return "🌱";
+    return "🌰";                  // la graine, au départ
+  }
+
   function phaseChrono() {
     let n = 15;
     app.innerHTML = `<div class="tv">
       <div class="tv-phase">🚀 Ça commence dans…</div>
       <div class="tv-chrono" id="tvC">${n}</div>
-      <div class="tv-sub">Prépare ton téléphone pour récolter des graines !</div>
+      <div class="tv-tree" id="tvTree">${arbreCourt(n)}</div>
+      <div class="tv-sub">Regarde l'arbre grandir… 🌱</div>
     </div>`;
     const it = setInterval(() => {
-      const c = document.getElementById("tvC");
+      const c = document.getElementById("tvC"), tr = document.getElementById("tvTree");
       if (!c) { clearInterval(it); return; }
       n--;
+      if (tr) tr.textContent = arbreCourt(n);
       if (n > 0) { c.textContent = n; }
-      else { c.textContent = "🌱"; clearInterval(it); simTimers.push(setTimeout(phaseScore, 1500)); }
+      else {
+        c.textContent = "🎉"; clearInterval(it);
+        // on laisse admirer l'arbre fini quelques secondes avant le classement
+        simTimers.push(setTimeout(phaseScore, 2800));
+      }
     }, 1000);
     simTimers.push(it);
   }
@@ -1708,7 +1804,7 @@ function renderSimTele() {
       <div class="tv-phase">🏆 Le grand quiz Famiformation</div>
       <div class="tv-cols">
         <div class="tv-board">
-          ${demo.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)} ${stadeDe(p.score).emoji}</span><span>${p.score} 🌱</span></div>`).join("")}
+          ${demo.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`).join("")}
         </div>
         <div class="tv-qr">
           <div class="tv-qr-box">${q ? q.svg : "<div style='padding:40px'>QR…</div>"}</div>
@@ -1746,6 +1842,89 @@ function renderSimCode() {
   };
   document.getElementById("codeOk").addEventListener("click", valider);
   document.getElementById("codeIn").addEventListener("keydown", (e) => e.key === "Enter" && valider());
+}
+
+/* ============================================================
+   📺 ÉCRAN TÉLÉ (/quiz/tele) — pour la télé du magasin.
+   En BOUCLE : le VRAI compte à rebours (avec la graine qui pousse) → le VRAI
+   classement en direct + QR code pour rejoindre. Données réelles, pas de démo.
+   ============================================================ */
+function renderTele() {
+  document.body.classList.add("mode-tele");
+  const timers = [];
+  const clear = () => { timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); timers.length = 0; };
+
+  function ecranChrono() {
+    clear();
+    const phase = phaseNow();
+    const target = phase === "avant" ? CONFIG.dateLancement : CONFIG.dateCloture;
+    const label = phase === "avant" ? "🚀 Lancement dans…" : phase === "ouvert" ? "⏳ Fin du quiz dans…" : "🏆 Merci à tous !";
+    app.innerHTML = `<div class="tv">
+      <div class="tv-phase">${label}</div>
+      ${phase !== "termine" ? `<div class="cd-digits">
+        <div class="cd-cell"><div class="cd-num" id="cd-j">--</div><div class="cd-lab">Jours</div></div>
+        <div class="cd-cell"><div class="cd-num" id="cd-h">--</div><div class="cd-lab">Heures</div></div>
+        <div class="cd-cell"><div class="cd-num" id="cd-m">--</div><div class="cd-lab">Minutes</div></div>
+        <div class="cd-cell sec"><div class="cd-num" id="cd-s">--</div><div class="cd-lab">Secondes</div></div>
+      </div>` : ""}
+      <div class="tv-tree" id="tv-tree">${cdPousse(CONFIG.dateLancement.getTime() - Date.now())}</div>
+      <div class="tv-sub">📱 Scanne le QR pour jouer sur ton téléphone !</div>
+    </div>`;
+    const tick = () => {
+      const diff = Math.max(0, target.getTime() - Date.now());
+      const tr = document.getElementById("tv-tree");
+      if (tr) tr.textContent = cdPousse(CONFIG.dateLancement.getTime() - Date.now());
+      if (phase !== "termine") {
+        const J = document.getElementById("cd-j"); if (!J) return;
+        J.textContent = pad(Math.floor(diff / 86400000));
+        document.getElementById("cd-h").textContent = pad(Math.floor((diff % 86400000) / 3600000));
+        document.getElementById("cd-m").textContent = pad(Math.floor((diff % 3600000) / 60000));
+        document.getElementById("cd-s").textContent = pad(Math.floor((diff % 60000) / 1000));
+      }
+    };
+    tick();
+    timers.push(setInterval(tick, 1000));
+    timers.push(setTimeout(ecranClassement, 18000));   // ~18 s de chrono, puis le classement
+  }
+
+  async function ecranClassement() {
+    clear();
+    board = await apiGetBoard().catch(() => board);
+    const q = await qrQuiz().catch(() => null);
+    const top = board.slice(0, 8);
+    app.innerHTML = `<div class="tv">
+      <div class="tv-phase">🏆 Le classement en direct</div>
+      <div class="tv-cols">
+        <div class="tv-board">
+          ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`).join("")
+            : `<div class="tv-row" style="justify-content:center;">Sois le premier à jouer ! 🌱</div>`}
+        </div>
+        <div class="tv-qr">
+          <div class="tv-qr-box">${q ? q.svg : ""}</div>
+          <div class="tv-scan">📱 Scanne pour jouer !</div>
+          <div class="tv-url">${esc(q ? q.url : "")}</div>
+        </div>
+      </div>
+    </div>`;
+    timers.push(setTimeout(ecranChrono, 15000));       // ~15 s de classement, puis retour au chrono
+  }
+
+  ecranChrono();
+}
+
+/* ============================================================
+   🖥️ ÉCRAN BORNE (/quiz/borne) — à configurer plus tard.
+   ============================================================ */
+function renderBorne() {
+  document.body.classList.add("mode-borne");
+  app.innerHTML = `<div class="card center">
+    <div style="font-size:3rem;">🖥️</div>
+    <h2 class="q-text" style="margin:8px 0;">Borne Famiflora</h2>
+    <p class="hint">Cet écran « borne » sera configuré prochainement.<br>
+    En attendant, tu peux lancer le quiz.</p>
+    <button class="btn" id="borne-jouer">Jouer au quiz 🌱</button>
+  </div>`;
+  $("#borne-jouer").addEventListener("click", () => { location.href = quizBase(); });
 }
 
 /* ============================================================
@@ -2211,6 +2390,11 @@ function render() {
   }
   board = bd;
 
+  // 🖥️ Écrans dédiés : la télé et la borne ont leur propre affichage, sans
+  // compte ni quiz. On les lance ici et on s'arrête là.
+  if (ECRAN === "tele")  { renderTele();  return; }
+  if (ECRAN === "borne") { renderBorne(); return; }
+
   // 🌱 Auto-reconnaissance : si ce téléphone a déjà une carte de jardinier, on
   // identifie la personne sans qu'elle ait à retaper quoi que ce soit.
   const moi = chargeMoi();
@@ -2229,6 +2413,8 @@ function render() {
   // 🎁 Lien d'un code bonus scanné en magasin : ?code=FAMI-XXXX
   const cp = SIM_PARAMS.get("code");
   if (cp && !SIMULATION) { codeAReclamer = cp.toUpperCase(); userView = "reclamer"; }
+  // 🎁 Page /quiz/code : on ouvre directement l'écran de saisie d'un code.
+  else if (ECRAN === "code" && !SIMULATION) { codeAReclamer = null; userView = "reclamer"; }
 
   render();
 })();

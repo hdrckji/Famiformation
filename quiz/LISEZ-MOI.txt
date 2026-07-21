@@ -2,12 +2,18 @@
   🌱 SITE ÉVÉNEMENT — GUIDE D'INSTALLATION SUR IONOS
 ═══════════════════════════════════════════════════════
 
-DEUX ADRESSES, DEUX PAGES
--------------------------
-  tonsite.be/quiz/         → LES JOUEURS. Compte à rebours, quiz, classement.
-                             Rien d'autre : aucun accès caché.
+LES ADRESSES (une par écran)
+----------------------------
+  tonsite.be/quiz/         → LES JOUEURS. Inscription, quiz, jardin, classement.
+  tonsite.be/quiz/tele     → ÉCRAN TÉLÉ. En boucle : le compte à rebours (avec la
+                             graine qui pousse) puis le classement en direct + un
+                             QR code pour rejoindre. À mettre en plein écran sur la télé.
+  tonsite.be/quiz/borne    → BORNE (à configurer plus tard).
+  tonsite.be/quiz/code     → RÉCUPÉRER UN CODE. La page où saisir un code bonus.
   tonsite.be/quiz/admin/   → TOI. Identifiant + mot de passe, puis la gestion
-                             des questions, le classement et les codes bonus.
+                             (questions, classement, jardin, codes, dates, simulation).
+
+  (Pour tester en local sans mettre en ligne : ajoute ?ecran=tele / borne / code.)
 
 CONTENU DU DOSSIER
 ------------------
