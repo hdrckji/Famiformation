@@ -345,6 +345,20 @@ body {
 .tv-sub { font-weight: 700; font-size: clamp(1rem, 2.4vw, 1.5rem); opacity: .8; margin-top: 12px; }
 .tv-tree { font-size: clamp(2rem, 5.5vw, 3.6rem); line-height: 1; margin-top: 14px;
   animation: grow 2.4s ease-in-out infinite; }
+
+/* --- La BORNE : 3 grandes tuiles tactiles --- */
+body.mode-borne { justify-content: center; }
+.borne { width: min(760px, 94vw); margin: 0 auto; text-align: center; padding: 10px; }
+.borne-titre { font-family: 'Fredoka', sans-serif; color: var(--pousse); font-size: clamp(1.6rem, 4.5vw, 2.4rem); }
+.borne-sous { font-weight: 700; opacity: .72; margin-bottom: 24px; font-size: clamp(1rem, 2.6vw, 1.2rem); }
+.borne-modules { display: flex; flex-direction: column; gap: 16px; }
+.borne-mod { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+  background: var(--craie); border: 3px solid transparent; border-radius: 22px; padding: 26px 20px;
+  box-shadow: 0 6px 24px rgba(14,59,36,.1); transition: transform .12s, border-color .15s, box-shadow .15s; }
+.borne-mod:hover, .borne-mod:active { transform: translateY(-3px); border-color: var(--pousse); box-shadow: 0 10px 30px rgba(14,59,36,.16); }
+.bm-emo { font-size: clamp(2.4rem, 7vw, 3.4rem); line-height: 1; }
+.bm-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(1.15rem, 3.4vw, 1.55rem); color: var(--foret); }
+.bm-desc { font-weight: 600; opacity: .7; font-size: clamp(.85rem, 2.2vw, 1rem); }
 /* Sur la télé, on colle le bloc (compte à rebours / classement) EN HAUT pour
    laisser tout le bas libre à la fée (sinon elle chevauche le texte). */
 body.mode-tele { justify-content: flex-start; padding-top: 20px; }
@@ -1906,18 +1920,37 @@ async function renderTeleBoard() {
 }
 
 /* ============================================================
-   🖥️ ÉCRAN BORNE (/quiz/borne) — à configurer plus tard.
+   🖥️ ÉCRAN BORNE (/quiz/borne) — 3 modules qui redirigent :
+   • Participer au quiz        → /quiz
+   • J'ai trouvé un code       → /quiz/code
+   • Je n'ai pas donné mon mail → https://famiformation.com/emails
    ============================================================ */
 function renderBorne() {
   document.body.classList.add("mode-borne");
-  app.innerHTML = `<div class="card center">
-    <div style="font-size:3rem;">🖥️</div>
-    <h2 class="q-text" style="margin:8px 0;">Borne Famiflora</h2>
-    <p class="hint">Cet écran « borne » sera configuré prochainement.<br>
-    En attendant, tu peux lancer le quiz.</p>
-    <button class="btn" id="borne-jouer">Jouer au quiz 🌱</button>
+  const base = quizBase();
+  app.innerHTML = `<div class="borne">
+    <h2 class="borne-titre">Bienvenue chez Famiflora 🌱</h2>
+    <p class="borne-sous">Que veux-tu faire ?</p>
+    <div class="borne-modules">
+      <button class="borne-mod" data-go="quiz">
+        <span class="bm-emo">🎯</span>
+        <span class="bm-titre">Participer au quiz</span>
+        <span class="bm-desc">Réponds aux questions et récolte des graines</span>
+      </button>
+      <button class="borne-mod" data-go="code">
+        <span class="bm-emo">🎁</span>
+        <span class="bm-titre">J'ai trouvé un code</span>
+        <span class="bm-desc">Récupère tes graines bonus</span>
+      </button>
+      <button class="borne-mod" data-go="mail">
+        <span class="bm-emo">✉️</span>
+        <span class="bm-titre">Je n'ai pas encore donné mon mail</span>
+        <span class="bm-desc">Laisse ton adresse e-mail</span>
+      </button>
+    </div>
   </div>`;
-  $("#borne-jouer").addEventListener("click", () => { location.href = quizBase(); });
+  const dest = { quiz: base, code: base + "code", mail: "https://famiformation.com/emails" };
+  app.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => { location.href = dest[b.dataset.go]; }));
 }
 
 /* ============================================================
