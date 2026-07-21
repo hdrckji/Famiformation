@@ -97,7 +97,7 @@ function ladConfig($fichier) {
 $PLANTES = [
   'trefle'     => ['emoji' => '🍀', 'nom' => 'Trèfle',        'cout' => 1],
   'brin'       => ['emoji' => '🌱', 'nom' => 'Brin d\'herbe',  'cout' => 1],
-  'arbreglace' => ['emoji' => '🍦', 'nom' => 'Arbre à glaces', 'cout' => 5],
+  'arbreglace' => ['emoji' => '🎟️', 'nom' => 'Arbre à tickets glace', 'cout' => 5],
   'paquerette' => ['emoji' => '🌼', 'nom' => 'Pâquerette',    'cout' => 20],
   'tulipe'     => ['emoji' => '🌷', 'nom' => 'Tulipe',        'cout' => 35],
   'lavande'    => ['emoji' => '💜', 'nom' => 'Lavande',       'cout' => 50],

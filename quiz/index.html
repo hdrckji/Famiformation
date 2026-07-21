@@ -268,6 +268,14 @@ body {
 .plt .emo .fleur-rare { display: inline-block; width: 34px; height: 34px; }
 .case .arbre-glace { width: 96%; height: 96%; }
 .plt .emo .arbre-glace { display: inline-block; width: 38px; height: 38px; vertical-align: middle; }
+/* 🎟️ Ticket glace bleu — en gros dans le module, en petit dans les messages. */
+.ticket-glace { display: inline-block; }
+svg.ticket-glace.tk-inline { width: 1.7em; height: auto; vertical-align: -0.3em; }
+span.tk-inline { display: inline-block; width: 1.3em; height: 1.3em; vertical-align: -0.3em; }
+span.tk-inline svg { width: 100%; height: auto; display: block; }
+.bm-ticket { line-height: 0; }
+.bm-ticket .ticket-glace { width: clamp(96px, 24vw, 148px); height: auto;
+  filter: drop-shadow(0 5px 12px rgba(21,44,107,.3)); }
 .fleur-rare { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); animation: fleurBrille 2.6s ease-in-out infinite; }
 @keyframes fleurBrille {
   0%, 100% { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)) drop-shadow(0 0 1px rgba(255,255,255,.4)); }
@@ -429,13 +437,35 @@ body.mode-tele #app { flex: 0 0 auto; }
 .tv-row { display: flex; justify-content: space-between; gap: 12px; background: var(--craie); border-radius: 14px;
   padding: 12px 20px; margin-bottom: 10px; font-family: 'Fredoka', sans-serif; font-weight: 600;
   font-size: clamp(1rem, 2.2vw, 1.5rem); box-shadow: 0 3px 12px rgba(14,59,36,.1); }
-.tv-qr { flex: 0 0 auto; text-align: center; }
+.tv-qr { flex: 0 0 auto; text-align: center; width: min(280px, 62vw); }
 .tv-qr-box { background: #fff; padding: 14px; border-radius: 18px; box-shadow: 0 8px 24px rgba(14,59,36,.18);
-  width: min(280px, 62vw); }
+  width: 100%; }
 .tv-qr-box svg { width: 100%; height: auto; display: block; }
 .tv-scan { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
   font-size: clamp(1.1rem, 2.6vw, 1.6rem); margin-top: 14px; }
-.tv-url { font-size: clamp(.72rem, 1.7vw, 1rem); opacity: .7; word-break: break-all; margin-top: 4px; }
+.tv-url { font-size: clamp(.8rem, 1.7vw, 1.05rem); font-weight: 600; opacity: .72; margin-top: 4px; }
+
+/* 📺 Télé — derniers 10 s : uniquement un chiffre géant qui « pulse ». */
+.tf-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 78vh; text-align: center; }
+.tf-num { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
+  font-size: clamp(9rem, 40vh, 30rem); line-height: 1; text-shadow: 0 10px 40px rgba(14,59,36,.18); }
+.tf-num.pop { animation: tfPop .5s ease; }
+@keyframes tfPop { 0% { transform: scale(1.35); opacity: .3; } 60% { transform: scale(1); opacity: 1; } }
+/* 📺 Télé — l'instant du lancement : gros mot de fête. */
+.tl-wrap { gap: 10px; }
+.tl-emoji { font-size: clamp(4rem, 16vh, 10rem); line-height: 1; animation: tlBounce 1.4s ease-in-out infinite; }
+.tl-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
+  font-size: clamp(3rem, 12vh, 8rem); line-height: 1.05; }
+.tl-sous { font-family: 'Fredoka', sans-serif; font-weight: 600; color: var(--foret);
+  font-size: clamp(1.3rem, 4vh, 2.6rem); opacity: .9; }
+@keyframes tlBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+
+/* 🎉 Confettis (lancement) — pluie de morceaux colorés, purement décoratif. */
+.confetti-layer { position: fixed; inset: 0; z-index: 100055; pointer-events: none; overflow: hidden; }
+.confetti { position: absolute; top: -8vh; width: 12px; height: 16px; opacity: .95;
+  will-change: transform; animation: confettiFall linear forwards; }
+@keyframes confettiFall { to { transform: translate(var(--drift, 0), 116vh) rotate(var(--rot, 540deg)); } }
 
 /* ============================================================
    🥚 EASTER EGGS — "graine", "famiflora", "2026"
@@ -924,7 +954,7 @@ function phaseNow() {
 let PLANTES = {
   trefle:     { emoji: "🍀", nom: "Trèfle",        cout: 1 },
   brin:       { emoji: "🌱", nom: "Brin d'herbe",  cout: 1 },
-  arbreglace: { emoji: "🍦", nom: "Arbre à glaces", cout: 5 },
+  arbreglace: { emoji: "🎟️", nom: "Arbre à tickets glace", cout: 5 },
   paquerette: { emoji: "🌼", nom: "Pâquerette",    cout: 20 },
   tulipe:     { emoji: "🌷", nom: "Tulipe",        cout: 35 },
   lavande:    { emoji: "💜", nom: "Lavande",       cout: 50 },
@@ -1145,7 +1175,12 @@ function renderCountdown() {
       // jour après jour, puis fleur à 10 s, puis fruit une fois lancé.
       const sp = document.getElementById("cd-sprout");
       if (sp) sp.textContent = cdPousse(CONFIG.dateLancement.getTime() - Date.now());
-      if (diff === 0) { render(); return; } // bascule de phase
+      // 📺 Télé, avant le lancement : dès qu'il reste ≤ 10 s, on passe aux gros
+      // chiffres seuls (teleFinal enchaîne ensuite confettis puis classement).
+      if (ECRAN === "tele" && phase === "avant" && diff <= 10000) {
+        clearInterval(tickTimer); teleFinal(); return;
+      }
+      if (diff === 0) { render(); return; } // bascule de phase (hors télé)
       $("#cd-j").textContent = pad(Math.floor(diff / 86400000));
       $("#cd-h").textContent = pad(Math.floor((diff % 86400000) / 3600000));
       $("#cd-m").textContent = pad(Math.floor((diff % 3600000) / 60000));
@@ -1154,6 +1189,63 @@ function renderCountdown() {
     tick();
     tickTimer = setInterval(tick, 1000);
   }
+}
+
+// 📺 TÉLÉ — les 10 dernières secondes : uniquement un chiffre géant (10 → 1).
+function teleFinal() {
+  document.body.classList.add("mode-tele");
+  FEE.stop(); stopHerbes();
+  app.innerHTML = `<div class="tf-wrap"><div class="tf-num" id="tf-num">10</div></div>`;
+  clearInterval(tickTimer); clearTimeout(tickTimer);
+  const maj = () => {
+    const diff = CONFIG.dateLancement.getTime() - Date.now();
+    if (diff <= 0) { clearInterval(tickTimer); teleLancement(); return; }
+    const n = Math.max(1, Math.ceil(diff / 1000));
+    const el = document.getElementById("tf-num");
+    if (el && el.textContent != n) {
+      el.textContent = n;
+      el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+    }
+  };
+  maj();
+  tickTimer = setInterval(maj, 100);   // 100 ms : bascule nette pile à zéro
+}
+
+// 📺 TÉLÉ — l'instant du lancement : confettis + mot de fête, 15 s, puis classement.
+function teleLancement() {
+  document.body.classList.add("mode-tele");
+  FEE.stop();
+  clearInterval(tickTimer); clearTimeout(tickTimer);
+  app.innerHTML = `<div class="tf-wrap tl-wrap">
+    <div class="tl-emoji">🎉</div>
+    <div class="tl-titre">C'est parti !</div>
+    <div class="tl-sous">Le grand quiz Famiformation est lancé 🌱</div>
+  </div>`;
+  lanceConfettis(9000);
+  tickTimer = setTimeout(() => renderTeleBoard(), 15000);   // 15 s de fête
+}
+
+// 🎉 Pluie de confettis (décorative). La couche vit au-dessus de #app et survit
+// à un re-rendu, puis se retire toute seule.
+function lanceConfettis(ms = 6000) {
+  const couleurs = ["#2E7D32", "#F7C13A", "#E4572E", "#4EA5D9", "#F2A2C4", "#8BC34A", "#FFFFFF"];
+  const layer = document.createElement("div");
+  layer.className = "confetti-layer";
+  document.body.appendChild(layer);
+  const N = 130;
+  for (let i = 0; i < N; i++) {
+    const c = document.createElement("i");
+    c.className = "confetti";
+    c.style.left = (Math.random() * 100) + "vw";
+    c.style.background = couleurs[i % couleurs.length];
+    c.style.animationDuration = (2.3 + Math.random() * 1.9) + "s";
+    c.style.animationDelay = (Math.random() * 0.7) + "s";
+    c.style.setProperty("--rot", (Math.random() * 900 - 300) + "deg");
+    c.style.setProperty("--drift", (Math.random() * 34 - 17) + "vw");
+    if (Math.random() < 0.5) c.style.borderRadius = "50%";
+    layer.appendChild(c);
+  }
+  setTimeout(() => layer.remove(), ms + 2500);
 }
 
 /* ============================================================
@@ -1405,12 +1497,28 @@ function arbreGlaceSvg() {
   </svg>`;
 }
 
+// 🎟️ Un ticket glace bleu seul (le « 1x GRATUIT » du site), pour les modules et
+// les petits messages (là où l'arbre entier serait trop gros).
+function ticketGlaceSvg(cls = "") {
+  return `<svg class="ticket-glace ${cls}" viewBox="0 0 170 104" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="glaceTgJ" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9bf5"/><stop offset="1" stop-color="#1e40af"/></linearGradient></defs>
+    ${TICKET_GLACE}</svg>`;
+}
+
 // Ce qui s'affiche dans une case : fleur métallique (rares), arbre à tickets glace,
 // sinon l'emoji de la plante.
 function visuelPlante(cle) {
   const p = PLANTES[cle];
   if (p && p.rare) return fleurRareSvg(p.rare);
   if (cle === "arbreglace") return arbreGlaceSvg();
+  return p?.emoji || "🌿";
+}
+
+// Petite icône inline pour les messages : ticket glace (arbre), fleur rare, sinon emoji.
+function iconePlante(cle) {
+  if (cle === "arbreglace") return ticketGlaceSvg("tk-inline");
+  const p = PLANTES[cle];
+  if (p && p.rare) return `<span class="tk-inline">${fleurRareSvg(p.rare)}</span>`;
   return p?.emoji || "🌿";
 }
 
@@ -1472,7 +1580,7 @@ function renderJardin() {
         return `<button class="case pleine ${p?.rare ? "rare-" + p.rare : ""}" data-info="${i}" title="${esc((p?.nom || c.plante) + " — planté par " + c.par)}">${visuelPlante(c.plante)}</button>`;
       }).join("")}
     </div>
-    <div class="jardin-info" id="j-info">${jardinMsg ? esc(jardinMsg) : (planteChoisie ? `${PLANTES[planteChoisie].emoji} ${esc(PLANTES[planteChoisie].nom)} sélectionné — tape une case libre !` : "")}</div>
+    <div class="jardin-info" id="j-info">${jardinMsg ? esc(jardinMsg) : (planteChoisie ? `${iconePlante(planteChoisie)} ${esc(PLANTES[planteChoisie].nom)} sélectionné — tape une case libre !` : "")}</div>
     ${(() => {
       const cl = classementJardins();
       if (!cl.length) return "";
@@ -1504,7 +1612,7 @@ function renderJardin() {
     const p = PLANTES[c.plante];
     const info = $("#j-info");
     const aMoi = joueur && c.par.toLowerCase() === joueur.name.toLowerCase();
-    info.innerHTML = `<span class="revente">${p?.emoji || "🌿"} ${esc(p?.nom || c.plante)} — planté par ${esc(c.par)}`
+    info.innerHTML = `<span class="revente">${p ? iconePlante(c.plante) : "🌿"} ${esc(p?.nom || c.plante)} — planté par ${esc(c.par)}`
       + (aMoi ? ` <button class="btn mini" id="j-revendre">Revendre +${p?.cout ?? 0} 🌱</button>` : "")
       + `</span>`;
     if (aMoi) {
@@ -1870,7 +1978,7 @@ function chargeQR() {
 async function qrQuiz() {
   if (qrCache) return qrCache;
   await chargeQR();
-  const url = quizBase();   // toujours l'adresse des joueurs (.../quiz/)
+  const url = "https://famiformation.com/quiz";   // adresse publique des joueurs
   const qr = qrcode(0, "M");
   qr.addData(url);
   qr.make();
@@ -2070,9 +2178,9 @@ function renderHome() {
         <span class="bm-desc">Récupère tes graines bonus</span>
       </button>
       <button class="borne-mod" data-go="mail">
-        <span class="bm-emo">✉️</span>
+        <span class="bm-ticket">${ticketGlaceSvg()}</span>
         <span class="bm-titre">Je ne suis pas encore inscrit sur Famiformation</span>
-        <span class="bm-desc">🍦 Ticket glace à gagner</span>
+        <span class="bm-desc">Ticket glace à gagner 🎁</span>
       </button>
     </div>
   </div>`;
@@ -2082,7 +2190,7 @@ function renderHome() {
   if (cd) {
     const tick = () => {
       const diff = Math.max(0, CONFIG.dateLancement.getTime() - Date.now());
-      if (diff === 0) { render(); return; }
+      if (diff === 0) { lanceConfettis(6000); render(); return; }   // 🎉 lancement !
       const set = (id, v) => { const n = document.getElementById(id); if (n) n.textContent = v; };
       set("hcd-j", Math.floor(diff / 86400000));
       set("hcd-h", pad(Math.floor((diff % 86400000) / 3600000)));
@@ -2613,8 +2721,14 @@ function render() {
   // toute seule (le tick du compte à rebours rappelle render() à zéro).
   if (ECRAN === "tele") {
     document.body.classList.add("mode-tele");
-    if (phaseNow() === "avant") { stopHerbes(); FEE.start(); renderCountdown(); }
-    else { renderTeleBoard(); }
+    stopHerbes();
+    if (phaseNow() === "avant") {
+      // Dans les 10 dernières secondes on entre direct sur les gros chiffres
+      // (sinon compte à rebours complet avec la fée).
+      const diff = CONFIG.dateLancement.getTime() - Date.now();
+      if (diff <= 10000) teleFinal();
+      else { FEE.start(); renderCountdown(); }
+    } else { renderTeleBoard(); }
     return;
   }
   // En simulation, les écrans de prévisualisation (menu/télé/code) passent avant

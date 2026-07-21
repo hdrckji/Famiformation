@@ -518,6 +518,7 @@ function vueSimulation() {
   c.innerHTML = `
     <style>
       .sim-ctrl{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:14px 0 4px;}
+      .sim-sep{width:1px;height:26px;background:rgba(14,59,36,.16);margin:0 4px;}
       .sim-etat{margin:6px 0 18px;font-weight:600;opacity:.82;}
       .sim-grid{display:flex;flex-wrap:wrap;gap:24px;justify-content:center;align-items:flex-start;}
       .sim-card{display:flex;flex-direction:column;align-items:center;gap:8px;}
@@ -537,9 +538,11 @@ function vueSimulation() {
       lance l'aperçu en plein écran pour cliquer dedans.</p>
       <div class="sim-ctrl">
         <label class="lbl" style="margin:0 6px 0 0;">🕐 Moment simulé</label>
-        <input class="field" type="datetime-local" step="1" id="sim-quand" value="${esc(val)}" style="max-width:240px;">
+        <input class="field" type="datetime-local" step="1" id="sim-quand" value="${esc(val)}" style="max-width:230px;">
+        <button class="btn" id="sim-voir">👁️ Voir ce moment</button>
+        <span class="sim-sep"></span>
         <button class="btn ghost" data-preset="live">🔴 En direct</button>
-        <button class="btn ghost" data-preset="avant10">⏳ 10 s avant</button>
+        <button class="btn ghost" data-preset="avant10">⏳ 10 s avant lancement</button>
         <button class="btn ghost" data-preset="lancement">🚀 Au lancement</button>
         <button class="btn ghost" data-preset="apres">🏁 Quiz fini</button>
       </div>
@@ -554,13 +557,17 @@ function vueSimulation() {
     </div>`;
 
   const champ = $("#sim-quand");
-  champ.addEventListener("change", () => { simQuand = champ.value; simSeed++; vueSimulation(); });
+  const lancement = cf.lancement || "2026-07-29T12:00";
+  const cloture = cf.cloture || "2026-08-30T23:59";
+  const applique = () => { simQuand = champ.value; simSeed++; vueSimulation(); };
+  $("#sim-voir").addEventListener("click", applique);
+  champ.addEventListener("change", applique);
   c.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
     const p = b.dataset.preset;
     if (p === "live") simQuand = "";
-    else if (p === "lancement") simQuand = decaleLocal(cf.lancement, 0);
-    else if (p === "avant10") simQuand = decaleLocal(cf.lancement, -10000);
-    else if (p === "apres") simQuand = decaleLocal(cf.cloture, 60000);
+    else if (p === "lancement") simQuand = decaleLocal(lancement, 0);
+    else if (p === "avant10") simQuand = decaleLocal(lancement, -10000);
+    else if (p === "apres") simQuand = decaleLocal(cloture, 60000);   // 1 min après la clôture
     simSeed++; vueSimulation();
   }));
 }
