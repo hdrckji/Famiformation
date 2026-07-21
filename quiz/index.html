@@ -391,6 +391,24 @@ body.mode-borne #app { width: 100%; }
 .borne-mod.mod-inactif:hover, .borne-mod.mod-inactif:active { transform: none; border-color: transparent;
   box-shadow: 0 6px 24px rgba(14,59,36,.1); }
 
+/* 🖥️ SUR LA BORNE : on enlève le plafond de largeur (le téléphone/ordi le garde
+   pour rester lisible) → l'accueil prend TOUTE la largeur de l'écran, avec 3
+   grosses tuiles côte à côte qui remplissent la hauteur. */
+body.mode-borne .home { max-width: none; padding: 0 clamp(16px, 3vw, 48px); }
+body.mode-borne .borne-titre { font-size: clamp(2.2rem, 5.2vw, 4.4rem); }
+body.mode-borne .borne-sous { font-size: clamp(1.2rem, 2.8vw, 1.9rem); margin-bottom: clamp(24px, 4vh, 48px); }
+body.mode-borne .borne-modules { grid-template-columns: repeat(3, 1fr); gap: clamp(18px, 2.4vw, 36px); }
+body.mode-borne .borne-mod { min-height: clamp(300px, 48vh, 660px); padding: clamp(30px, 6vh, 70px) clamp(18px, 2vw, 34px); }
+body.mode-borne .bm-emo { font-size: clamp(3.4rem, 9vw, 6rem); }
+body.mode-borne .bm-titre { font-size: clamp(1.5rem, 3vw, 2.6rem); }
+body.mode-borne .bm-desc { font-size: clamp(1rem, 1.8vw, 1.5rem); }
+body.mode-borne .bm-ticket .ticket-glace { width: clamp(120px, 15vw, 230px); }
+/* Borne étroite / portrait : on empile pour garder des tuiles lisibles. */
+@media (max-width: 720px) {
+  body.mode-borne .borne-modules { grid-template-columns: 1fr; }
+  body.mode-borne .borne-mod { min-height: clamp(180px, 24vh, 300px); }
+}
+
 /* Bouton « maison » permanent quand on est arrivé par la borne. */
 .home-borne { position: fixed; top: 12px; right: 12px; z-index: 100050; width: 48px; height: 48px;
   border-radius: 50%; background: var(--craie); box-shadow: 0 3px 12px rgba(14,59,36,.22);
