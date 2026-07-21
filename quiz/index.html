@@ -2040,17 +2040,22 @@ function ouvreMailBorne() {
       <button class="ext-home" id="ext-retour">🏠 Retour à l'accueil</button>
       <button class="ext-form" id="ext-toggle">📝 Remplir le formulaire →</button>
     </div>
-    <iframe class="ext-frame" id="ext-if" src="${esc(URL_EMAILS)}" title="Famiflora"></iframe>`;
+    <iframe class="ext-frame" id="ext-if" title="Famiflora"></iframe>`;
   document.body.appendChild(o);
   const iframe = o.querySelector("#ext-if");
   const toggle = o.querySelector("#ext-toggle");
   let surForm = false;
-  o.querySelector("#ext-retour").addEventListener("click", () => o.remove());
-  toggle.addEventListener("click", () => {
-    surForm = !surForm;
-    iframe.src = surForm ? URL_FORM : URL_EMAILS;
+  // La page emails est affichée en « sandbox SANS popup » : son bouton
+  // « C'est parti » ne peut donc PAS ouvrir de nouvel onglet (il reste inoffensif).
+  // Le seul chemin vers le formulaire, c'est NOTRE bouton, qui l'affiche ici même.
+  const majCadre = () => {
+    if (surForm) { iframe.removeAttribute("sandbox"); iframe.src = URL_FORM; }
+    else { iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms"); iframe.src = URL_EMAILS; }
     toggle.textContent = surForm ? "← Revenir à la page" : "📝 Remplir le formulaire →";
-  });
+  };
+  o.querySelector("#ext-retour").addEventListener("click", () => o.remove());
+  toggle.addEventListener("click", () => { surForm = !surForm; majCadre(); });
+  majCadre();
 }
 
 // 🏠 Bouton maison permanent : visible sur les pages atteintes DEPUIS la borne,
