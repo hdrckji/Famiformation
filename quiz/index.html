@@ -179,6 +179,21 @@ body {
 .rank-pos { font-family: 'Fredoka', sans-serif; color: var(--pousse); font-weight: 700; }
 .rank-pts { font-variant-numeric: tabular-nums; }
 .board-wrap { width: 100%; max-width: 680px; }
+/* Titre du classement + « c'est toi » mis en avant */
+.board-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
+  font-size: clamp(1.3rem, 3.4vw, 1.9rem); text-align: center; margin-bottom: 16px; }
+.board-titre span { display: block; font-size: .62em; font-weight: 600; color: var(--foret); opacity: .8; }
+.moi-score { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding: 14px 18px;
+  border-radius: 18px; background: linear-gradient(100deg, #0E3B24, #1E6238); color: #fff;
+  box-shadow: 0 8px 24px rgba(11,51,32,.22); }
+.moi-rang { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(1.6rem, 5vw, 2.4rem);
+  min-width: 1.6em; text-align: center; }
+.moi-info { flex: 1; text-align: left; min-width: 0; }
+.moi-nom { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(1.05rem, 2.6vw, 1.4rem); }
+.moi-pts { font-weight: 600; opacity: .92; font-size: clamp(.85rem, 2vw, 1.05rem); }
+.moi-score .btn { background: var(--soleil); color: #0B3320; flex: 0 0 auto; }
+.rank-row.moi { background: #DDF0DE; box-shadow: 0 0 0 2px var(--pousse) inset; }
+.pod.moi { box-shadow: 0 0 0 3px var(--soleil); border-radius: 14px; }
 
 /* --- La plante qui pousse pendant le quiz --- */
 .q-plante {
@@ -1137,9 +1152,17 @@ function currentView() {
   // code bonus, on montre l'écran du code, pas le compte à rebours.
   if (userView === "reclamer") return "reclamer";
   if (userView === "retrouver") return "retrouver";
-  // Hors période d'ouverture (avant le lancement / après la clôture), on montre
-  // l'accueil : compte à rebours (téléphone) + modules, quiz non jouable.
-  if (phaseNow() !== "ouvert") return "home";
+  const phase = phaseNow();
+  // Avant le lancement : accueil (compte à rebours + modules, quiz verrouillé).
+  if (phase === "avant") return "home";
+  // Quiz TERMINÉ : place aux résultats. On montre le classement (avec son propre
+  // score en évidence) et on peut aller dans le jardin — plus jamais l'accueil
+  // « bientôt disponible » qui n'a plus de sens.
+  if (phase === "termine") {
+    if (userView === "jardin") return "jardin";
+    return "board";
+  }
+  // Quiz ouvert.
   if (userView === "quiz") return "quiz";
   if (userView === "board") return "board";
   if (userView === "jardin") return "jardin";
@@ -1429,27 +1452,41 @@ function bindPills() {
 
 function renderBoard() {
   clearInterval(tickTimer);
+  const fini = phaseNow() === "termine";
+  const titre = `<div class="board-titre">${fini ? "🏆 Résultats finaux <span>— merci d'avoir joué !</span>" : "🏆 Classement en direct"}</div>`;
   if (!board.length) {
-    app.innerHTML = `${pillsHtml("board")}<div class="card center">
-      <h2 class="q-text">Le classement est encore vide 🌱</h2>
-      <p class="hint">Sois le premier ou la première à jouer !</p></div>`;
+    app.innerHTML = `${pillsHtml("board")}<div class="card center">${titre}
+      <p class="hint">${fini ? "Le quiz est terminé." : "Sois le premier ou la première à jouer ! 🌱"}</p></div>`;
     bindPills();
     return;
   }
+  // Ma ligne à moi : si je suis identifié, je la mets en avant (score + rang) et
+  // je propose d'aller directement dans mon jardin.
+  const moiRang = joueur ? board.findIndex((p) => p.name.toLowerCase() === joueur.name.toLowerCase()) : -1;
+  const moiHtml = (moiRang >= 0) ? `<div class="moi-score">
+      <div class="moi-rang">${moiRang < 3 ? medals[moiRang] : "#" + (moiRang + 1)}</div>
+      <div class="moi-info">
+        <div class="moi-nom">${esc(board[moiRang].name)} — c'est toi ! 🌱</div>
+        <div class="moi-pts">${board[moiRang].score} graines récoltées${moiRang < 3 ? " · sur le podium ! 🎉" : ""}</div>
+      </div>
+      <button class="btn" id="moi-jardin">🌼 Mon jardin</button>
+    </div>` : "";
   const top3 = board.slice(0, 3);
   const rest = board.slice(3);
   const order = [1, 0, 2];
   app.innerHTML = `<div class="board-wrap">${pillsHtml("board")}<div class="card">
+    ${titre}
+    ${moiHtml}
     <div class="podium">
       ${order.map((pos) => top3[pos] ? `
-        <div class="pod p${pos + 1}">
+        <div class="pod p${pos + 1}${moiRang === pos ? " moi" : ""}">
           <div class="pod-medal">${medals[pos]}</div>
           <div class="pod-name">${esc(top3[pos].name)}</div>
           <div class="pod-pts">${top3[pos].score} 🌱</div>
         </div>` : "").join("")}
     </div>
     ${rest.map((p, i) => `
-      <div class="rank-row">
+      <div class="rank-row${moiRang === i + 3 ? " moi" : ""}">
         <span class="rank-pos">${i + 4}.</span>
         ${avatarDe(p.name)}
         <span class="rank-nom"><span class="qui">${esc(p.name)}</span></span>
@@ -1460,6 +1497,13 @@ function renderBoard() {
     </div>
   </div></div>`;
   bindPills();
+  const mj = $("#moi-jardin");
+  if (mj) mj.addEventListener("click", async () => {
+    jardin = await apiJardin();
+    const s = await apiSolde(joueur.name).catch(() => null);
+    if (s && s.exists) joueur.solde = s.solde;
+    userView = "jardin"; render();
+  });
   $("#b-refresh").addEventListener("click", async () => { board = await apiGetBoard(); renderBoard(); });
 }
 
