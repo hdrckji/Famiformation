@@ -381,8 +381,11 @@ body.mode-borne #app { width: 100%; }
 .ext-home { background: var(--soleil); color: #0E3B24; border: none; border-radius: 999px; font-weight: 800;
   font-size: clamp(1rem, 2.2vw, 1.2rem); padding: 12px 24px; cursor: pointer; }
 .ext-home:hover { filter: brightness(1.06); }
+.ext-form { margin-left: auto; background: var(--craie); color: var(--pousse); border: none; border-radius: 999px;
+  font-weight: 800; font-size: clamp(.95rem, 2.2vw, 1.15rem); padding: 12px 22px; cursor: pointer; }
+.ext-form:hover { filter: brightness(1.04); }
 .ext-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.1rem; opacity: .9; }
-.ext-frame { flex: 1; width: 100%; border: 0; }
+.ext-frame { flex: 1; width: 100%; border: 0; background: #fff; }
 .borne-mod { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
   background: var(--craie); border: 3px solid transparent; border-radius: 24px; padding: clamp(30px, 6vh, 60px) 24px;
   min-height: clamp(200px, 34vh, 340px); box-shadow: 0 6px 24px rgba(14,59,36,.1);
@@ -968,6 +971,28 @@ function estBorne() { try { return sessionStorage.getItem("fj_borne") === "1"; }
 // Retour « accueil » : dans la borne, on RESTE dans la borne (on ne s'échappe pas
 // vers le quiz). Renvoie true si on a bien géré la redirection.
 function retourAccueilBorne() { if (estBorne()) { location.href = quizBase() + "borne"; return true; } return false; }
+
+// 🎁 Petite fenêtre (modale) pour l'issue d'un code : inconnu, déjà utilisé, déjà à toi.
+// texte peut contenir du HTML simple (emoji, <br>) — il vient de nos propres chaînes.
+function modaleCode(emoji, titre, texte) {
+  app.innerHTML = `<div class="card center"><div style="font-size:2.2rem;">🎁</div><h2 class="q-text">Ton code…</h2></div>`;
+  const o = document.createElement("div");
+  o.className = "modal-fond";
+  o.innerHTML = `<div class="modal code-modal">
+    <div class="cm-emoji">${emoji}</div>
+    <h2 class="cm-titre">${esc(titre)}</h2>
+    <p class="cm-sous">${texte}</p>
+    <button class="btn" id="cm-ok" style="min-width:180px;">${estBorne() ? "🏠 Retour à l'accueil" : "J'ai compris"}</button>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => {
+    o.remove();
+    if (retourAccueilBorne()) return;                 // borne : on rentre à l'accueil
+    codeAReclamer = null; userView = joueur ? "jardin" : "reclamer"; render();
+  };
+  o.querySelector("#cm-ok").addEventListener("click", ferme);
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
+}
 
 // 🔒 Petite fenêtre « politique de confidentialité ».
 function ouvrePolitique() {
@@ -1719,22 +1744,16 @@ async function renderReclamer() {
   const st = await apiCodeStatus(code, joueur ? joueur.name : "").catch(() => ({ connu: false }));
 
   if (!st.connu) {
-    app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">❓</div>
-      <h2 class="q-text">Code inconnu</h2>
-      <p class="hint">« ${esc(code)} » n'est pas un code valide. Vérifie l'orthographe.</p>${retourHtml()}</div>`;
-    brancheRetour(); return;
+    modaleCode("❓", "Code inconnu", "« " + esc(code) + " » n'est pas un code valide. Vérifie bien l'orthographe.");
+    return;
   }
   if (st.pris && st.parMoi) {
-    app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">😉</div>
-      <h2 class="q-text">Tu as déjà ce code !</h2>
-      <p class="hint">Ce bonus est déjà dans ton jardin. Va en chercher d'autres en magasin !</p>${retourHtml()}</div>`;
-    brancheRetour(); return;
+    modaleCode("😉", "Tu as déjà ce code !", "Ce bonus est déjà dans ton jardin. Va en chercher d'autres en magasin !");
+    return;
   }
   if (st.pris) {
-    app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">🥀</div>
-      <h2 class="q-text">Dommage…</h2>
-      <p class="hint">Ce code a déjà été utilisé… ou planté, qui sait ! 🌱 Cherche-en un autre en magasin, il y en a d'autres à trouver.</p>${retourHtml()}</div>`;
-    brancheRetour(); return;
+    modaleCode("🥀", "Dommage…", "Ce code a déjà été utilisé… ou planté, qui sait ! 🌱 Cherche-en un autre en magasin, il y en a d'autres à trouver.");
+    return;
   }
 
   // Code disponible mais pas encore identifié : GROSSE FENÊTRE de félicitations,
@@ -2002,23 +2021,36 @@ function renderBorne() {
     const go = b.dataset.go;
     // Le module « mail » mène à un AUTRE site : on l'ouvre dans un cadre plein
     // écran AVEC un bouton retour, pour que la borne garde toujours une sortie.
-    if (go === "mail") { ouvreExterne(dest.mail); return; }
+    if (go === "mail") { ouvreMailBorne(); return; }
     try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {}   // on se souvient qu'on vient de la borne
     location.href = dest[go];
   }));
 }
 
-// Ouvre un site externe DANS la borne (cadre plein écran) avec un bouton retour.
-function ouvreExterne(url) {
+// 📧 Le module e-mail DANS la borne : la page emails ET le formulaire s'affichent
+// dans un cadre (jamais de nouvel onglet). Un bouton bascule vers le formulaire
+// Google (version embarquée, qui accepte l'affichage en cadre), un autre revient
+// à l'accueil. Tout reste dans la borne, formulaire complétable et envoyable.
+const URL_EMAILS = "https://famiformation.com/emails/";
+const URL_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSfEq4cwc2P9aDQno8z3ftMRiKAgttI9UaH46-3PVMQJY_5Feg/viewform?embedded=true";
+function ouvreMailBorne() {
   const o = document.createElement("div");
   o.className = "ext-overlay";
   o.innerHTML = `<div class="ext-bar">
       <button class="ext-home" id="ext-retour">🏠 Retour à l'accueil</button>
-      <span class="ext-titre">Famiflora</span>
+      <button class="ext-form" id="ext-toggle">📝 Remplir le formulaire →</button>
     </div>
-    <iframe class="ext-frame" src="${esc(url)}" title="Famiflora"></iframe>`;
+    <iframe class="ext-frame" id="ext-if" src="${esc(URL_EMAILS)}" title="Famiflora"></iframe>`;
   document.body.appendChild(o);
+  const iframe = o.querySelector("#ext-if");
+  const toggle = o.querySelector("#ext-toggle");
+  let surForm = false;
   o.querySelector("#ext-retour").addEventListener("click", () => o.remove());
+  toggle.addEventListener("click", () => {
+    surForm = !surForm;
+    iframe.src = surForm ? URL_FORM : URL_EMAILS;
+    toggle.textContent = surForm ? "← Revenir à la page" : "📝 Remplir le formulaire →";
+  });
 }
 
 // 🏠 Bouton maison permanent : visible sur les pages atteintes DEPUIS la borne,
