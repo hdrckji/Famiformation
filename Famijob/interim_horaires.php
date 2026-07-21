@@ -1840,6 +1840,7 @@ foreach ($weekDays as $weekDay) {
                     <input type="hidden" name="matching_mode" value="<?php echo e($matchingMode); ?>">
                     <button type="submit" class="btn btn-primary"><?php echo e(fjhT('Auto-matching semaine', 'Automatische matching week')); ?></button>
                 </form>
+                <a class="btn btn-soft" href="export_matching.php?week=<?php echo e($selectedWeekKey); ?>" title="<?php echo e(fjhT('Exporter le planning de la semaine (Excel/CSV)', 'Weekplanning exporteren (Excel/CSV)')); ?>" style="display:inline-flex;align-items:center;gap:6px;">⬇ <?php echo e(fjhT('Exporter', 'Exporteren')); ?></a>
             <?php endif; ?>
             <div style="text-align:right;color:var(--muted);line-height:1.5;">
                 <strong><?php echo e(fjhT('Période', 'Periode')); ?></strong><br>
