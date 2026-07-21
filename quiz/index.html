@@ -208,6 +208,7 @@ body {
   color: var(--pousse); font-weight: 800; margin-left: 6px; display: inline-block;
   animation: gain-pop .9s ease-out both;
 }
+.q-plante .serie { margin-left: 8px; color: #E4572E; font-weight: 800; font-size: .92em; white-space: nowrap; }
 @keyframes gain-pop {
   0% { opacity: 0; transform: translateY(8px) scale(.7); }
   30% { opacity: 1; transform: translateY(0) scale(1.15); }
@@ -719,6 +720,26 @@ const CONFIG = {
   // n'importe qui avec « afficher le code source ».
   api: "api.php",
 };
+
+// 🎯 BARÈME DU QUIZ. Chaque bonne réponse rapporte :
+//   • une base fixe (validité),
+//   • un bonus RAPIDITÉ continu (au ratio du temps de réponse : plus tu réponds
+//     vite, plus tu gagnes — 3,2 s ≠ 3,8 s, les décimales départagent),
+//   • un bonus de SÉRIE qui grimpe avec les bonnes réponses d'affilée.
+// Le score final est un nombre à virgule (les décimales servent à départager).
+const BAREME = {
+  base: CONFIG.pointsParBonneReponse,  // graines par bonne réponse (validité)
+  vitesseMax: 5,                       // bonus max si réponse quasi instantanée
+  vitesseT: 12,                        // au-delà de 12 s : plus de bonus rapidité
+  serieMax: 5,                         // plafond du bonus de série
+};
+// Gain d'une bonne réponse selon le temps (s) et la série en cours.
+function gainReponse(tSec, serie) {
+  const vitesse = BAREME.vitesseMax * Math.max(0, 1 - tSec / BAREME.vitesseT);
+  const bonusSerie = serie >= 2 ? Math.min(serie - 1, BAREME.serieMax) : 0;
+  return BAREME.base + vitesse + bonusSerie;
+}
+const arr1 = (n) => Math.round((Number(n) || 0) * 10) / 10;   // arrondi 1 décimale
 
 /* ============================================================
    🎬 MODE SIMULATION — un banc d'essai avec plusieurs ÉCRANS à prévisualiser.
@@ -1436,7 +1457,7 @@ function renderQuiz() {
   if (!quiz && joueur.quizFait) { userView = "dashboard"; render(); return; }
 
   // On démarre directement le quiz avec la carte déjà en poche (plus d'intro).
-  if (!quiz) quiz = { step: "play", pseudo: joueur.name, code: joueur.code, nom: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, start: Date.now(), score: 0 };
+  if (!quiz) quiz = { step: "play", pseudo: joueur.name, code: joueur.code, nom: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, start: Date.now(), score: 0, streak: 0, qStart: Date.now() };
 
   // ---- (fallback) Ancienne inscription intégrée au quiz — inutilisée dans le
   // nouveau flux, conservée par sécurité si quiz.step vaut « intro ». ----
@@ -1491,15 +1512,16 @@ function renderQuiz() {
 
   if (quiz.step === "play") {
     const q = quiz.questions[quiz.idx];
-    const graines = quiz.correct * CONFIG.pointsParBonneReponse;
-    const stade = stadeDe(graines);
+    const graines = arr1(quiz.score);
+    const stade = stadeDe(quiz.score);
+    quiz.qStart = Date.now();   // ⏱ départ du chrono de CETTE question (bonus rapidité)
     app.innerHTML = `<div class="card">
       <div class="q-plante">
         <span class="stade">
           <span class="emo ${quiz.vientDePousser ? "pousse-pop" : ""}">${stade.emoji}</span>
           <span class="nom">${stade.nom}</span>
         </span>
-        <span class="graines">${graines} 🌰${quiz.lastGain ? `<span class="gain">+${quiz.lastGain}</span>` : ""}</span>
+        <span class="graines">${graines} 🌰${quiz.lastGain ? `<span class="gain">+${quiz.lastGain}</span>` : ""}${quiz.streak >= 2 ? `<span class="serie">🔥 ${quiz.streak}</span>` : ""}</span>
       </div>
       <div class="q-progress"><div style="width:${(quiz.idx / quiz.questions.length) * 100}%"></div></div>
       <div class="q-num">Question ${quiz.idx + 1} / ${quiz.questions.length}</div>
@@ -1507,20 +1529,25 @@ function renderQuiz() {
       ${q.options.map((o, i) => `<button class="q-opt" data-i="${i}">${esc(o.text)}</button>`).join("")}
     </div>`;
     app.querySelectorAll(".q-opt").forEach((btn) => btn.addEventListener("click", async () => {
-      const avant = stadeDe(quiz.correct * CONFIG.pointsParBonneReponse);
+      const avant = stadeDe(quiz.score);
+      const tSec = (Date.now() - quiz.qStart) / 1000;   // temps de réponse (avec décimales)
       if (q.options[btn.dataset.i].good) {
+        quiz.streak++;
+        const gain = gainReponse(tSec, quiz.streak);     // base + rapidité (ratio) + série
+        quiz.score += gain;
         quiz.correct++;
-        quiz.lastGain = CONFIG.pointsParBonneReponse;
+        quiz.lastGain = arr1(gain);
       } else {
+        quiz.streak = 0;
         quiz.lastGain = 0;
       }
-      const apres = stadeDe(quiz.correct * CONFIG.pointsParBonneReponse);
+      const apres = stadeDe(quiz.score);
       quiz.vientDePousser = apres.min !== avant.min; // la plante vient de changer de stade
       if (quiz.idx + 1 < quiz.questions.length) { quiz.idx++; renderQuiz(); return; }
       // Dernière question : on inscrit la récolte sur le compte (déjà créé).
       quiz.step = "fin"; renderQuiz();
       const time = Math.round((Date.now() - quiz.start) / 1000);
-      quiz.score = quiz.correct * CONFIG.pointsParBonneReponse;
+      quiz.score = arr1(quiz.score);   // score final à virgule (les décimales départagent)
       await apiSubmit({ name: quiz.pseudo, code: quiz.code, nom: quiz.nom, score: quiz.score, correct: quiz.correct, time }).catch(() => {});
       sauveMoi(quiz.pseudo, quiz.code);                    // l'appareil perso se souvient
       if (!joueur) joueur = { name: quiz.pseudo, code: quiz.code, nbCodes: 0 };

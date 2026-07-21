@@ -131,7 +131,8 @@ $HERBE_MAX_GAIN = 80;         // gain maximum crédité en une partie
  * les prix, restent basés sur le quiz uniquement.
  */
 function soldeDe($p) {
-  return max(0, intval($p['score'] ?? 0) + intval($p['bonus'] ?? 0) - intval($p['depensees'] ?? 0));
+  // Le score du quiz est un nombre à virgule (bonus rapidité continu) : float.
+  return max(0, round(floatval($p['score'] ?? 0) + intval($p['bonus'] ?? 0) - intval($p['depensees'] ?? 0), 1));
 }
 
 // ❓ QUESTIONS PAR DÉFAUT. Elles ne servent qu'AU TOUT PREMIER lancement : dès que
@@ -254,8 +255,12 @@ function writeJson($file, $data) {
 
 function sortBoard(&$board) {
   usort($board, function ($a, $b) {
-    if ($b['score'] !== $a['score']) return $b['score'] - $a['score'];
-    return $a['time'] - $b['time']; // égalité : le plus rapide devant
+    // Score DÉCROISSANT, décimales incluses (la rapidité départage). On utilise
+    // l'opérateur <=> : un retour flottant serait tronqué en int et perdrait la
+    // virgule. En cas d'égalité stricte, le plus rapide (time) passe devant.
+    $sa = floatval($a['score'] ?? 0); $sb = floatval($b['score'] ?? 0);
+    if ($sa !== $sb) return $sb <=> $sa;
+    return intval($a['time'] ?? 0) <=> intval($b['time'] ?? 0);
   });
 }
 
@@ -305,7 +310,7 @@ switch ($action) {
       'name'      => $name,                                   // le pseudo (nom de jardinier)
       'code'      => substr($codeJard, 0, 4),                 // code secret à 4 chiffres
       'nom'       => trim(mb_substr((string)($input['nom'] ?? ''), 0, 60)),
-      'score'     => max(0, intval($input['score'] ?? 0)),   // graines récoltées, définitives
+      'score'     => max(0, round(floatval($input['score'] ?? 0), 1)),   // récolte (nombre à virgule)
       'bonus'     => 0,                                       // graines gagnées au mini-jeu
       'depensees' => 0,                                       // graines déjà plantées au jardin
       'correct'   => max(0, intval($input['correct'] ?? 0)),
@@ -389,7 +394,7 @@ switch ($action) {
         if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
           if ((string)($p['code'] ?? '') === $code4) {
             return ['ok' => true, 'exist' => true, 'name' => $p['name'],
-                    'quiz_fait' => ($p['quiz_fait'] ?? true), 'recoltees' => intval($p['score'] ?? 0),
+                    'quiz_fait' => ($p['quiz_fait'] ?? true), 'recoltees' => round(floatval($p['score'] ?? 0), 1),
                     'solde' => soldeDe($p), 'nbCodes' => intval($p['codes'] ?? 0)];
           }
           return ['pris' => true];
@@ -459,7 +464,7 @@ switch ($action) {
         echo json_encode([
           'exists'    => true,
           'name'      => $p['name'],
-          'recoltees' => intval($p['score'] ?? 0),
+          'recoltees' => round(floatval($p['score'] ?? 0), 1),
           'depensees' => intval($p['depensees'] ?? 0),
           'solde'     => soldeDe($p),
           'quiz_fait' => ($p['quiz_fait'] ?? true),
@@ -653,7 +658,7 @@ switch ($action) {
         echo json_encode([
           'exists'    => true,
           'name'      => $p['name'],
-          'recoltees' => intval($p['score'] ?? 0),
+          'recoltees' => round(floatval($p['score'] ?? 0), 1),
           'solde'     => soldeDe($p),
           'nbCodes'   => intval($p['codes'] ?? 0),
           'quiz_fait' => ($p['quiz_fait'] ?? true),
@@ -734,11 +739,11 @@ switch ($action) {
     $res = withLock($scoresFile, function (&$board, &$write) use ($name, $bonus, $CODE_GRAINES) {
       foreach ($board as &$p) {
         if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
-          $p['score'] = intval($p['score'] ?? 0) + $CODE_GRAINES;
+          $p['score'] = round(floatval($p['score'] ?? 0) + $CODE_GRAINES, 1);
           $p['codes_pris'] = array_values(array_merge($p['codes_pris'] ?? [], [$bonus]));
           $p['codes'] = count($p['codes_pris']);
           $write = true;
-          return ['ok' => true, 'gagne' => $CODE_GRAINES, 'recoltees' => intval($p['score']), 'solde' => soldeDe($p), 'nbCodes' => $p['codes']];
+          return ['ok' => true, 'gagne' => $CODE_GRAINES, 'recoltees' => round(floatval($p['score']), 1), 'solde' => soldeDe($p), 'nbCodes' => $p['codes']];
         }
       }
       return ['ok' => true, 'gagne' => $CODE_GRAINES];
