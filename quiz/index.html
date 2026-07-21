@@ -1216,11 +1216,10 @@ function ouvreExplication() {
     <div class="explik-steps">
       <div class="explik-step"><span class="explik-ico">🎯</span><span class="explik-txt"><b class="eh">Réponds au quiz</b>Chaque bonne réponse te fait récolter des graines 🌱. Ta récolte, c'est ta place au classement.</span></div>
       <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Ta carte de jardinier</b>Un pseudo + un code à 4 chiffres, choisis en jouant. <b>Retiens-les !</b> C'est ta clé : elle garde ta récolte et te laisse retrouver ton jardin sur n'importe quel appareil.</span></div>
-      <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes cachés en magasin te donnent +${CONFIG.pointsParCodeBonus} graines chacun (jusqu'à ${CONFIG.maxCodes}). Ouvre l'œil !</span></div>
-      <div class="explik-step explik-star"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Le jardin collectif ⭐</b>Dépense tes graines pour planter sur une <b>fresque commune</b> que tout le monde fait pousser ensemble : fleurs rares or/argent/bronze et l'arbre à tickets glace 🎟️. <b>Planter ne te fait JAMAIS reculer au classement</b> — fais-toi plaisir !</span></div>
-      <div class="explik-step"><span class="explik-ico">🌿</span><span class="explik-txt"><b class="eh">Encore plus de graines</b>Un petit mini-jeu (la chasse aux mauvaises herbes) dans le jardin pour en récolter davantage.</span></div>
-      <div class="explik-step"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Deux classements</b>Celui de la récolte (tes graines) et celui des plus beaux jardins.</span></div>
-      <div class="explik-step"><span class="explik-ico">🍦</span><span class="explik-txt"><b class="eh">À gagner</b>Des tickets glace et des prix. Remise le ${esc(CONFIG.dateResultats)} !</span></div>
+      <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes cachés en magasin te donnent +${CONFIG.pointsParCodeBonus} graines chacun (jusqu'à ${CONFIG.maxCodes}) — et ces graines comptent au classement. Ouvre l'œil !</span></div>
+      <div class="explik-step explik-star"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Un seul classement ⭐</b>Ta récolte de graines (quiz + codes), c'est tout. <b>Les 3 meilleures récoltes gagnent des prix</b> ! Remise le ${esc(CONFIG.dateResultats)}.</span></div>
+      <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin à toi</b>Dépense tes graines pour planter dans <b>ton</b> jardin (fleurs, arbres, fleurs rares…). C'est juste pour le plaisir : <b>planter ne change RIEN à ton classement</b>.</span></div>
+      <div class="explik-step"><span class="explik-ico">🌿</span><span class="explik-txt"><b class="eh">Un mini-jeu bonus</b>La chasse aux mauvaises herbes te donne des graines <b>en plus, uniquement pour planter</b> dans ton jardin. Ça ne compte pas au classement.</span></div>
     </div>
     <button class="btn" id="explik-ok" style="width:100%;">J'ai tout compris, à moi de jouer ! 🌱</button>
   </div>`;
@@ -1436,7 +1435,7 @@ function renderQuiz() {
       <button class="btn" id="q-start" style="width:100%;">C'est parti ! 🚀</button>
       <p class="center" style="margin-top:12px;"><a href="#" id="q-retrouver" class="lien">J'ai déjà un compte</a></p>
       <details class="plus" style="margin-top:10px;"><summary>▸ En savoir plus</summary>
-        <p class="hint" style="margin-top:8px;">Cette étape crée ton compte pour le grand quiz Famiflora : réponds aux questions, récolte des graines 🌱, trouve des codes bonus en magasin et fais fleurir le jardin collectif ! Ton pseudo apparaît au classement.</p>
+        <p class="hint" style="margin-top:8px;">Cette étape crée ton compte pour le grand quiz Famiflora : réponds aux questions, récolte des graines 🌱, trouve des codes bonus en magasin et fais fleurir ton jardin ! Ton pseudo apparaît au classement.</p>
       </details>
       <p class="center" style="margin-top:8px;"><a href="#" id="q-conf" class="lien conf">Politique de confidentialité</a></p>
     </div>`;
@@ -1527,7 +1526,7 @@ function renderQuiz() {
       <br>Trouve des codes bonus en magasin (+${CONFIG.pointsParCodeBonus} 🌱 chacun, ${CONFIG.maxCodes} max) et récolte encore des graines dans le jardin !
       <br>Remise des prix le ${CONFIG.dateResultats} — bonne chance ! 🍀</p>
     <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-      <button class="btn" id="q-jardin">🌼 Planter dans le jardin collectif</button>
+      <button class="btn" id="q-jardin">🌼 Planter dans mon jardin</button>
       <button class="btn ghost" id="q-board">Voir le classement 🏆</button>
     </div>
     <p class="center" style="margin-top:12px;"><button class="lien-explik" id="q-explik">✨ Comment ça marche ? Découvre tout ce que tu peux faire</button></p>
@@ -1775,15 +1774,6 @@ function renderJardin() {
       }).join("")}
     </div>
     <div class="jardin-info" id="j-info">${jardinMsg ? esc(jardinMsg) : (planteChoisie ? `${iconePlante(planteChoisie)} ${esc(PLANTES[planteChoisie].nom)} sélectionné — tape une case libre !` : "")}</div>
-    ${(() => {
-      const cl = classementJardins();
-      if (!cl.length) return "";
-      return `<details class="beaux" open><summary>🏆 Les plus beaux jardins</summary>
-        <p class="hint" style="margin:8px 0;">Classé par valeur des plantes posées — à toi de composer le plus beau !</p>
-        ${cl.slice(0, 8).map((x, i) => `<div class="beau-row ${joueur && x.name.toLowerCase() === joueur.name.toLowerCase() ? "moi" : ""}">
-          <span>${medals[i] || (i + 1) + "."} ${esc(x.name)}</span><span>${x.valeur} 🌱</span></div>`).join("")}
-      </details>`;
-    })()}
   </div></div>`;
   bindPills();
 
