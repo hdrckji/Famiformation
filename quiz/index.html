@@ -402,6 +402,20 @@ body.mode-borne #app { width: 100%; }
   font-weight: 700; color: var(--pousse); font-size: clamp(.95rem, 2.2vw, 1.15rem); padding: 6px 4px;
   text-decoration: underline; text-underline-offset: 3px; }
 .lien-explik:hover { color: var(--foret); }
+/* Bloc principal (mis en avant) sur l'accueil / l'espace */
+.bm-primaire { border-color: var(--pousse); background: #F1F8EF; }
+/* Espace (gate connexion/création) : 2 blocs centrés */
+.esp-modules { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); max-width: 760px; margin: 0 auto; }
+body.mode-borne .esp-modules { grid-template-columns: repeat(2, 1fr); }
+/* Tableau de bord */
+.dash-hello { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--foret);
+  font-size: clamp(1.1rem, 2.8vw, 1.6rem); margin-bottom: 18px; }
+.dash-hello span { display: block; font-weight: 600; color: var(--pousse); font-size: .8em; }
+.dash-modules { max-width: 1000px; margin: 0 auto; }
+/* Case de consentement RGPD à la création de compte */
+.rgpd { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: .9rem;
+  font-weight: 500; margin: 16px 0; line-height: 1.4; opacity: .92; }
+.rgpd input { margin-top: 3px; flex: 0 0 auto; width: 18px; height: 18px; cursor: pointer; }
 /* Modal « Comment ça marche ? » */
 .modal.explik { max-width: 560px; text-align: left; position: relative; max-height: 86vh; overflow-y: auto; }
 .explik-x { position: absolute; top: 12px; right: 14px; border: none; background: none; cursor: pointer;
@@ -825,10 +839,17 @@ async function apiQuestions() {
 }
 async function apiSubmit(entry) {
   if (SIMULATION) {
-    // La participation simulée entre dans le classement local, jamais sur le serveur.
-    board.push({ name: entry.name, code: entry.code || "", nom: entry.nom || "", score: entry.score,
-                 bonus: 0, depensees: 0, correct: entry.correct, codes: 0, codes_pris: [],
-                 time: entry.time, date: new Date().toISOString() });
+    // Même logique que le serveur : si le compte existe (créé avant de jouer), on
+    // met à jour sa récolte au lieu d'ajouter un doublon. Jamais sur le serveur.
+    const p = board.find((x) => x.name.toLowerCase() === (entry.name || "").toLowerCase());
+    if (p) {
+      if ((p.code || "") !== (entry.code || "")) return false;   // nom pris par un autre
+      if (!p.quiz_fait) { p.score = entry.score; p.correct = entry.correct; p.time = entry.time; p.quiz_fait = true; if (entry.nom) p.nom = entry.nom; }
+    } else {
+      board.push({ name: entry.name, code: entry.code || "", nom: entry.nom || "", score: entry.score,
+                   bonus: 0, depensees: 0, correct: entry.correct, codes: 0, codes_pris: [],
+                   time: entry.time, quiz_fait: true, date: new Date().toISOString() });
+    }
     board.sort((a, b) => b.score - a.score || a.time - b.time);
     return true;
   }
@@ -844,11 +865,29 @@ async function apiLoginJoueur(name, code) {
     const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
     if (!p) return { exists: false };
     if ((p.code || "") !== code) return { exists: true, mauvais_code: true };
-    return { exists: true, name: p.name, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: (p.codes_pris || []).length };
+    return { exists: true, name: p.name, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: (p.codes_pris || []).length, quiz_fait: p.quiz_fait !== false };
   }
   const r = await fetch(`${CONFIG.api}?action=login_joueur`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, code }),
   });
+  return await r.json();
+}
+// ✨ Créer (réserver) son compte AVANT de jouer (pseudo + code à 4 chiffres).
+async function apiRegister(name, code, nom) {
+  if (SIMULATION) {
+    const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (p) {
+      if ((p.code || "") !== code) return { pris: true };
+      return { ok: true, exist: true, name: p.name, quiz_fait: p.quiz_fait !== false, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: (p.codes_pris || []).length };
+    }
+    board.push({ name, code, nom: nom || "", score: 0, bonus: 0, depensees: 0, correct: 0, codes: 0, codes_pris: [], time: 0, quiz_fait: false, date: new Date().toISOString() });
+    return { ok: true, exist: false, name, quiz_fait: false, recoltees: 0, solde: 0, nbCodes: 0 };
+  }
+  const r = await fetch(`${CONFIG.api}?action=register`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, code, nom: nom || "" }),
+  });
+  if (r.status === 409) return { pris: true };
+  if (!r.ok) return { erreur: true };
   return await r.json();
 }
 // 🎁 Statut d'un code bonus (dispo / déjà pris / inconnu). Le pseudo permet de
@@ -1207,22 +1246,17 @@ function currentView() {
   // code bonus, on montre l'écran du code, pas le compte à rebours.
   if (userView === "reclamer") return "reclamer";
   if (userView === "retrouver") return "retrouver";
-  const phase = phaseNow();
-  // Avant le lancement : accueil (compte à rebours + modules, quiz verrouillé).
-  if (phase === "avant") return "home";
-  // Quiz TERMINÉ : place aux résultats. On montre le classement (avec son propre
-  // score en évidence) et on peut aller dans le jardin — plus jamais l'accueil
-  // « bientôt disponible » qui n'a plus de sens.
-  if (phase === "termine") {
-    if (userView === "jardin") return "jardin";
-    return "board";
-  }
-  // Quiz ouvert.
-  if (userView === "quiz") return "quiz";
-  if (userView === "board") return "board";
-  if (userView === "jardin") return "jardin";
-  if (userView === "herbes") return "herbes";
-  return "home";
+  if (userView === "creation") return "creation";
+  // L'espace du compte : gate connexion/création si pas connecté, sinon dashboard.
+  if (userView === "espace")    return joueur ? "dashboard" : "espace";
+  if (userView === "dashboard") return joueur ? "dashboard" : "espace";
+  // Vues qui exigent un compte : sinon on renvoie vers l'espace.
+  if (userView === "quiz")   return phaseNow() === "ouvert" ? "quiz" : (joueur ? "dashboard" : "home");
+  if (userView === "jardin") return joueur ? "jardin" : "espace";
+  if (userView === "herbes") return joueur ? "herbes" : "espace";
+  if (userView === "board")  return "board";   // classement : public
+  // Défaut selon la phase : quiz fini → classement, sinon accueil.
+  return phaseNow() === "termine" ? "board" : "home";
 }
 
 /* ============================================================
@@ -1350,12 +1384,20 @@ function lanceConfettis(ms = 6000) {
 
 function renderQuiz() {
   clearInterval(tickTimer);
-  // Hors période d'ouverture, on repasse au compte à rebours.
+  // Hors période d'ouverture, on repasse à l'accueil / tableau de bord.
   if (phaseNow() !== "ouvert") { render(); return; }
+  // Nouveau flux : on joue APRÈS s'être identifié (création/connexion). Donc pas
+  // de compte → on renvoie à l'espace. « Quiz déjà fait » ne bloque QU'AU
+  // DÉMARRAGE (quiz null) : une partie en cours ou son écran final doivent pouvoir
+  // s'afficher même si quizFait vient de passer à true.
+  if (!joueur) { userView = "espace"; render(); return; }
+  if (!quiz && joueur.quizFait) { userView = "dashboard"; render(); return; }
 
-  if (!quiz) quiz = { step: "intro", pseudo: "", code: "", nom: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, start: 0, score: 0 };
+  // On démarre directement le quiz avec la carte déjà en poche (plus d'intro).
+  if (!quiz) quiz = { step: "play", pseudo: joueur.name, code: joueur.code, nom: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, start: Date.now(), score: 0 };
 
-  // ---- Inscription : simple et fun (pseudo + code secret à 4 chiffres) ----
+  // ---- (fallback) Ancienne inscription intégrée au quiz — inutilisée dans le
+  // nouveau flux, conservée par sécurité si quiz.step vaut « intro ». ----
   if (quiz.step === "intro") {
     app.innerHTML = `<div class="card">
       <div class="center"><div style="font-size:2.8rem;">🌱</div>
@@ -1433,13 +1475,17 @@ function renderQuiz() {
       const apres = stadeDe(quiz.correct * CONFIG.pointsParBonneReponse);
       quiz.vientDePousser = apres.min !== avant.min; // la plante vient de changer de stade
       if (quiz.idx + 1 < quiz.questions.length) { quiz.idx++; renderQuiz(); return; }
-      // Dernière question : on enregistre la carte de jardinier et la récolte.
+      // Dernière question : on inscrit la récolte sur le compte (déjà créé).
       quiz.step = "fin"; renderQuiz();
       const time = Math.round((Date.now() - quiz.start) / 1000);
       quiz.score = quiz.correct * CONFIG.pointsParBonneReponse;
       await apiSubmit({ name: quiz.pseudo, code: quiz.code, nom: quiz.nom, score: quiz.score, correct: quiz.correct, time }).catch(() => {});
-      sauveMoi(quiz.pseudo, quiz.code);                    // le téléphone se souvient
-      joueur = { name: quiz.pseudo, code: quiz.code, solde: quiz.score, recoltees: quiz.score, nbCodes: 0 };
+      sauveMoi(quiz.pseudo, quiz.code);                    // l'appareil perso se souvient
+      if (!joueur) joueur = { name: quiz.pseudo, code: quiz.code, nbCodes: 0 };
+      joueur.recoltees = quiz.score;
+      joueur.quizFait = true;                              // le jardin se débloque
+      const s = await apiSolde(quiz.pseudo).catch(() => null);
+      joueur.solde = (s && s.exists) ? s.solde : quiz.score;
       board = await apiGetBoard();
       quiz.messageCode = await reclamerEnAttente();        // un code scanné avant de jouer ?
       quiz.step = "done"; renderQuiz();
@@ -1511,7 +1557,10 @@ function renderBoard() {
   clearInterval(tickTimer);
   const fini = phaseNow() === "termine";
   const titre = `<div class="board-titre">${fini ? "🏆 Résultats finaux <span>— merci d'avoir joué !</span>" : "🏆 Classement en direct"}</div>`;
-  if (!board.length) {
+  // On ne montre QUE ceux qui ont joué (un compte réservé mais pas encore joué
+  // n'apparaît pas). Le serveur filtre déjà ; ici c'est utile en simulation.
+  const lignes = board.filter((p) => p.quiz_fait !== false);
+  if (!lignes.length) {
     app.innerHTML = `${pillsHtml("board")}<div class="card center">${titre}
       <p class="hint">${fini ? "Le quiz est terminé." : "Sois le premier ou la première à jouer ! 🌱"}</p></div>`;
     bindPills();
@@ -1519,17 +1568,17 @@ function renderBoard() {
   }
   // Ma ligne à moi : si je suis identifié, je la mets en avant (score + rang) et
   // je propose d'aller directement dans mon jardin.
-  const moiRang = joueur ? board.findIndex((p) => p.name.toLowerCase() === joueur.name.toLowerCase()) : -1;
+  const moiRang = joueur ? lignes.findIndex((p) => p.name.toLowerCase() === joueur.name.toLowerCase()) : -1;
   const moiHtml = (moiRang >= 0) ? `<div class="moi-score">
       <div class="moi-rang">${moiRang < 3 ? medals[moiRang] : "#" + (moiRang + 1)}</div>
       <div class="moi-info">
-        <div class="moi-nom">${esc(board[moiRang].name)} — c'est toi ! 🌱</div>
-        <div class="moi-pts">${board[moiRang].score} graines récoltées${moiRang < 3 ? " · sur le podium ! 🎉" : ""}</div>
+        <div class="moi-nom">${esc(lignes[moiRang].name)} — c'est toi ! 🌱</div>
+        <div class="moi-pts">${lignes[moiRang].score} graines récoltées${moiRang < 3 ? " · sur le podium ! 🎉" : ""}</div>
       </div>
       <button class="btn" id="moi-jardin">🌼 Mon jardin</button>
     </div>` : "";
-  const top3 = board.slice(0, 3);
-  const rest = board.slice(3);
+  const top3 = lignes.slice(0, 3);
+  const rest = lignes.slice(3);
   const order = [1, 0, 2];
   app.innerHTML = `<div class="board-wrap">${pillsHtml("board")}<div class="card">
     ${titre}
@@ -1953,17 +2002,49 @@ async function finHerbes() {
 /* ============================================================
    🔑 RETROUVER SON JARDIN (autre téléphone) : pseudo + code à 4 chiffres
    ============================================================ */
+// 🚪 L'ESPACE — porte d'entrée : soit on se connecte, soit on crée sa carte.
+// Si on est déjà identifié, on file droit au tableau de bord.
+function renderEspace() {
+  clearInterval(tickTimer);
+  if (joueur) { userView = "dashboard"; render(); return; }
+  app.innerHTML = `<div class="home">
+    <h2 class="borne-titre">Ton espace jardin 🌱</h2>
+    <p class="borne-sous">Connecte-toi ou crée ta carte de jardinier pour jouer.</p>
+    <div class="borne-modules esp-modules">
+      <button class="borne-mod bm-primaire" id="esp-creer">
+        <span class="bm-emo">✨</span>
+        <span class="bm-titre">Créer mon compte</span>
+        <span class="bm-desc">Première fois ? Choisis ta carte de jardinier</span>
+      </button>
+      <button class="borne-mod" id="esp-login">
+        <span class="bm-emo">🔑</span>
+        <span class="bm-titre">Me connecter</span>
+        <span class="bm-desc">J'ai déjà une carte (pseudo + code)</span>
+      </button>
+    </div>
+    <div class="home-liens">
+      <button class="lien-explik" id="esp-explik">✨ Comment ça marche ?</button>
+      <button class="lien-explik" id="esp-retour">◂ Retour à l'accueil</button>
+    </div>
+  </div>`;
+  $("#esp-creer").addEventListener("click", () => { jardinMsg = null; userView = "creation"; render(); });
+  $("#esp-login").addEventListener("click", () => { jardinMsg = null; userView = "retrouver"; render(); });
+  $("#esp-explik").addEventListener("click", ouvreExplication);
+  $("#esp-retour").addEventListener("click", () => { if (retourAccueilBorne()) return; userView = "auto"; render(); });
+}
+
+// 🔑 SE CONNECTER à sa carte de jardinier (pseudo + code) → tableau de bord.
 function renderRetrouver() {
   clearInterval(tickTimer);
   app.innerHTML = `<div class="card">
     <div class="center"><div style="font-size:2.6rem;">🔑</div>
-      <h2 class="q-text" style="margin:8px 0 12px;">Retrouver ton jardin</h2></div>
+      <h2 class="q-text" style="margin:8px 0 12px;">Me connecter</h2></div>
     ${jardinMsg ? `<div class="alert">${esc(jardinMsg)}</div>` : ""}
     <label class="lbl">Ton nom de jardinier</label>
     <input class="field" id="r-pseudo" placeholder="Ton pseudo" maxlength="24">
     <label class="lbl">Ton code jardinier (4 chiffres)</label>
     <input class="field" id="r-code" inputmode="numeric" maxlength="4" placeholder="••••">
-    <button class="btn" id="r-ok" style="width:100%;">Retrouver mon jardin 🌱</button>
+    <button class="btn" id="r-ok" style="width:100%;">Me connecter 🌱</button>
     <p class="center" style="margin-top:12px;"><a href="#" id="r-retour" class="lien">◂ Retour</a></p>
   </div>`;
   const go = async () => {
@@ -1972,19 +2053,139 @@ function renderRetrouver() {
     if (pseudo.length < 2 || code.length !== 4) { jardinMsg = "Entre ton nom de jardinier et tes 4 chiffres."; renderRetrouver(); return; }
     $("#r-ok").disabled = true;
     const res = await apiLoginJoueur(pseudo, code).catch(() => null);
-    if (!res || !res.exists) { jardinMsg = "Aucun jardin à ce nom… Vérifie ton pseudo, ou crée ta carte."; renderRetrouver(); return; }
+    if (!res || !res.exists) { jardinMsg = "Aucun compte à ce nom… Vérifie ton pseudo, ou crée ta carte."; renderRetrouver(); return; }
     if (res.mauvais_code) { jardinMsg = "Code jardinier incorrect 🔒"; renderRetrouver(); return; }
-    joueur = { name: res.name, code, solde: res.solde, recoltees: res.recoltees, nbCodes: res.nbCodes };
+    joueur = { name: res.name, code, solde: res.solde, recoltees: res.recoltees, nbCodes: res.nbCodes, quizFait: res.quiz_fait !== false };
     sauveMoi(res.name, code);
     const msg = await reclamerEnAttente();
-    jardin = await apiJardin();
     jardinMsg = msg || null;
-    userView = "jardin"; quiz = null;
+    userView = "dashboard"; quiz = null;
     render();
   };
   $("#r-ok").addEventListener("click", go);
   $("#r-code").addEventListener("keydown", (e) => e.key === "Enter" && go());
-  $("#r-retour").addEventListener("click", (e) => { e.preventDefault(); jardinMsg = null; if (retourAccueilBorne()) return; userView = "auto"; quiz = null; render(); });
+  $("#r-retour").addEventListener("click", (e) => { e.preventDefault(); jardinMsg = null; if (retourAccueilBorne()) return; userView = "espace"; quiz = null; render(); });
+}
+
+// ✨ CRÉER SA CARTE DE JARDINIER (avant de jouer). Pseudo + code + (option) nom,
+// avec consentement RGPD. Réserve le compte côté serveur, puis → tableau de bord.
+let creationSaisie = { pseudo: "", code: "", nom: "" };
+function renderCreation() {
+  clearInterval(tickTimer);
+  app.innerHTML = `<div class="card">
+    <div class="center"><div style="font-size:2.6rem;">✨</div>
+      <h2 class="q-text" style="margin:8px 0 12px;">Crée ta carte de jardinier</h2></div>
+    ${jardinMsg ? `<div class="alert">${esc(jardinMsg)}</div>` : ""}
+    <label class="lbl">Ton pseudo de jardinier</label>
+    <input class="field" id="c-pseudo" placeholder="Ex : SuperMarie" maxlength="24" value="${esc(creationSaisie.pseudo)}">
+    <label class="lbl">Choisis un code secret 🌱 (4 chiffres)</label>
+    <input class="field" id="c-code" inputmode="numeric" maxlength="4" placeholder="Ex : ton année de naissance" value="${esc(creationSaisie.code)}">
+    <p class="mini-warn">⚠️ Note bien ton pseudo et ton code : c'est ta carte pour retrouver ton jardin sur un autre appareil.</p>
+    <details class="plus"><summary>🌿 Ajouter mon nom (optionnel)</summary>
+      <p class="hint" style="margin-top:8px;">Nom et prénom : utile pour te remettre ton prix si tu gagnes. Pas obligatoire.</p>
+      <input class="field" id="c-nom" placeholder="Nom Prénom (facultatif)" maxlength="60" value="${esc(creationSaisie.nom)}">
+    </details>
+    <label class="rgpd"><input type="checkbox" id="c-rgpd"> J'accepte que mon pseudo (et mon nom si donné) soient utilisés pour le jeu et le classement, le temps de l'événement. <a href="#" id="c-conf" class="lien">Politique de confidentialité</a></label>
+    <button class="btn" id="c-ok" style="width:100%;">Créer ma carte 🌱</button>
+    <p class="center" style="margin-top:12px;"><a href="#" id="c-retour" class="lien">◂ J'ai déjà un compte / Retour</a></p>
+  </div>`;
+  const memo = () => { creationSaisie = { pseudo: $("#c-pseudo").value, code: $("#c-code").value, nom: ($("#c-nom") ? $("#c-nom").value : creationSaisie.nom) }; };
+  $("#c-conf").addEventListener("click", (e) => { e.preventDefault(); memo(); ouvrePolitique(); });
+  const go = async () => {
+    const pseudo = $("#c-pseudo").value.trim();
+    const code = $("#c-code").value.replace(/\D/g, "").slice(0, 4);
+    const nom = $("#c-nom") ? $("#c-nom").value.trim() : "";
+    creationSaisie = { pseudo, code, nom };
+    if (pseudo.length < 2) { jardinMsg = "Choisis un pseudo (au moins 2 lettres) 🙂"; renderCreation(); return; }
+    if (code.length !== 4) { jardinMsg = "Ton code doit faire 4 chiffres 🔢"; renderCreation(); return; }
+    if (!$("#c-rgpd").checked) { jardinMsg = "Coche la case pour accepter (RGPD) avant de continuer."; renderCreation(); return; }
+    $("#c-ok").disabled = true;
+    const res = await apiRegister(pseudo, code, nom).catch(() => ({ erreur: true }));
+    if (res.pris) { jardinMsg = "Ce pseudo est déjà pris ! Choisis-en un autre — ou connecte-toi si c'est toi."; renderCreation(); return; }
+    if (!res.ok) { jardinMsg = "Petit souci, réessaie."; renderCreation(); return; }
+    joueur = { name: res.name, code, solde: res.solde || 0, recoltees: res.recoltees || 0, nbCodes: res.nbCodes || 0, quizFait: res.quiz_fait !== false };
+    sauveMoi(res.name, code);
+    creationSaisie = { pseudo: "", code: "", nom: "" };
+    const msg = await reclamerEnAttente();
+    jardinMsg = msg || null;
+    userView = "dashboard"; quiz = null;
+    render();
+  };
+  $("#c-ok").addEventListener("click", go);
+  $("#c-code").addEventListener("keydown", (e) => e.key === "Enter" && go());
+  $("#c-retour").addEventListener("click", (e) => { e.preventDefault(); jardinMsg = null; memo(); userView = "retrouver"; render(); });
+}
+
+// 🧭 TABLEAU DE BORD (une fois connecté) : 3 gros blocs — faire le quiz (verrouillé
+// avant le lancement), mon jardin (verrouillé tant que le quiz n'est pas fait),
+// voir le classement.
+function renderDashboard() {
+  clearInterval(tickTimer);
+  if (!joueur) { userView = "espace"; render(); return; }
+  document.body.classList.toggle("mode-borne", ECRAN === "borne");
+  const phase = phaseNow();
+  const quizOuvert = (phase === "ouvert");
+  const quizFait = !!joueur.quizFait;
+  const jardinOk = quizFait;
+  app.innerHTML = `<div class="home">
+    <div class="dash-hello">Salut <b>${esc(joueur.name)}</b> 🌱 <span>${joueur.recoltees || 0} graines récoltées</span></div>
+    ${jardinMsg ? `<div class="alert" style="max-width:640px;margin:0 auto 16px;">${esc(jardinMsg)}</div>` : ""}
+    <div class="borne-modules dash-modules">
+      <button class="borne-mod${quizOuvert && !quizFait ? "" : " mod-inactif"}" id="dash-quiz">
+        <span class="bm-emo">🎯</span>
+        <span class="bm-titre">Faire le quiz</span>
+        <span class="bm-desc">${quizFait ? "✅ Quiz déjà fait" : (quizOuvert ? "Réponds et récolte tes graines" : "🔒 Dispo le " + labelLancement())}</span>
+      </button>
+      <button class="borne-mod${jardinOk ? "" : " mod-inactif"}" id="dash-jardin">
+        <span class="bm-ticket">${ticketGlaceSvg()}</span>
+        <span class="bm-titre">Mon espace jardin</span>
+        <span class="bm-desc">${jardinOk ? "Plante tes graines, gagne des tickets glace" : "🔒 Fais le quiz d'abord"}</span>
+      </button>
+      <button class="borne-mod" id="dash-board">
+        <span class="bm-emo">🏆</span>
+        <span class="bm-titre">Voir le classement</span>
+        <span class="bm-desc">Les 3 meilleurs gagnent !</span>
+      </button>
+    </div>
+    <div class="home-liens">
+      <button class="lien-explik" id="dash-explik">✨ Comment ça marche ?</button>
+      <button class="lien-explik" id="dash-code">🎁 J'ai un code</button>
+      <button class="lien-explik" id="dash-retour">◂ Accueil</button>
+    </div>
+  </div>`;
+  $("#dash-quiz").addEventListener("click", () => {
+    if (quizFait) { jardinMsg = "Tu as déjà fait le quiz 🌱 Direction ton jardin !"; userView = "jardin"; ouvreJardinDepuisDash(); return; }
+    if (!quizOuvert) { modaleQuizVerrouille(); return; }
+    userView = "quiz"; quiz = null; render();
+  });
+  $("#dash-jardin").addEventListener("click", () => {
+    if (!jardinOk) { modaleJardinVerrouille(); return; }
+    ouvreJardinDepuisDash();
+  });
+  $("#dash-board").addEventListener("click", () => { userView = "board"; render(); });
+  $("#dash-explik").addEventListener("click", ouvreExplication);
+  $("#dash-code").addEventListener("click", () => { codeAReclamer = null; userView = "reclamer"; render(); });
+  $("#dash-retour").addEventListener("click", () => { if (retourAccueilBorne()) return; userView = "auto"; render(); });
+}
+async function ouvreJardinDepuisDash() {
+  jardin = await apiJardin();
+  if (joueur) { const s = await apiSolde(joueur.name).catch(() => null); if (s && s.exists) joueur.solde = s.solde; }
+  userView = "jardin"; render();
+}
+// 🔒 Message quand le jardin est encore verrouillé (quiz pas fait).
+function modaleJardinVerrouille() {
+  const o = document.createElement("div");
+  o.className = "modal-fond";
+  o.innerHTML = `<div class="modal code-modal">
+    <div class="cm-emoji">🌱</div>
+    <h2 class="cm-titre">Ton jardin t'attend !</h2>
+    <p class="cm-sous">Fais d'abord le quiz pour récolter tes premières graines — ensuite tu pourras planter 🌼</p>
+    <button class="btn" id="cm-ok" style="min-width:180px;">Compris !</button>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => o.remove();
+  o.querySelector("#cm-ok").addEventListener("click", ferme);
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
 }
 
 /* ============================================================
@@ -2239,7 +2440,7 @@ async function renderTeleBoard() {
   FEE.stop();   // une fois le quiz lancé, la fée range sa baguette
   board = await apiGetBoard().catch(() => board);
   const q = await qrQuiz().catch(() => null);
-  const top = board.slice(0, 8);
+  const top = board.filter((p) => p.quiz_fait !== false).slice(0, 8);
   const termine = phaseNow() === "termine";
   app.innerHTML = `<div class="tv">
     <div class="tv-phase">${termine ? "🏆 Résultats — merci à tous !" : "🏆 Le classement en direct"}</div>
@@ -2291,10 +2492,10 @@ function renderHome() {
     <h2 class="borne-titre">Bienvenue chez Famiflora 🌱</h2>
     <p class="borne-sous">Que veux-tu faire ?</p>
     <div class="borne-modules">
-      <button class="borne-mod${ouvert ? "" : " mod-inactif"}" data-go="quiz">
-        <span class="bm-emo">🎯</span>
-        <span class="bm-titre">Participer au quiz</span>
-        <span class="bm-desc">${ouvert ? "Réponds aux questions et récolte des graines" : "🔒 Bientôt disponible"}</span>
+      <button class="borne-mod bm-primaire" data-go="espace">
+        <span class="bm-emo">🌱</span>
+        <span class="bm-titre">Quiz &amp; mon espace jardin</span>
+        <span class="bm-desc">Réponds au quiz, récolte des graines, fais pousser ton jardin</span>
       </button>
       <button class="borne-mod" data-go="code">
         <span class="bm-emo">🎁</span>
@@ -2307,10 +2508,10 @@ function renderHome() {
         <span class="bm-desc">Ticket glace à gagner 🎁</span>
       </button>
     </div>
-    <div class="home-tease">🌱 Récolte des graines, fais pousser le <b>jardin collectif</b> et gagne des <b>tickets glace</b>.</div>
+    <div class="home-tease">🎯 Le but : récolte un max de <b>graines</b> au quiz — les <b>3 meilleurs gagnent</b> ! Puis fais pousser ton <b>jardin</b>.</div>
     <div class="home-liens">
       <button class="lien-explik" id="home-explik">✨ Comment ça marche ?</button>
-      ${phase !== "avant" ? `<button class="lien-explik lien-compte" id="home-compte">🌱 J'ai déjà un compte — mon jardin</button>` : ""}
+      <button class="lien-explik" id="home-board">🏆 Voir le classement</button>
     </div>
   </div>`;
 
@@ -2333,10 +2534,12 @@ function renderHome() {
   const base = quizBase();
   app.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => {
     const go = b.dataset.go;
-    if (go === "quiz") {
-      if (!ouvert) { modaleQuizVerrouille(); return; }   // avant le lancement : message
-      if (borne) { try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {} location.href = base + "?play=1"; return; }
-      userView = "quiz"; quiz = null; render(); return;
+    // « Quiz & mon espace jardin » : on entre dans l'espace (connexion/création
+    // puis tableau de bord). Depuis la borne on navigue vers /quiz (avec le bouton
+    // maison) pour garder une sortie ; sur téléphone/ordi, en place.
+    if (go === "espace") {
+      if (borne) { try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {} location.href = base + "?espace=1"; return; }
+      userView = "espace"; quiz = null; render(); return;
     }
     // Module « mail » : cadre emails + formulaire (jamais de nouvel onglet), borne ET téléphone.
     if (go === "mail") { ouvreMailBorne(); return; }
@@ -2347,9 +2550,8 @@ function renderHome() {
   }));
   const be = app.querySelector("#home-explik");
   if (be) be.addEventListener("click", ouvreExplication);
-  // « J'ai déjà un compte » : connexion à sa carte de jardinier (borne comprise) → jardin.
-  const bc = app.querySelector("#home-compte");
-  if (bc) bc.addEventListener("click", () => { jardinMsg = null; userView = "retrouver"; quiz = null; render(); });
+  const bb = app.querySelector("#home-board");
+  if (bb) bb.addEventListener("click", () => { userView = "board"; quiz = null; render(); });
 }
 
 // 🔒 Message affiché quand on tente « Participer au quiz » avant l'ouverture.
@@ -2884,6 +3086,9 @@ function render() {
   // On quitte le mini-jeu : couper la partie en cours (timers d'apparition).
   if (v !== "herbes") stopHerbes();
   if (v === "home") renderHome();
+  else if (v === "espace") renderEspace();
+  else if (v === "creation") renderCreation();
+  else if (v === "dashboard") renderDashboard();
   else if (v === "quiz") renderQuiz();
   else if (v === "jardin") renderJardin();
   else if (v === "herbes") renderHerbes();
@@ -2926,8 +3131,10 @@ function render() {
   // (créer un compte / se connecter) se fait au moment de récupérer les graines.
   if (ECRAN === "code") { codeAReclamer = null; userView = "reclamer"; render(); return; }
 
-  // 🎯 Depuis la borne, « Participer au quiz » ouvre /quiz?play=1 : on lance direct.
-  if (SIM_PARAMS.get("play")) userView = "quiz";
+  // 🌱 Depuis la borne, « Quiz & mon espace jardin » ouvre /quiz?espace=1 : on
+  // entre direct dans l'espace (connexion/création → tableau de bord).
+  if (SIM_PARAMS.get("espace")) userView = "espace";
+  else if (SIM_PARAMS.get("play")) userView = "quiz";
 
   // 🌱 Auto-reconnaissance : si ce téléphone a déjà une carte de jardinier, on
   // identifie la personne sans qu'elle ait à retaper quoi que ce soit. Sur une
@@ -2937,8 +3144,9 @@ function render() {
   if (moi && moi.name && moi.code) {
     const res = await apiLoginJoueur(moi.name, moi.code).catch(() => null);
     if (res && res.exists && !res.mauvais_code) {
-      joueur = { name: res.name, code: moi.code, solde: res.solde, recoltees: res.recoltees, nbCodes: res.nbCodes };
-      if (userView === "auto") userView = "board";
+      joueur = { name: res.name, code: moi.code, solde: res.solde, recoltees: res.recoltees, nbCodes: res.nbCodes, quizFait: res.quiz_fait !== false };
+      // Reconnu : on reste sur l'accueil (userView "auto" → home). Entrer dans
+      // « Quiz & mon espace jardin » ira droit au tableau de bord (déjà connecté).
       const m = await reclamerEnAttente();      // un code mis de côté ?
       if (m) jardinMsg = m;
     } else if (res && res.mauvais_code) {

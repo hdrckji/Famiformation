@@ -264,6 +264,9 @@ switch ($action) {
   // 📊 Récupérer le classement (lecture seule)
   case 'board': {
     $board = readJson($scoresFile);
+    // Au classement, on ne montre QUE ceux qui ont réellement joué : un compte
+    // créé (réservé) mais pas encore joué (quiz_fait=false) ne pollue pas la liste.
+    $board = array_values(array_filter($board, fn($p) => ($p['quiz_fait'] ?? true)));
     sortBoard($board);
     echo json_encode($board, JSON_UNESCAPED_UNICODE);
     break;
@@ -299,23 +302,41 @@ switch ($action) {
     ];
 
     $res = withLock($scoresFile, function (&$board, &$write) use ($name, $entree) {
-      foreach ($board as $p) {
-        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
-          return ['doublon' => true];
+      for ($i = 0; $i < count($board); $i++) {
+        if (mb_strtolower($board[$i]['name'] ?? '') === mb_strtolower($name)) {
+          // Compte existant. Si le code ne correspond pas → nom pris par un autre.
+          if ((string)($board[$i]['code'] ?? '') !== $entree['code']) {
+            return ['conflit' => true];
+          }
+          // Quiz déjà fait : on ne réécrase pas la récolte (on renvoie l'état actuel).
+          if (!empty($board[$i]['quiz_fait'])) {
+            sortBoard($board);
+            return ['deja' => true, 'board' => $board];
+          }
+          // Compte créé AVANT de jouer : on inscrit maintenant sa récolte du quiz.
+          $board[$i]['score']    = $entree['score'];
+          $board[$i]['correct']  = $entree['correct'];
+          $board[$i]['time']     = $entree['time'];
+          $board[$i]['quiz_fait'] = true;
+          if ($entree['nom'] !== '') $board[$i]['nom'] = $entree['nom'];
+          sortBoard($board);
+          $write = true;
+          return ['board' => $board];
         }
       }
+      // Aucun compte à ce nom : création directe (joué sans passer par « créer un compte »).
+      $entree['quiz_fait'] = true;
       $board[] = $entree;
       sortBoard($board);
       $write = true;
-      return ['doublon' => false, 'board' => $board];
+      return ['board' => $board];
     });
 
-    if (!empty($res['doublon'])) {
+    if (!empty($res['conflit'])) {
       http_response_code(409);
-      echo json_encode(['error' => 'deja_joue']);
+      echo json_encode(['error' => 'nom_pris']);
       break;
     }
-    if (isset($res['error'])) { echo json_encode($res); break; }
     echo json_encode($res['board'], JSON_UNESCAPED_UNICODE);
     break;
   }
@@ -332,6 +353,45 @@ switch ($action) {
       }
     }
     echo json_encode(['exists' => false]);
+    break;
+  }
+
+  // ✨ CRÉER (réserver) un compte AVANT de jouer : pseudo + code à 4 chiffres.
+  // Le compte entre dans les données avec score 0 et quiz_fait=false (donc pas au
+  // classement tant qu'il n'a pas joué). Si le nom existe déjà : c'est TOI si le
+  // code correspond (reconnexion), sinon le nom est pris.
+  case 'register': {
+    $name = trim($input['name'] ?? '');
+    if (mb_strlen($name) < 2 || mb_strlen($name) > 24) {
+      http_response_code(400); echo json_encode(['error' => 'Pseudo invalide']); break;
+    }
+    $code4 = substr(preg_replace('/\D/', '', (string)($input['code'] ?? '')), 0, 4);
+    if (strlen($code4) !== 4) {
+      http_response_code(400); echo json_encode(['error' => 'code_invalide']); break;
+    }
+    $nom = trim(mb_substr((string)($input['nom'] ?? ''), 0, 60));
+    $res = withLock($scoresFile, function (&$board, &$write) use ($name, $code4, $nom) {
+      foreach ($board as $p) {
+        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+          if ((string)($p['code'] ?? '') === $code4) {
+            return ['ok' => true, 'exist' => true, 'name' => $p['name'],
+                    'quiz_fait' => ($p['quiz_fait'] ?? true), 'recoltees' => intval($p['score'] ?? 0),
+                    'solde' => soldeDe($p), 'nbCodes' => intval($p['codes'] ?? 0)];
+          }
+          return ['pris' => true];
+        }
+      }
+      $board[] = ['name' => $name, 'code' => $code4, 'nom' => $nom, 'score' => 0, 'bonus' => 0,
+        'depensees' => 0, 'correct' => 0, 'codes' => 0, 'codes_pris' => [], 'time' => 0,
+        'quiz_fait' => false, 'date' => date('c')];
+      $write = true;
+      return ['ok' => true, 'exist' => false, 'name' => $name, 'quiz_fait' => false,
+              'recoltees' => 0, 'solde' => 0, 'nbCodes' => 0];
+    });
+    if (!empty($res['pris'])) {
+      http_response_code(409); echo json_encode(['error' => 'nom_pris']); break;
+    }
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
     break;
   }
 
@@ -385,6 +445,7 @@ switch ($action) {
           'recoltees' => intval($p['score'] ?? 0),
           'depensees' => intval($p['depensees'] ?? 0),
           'solde'     => soldeDe($p),
+          'quiz_fait' => ($p['quiz_fait'] ?? true),
         ], JSON_UNESCAPED_UNICODE);
         exit;
       }
@@ -568,6 +629,7 @@ switch ($action) {
           'recoltees' => intval($p['score'] ?? 0),
           'solde'     => soldeDe($p),
           'nbCodes'   => intval($p['codes'] ?? 0),
+          'quiz_fait' => ($p['quiz_fait'] ?? true),
         ], JSON_UNESCAPED_UNICODE);
         exit;
       }
