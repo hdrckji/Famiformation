@@ -435,10 +435,29 @@ function vueJardin() {
 
 /* ---------------------- ONGLET COMPTE À REBOURS ---------------------- */
 
+// Zones (nom + nb de codes) en cours d'édition dans l'onglet Compte à rebours.
+let zonesEdit = [];
+function zoneRowsHtml() {
+  if (!zonesEdit.length) return `<p class="hint">Aucune zone pour l'instant. Ajoutes-en pour aider les joueurs à J-1.</p>`;
+  return zonesEdit.map((z, i) => `
+    <div class="zone-row" style="display:flex;gap:8px;margin-bottom:6px;align-items:center;">
+      <input class="field" data-zn="${i}" placeholder="Nom de la zone (ex : Rayon fleurs)" value="${esc(z.nom || "")}" style="flex:1;margin:0;">
+      <input class="field" data-znb="${i}" type="number" min="0" value="${z.nb ?? 0}" style="width:78px;margin:0;">
+      <span style="font-size:.82rem;opacity:.7;white-space:nowrap;">code(s)</span>
+      <button class="btn ghost" data-zsup="${i}" style="padding:8px 12px;">✕</button>
+    </div>`).join("");
+}
+function lireZones(c) {
+  zonesEdit = [...c.querySelectorAll(".zone-row")].map((r) => ({
+    nom: r.querySelector("[data-zn]").value.trim(),
+    nb: Math.max(0, parseInt(r.querySelector("[data-znb]").value, 10) || 0),
+  }));
+}
 function vueCountdown() {
   const c = $("#contenu");
   const cf = data.config || { lancement: "2026-07-29T12:00", cloture: "2026-08-30T23:59", resultats: "31 août" };
   const lbl = "display:block;font-weight:700;font-size:.85rem;color:#0E3B24;margin:8px 0 4px;";
+  zonesEdit = (cf.zones || []).map((z) => ({ nom: z.nom || "", nb: z.nb || 0 }));
   c.innerHTML = `
     <div class="card">
       <h2>⏱ Le compte à rebours</h2>
@@ -455,7 +474,34 @@ function vueCountdown() {
         <button class="btn" id="cf-save">💾 Enregistrer les dates</button>
         <button class="btn ghost" id="cf-defaut">Remettre le 29/07 à midi</button>
       </div>
+    </div>
+    <div class="card">
+      <h2>🎯 Zones où j'ai caché des codes</h2>
+      <p class="hint">Indique combien de codes tu as placés dans chaque zone du magasin. Cet indice
+      s'affichera aux joueurs sur la page « J'ai un code » <strong>à partir de la veille de la clôture</strong>,
+      pour les aider à dénicher les derniers codes.</p>
+      <div id="zones-liste">${zoneRowsHtml()}</div>
+      <button class="btn ghost" id="zone-add" style="margin-top:8px;">＋ Ajouter une zone</button>
+      <div id="zones-msg" style="margin-top:8px;"></div>
+      <button class="btn" id="zones-save" style="margin-top:10px;">💾 Enregistrer les zones</button>
     </div>`;
+  const wireZoneSuppr = () => c.querySelectorAll("[data-zsup]").forEach((b) => b.addEventListener("click", () => {
+    lireZones(c); zonesEdit.splice(+b.dataset.zsup, 1);
+    $("#zones-liste").innerHTML = zoneRowsHtml(); wireZoneSuppr();
+  }));
+  wireZoneSuppr();
+  $("#zone-add").addEventListener("click", () => {
+    lireZones(c); zonesEdit.push({ nom: "", nb: 1 });
+    $("#zones-liste").innerHTML = zoneRowsHtml(); wireZoneSuppr();
+  });
+  $("#zones-save").addEventListener("click", async () => {
+    lireZones(c);
+    const r = await post("config_set", { lancement: $("#cf-lancement").value, cloture: $("#cf-cloture").value, resultats: $("#cf-resultats").value.trim(), zones: zonesEdit });
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    if (!r.ok) { $("#zones-msg").innerHTML = `<div class="alert">Enregistrement impossible.</div>`; return; }
+    message = { ok: true, texte: "Zones enregistrées." };
+    await charger();
+  });
   $("#cf-save").addEventListener("click", async () => {
     const lancement = $("#cf-lancement").value;
     const cloture = $("#cf-cloture").value;

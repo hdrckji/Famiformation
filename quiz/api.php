@@ -81,6 +81,9 @@ function ladConfig($fichier) {
     'lancement' => $c['lancement'] ?? '2026-07-29T12:00',
     'cloture'   => $c['cloture']   ?? '2026-08-30T23:59',
     'resultats' => $c['resultats'] ?? '31 août',
+    // Zones du magasin où des codes ont été cachés (indice affiché à J-1) :
+    // liste de { nom, nb }.
+    'zones'     => (isset($c['zones']) && is_array($c['zones'])) ? array_values($c['zones']) : [],
   ];
 }
 
@@ -614,10 +617,21 @@ switch ($action) {
       break;
     }
     $actuel = ladConfig($configFile);
+    // Zones (facultatif) : liste { nom, nb }. On nettoie et on plafonne à 30.
+    $zones = $actuel['zones'];
+    if (isset($input['zones']) && is_array($input['zones'])) {
+      $zones = [];
+      foreach (array_slice($input['zones'], 0, 30) as $z) {
+        $nom = trim(mb_substr((string)($z['nom'] ?? ''), 0, 60));
+        $nb  = max(0, intval($z['nb'] ?? 0));
+        if ($nom !== '') { $zones[] = ['nom' => $nom, 'nb' => $nb]; }
+      }
+    }
     writeJson($configFile, [
       'lancement' => $lancement,
       'cloture'   => $cloture !== '' ? $cloture : $actuel['cloture'],
       'resultats' => $resultats !== '' ? $resultats : $actuel['resultats'],
+      'zones'     => $zones,
     ]);
     echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     break;
