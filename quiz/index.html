@@ -581,13 +581,17 @@ async function apiLoginJoueur(name, code) {
   });
   return await r.json();
 }
-// 🎁 Statut d'un code bonus (dispo / déjà pris / inconnu).
-async function apiCodeStatus(bonuscode) {
+// 🎁 Statut d'un code bonus (dispo / déjà pris / inconnu). Le pseudo permet de
+// savoir si c'est MOI qui l'ai déjà (message adapté au lieu de « trop tard »).
+async function apiCodeStatus(bonuscode, name) {
   if (SIMULATION) {
-    return { connu: /^FAMI-/i.test(bonuscode), pris: (window.__simCodes || new Set()).has(bonuscode.toUpperCase()) };
+    const bc = bonuscode.toUpperCase();
+    const p = board.find((x) => name && x.name.toLowerCase() === name.toLowerCase());
+    return { connu: /^FAMI-/i.test(bonuscode), pris: (window.__simCodes || new Set()).has(bc),
+             parMoi: !!(p && (p.codes_pris || []).includes(bc)) };
   }
   const r = await fetch(`${CONFIG.api}?action=code_status`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bonuscode }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bonuscode, name: name || "" }),
   });
   return await r.json();
 }
@@ -1435,12 +1439,18 @@ async function renderReclamer() {
     return;
   }
 
-  const st = await apiCodeStatus(code).catch(() => ({ connu: false }));
+  const st = await apiCodeStatus(code, joueur ? joueur.name : "").catch(() => ({ connu: false }));
 
   if (!st.connu) {
     app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">❓</div>
       <h2 class="q-text">Code inconnu</h2>
       <p class="hint">« ${esc(code)} » n'est pas un code valide. Vérifie l'orthographe.</p>${retourHtml()}</div>`;
+    brancheRetour(); return;
+  }
+  if (st.pris && st.parMoi) {
+    app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">😉</div>
+      <h2 class="q-text">Tu as déjà ce code !</h2>
+      <p class="hint">Ce bonus est déjà dans ton jardin. Va en chercher d'autres en magasin !</p>${retourHtml()}</div>`;
     brancheRetour(); return;
   }
   if (st.pris) {

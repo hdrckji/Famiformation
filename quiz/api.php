@@ -521,13 +521,21 @@ switch ($action) {
     break;
   }
 
-  // 🎁 STATUT d'un code bonus (quand on scanne son QR) : existe-t-il, est-il pris ?
+  // 🎁 STATUT d'un code bonus (quand on scanne son QR) : existe-t-il, est-il pris,
+  // et — si on donne le pseudo — est-ce MOI qui l'ai déjà (pour un message adapté) ?
   case 'code_status': {
     $bonus = strtoupper(trim($input['bonuscode'] ?? ''));
+    $name  = trim($input['name'] ?? '');
     $connu = in_array($bonus, $BONUS_CODES, true);
-    $pris  = false;
-    if ($connu) { $claimed = readJson($codesFile); $pris = isset($claimed[$bonus]); }
-    echo json_encode(['connu' => $connu, 'pris' => $pris], JSON_UNESCAPED_UNICODE);
+    $pris  = false; $parMoi = false;
+    if ($connu) {
+      $claimed = readJson($codesFile);
+      if (isset($claimed[$bonus])) {
+        $pris = true;
+        $parMoi = ($name !== '' && mb_strtolower($claimed[$bonus]['par'] ?? '') === mb_strtolower($name));
+      }
+    }
+    echo json_encode(['connu' => $connu, 'pris' => $pris, 'parMoi' => $parMoi], JSON_UNESCAPED_UNICODE);
     break;
   }
 
