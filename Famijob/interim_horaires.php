@@ -661,55 +661,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($_POST['assign_student'])) {
         $requestId = (int) ($_POST['request_id'] ?? 0);
-        $studentId = 0;
+        $studentId = (int) ($_POST['student_id'] ?? 0);   // choix dans la liste (prioritaire)
+        $studentName = trim((string) ($_POST['student_name'] ?? ''));
         $externalName = '';
         $isExternal = false;
         $ambiguousName = false;
 
-        if ($matchingMode === 'name') {
-            $studentName = trim((string) ($_POST['student_name'] ?? ''));
-            if ($studentName !== '') {
-                $studentSearchStmt = $db->prepare(
-                    "SELECT id, nom, prenom, interim
-                     FROM utilisateurs
-                     WHERE role = 'etudiant'
-                       AND (
-                            LOWER(CONCAT(TRIM(prenom), ' ', TRIM(nom))) = LOWER(?)
-                         OR LOWER(CONCAT(TRIM(nom), ' ', TRIM(prenom))) = LOWER(?)
-                         OR LOWER(CONCAT(TRIM(prenom), ' ', TRIM(nom))) LIKE LOWER(?)
-                         OR LOWER(CONCAT(TRIM(nom), ' ', TRIM(prenom))) LIKE LOWER(?)
-                       )
-                     ORDER BY nom ASC, prenom ASC
-                     LIMIT 5"
-                );
-                $likeTerm = $studentName . '%';
-                $studentSearchStmt->execute([$studentName, $studentName, $likeTerm, $likeTerm]);
-                $candidateRows = $studentSearchStmt->fetchAll(PDO::FETCH_ASSOC);
+        // Fusion "2 en 1" : si aucun étudiant n'est choisi dans la liste mais qu'un nom est
+        // tapé, on recherche l'inscrit ; à défaut on l'affecte en texte libre (externe).
+        if ($studentId <= 0 && $studentName !== '') {
+            $studentSearchStmt = $db->prepare(
+                "SELECT id, nom, prenom, interim
+                 FROM utilisateurs
+                 WHERE role = 'etudiant'
+                   AND (
+                        LOWER(CONCAT(TRIM(prenom), ' ', TRIM(nom))) = LOWER(?)
+                     OR LOWER(CONCAT(TRIM(nom), ' ', TRIM(prenom))) = LOWER(?)
+                     OR LOWER(CONCAT(TRIM(prenom), ' ', TRIM(nom))) LIKE LOWER(?)
+                     OR LOWER(CONCAT(TRIM(nom), ' ', TRIM(prenom))) LIKE LOWER(?)
+                   )
+                 ORDER BY nom ASC, prenom ASC
+                 LIMIT 5"
+            );
+            $likeTerm = $studentName . '%';
+            $studentSearchStmt->execute([$studentName, $studentName, $likeTerm, $likeTerm]);
+            $candidateRows = $studentSearchStmt->fetchAll(PDO::FETCH_ASSOC);
 
-                if (count($candidateRows) === 1) {
-                    $studentId = (int) $candidateRows[0]['id'];
-                } elseif (count($candidateRows) > 1) {
-                    $exactMatches = array_filter($candidateRows, static function ($row) use ($studentName) {
-                        $full1 = trim((string) $row['prenom'] . ' ' . $row['nom']);
-                        $full2 = trim((string) $row['nom'] . ' ' . $row['prenom']);
-                        return strcasecmp($full1, $studentName) === 0 || strcasecmp($full2, $studentName) === 0;
-                    });
-                    if (count($exactMatches) === 1) {
-                        $studentId = (int) array_values($exactMatches)[0]['id'];
-                    } else {
-                        // Plusieurs inscrits correspondent sans nom complet unique : on demande de preciser.
-                        $ambiguousName = true;
-                    }
-                }
-
-                // Aucun inscrit ne correspond : on affecte la personne en texte libre (version A).
-                if ($studentId <= 0 && !$ambiguousName) {
-                    $isExternal = true;
-                    $externalName = $studentName;
+            if (count($candidateRows) === 1) {
+                $studentId = (int) $candidateRows[0]['id'];
+            } elseif (count($candidateRows) > 1) {
+                $exactMatches = array_filter($candidateRows, static function ($row) use ($studentName) {
+                    $full1 = trim((string) $row['prenom'] . ' ' . $row['nom']);
+                    $full2 = trim((string) $row['nom'] . ' ' . $row['prenom']);
+                    return strcasecmp($full1, $studentName) === 0 || strcasecmp($full2, $studentName) === 0;
+                });
+                if (count($exactMatches) === 1) {
+                    $studentId = (int) array_values($exactMatches)[0]['id'];
+                } else {
+                    // Plusieurs inscrits correspondent sans nom complet unique : on demande de preciser.
+                    $ambiguousName = true;
                 }
             }
-        } else {
-            $studentId = (int) ($_POST['student_id'] ?? 0);
+
+            // Aucun inscrit ne correspond : on affecte la personne en texte libre.
+            if ($studentId <= 0 && !$ambiguousName) {
+                $isExternal = true;
+                $externalName = $studentName;
+            }
         }
 
         $confirmAssign = isset($_POST['confirm_assign']);
@@ -784,7 +782,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'request_id' => $requestId,
                     'student_name' => $studentName,
                     'student_id' => $studentId,
-                    'matching_mode' => $matchingMode,
+                    'matching_mode' => ($studentId > 0 ? 'list' : 'name'),
                 ];
             }
         }
@@ -792,7 +790,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($pendingConfirm !== null) {
             // Confirmation requise : la modale sera affichee, on n'affecte pas encore.
         } elseif ($ambiguousName) {
-            $message = "<div class='alert error'>Plusieurs étudiants correspondent à ce nom. Précisez le nom complet ou utilisez l'onglet Matching par liste.</div>";
+            $message = "<div class='alert error'>Plusieurs étudiants correspondent à ce nom. Précisez le nom complet, ou choisissez la personne dans la liste déroulante.</div>";
         } elseif ($requestId <= 0 || ($studentId <= 0 && !$isExternal)) {
             $message = "<div class='alert error'>Sélection étudiant invalide.</div>";
         } elseif ($isExternal) {
@@ -1837,28 +1835,26 @@ foreach ($weekDays as $weekDay) {
                     <?php echo csrfField(); ?>
                     <input type="hidden" name="auto_match_week" value="1">
                     <input type="hidden" name="week" value="<?php echo e($selectedWeekKey); ?>">
-                    <input type="hidden" name="matching_mode" value="<?php echo e($matchingMode); ?>">
                     <button type="submit" class="btn btn-primary"><?php echo e(fjhT('Auto-matching semaine', 'Automatische matching week')); ?></button>
                 </form>
-                <a class="btn btn-soft" href="export_matching.php?week=<?php echo e($selectedWeekKey); ?>" title="<?php echo e(fjhT('Exporter le planning de la semaine (Excel/CSV)', 'Weekplanning exporteren (Excel/CSV)')); ?>" style="display:inline-flex;align-items:center;gap:6px;">⬇ <?php echo e(fjhT('Exporter', 'Exporteren')); ?></a>
             <?php endif; ?>
+            <a class="btn-export" href="export_matching.php?week=<?php echo e($selectedWeekKey); ?>" title="<?php echo e(fjhT('Exporter le planning de la semaine dans Excel', 'Weekplanning naar Excel exporteren')); ?>">
+                <span class="btn-export-ic">↓</span>
+                <span><?php echo e(fjhT('Exporter Excel', 'Naar Excel')); ?></span>
+            </a>
+            <style>
+                .btn-export { display:inline-flex; align-items:center; gap:8px; text-decoration:none;
+                    background:linear-gradient(135deg,#1f7a3d,#2fa757); color:#fff; font-weight:800; font-size:.92rem;
+                    padding:11px 18px; border-radius:12px; box-shadow:0 6px 16px rgba(31,122,61,.28);
+                    transition:transform .15s ease, box-shadow .15s ease; border:none; }
+                .btn-export:hover { transform:translateY(-2px); box-shadow:0 10px 22px rgba(31,122,61,.38); }
+                .btn-export .btn-export-ic { display:inline-flex; align-items:center; justify-content:center;
+                    width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.22); font-size:.95rem; font-weight:900; }
+            </style>
             <div style="text-align:right;color:var(--muted);line-height:1.5;">
                 <strong><?php echo e(fjhT('Période', 'Periode')); ?></strong><br>
                 <?php echo $selectedWeek['start']->format('d/m/Y'); ?> - <?php echo $selectedWeek['end']->format('d/m/Y'); ?>
             </div>
-        </section>
-
-        <section class="tabs">
-            <?php
-                $tabQuery = http_build_query([
-                    'week' => $selectedWeekKey,
-                    'day' => $selectedDayFilter,
-                    'department' => $selectedDepartmentFilter,
-                    'vue' => $selectedVueFilter,
-                ]);
-            ?>
-            <a href="?<?php echo $tabQuery . '&matching_mode=name'; ?>" class="tab <?php echo $matchingMode === 'name' ? 'is-active' : ''; ?>"><?php echo e(fjhT('Matching par nom', 'Matching op naam')); ?></a>
-            <a href="?<?php echo $tabQuery . '&matching_mode=list'; ?>" class="tab <?php echo $matchingMode === 'list' ? 'is-active' : ''; ?>"><?php echo e(fjhT('Matching par liste', 'Matching per lijst')); ?></a>
         </section>
 
         <section class="layout">
@@ -2000,60 +1996,44 @@ foreach ($weekDays as $weekDay) {
                                                 </td>
                                                 <td>
                                                     <?php if (!$isFull): ?>
-                                                        <?php if ($matchingMode === 'list'): ?>
                                                         <?php if (!empty($topSuggestions)): ?>
                                                             <ul class="suggestion-list">
                                                                 <?php foreach ($topSuggestions as $suggestion): ?>
-                                                                    <?php
-                                                                    $availabilityLabel = $statusLabels[$suggestion['availability_status']] ?? $suggestion['availability_status'];
-                                                                    ?>
+                                                                    <?php $availabilityLabel = $statusLabels[$suggestion['availability_status']] ?? $suggestion['availability_status']; ?>
                                                                     <li>
                                                                         <?php echo e($suggestion['name']); ?>
-                                                                        <?php if ($isAdmin): ?>
-                                                                            (P<?php echo (int) $suggestion['priority_rank']; ?> - <?php echo e($availabilityLabel); ?>)
-                                                                        <?php else: ?>
-                                                                            (P<?php echo (int) $suggestion['priority_rank']; ?>)
-                                                                        <?php endif; ?>
+                                                                        <?php if ($isAdmin): ?>(P<?php echo (int) $suggestion['priority_rank']; ?> - <?php echo e($availabilityLabel); ?>)<?php else: ?>(P<?php echo (int) $suggestion['priority_rank']; ?>)<?php endif; ?>
                                                                     </li>
                                                                 <?php endforeach; ?>
                                                             </ul>
-                                                        <?php else: ?>
-                                                            <div class="slot-meta">Aucun candidat compatible (dispo + département).</div>
-                                                        <?php endif; ?>
                                                         <?php endif; ?>
 
                                                         <form method="POST" class="fill-form">
                                                             <?php echo csrfField(); ?>
                                                             <input type="hidden" name="assign_student" value="1">
                                                             <input type="hidden" name="request_id" value="<?php echo $requestId; ?>">
-                                                            <input type="hidden" name="matching_mode" value="<?php echo e($matchingMode); ?>">
-                                                            <?php if ($matchingMode === 'name'): ?>
-                                                                <div style="font-weight:600;margin-bottom:8px;line-height:1.35;"><?php echo e(fjhT('Entrez le nom et prénom de la personne que vous souhaitez pour cette demande', 'Voer de naam en voornaam in van de gewenste persoon voor deze aanvraag')); ?></div>
-                                                                <input type="text" name="student_name" placeholder="<?php echo e(fjhT('Nom et prénom', 'Naam en voornaam')); ?>" autocomplete="off" style="width:100%;padding:22px 18px;font-size:1.35rem;margin-bottom:10px;" required>
-                                                            <?php else: ?>
-                                                                <select name="student_id" required>
-                                                                    <option value=""><?php echo $hasManualEligibleCandidates ? 'Choisir étudiant' : 'Aucun étudiant éligible'; ?></option>
-                                                                    <?php foreach ($rankedCandidates as $candidate): ?>
-                                                                    <?php
-                                                                    $candidateStatusLabel = $statusLabels[$candidate['availability_status']] ?? $candidate['availability_status'];
-                                                                    $candidateReason = trim((string) ($candidate['manual_reason'] ?? ''));
-                                                                    $candidateLabel = $candidate['name']
-                                                                        . ' - P' . (int) $candidate['priority_rank']
-                                                                        . ' - ' . $candidateStatusLabel;
-                                                                    if (!empty($candidate['manual_eligible']) && empty($candidate['eligible'])) {
-                                                                        $candidateLabel .= ' (manuel uniquement)';
-                                                                    }
-                                                                    if ($candidateReason !== '') {
-                                                                        $candidateLabel .= ' (' . $candidateReason . ')';
-                                                                    }
-                                                                    ?>
-                                                                    <option value="<?php echo (int) $candidate['id']; ?>" <?php echo !empty($candidate['manual_eligible']) ? '' : 'disabled'; ?>>
-                                                                        <?php echo e($candidateLabel); ?>
-                                                                    </option>
+
+                                                            <label style="display:block;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5c6f67;margin-bottom:5px;"><?php echo e(fjhT('Choisir dans la liste', 'Kies uit de lijst')); ?></label>
+                                                            <select name="student_id" style="width:100%;padding:11px 12px;font-size:1rem;border:1px solid #cfdad3;border-radius:10px;">
+                                                                <option value="">— <?php echo e(fjhT('Choisir un étudiant', 'Kies een student')); ?> —</option>
+                                                                <?php foreach ($rankedCandidates as $candidate): ?>
+                                                                <?php
+                                                                $candidateStatusLabel = $statusLabels[$candidate['availability_status']] ?? $candidate['availability_status'];
+                                                                $candidateReason = trim((string) ($candidate['manual_reason'] ?? ''));
+                                                                $candidateLabel = $candidate['name'] . ' - P' . (int) $candidate['priority_rank'] . ' - ' . $candidateStatusLabel;
+                                                                if (!empty($candidate['manual_eligible']) && empty($candidate['eligible'])) { $candidateLabel .= ' (manuel uniquement)'; }
+                                                                if ($candidateReason !== '') { $candidateLabel .= ' (' . $candidateReason . ')'; }
+                                                                ?>
+                                                                <option value="<?php echo (int) $candidate['id']; ?>" <?php echo !empty($candidate['manual_eligible']) ? '' : 'disabled'; ?>><?php echo e($candidateLabel); ?></option>
                                                                 <?php endforeach; ?>
-                                                                </select>
-                                                            <?php endif; ?>
-                                                            <button type="submit" class="btn btn-primary" <?php echo ($matchingMode === 'list' && !$hasManualEligibleCandidates) ? 'disabled' : ''; ?>>Affecter</button>
+                                                            </select>
+
+                                                            <div style="text-align:center;color:#9bb0a3;font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:9px 0;">— <?php echo e(fjhT('ou', 'of')); ?> —</div>
+
+                                                            <label style="display:block;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5c6f67;margin-bottom:5px;"><?php echo e(fjhT('Taper un nom (non listé)', 'Typ een naam (niet in de lijst)')); ?></label>
+                                                            <input type="text" name="student_name" placeholder="<?php echo e(fjhT('Nom et prénom', 'Naam en voornaam')); ?>" autocomplete="off" style="width:100%;padding:12px 14px;font-size:1rem;border:1px solid #cfdad3;border-radius:10px;">
+
+                                                            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px;">Affecter</button>
                                                         </form>
 
                                                         <?php if ($isAdmin): ?>

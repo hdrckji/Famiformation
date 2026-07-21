@@ -14,9 +14,20 @@ require_once 'config.php';
 verifierConnexion($db);
 
 $role = (string) ($_SESSION['role'] ?? '');
-if ($role !== 'admin') {
+if (!in_array($role, ['admin', 'teamcoach'], true)) {
     header('Location: ../index.php');
     exit();
+}
+$isAdmin = ($role === 'admin');
+
+// Un teamcoach n'exporte que le planning de SON agence (comme ce qu'il voit dans le matching).
+$agencyName = '';
+if (!$isAdmin) {
+    try {
+        $agencyStmt = $db->prepare('SELECT interim FROM utilisateurs WHERE id = ? LIMIT 1');
+        $agencyStmt->execute([(int) ($_SESSION['user_id'] ?? 0)]);
+        $agencyName = trim((string) $agencyStmt->fetchColumn());
+    } catch (Exception $e) {}
 }
 
 // --- Semaine demandee (on se cale toujours sur le lundi) ---
@@ -41,17 +52,23 @@ foreach ($days as $idx => $d) {
 }
 
 // --- Affectations de la semaine ---
-$stmt = $db->prepare(
+$sql =
     "SELECT r.shift_date, r.department_name, r.time_slot,
             a.seat_number, a.student_id, a.external_name, a.agency_name,
             u.nom AS student_nom, u.prenom AS student_prenom, u.interim AS student_interim
      FROM interim_shift_assignments a
      INNER JOIN interim_shift_requests r ON r.id = a.request_id
      LEFT JOIN utilisateurs u ON u.id = a.student_id
-     WHERE r.shift_date BETWEEN ? AND ?
-     ORDER BY r.department_name ASC, r.time_slot ASC, a.seat_number ASC"
-);
-$stmt->execute([$weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d')]);
+     WHERE r.shift_date BETWEEN ? AND ?";
+$sqlParams = [$weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d')];
+if (!$isAdmin && $agencyName !== '') {
+    $sql .= " AND (TRIM(a.agency_name) = ? OR TRIM(u.interim) = ?)";
+    $sqlParams[] = $agencyName;
+    $sqlParams[] = $agencyName;
+}
+$sql .= " ORDER BY r.department_name ASC, r.time_slot ASC, a.seat_number ASC";
+$stmt = $db->prepare($sql);
+$stmt->execute($sqlParams);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // --- Regroupement : departement -> [jour0..jour6] -> liste d'affectations ---
