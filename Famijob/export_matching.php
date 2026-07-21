@@ -181,7 +181,166 @@ foreach ($deptNames as $dept) {
     $csvRows[] = array_fill(0, 42, '');
 }
 
-// --- Sortie CSV ---
+// ============================================================
+// SORTIE : on tente un vrai fichier Excel (.xlsx) mis en forme (couleurs,
+// fusions, bordures) via PhpSpreadsheet. En cas d'indisponibilite -> CSV.
+// ============================================================
+
+/** Lettre de colonne Excel a partir d'un index 1-based (1 -> A, 27 -> AA). */
+function fjxCol($n)
+{
+    $s = '';
+    while ($n > 0) {
+        $n--;
+        $s = chr(65 + ($n % 26)) . $s;
+        $n = intdiv($n, 26);
+    }
+    return $s;
+}
+
+/** Construit le classeur .xlsx et renvoie ses octets (ou lance une exception). */
+function fjxBuildXlsx(array $days, array $deptNames, array $byDept, callable $dateLabel)
+{
+    $ss = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+    $sheet = $ss->getActiveSheet();
+    $sheet->setTitle('Matching');
+
+    $fillSolid = \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID;
+    $hCenter = \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER;
+    $vCenter = \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER;
+    $thin = \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN;
+
+    // Largeurs de colonnes (motif repete pour chaque jour : horaire,I,EI,EFM,nom,agence).
+    $widths = [10, 4, 4, 5, 22, 14];
+    for ($d = 0; $d < 7; $d++) {
+        for ($c = 0; $c < 6; $c++) {
+            $sheet->getColumnDimension(fjxCol($d * 6 + $c + 1))->setWidth($widths[$c]);
+        }
+    }
+
+    $r = 1;
+
+    // Ligne 1 : dates (fusionnees sur les 6 colonnes de chaque jour).
+    foreach ($days as $i => $d) {
+        $c1 = $i * 6 + 1;
+        $sheet->setCellValue(fjxCol($c1) . $r, ucfirst($dateLabel($d)));
+        $sheet->mergeCells(fjxCol($c1) . $r . ':' . fjxCol($c1 + 5) . $r);
+    }
+    $sheet->getStyle('A' . $r . ':' . fjxCol(42) . $r)->applyFromArray([
+        'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => 'FFFFFF']],
+        'fill' => ['fillType' => $fillSolid, 'startColor' => ['rgb' => '264E35']],
+        'alignment' => ['horizontal' => $hCenter, 'vertical' => $vCenter],
+    ]);
+    $sheet->getRowDimension($r)->setRowHeight(22);
+    $r++;
+
+    // Ligne 2 : en-tetes de colonnes.
+    $heads = ['horaire', 'I', 'EI', 'EFM', 'nom', 'agence'];
+    for ($d = 0; $d < 7; $d++) {
+        foreach ($heads as $c => $h) {
+            $sheet->setCellValue(fjxCol($d * 6 + $c + 1) . $r, $h);
+        }
+    }
+    $sheet->getStyle('A' . $r . ':' . fjxCol(42) . $r)->applyFromArray([
+        'font' => ['bold' => true, 'size' => 9, 'color' => ['rgb' => '21362A']],
+        'fill' => ['fillType' => $fillSolid, 'startColor' => ['rgb' => 'D9E7DD']],
+        'alignment' => ['horizontal' => $hCenter, 'vertical' => $vCenter],
+    ]);
+    $r++;
+
+    $headerRows = $r - 1; // fige les 2 lignes d'en-tete
+
+    foreach ($deptNames as $dept) {
+        // Bande de departement (fusionnee sur toute la largeur).
+        $sheet->setCellValue('A' . $r, $dept);
+        $sheet->mergeCells('A' . $r . ':' . fjxCol(42) . $r);
+        $sheet->getStyle('A' . $r . ':' . fjxCol(42) . $r)->applyFromArray([
+            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '6B4E00']],
+            'fill' => ['fillType' => $fillSolid, 'startColor' => ['rgb' => 'FDE9A9']],
+            'alignment' => ['vertical' => $vCenter],
+        ]);
+        $sheet->getStyle('A' . $r)->getAlignment()->setIndent(1);
+        $sheet->getRowDimension($r)->setRowHeight(18);
+        $r++;
+
+        $maxRows = 0;
+        foreach ($byDept[$dept] as $dayList) {
+            $maxRows = max($maxRows, count($dayList));
+        }
+
+        $firstDataRow = $r;
+        for ($rowIdx = 0; $rowIdx < $maxRows; $rowIdx++) {
+            for ($dayIdx = 0; $dayIdx < 7; $dayIdx++) {
+                $a = $byDept[$dept][$dayIdx][$rowIdx] ?? null;
+                if ($a === null) {
+                    continue;
+                }
+                $base = $dayIdx * 6 + 1;
+                $sheet->setCellValue(fjxCol($base) . $r, $a['horaire']);       // horaire
+                $sheet->setCellValue(fjxCol($base + 4) . $r, $a['nom']);       // nom
+                $sheet->setCellValue(fjxCol($base + 5) . $r, $a['agence']);    // agence
+            }
+            $r++;
+        }
+
+        // Bordures fines sur la zone de donnees du departement.
+        if ($maxRows > 0) {
+            $sheet->getStyle('A' . $firstDataRow . ':' . fjxCol(42) . ($r - 1))->applyFromArray([
+                'borders' => ['allBorders' => ['borderStyle' => $thin, 'color' => ['rgb' => 'DDE6DF']]],
+                'font' => ['size' => 10],
+            ]);
+        }
+
+        $r++; // ligne vide de separation
+    }
+
+    // Fige les colonnes/lignes d'en-tete.
+    $sheet->freezePane('A' . ($headerRows + 1));
+
+    $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
+    ob_start();
+    $writer->save('php://output');
+    $bytes = ob_get_clean();
+    $ss->disconnectWorksheets();
+    unset($ss);
+    return $bytes;
+}
+
+// Tentative de chargement de PhpSpreadsheet (present dans public/vendor sur Railway).
+$xlsxData = null;
+foreach ([
+    dirname(__DIR__) . '/vendor/autoload.php',
+    dirname(__DIR__) . '/public/vendor/autoload.php',
+    __DIR__ . '/vendor/autoload.php',
+] as $autoload) {
+    if (is_file($autoload)) {
+        require_once $autoload;
+        break;
+    }
+}
+if (class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet')) {
+    try {
+        $xlsxData = fjxBuildXlsx($days, $deptNames, $byDept, $dateLabel);
+    } catch (\Throwable $e) {
+        $xlsxData = null;
+    }
+}
+
+if (is_string($xlsxData) && $xlsxData !== '') {
+    $filename = 'matching_semaine_' . $weekStart->format('Y-m-d') . '.xlsx';
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . strlen($xlsxData));
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    echo $xlsxData;
+    exit();
+}
+
+// --- Repli CSV (si PhpSpreadsheet indisponible) ---
 $escapeCsv = static function ($value) {
     $value = (string) $value;
     if ($value === '') {
@@ -203,7 +362,6 @@ header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 
-// BOM UTF-8 pour qu'Excel reconnaisse l'encodage (accents corrects).
 echo "\xEF\xBB\xBF";
 
 $out = fopen('php://output', 'w');

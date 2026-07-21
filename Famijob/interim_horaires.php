@@ -2013,25 +2013,19 @@ foreach ($weekDays as $weekDay) {
                                                             <input type="hidden" name="assign_student" value="1">
                                                             <input type="hidden" name="request_id" value="<?php echo $requestId; ?>">
 
-                                                            <label style="display:block;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5c6f67;margin-bottom:5px;"><?php echo e(fjhT('Choisir dans la liste', 'Kies uit de lijst')); ?></label>
-                                                            <select name="student_id" style="width:100%;padding:11px 12px;font-size:1rem;border:1px solid #cfdad3;border-radius:10px;">
-                                                                <option value="">— <?php echo e(fjhT('Choisir un étudiant', 'Kies een student')); ?> —</option>
+                                                            <label style="display:block;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5c6f67;margin-bottom:5px;"><?php echo e(fjhT('Rechercher un étudiant ou taper un nom', 'Zoek een student of typ een naam')); ?></label>
+                                                            <input type="text" name="student_name" list="fjm-cand-<?php echo $requestId; ?>" placeholder="<?php echo e(fjhT('Tapez pour rechercher, ou un nom libre…', 'Typ om te zoeken, of een vrije naam…')); ?>" autocomplete="off" style="width:100%;padding:13px 14px;font-size:1.05rem;border:1px solid #cfdad3;border-radius:10px;">
+                                                            <datalist id="fjm-cand-<?php echo $requestId; ?>">
                                                                 <?php foreach ($rankedCandidates as $candidate): ?>
                                                                 <?php
                                                                 $candidateStatusLabel = $statusLabels[$candidate['availability_status']] ?? $candidate['availability_status'];
-                                                                $candidateReason = trim((string) ($candidate['manual_reason'] ?? ''));
-                                                                $candidateLabel = $candidate['name'] . ' - P' . (int) $candidate['priority_rank'] . ' - ' . $candidateStatusLabel;
-                                                                if (!empty($candidate['manual_eligible']) && empty($candidate['eligible'])) { $candidateLabel .= ' (manuel uniquement)'; }
-                                                                if ($candidateReason !== '') { $candidateLabel .= ' (' . $candidateReason . ')'; }
+                                                                $optLabel = 'P' . (int) $candidate['priority_rank'] . ' · ' . $candidateStatusLabel;
+                                                                if (!empty($candidate['manual_eligible']) && empty($candidate['eligible'])) { $optLabel .= ' · manuel'; }
                                                                 ?>
-                                                                <option value="<?php echo (int) $candidate['id']; ?>" <?php echo !empty($candidate['manual_eligible']) ? '' : 'disabled'; ?>><?php echo e($candidateLabel); ?></option>
+                                                                <option value="<?php echo e((string) $candidate['name']); ?>"><?php echo e($optLabel); ?></option>
                                                                 <?php endforeach; ?>
-                                                            </select>
-
-                                                            <div style="text-align:center;color:#9bb0a3;font-size:.76rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:9px 0;">— <?php echo e(fjhT('ou', 'of')); ?> —</div>
-
-                                                            <label style="display:block;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#5c6f67;margin-bottom:5px;"><?php echo e(fjhT('Taper un nom (non listé)', 'Typ een naam (niet in de lijst)')); ?></label>
-                                                            <input type="text" name="student_name" placeholder="<?php echo e(fjhT('Nom et prénom', 'Naam en voornaam')); ?>" autocomplete="off" style="width:100%;padding:12px 14px;font-size:1rem;border:1px solid #cfdad3;border-radius:10px;">
+                                                            </datalist>
+                                                            <div class="slot-meta" style="margin-top:6px;"><?php echo e(fjhT('La liste se filtre pendant la saisie. Un nom absent de la liste sera ajouté en externe.', 'De lijst filtert tijdens het typen. Een naam die niet in de lijst staat, wordt als extern toegevoegd.')); ?></div>
 
                                                             <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px;">Affecter</button>
                                                         </form>
