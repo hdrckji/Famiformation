@@ -351,7 +351,14 @@ body.mode-borne { justify-content: center; }
 .borne { width: min(760px, 94vw); margin: 0 auto; text-align: center; padding: 10px; }
 .borne-titre { font-family: 'Fredoka', sans-serif; color: var(--pousse); font-size: clamp(1.6rem, 4.5vw, 2.4rem); }
 .borne-sous { font-weight: 700; opacity: .72; margin-bottom: 24px; font-size: clamp(1rem, 2.6vw, 1.2rem); }
-.borne-modules { display: flex; flex-direction: column; gap: 16px; }
+.borne-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+
+/* Bouton « maison » permanent quand on est arrivé par la borne. */
+.home-borne { position: fixed; top: 12px; right: 12px; z-index: 100050; width: 48px; height: 48px;
+  border-radius: 50%; background: var(--craie); box-shadow: 0 3px 12px rgba(14,59,36,.22);
+  display: flex; align-items: center; justify-content: center; font-size: 1.5rem; text-decoration: none;
+  cursor: pointer; transition: transform .12s; }
+.home-borne:hover { transform: scale(1.07); }
 .borne-mod { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
   background: var(--craie); border: 3px solid transparent; border-radius: 22px; padding: 26px 20px;
   box-shadow: 0 6px 24px rgba(14,59,36,.1); transition: transform .12s, border-color .15s, box-shadow .15s; }
@@ -1693,22 +1700,23 @@ async function renderReclamer() {
     brancheRetour(); return;
   }
   if (st.pris) {
-    app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">🏃</div>
-      <h2 class="q-text">Trop tard !</h2>
-      <p class="hint">Ce code a déjà été récupéré par quelqu'un d'autre. Cherche-en un autre en magasin !</p>${retourHtml()}</div>`;
+    app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">🥀</div>
+      <h2 class="q-text">Dommage…</h2>
+      <p class="hint">Ce code a déjà été utilisé… ou planté, qui sait ! 🌱 Cherche-en un autre en magasin, il y en a d'autres à trouver.</p>${retourHtml()}</div>`;
     brancheRetour(); return;
   }
 
-  // Code disponible mais pas encore identifié : on le met de côté.
+  // Code disponible mais pas encore identifié : on le met de côté et on propose
+  // de créer un compte ou de se connecter pour récupérer les graines.
   if (!joueur) {
     metCodeAttente(code);
     app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">🎁</div>
-      <h2 class="q-text">Bravo, un bonus !</h2>
-      <p class="hint">Le code <b>${esc(code)}</b> est disponible (+${CONFIG.pointsParCodeBonus} 🌱). Crée ta carte de jardinier
-      (ou retrouve-la) et il s'ajoutera <b>tout seul</b> à ton compte !</p>
+      <h2 class="q-text">Bravo, un bonus disponible !</h2>
+      <p class="hint">Le code <b>${esc(code)}</b> vaut <b>+${CONFIG.pointsParCodeBonus} 🌱</b>. Pour l'ajouter à tes graines,
+      crée un compte ou connecte-toi — il s'ajoutera <b>tout seul</b> ensuite.</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-        <button class="btn" id="rc-jouer">Créer ma carte 🌱</button>
-        <button class="btn ghost" id="rc-retrouver">J'ai déjà une carte</button>
+        <button class="btn" id="rc-jouer">Créer un compte 🌱</button>
+        <button class="btn ghost" id="rc-retrouver">Se connecter</button>
       </div></div>`;
     $("#rc-jouer").addEventListener("click", () => { codeAReclamer = null; userView = "auto"; quiz = null; render(); });
     $("#rc-retrouver").addEventListener("click", () => { codeAReclamer = null; userView = "retrouver"; quiz = null; render(); });
@@ -1950,7 +1958,24 @@ function renderBorne() {
     </div>
   </div>`;
   const dest = { quiz: base, code: base + "code", mail: "https://famiformation.com/emails" };
-  app.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => { location.href = dest[b.dataset.go]; }));
+  app.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => {
+    try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {}   // on se souvient qu'on vient de la borne
+    location.href = dest[b.dataset.go];
+  }));
+}
+
+// 🏠 Bouton maison permanent : visible sur les pages atteintes DEPUIS la borne,
+// il ramène à /quiz/borne (pratique sur une borne tactile partagée).
+function injecteHomeBorne() {
+  try { if (sessionStorage.getItem("fj_borne") !== "1") return; } catch (e) { return; }
+  if (ECRAN === "borne" || document.getElementById("home-borne")) return;
+  const a = document.createElement("a");
+  a.id = "home-borne";
+  a.className = "home-borne";
+  a.href = quizBase() + "borne";
+  a.title = "Retour à l'accueil";
+  a.textContent = "🏠";
+  document.body.appendChild(a);
 }
 
 /* ============================================================
@@ -2428,7 +2453,13 @@ function render() {
   // 🖥️ La BORNE a son propre affichage. La TÉLÉ passe par render() (elle réutilise
   // le vrai compte à rebours avec la fée, puis bascule sur le classement).
   if (ECRAN === "borne") { renderBorne(); return; }
+  injecteHomeBorne();   // bouton maison si on vient de la borne
   if (ECRAN === "tele")  { render(); return; }
+
+  // 🎁 Page /quiz/code : appareil potentiellement PARTAGÉ (borne) → pas d'auto-
+  // reconnaissance. On ouvre directement la saisie du code ; l'identification
+  // (créer un compte / se connecter) se fait au moment de récupérer les graines.
+  if (ECRAN === "code") { codeAReclamer = null; userView = "reclamer"; render(); return; }
 
   // 🌱 Auto-reconnaissance : si ce téléphone a déjà une carte de jardinier, on
   // identifie la personne sans qu'elle ait à retaper quoi que ce soit.

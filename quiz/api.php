@@ -37,7 +37,12 @@ $BONUS_CODES = [
   "FAMI-F6H8", "FAMI-G1J3", "FAMI-K9L2", "FAMI-M4N7", "FAMI-P5Q8",
   "FAMI-R3S6", "FAMI-T2U9", "FAMI-V7W1", "FAMI-X8Y4", "FAMI-Z5A2",
   "FAMI-B9C6", "FAMI-D1E3", "FAMI-F4G7", "FAMI-H8J5", "FAMI-K2L9",
+  // 🧪 Codes de TEST : le premier marche toujours (jamais consommé, re-testable),
+  // le second est toujours vu comme « déjà utilisé ». Pratique pour tester /quiz/code.
+  "FAMI-TEST-OK", "FAMI-TEST-USED",
 ];
+$CODE_TEST_OK   = "FAMI-TEST-OK";
+$CODE_TEST_USED = "FAMI-TEST-USED";
 $CODE_GRAINES = 15;   // graines par code bonus (comptent dans le classement)
 $MAX_CODES    = 2;    // combien de codes une même personne peut cumuler
 
@@ -576,6 +581,9 @@ switch ($action) {
   case 'code_status': {
     $bonus = strtoupper(trim($input['bonuscode'] ?? ''));
     $name  = trim($input['name'] ?? '');
+    // 🧪 Codes de test : réponse fixe (dispo / déjà utilisé), sans toucher aux données.
+    if ($bonus === $CODE_TEST_USED) { echo json_encode(['connu' => true, 'pris' => true, 'parMoi' => false]); break; }
+    if ($bonus === $CODE_TEST_OK)   { echo json_encode(['connu' => true, 'pris' => false, 'parMoi' => false]); break; }
     $connu = in_array($bonus, $BONUS_CODES, true);
     $pris  = false; $parMoi = false;
     if ($connu) {
@@ -598,6 +606,8 @@ switch ($action) {
     $bonus = strtoupper(trim($input['bonuscode'] ?? ''));
 
     if (!in_array($bonus, $BONUS_CODES, true)) { echo json_encode(['ok' => false, 'reason' => 'inconnu']); break; }
+    // 🧪 Le code de test « déjà utilisé » refuse toujours.
+    if ($bonus === $CODE_TEST_USED) { echo json_encode(['ok' => false, 'reason' => 'deja_pris']); break; }
 
     // Étape 1 : authentifier + vérifier qu'il peut encore prendre un code.
     $chk = withLock($scoresFile, function (&$board, &$write) use ($name, $code4, $bonus, $MAX_CODES) {
@@ -619,13 +629,17 @@ switch ($action) {
     }
 
     // Étape 2 : réserver le code globalement (premier arrivé, premier servi).
-    $prise = withLock($codesFile, function (&$claimed, &$write) use ($bonus, $name) {
-      if (isset($claimed[$bonus])) { return ['ok' => false, 'reason' => 'deja_pris']; }
-      $claimed[$bonus] = ['par' => $name, 'date' => date('c')];
-      $write = true;
-      return ['ok' => true];
-    });
-    if (empty($prise['ok'])) { echo json_encode($prise, JSON_UNESCAPED_UNICODE); break; }
+    // Le code de test « qui marche » n'est JAMAIS consommé : on saute cette étape
+    // pour qu'il reste disponible et re-testable.
+    if ($bonus !== $CODE_TEST_OK) {
+      $prise = withLock($codesFile, function (&$claimed, &$write) use ($bonus, $name) {
+        if (isset($claimed[$bonus])) { return ['ok' => false, 'reason' => 'deja_pris']; }
+        $claimed[$bonus] = ['par' => $name, 'date' => date('c')];
+        $write = true;
+        return ['ok' => true];
+      });
+      if (empty($prise['ok'])) { echo json_encode($prise, JSON_UNESCAPED_UNICODE); break; }
+    }
 
     // Étape 3 : créditer les graines (elles comptent dans le classement).
     $res = withLock($scoresFile, function (&$board, &$write) use ($name, $bonus, $CODE_GRAINES) {
