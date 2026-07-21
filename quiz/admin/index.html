@@ -478,39 +478,91 @@ function vueCountdown() {
 
 /* ---------------------- ONGLET SIMULATION ---------------------- */
 
-// Format d'aperçu retenu entre deux affichages de l'onglet.
-let simFormat = "mobile";
+// Moment simulé (valeur du champ datetime-local, "" = en direct) + graine de
+// rechargement (force le rechargement des aperçus même si l'URL ne change pas).
+let simQuand = "";
+let simSeed = 0;
+
+// Décale une date "datetime-local" de N millisecondes et la re-formate AVEC les
+// secondes (ex. lancement - 10 000 ms → "2026-07-29T11:59:50").
+function decaleLocal(iso, ms) {
+  const d = new Date(new Date(iso).getTime() + ms);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 
 function vueSimulation() {
   const c = $("#contenu");
-  c.innerHTML = `
-    <div class="card">
-      <h2>Vivre l'expérience joueur</h2>
-      <p class="hint">Ci-dessous, la <strong>vraie</strong> page des joueurs en mode simulation :
-      le quiz est jouable même avant le lancement, avec les vraies questions et le vrai jardin en décor —
-      mais <strong>rien n'est enregistré</strong> (ni score, ni plantation, ni code).
-      Le code bonus de test est <strong>FAMI-TEST</strong>.
-      Recharge la simulation pour tout effacer et recommencer autant de fois que tu veux.</p>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
-        <button class="btn ${simFormat === "mobile" ? "" : "ghost"}" id="s-mobile">📱 Format téléphone</button>
-        <button class="btn ${simFormat === "large" ? "" : "ghost"}" id="s-large">🖥️ Format borne / grand écran</button>
-        <button class="btn ghost" id="s-restart">🔄 Recommencer à zéro</button>
+  const cf = data.config || { lancement: "2026-07-29T12:00", cloture: "2026-08-30T23:59" };
+  const val = simQuand || cf.lancement || "2026-07-29T12:00";
+
+  // URL d'un aperçu : la VRAIE page joueur, en mode simulation daté (rien n'est
+  // envoyé au serveur, la phase suit le moment choisi). simSeed force le rechargement.
+  const src = (ecran) => `../index.html?ecran=${ecran}&simulation=apercu`
+    + (simQuand ? `&simnow=${encodeURIComponent(simQuand)}` : "")
+    + `&_=${simSeed}`;
+
+  // Un aperçu à l'échelle : l'iframe est à sa taille « logique » (comme un vrai
+  // écran) puis réduite par transform:scale pour tenir dans la vignette.
+  const cadre = (ecran, titre, wLog, hLog, wDisp) => {
+    const s = wDisp / wLog, hDisp = Math.round(hLog * s);
+    return `<div class="sim-card">
+      <div class="sim-cap">${titre}</div>
+      <div class="sim-screen" style="width:${wDisp}px; height:${hDisp}px;">
+        <iframe src="${src(ecran)}" style="width:${wLog}px; height:${hLog}px; transform:scale(${s.toFixed(3)});"></iframe>
       </div>
-      <div style="display:flex; justify-content:center; background:#DDE9E0; border-radius:16px; padding:14px;">
-        <iframe id="s-frame" src="../index.html?simulation=1"
-          style="border:none; border-radius:14px; background:var(--brume); height:72vh; min-height:520px;
-                 width:${simFormat === "mobile" ? "390px" : "100%"}; max-width:100%;
-                 box-shadow:0 8px 30px rgba(14,59,36,.18);"></iframe>
+      <a class="sim-open" href="${src(ecran)}" target="_blank" rel="noopener">⛶ Ouvrir en grand</a>
+    </div>`;
+  };
+
+  c.innerHTML = `
+    <style>
+      .sim-ctrl{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:14px 0 4px;}
+      .sim-etat{margin:6px 0 18px;font-weight:600;opacity:.82;}
+      .sim-grid{display:flex;flex-wrap:wrap;gap:24px;justify-content:center;align-items:flex-start;}
+      .sim-card{display:flex;flex-direction:column;align-items:center;gap:8px;}
+      .sim-cap{font-weight:700;color:var(--pousse,#2e7d32);font-size:1.05rem;}
+      .sim-screen{overflow:hidden;border-radius:14px;background:var(--brume,#eef5ef);
+        box-shadow:0 10px 30px rgba(14,59,36,.18);border:1px solid rgba(14,59,36,.1);}
+      .sim-screen iframe{border:0;transform-origin:top left;}
+      .sim-open{font-size:.86rem;color:var(--pousse,#2e7d32);text-decoration:none;font-weight:600;}
+      .sim-open:hover{text-decoration:underline;}
+    </style>
+    <div class="card">
+      <h2>🎬 Simulation — les 3 écrans à un instant précis</h2>
+      <p class="hint">Choisis une date/heure (secondes incluses) : les aperçus montrent exactement
+      ce que verront la <strong>télé</strong>, la <strong>borne</strong> et le
+      <strong>téléphone/ordi</strong> à ce moment-là. <strong>Rien n'est enregistré</strong> —
+      tu peux tout tester (code bonus de test : <strong>FAMI-TEST</strong>). « Ouvrir en grand »
+      lance l'aperçu en plein écran pour cliquer dedans.</p>
+      <div class="sim-ctrl">
+        <label class="lbl" style="margin:0 6px 0 0;">🕐 Moment simulé</label>
+        <input class="field" type="datetime-local" step="1" id="sim-quand" value="${esc(val)}" style="max-width:240px;">
+        <button class="btn ghost" data-preset="live">🔴 En direct</button>
+        <button class="btn ghost" data-preset="avant10">⏳ 10 s avant</button>
+        <button class="btn ghost" data-preset="lancement">🚀 Au lancement</button>
+        <button class="btn ghost" data-preset="apres">🏁 Quiz fini</button>
+      </div>
+      <div class="sim-etat">${simQuand
+        ? `🕐 Aperçu au <b>${esc(simQuand.replace("T", " à "))}</b> — l'horloge avance depuis ce moment.`
+        : "🔴 <b>En direct</b> — l'heure réelle de maintenant."}</div>
+      <div class="sim-grid">
+        ${cadre("tele", "📺 Télé", 1180, 720, 468)}
+        ${cadre("borne", "🖥️ Borne", 1180, 720, 468)}
+        ${cadre("user", "📱 Téléphone / ordi", 380, 760, 224)}
       </div>
     </div>`;
 
-  const frame = $("#s-frame");
-  $("#s-mobile").addEventListener("click", () => { simFormat = "mobile"; vueSimulation(); });
-  $("#s-large").addEventListener("click", () => { simFormat = "large"; vueSimulation(); });
-  // Recharger l'iframe efface toute la simulation (elle ne vit qu'en mémoire).
-  $("#s-restart").addEventListener("click", () => {
-    frame.src = `../index.html?simulation=1&_=${Date.now()}`;
-  });
+  const champ = $("#sim-quand");
+  champ.addEventListener("change", () => { simQuand = champ.value; simSeed++; vueSimulation(); });
+  c.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+    const p = b.dataset.preset;
+    if (p === "live") simQuand = "";
+    else if (p === "lancement") simQuand = decaleLocal(cf.lancement, 0);
+    else if (p === "avant10") simQuand = decaleLocal(cf.lancement, -10000);
+    else if (p === "apres") simQuand = decaleLocal(cf.cloture, 60000);
+    simSeed++; vueSimulation();
+  }));
 }
 
 /* ---------------------- ONGLET CODES BONUS ---------------------- */

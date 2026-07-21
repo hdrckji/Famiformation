@@ -600,6 +600,21 @@ const SIM_PARAMS = new URLSearchParams(location.search);
 const SIMULATION = SIM_PARAMS.has("simulation");
 let simMode = SIMULATION ? (SIM_PARAMS.get("simulation") || "menu") : "";
 
+// 🕐 APERÇU DATÉ (onglet Simulation de l'admin) : ?simulation=apercu. C'est un
+// mode simulation (rien n'est envoyé au serveur), MAIS la phase suit une horloge
+// choisie au lieu d'être forcée « ouvert ». Avec &simnow=<date>, on décale
+// l'horloge pour voir l'affichage à une date/heure précise (elle avance ensuite
+// en temps réel : les secondes défilent depuis ce moment).
+const APERCU = SIMULATION && SIM_PARAMS.get("simulation") === "apercu";
+if (APERCU && SIM_PARAMS.has("simnow")) {
+  const cible = new Date(SIM_PARAMS.get("simnow")).getTime();
+  if (!isNaN(cible)) {
+    const reel = Date.now.bind(Date);
+    const ecart = cible - reel();
+    Date.now = () => reel() + ecart;
+  }
+}
+
 /* ============================================================
    🖥️ ÉCRAN — selon l'URL, la MÊME page se comporte différemment :
    • /quiz/tele  → affichage TÉLÉ (chrono + classement en boucle, avec QR)
@@ -892,7 +907,8 @@ function prepareQuestions() {
   }));
 }
 function phaseNow() {
-  if (SIMULATION) return "ouvert";   // en simulation, on teste le quiz à tout moment
+  if (SIMULATION && !APERCU) return "ouvert";   // simu « joueur » : quiz jouable à tout moment
+  // (en aperçu daté, la phase suit l'horloge simulée — voir plus haut)
   const now = Date.now();
   if (now < CONFIG.dateLancement.getTime()) return "avant";
   if (now <= CONFIG.dateCloture.getTime()) return "ouvert";
@@ -2603,7 +2619,9 @@ function render() {
   }
   // En simulation, les écrans de prévisualisation (menu/télé/code) passent avant
   // tout. Le mode « joueur » (et sa suite jardin/mini-jeu) suit le flux normal.
-  if (SIMULATION) {
+  // Aperçu daté : on NE montre PAS le menu de simulation, on rend le VRAI écran
+  // (télé / borne / téléphone) tel qu'il sera au moment simulé.
+  if (SIMULATION && !APERCU) {
     majBarreSim();
     if (simMode !== "joueur") {
       FEE.stop(); stopHerbes(); clearInterval(tickTimer);
