@@ -515,9 +515,99 @@ if (!function_exists('ensureDepartmentsTable')) {
         // Elle ne s'execute qu'UNE seule fois (marqueur en base), pour qu'une suppression
         // faite par l'admin ne soit jamais rejouee.
         famijobDepartmentsMigrationOnce($db);
+        famijobDepartmentsCleanupOnce($db);
 
         $tableReady = true;
         return true;
+    }
+}
+
+if (!function_exists('famijobCapitalizeDepartmentName')) {
+    /** Met une majuscule a la premiere lettre (UTF-8), sans toucher au reste. */
+    function famijobCapitalizeDepartmentName($name)
+    {
+        $name = trim((string) $name);
+        $name = preg_replace('/\s+/', ' ', $name);
+        if ($name === '') {
+            return '';
+        }
+        if (function_exists('mb_strtoupper')) {
+            return mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($name, 1, null, 'UTF-8');
+        }
+        return ucfirst($name);
+    }
+}
+
+if (!function_exists('famijobPurgeInactiveDepartments')) {
+    /** Supprime DEFINITIVEMENT tous les departements retires (is_active = 0) + leurs liaisons. */
+    function famijobPurgeInactiveDepartments(PDO $db)
+    {
+        try {
+            $ids = $db->query("SELECT id FROM departments WHERE is_active = 0")->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {
+            return 0;
+        }
+        $ids = array_values(array_filter(array_map('intval', $ids), static function ($n) { return $n > 0; }));
+        if (empty($ids)) {
+            return 0;
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $db->prepare("DELETE FROM student_department_links WHERE department_id IN ($ph)")->execute($ids);
+        } catch (Exception $e) {}
+        try {
+            $stmt = $db->prepare("DELETE FROM departments WHERE id IN ($ph)");
+            $stmt->execute($ids);
+            return $stmt->rowCount();
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+}
+
+if (!function_exists('famijobCapitalizeAllDepartments')) {
+    /** Met une majuscule initiale a tous les departements existants. */
+    function famijobCapitalizeAllDepartments(PDO $db)
+    {
+        try {
+            $rows = $db->query("SELECT id, department_name FROM departments")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return 0;
+        }
+        $updated = 0;
+        $upd = null;
+        foreach ($rows as $row) {
+            $current = (string) $row['department_name'];
+            $capitalized = famijobCapitalizeDepartmentName($current);
+            if ($capitalized === '' || $capitalized === $current) {
+                continue;
+            }
+            try {
+                if ($upd === null) {
+                    $upd = $db->prepare("UPDATE departments SET department_name = ?, updated_at = NOW() WHERE id = ?");
+                }
+                $upd->execute([$capitalized, (int) $row['id']]);
+                $updated++;
+            } catch (Exception $e) {
+                // Collision de cle unique (un autre departement porte deja ce nom) : ignore,
+                // le dedoublonnage s'en chargera.
+            }
+        }
+        return $updated;
+    }
+}
+
+if (!function_exists('famijobDepartmentsCleanupOnce')) {
+    function famijobDepartmentsCleanupOnce(PDO $db)
+    {
+        if (famijobAppFlagIsSet($db, 'departments_cleanup_v1')) {
+            return;
+        }
+        // 1) Purge des departements retires. 2) Majuscule initiale partout.
+        famijobPurgeInactiveDepartments($db);
+        famijobCapitalizeAllDepartments($db);
+        famijobDedupeDepartments($db);
+        famijobAppFlagSet($db, 'departments_cleanup_v1');
     }
 }
 

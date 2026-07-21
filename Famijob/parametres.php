@@ -26,8 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // -------- Départements --------
     if (isset($_POST['add_department'])) {
-        $name = trim((string) ($_POST['department_name'] ?? ''));
-        $name = preg_replace('/\s+/', ' ', $name);
+        $name = famijobCapitalizeDepartmentName((string) ($_POST['department_name'] ?? ''));
         if ($name === '') {
             $error = 'Indiquez un nom de département.';
         } elseif (mb_strlen($name) > 120) {
@@ -76,6 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db->prepare("DELETE FROM departments WHERE id = ?")->execute([$id]);
             $message = 'Département supprimé définitivement.';
         }
+    } elseif (isset($_POST['purge_inactive'])) {
+        $n = famijobPurgeInactiveDepartments($db);
+        $message = $n > 0
+            ? ($n . ' département(s) retiré(s) supprimé(s) définitivement.')
+            : 'Aucun département retiré à nettoyer.';
+    } elseif (isset($_POST['capitalize_all'])) {
+        $n = famijobCapitalizeAllDepartments($db);
+        $message = 'Casse normalisée (' . $n . ' département(s) modifié(s)).';
     }
 
     $params = ['section' => 'departements'];
@@ -172,9 +179,15 @@ $inactiveDepartments = $db->query(
                 </div>
 
                 <div class="card">
-                    <h2>Départements actifs (<?= count($activeDepartments) ?>)</h2>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h2 style="margin:0;">Départements actifs (<?= count($activeDepartments) ?>)</h2>
+                        <form method="post">
+                            <?= csrfField() ?>
+                            <button class="btn btn-soft" type="submit" name="capitalize_all" value="1" title="Mettre une majuscule initiale à tous">Aa Normaliser la casse</button>
+                        </form>
+                    </div>
                     <?php if (empty($activeDepartments)): ?>
-                        <div class="empty">Aucun département actif.</div>
+                        <div class="empty" style="margin-top:12px;">Aucun département actif.</div>
                     <?php else: ?>
                         <div class="chips">
                             <?php foreach ($activeDepartments as $dept): ?>
@@ -193,7 +206,13 @@ $inactiveDepartments = $db->query(
 
                 <?php if (!empty($inactiveDepartments)): ?>
                 <div class="card">
-                    <h2>Départements retirés (<?= count($inactiveDepartments) ?>)</h2>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h2 style="margin:0;">Départements retirés (<?= count($inactiveDepartments) ?>)</h2>
+                        <form method="post" onsubmit="return confirm('Supprimer DÉFINITIVEMENT tous les départements retirés ?');">
+                            <?= csrfField() ?>
+                            <button class="btn btn-ko" type="submit" name="purge_inactive" value="1">🧹 Nettoyer tous les retirés</button>
+                        </form>
+                    </div>
                     <p class="sub">Ils n'apparaissent nulle part. Réactivez-les, ou supprimez-les définitivement.</p>
                     <div class="chips">
                         <?php foreach ($inactiveDepartments as $dept): ?>

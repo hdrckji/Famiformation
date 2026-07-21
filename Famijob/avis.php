@@ -78,6 +78,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mb_substr($subject, 0, 180),
                 mb_substr($body, 0, 5000),
             ]);
+
+            // Prévenir tous les admins qu'un nouvel avis est arrivé (boîte à notif).
+            try {
+                $categoryLabel = $categories[$category] ?? 'Avis';
+                $admins = $db->query("SELECT id FROM utilisateurs WHERE role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
+                foreach ($admins as $adminId) {
+                    $adminId = (int) $adminId;
+                    if ($adminId <= 0 || $adminId === $userId) {
+                        continue;
+                    }
+                    famijobNotify(
+                        $db,
+                        $adminId,
+                        'feedback',
+                        'Nouvel avis reçu',
+                        $categoryLabel . ' de ' . ($fullName !== '' ? $fullName : 'un utilisateur') . ' : ' . $subject,
+                        'avis.php',
+                        $userId,
+                        $fullName
+                    );
+                }
+            } catch (Exception $e) {}
+
             $message = 'Merci ! Votre avis a bien été transmis.';
             $oldSubject = $oldMessage = '';
             $oldCategory = 'question';

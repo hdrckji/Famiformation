@@ -43,6 +43,7 @@ function fjnTypeMeta($type)
         case 'validation_approved': return ['✅', '#1d6a39', '#dff3e3'];
         case 'validation_rejected': return ['⛔', '#a13e35', '#fae4e1'];
         case 'match':               return ['🤝', '#1b5e7a', '#dbeefa'];
+        case 'feedback':            return ['💬', '#6b4f9a', '#ece4fa'];
         default:                    return ['🔔', '#5c6f67', '#eef3f0'];
     }
 }
