@@ -14,25 +14,34 @@ $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireValidCSRF();
-    if (isset($_POST['mark_all_read'])) {
-        $n = famijobNotifMarkAllRead($db, $userId);
-        $message = 'Toutes les notifications ont été marquées comme lues.';
-    } elseif (isset($_POST['delete_all'])) {
+    if (isset($_POST['delete_all'])) {
         famijobNotifDeleteAll($db, $userId);
         $message = 'Boîte de notifications vidée.';
     } elseif (isset($_POST['delete_one'])) {
         famijobNotifDelete($db, $userId, (int) ($_POST['notif_id'] ?? 0));
     } elseif (isset($_POST['mark_read'])) {
         famijobNotifMarkRead($db, $userId, (int) ($_POST['notif_id'] ?? 0));
+    } elseif (isset($_POST['mark_unread'])) {
+        famijobNotifMarkUnread($db, $userId, (int) ($_POST['notif_id'] ?? 0));
+    } elseif (isset($_POST['mark_all_unread'])) {
+        famijobNotifMarkAllUnread($db, $userId);
+        $message = 'Toutes les notifications ont été remises en non lu.';
     }
-    // PRG : évite le renvoi de formulaire au refresh.
-    $suffix = $message !== '' ? ('?m=' . rawurlencode($message)) : '';
-    header('Location: notifications.php' . $suffix);
+    // PRG. keep=1 : on NE relance PAS l'auto-lecture (pour préserver un "non lu" manuel).
+    $params = ['keep' => 1];
+    if ($message !== '') { $params['m'] = $message; }
+    header('Location: notifications.php?' . http_build_query($params));
     exit();
 }
 
 if (isset($_GET['m'])) {
     $message = (string) $_GET['m'];
+}
+
+// À l'OUVERTURE de la boîte (arrivée fraîche, sans keep), tout est marqué comme lu
+// -> la pastille rouge se vide. Les actions internes (keep=1) préservent l'état.
+if (!isset($_GET['keep'])) {
+    famijobNotifMarkAllRead($db, $userId);
 }
 
 $notifications = famijobNotifRecent($db, $userId, 100);
@@ -101,7 +110,7 @@ function fjnTypeMeta($type)
     <div class="bar">
         <form method="post">
             <?= csrfField() ?>
-            <button class="btn btn-soft" type="submit" name="mark_all_read" value="1">Tout marquer lu</button>
+            <button class="btn btn-soft" type="submit" name="mark_all_unread" value="1" title="Remettre toutes en non lu">Tout marquer non lu</button>
         </form>
         <form method="post" onsubmit="return confirm('Vider toute la boîte de notifications ?');">
             <?= csrfField() ?>
@@ -144,6 +153,12 @@ function fjnTypeMeta($type)
                             <?= csrfField() ?>
                             <input type="hidden" name="notif_id" value="<?= (int) $notif['id'] ?>">
                             <button class="icon-btn" type="submit" name="mark_read" value="1" title="Marquer comme lu" style="color:#2d5a37;">✓</button>
+                        </form>
+                        <?php else: ?>
+                        <form method="post">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="notif_id" value="<?= (int) $notif['id'] ?>">
+                            <button class="icon-btn" type="submit" name="mark_unread" value="1" title="Marquer comme non lu" style="color:#2d5a37;">●</button>
                         </form>
                         <?php endif; ?>
                         <form method="post">

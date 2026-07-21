@@ -321,11 +321,12 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
                                             <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
                                             <button class="btn btn-ok" type="submit" name="approve_request" value="1"><?php echo e(fjvT('Valider', 'Goedkeuren')); ?></button>
                                         </form>
-                                        <form method="post" onsubmit="return fjvAskReject(this);">
+                                        <form method="post" onsubmit="return fjvOpenRejectModal(this);">
                                             <?php echo csrfField(); ?>
                                             <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
                                             <input type="hidden" name="reject_reason" value="">
-                                            <button class="btn btn-ko" type="submit" name="reject_request" value="1"><?php echo e(fjvT('Refuser', 'Weigeren')); ?></button>
+                                            <input type="hidden" name="reject_request" value="1">
+                                            <button class="btn btn-ko" type="submit"><?php echo e(fjvT('Refuser', 'Weigeren')); ?></button>
                                         </form>
                                     </div>
                                 </td>
@@ -337,14 +338,56 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
         </table>
     <?php endif; ?>
 </div>
+<div class="fjv-modal-mask" id="fjvRejectModal">
+    <div class="fjv-modal">
+        <h3><?php echo e(fjvT('Refuser la demande', 'Aanvraag weigeren')); ?></h3>
+        <p><?php echo e(fjvT('Motif du refus (optionnel) — la personne le recevra dans sa notification.', 'Reden van weigering (optioneel) — de persoon ontvangt dit in zijn melding.')); ?></p>
+        <textarea id="fjvRejectReason" rows="4" maxlength="500" placeholder="<?php echo e(fjvT('Ex. : créneau annulé, doublon, erreur de date…', 'Bv.: geannuleerd, dubbel, verkeerde datum…')); ?>"></textarea>
+        <div class="fjv-modal-actions">
+            <button type="button" class="btn btn-soft" onclick="fjvCloseRejectModal()"><?php echo e(fjvT('Annuler', 'Annuleren')); ?></button>
+            <button type="button" class="btn btn-ko" onclick="fjvConfirmReject()"><?php echo e(fjvT('Confirmer le refus', 'Weigering bevestigen')); ?></button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .fjv-modal-mask { position:fixed; inset:0; background:rgba(15,36,29,.55); display:none; align-items:center; justify-content:center; z-index:9000; padding:20px; }
+    .fjv-modal-mask.show { display:flex; }
+    .fjv-modal { background:#fff; border-radius:18px; padding:22px 22px 18px; max-width:460px; width:100%; box-shadow:0 24px 60px rgba(8,22,17,.35); }
+    .fjv-modal h3 { margin:0 0 6px; color:#21362a; }
+    .fjv-modal p { margin:0 0 12px; color:#64756a; font-size:.9rem; line-height:1.45; }
+    .fjv-modal textarea { width:100%; border:1px solid #cfdad3; border-radius:10px; padding:11px 12px; font-family:inherit; font-size:.95rem; resize:vertical; }
+    .fjv-modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+</style>
+
 <script>
-function fjvAskReject(form) {
-    var reason = window.prompt(<?php echo json_encode(fjvT('Motif du refus (optionnel) — la personne le recevra dans sa notification :', 'Reden van weigering (optioneel) — de persoon ontvangt dit in zijn melding:')); ?>, '');
-    if (reason === null) { return false; } // annulé : on ne refuse pas
-    var field = form.querySelector('input[name="reject_reason"]');
-    if (field) { field.value = reason; }
-    return true;
+var fjvRejectForm = null;
+function fjvOpenRejectModal(form) {
+    fjvRejectForm = form;
+    var ta = document.getElementById('fjvRejectReason');
+    if (ta) { ta.value = ''; }
+    document.getElementById('fjvRejectModal').classList.add('show');
+    if (ta) { ta.focus(); }
+    return false; // on n'envoie pas encore : on attend la confirmation dans la modale
 }
+function fjvCloseRejectModal() {
+    document.getElementById('fjvRejectModal').classList.remove('show');
+    fjvRejectForm = null;
+}
+function fjvConfirmReject() {
+    if (!fjvRejectForm) { return; }
+    var ta = document.getElementById('fjvRejectReason');
+    var field = fjvRejectForm.querySelector('input[name="reject_reason"]');
+    if (field && ta) { field.value = ta.value; }
+    var f = fjvRejectForm;
+    fjvRejectForm = null;
+    f.submit();
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { fjvCloseRejectModal(); } });
+(function () {
+    var mask = document.getElementById('fjvRejectModal');
+    if (mask) { mask.addEventListener('click', function (e) { if (e.target === this) { fjvCloseRejectModal(); } }); }
+})();
 </script>
 </body>
 </html>

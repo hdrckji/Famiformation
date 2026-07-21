@@ -175,6 +175,43 @@ if (!function_exists('famijobNotifMarkRead')) {
     }
 }
 
+if (!function_exists('famijobNotifMarkUnread')) {
+    function famijobNotifMarkUnread(PDO $db, $userId, $notifId)
+    {
+        $userId = (int) $userId;
+        $notifId = (int) $notifId;
+        if ($userId <= 0 || $notifId <= 0) {
+            return 0;
+        }
+        famijobNotifEnsureTable($db);
+        try {
+            $stmt = $db->prepare("UPDATE interim_notifications SET is_read = 0 WHERE id = ? AND recipient_id = ?");
+            $stmt->execute([$notifId, $userId]);
+            return $stmt->rowCount();
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+}
+
+if (!function_exists('famijobNotifMarkAllUnread')) {
+    function famijobNotifMarkAllUnread(PDO $db, $userId)
+    {
+        $userId = (int) $userId;
+        if ($userId <= 0) {
+            return 0;
+        }
+        famijobNotifEnsureTable($db);
+        try {
+            $stmt = $db->prepare("UPDATE interim_notifications SET is_read = 0 WHERE recipient_id = ?");
+            $stmt->execute([$userId]);
+            return $stmt->rowCount();
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+}
+
 if (!function_exists('famijobNotifDelete')) {
     function famijobNotifDelete(PDO $db, $userId, $notifId)
     {
