@@ -272,6 +272,17 @@ switch ($action) {
     break;
   }
 
+  // 🔢 Combien de codes bonus restent à trouver en magasin (hors codes de test).
+  case 'codes_restants': {
+    $claimed = readJson($codesFile);
+    $reels = array_values(array_filter($BONUS_CODES, fn($c) => $c !== $CODE_TEST_OK && $c !== $CODE_TEST_USED));
+    $total = count($reels);
+    $pris = 0;
+    foreach ($reels as $c) { if (isset($claimed[$c])) $pris++; }
+    echo json_encode(['total' => $total, 'restants' => max(0, $total - $pris), 'pris' => $pris]);
+    break;
+  }
+
   // 🏁 Enregistrer un score.
   // La vérification du doublon et l'ajout se font DANS le même verrou : c'est ce
   // qui garantit qu'un seul « Marie » entre dans la liste, même si deux Marie

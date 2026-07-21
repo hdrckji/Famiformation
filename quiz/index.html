@@ -402,6 +402,11 @@ body.mode-borne #app { width: 100%; }
   font-weight: 700; color: var(--pousse); font-size: clamp(.95rem, 2.2vw, 1.15rem); padding: 6px 4px;
   text-decoration: underline; text-underline-offset: 3px; }
 .lien-explik:hover { color: var(--foret); }
+/* Badge « il reste N codes à trouver » sur /quiz/code */
+.rc-restants { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
+  background: var(--brume); border-radius: 999px; padding: 8px 16px; display: inline-block;
+  margin: 2px auto 14px; font-size: clamp(.9rem, 2.2vw, 1.1rem); }
+.rc-restants:empty { display: none; }
 /* Bloc principal (mis en avant) sur l'accueil / l'espace */
 .bm-primaire { border-color: var(--pousse); background: #F1F8EF; }
 /* Espace (gate connexion/création) : 2 blocs centrés */
@@ -949,6 +954,14 @@ async function apiCodeClaim(name, code, bonuscode) {
 async function apiPlantes() {
   try {
     const r = await fetch(`${CONFIG.api}?action=plantes`);
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+// 🔢 Combien de codes bonus restent à trouver en magasin.
+async function apiCodesRestants() {
+  if (SIMULATION) { const pris = (window.__simCodes || new Set()).size; return { total: 20, restants: Math.max(0, 13 - pris), pris: 7 + pris }; }
+  try {
+    const r = await fetch(`${CONFIG.api}?action=codes_restants`);
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
@@ -2238,12 +2251,21 @@ async function renderReclamer() {
       <div style="font-size:2.6rem;">🎁</div>
       <h2 class="q-text" style="margin:8px 0;">J'ai un code bonus</h2>
       <p class="hint">Entre le code trouvé en magasin (ou scanne son QR code).</p>
+      <div id="rc-restants" class="rc-restants"></div>
       <input class="field" id="rc-in" placeholder="Ex : FAMI-XXXX" style="text-align:center; text-transform:uppercase;">
       <button class="btn" id="rc-ok">Vérifier ce code 🎁</button>
       ${retourHtml()}
     </div>`;
     if (joueur) bindPills();
     brancheRetour();
+    apiCodesRestants().then((cr) => {
+      const el = $("#rc-restants");
+      if (el && cr && cr.restants != null) {
+        el.innerHTML = cr.restants > 0
+          ? `🔎 Il reste <b>${cr.restants}</b> code${cr.restants > 1 ? "s" : ""} à trouver en magasin !`
+          : `✅ Tous les codes ont été trouvés — bravo à tous !`;
+      }
+    });
     const go = () => { const v = $("#rc-in").value.trim().toUpperCase(); if (v) { codeAReclamer = v; renderReclamer(); } };
     $("#rc-ok").addEventListener("click", go);
     $("#rc-in").addEventListener("keydown", (e) => e.key === "Enter" && go());
@@ -2823,7 +2845,7 @@ const FEE = (() => {
   // ENTIEREMENT a l'ecran (largeur d'une plante = 14vw, donc jamais au-dela de 90vw).
   const SPOTS = [18, 38, 58, 76];
 
-  let racine = null, bulle = null, timers = [], semis = [], actif = false;
+  let racine = null, bulle = null, timers = [], semis = [], actif = false, lastCodes = 0;
   const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // BAS A DROITE : la position de repos de la fee.
@@ -2960,8 +2982,21 @@ const FEE = (() => {
     t += 1500 + 10000;
 
     // 5) elle repart dans le coin, le jardin s'efface, puis elle patiente 10 s
-    //    dans le coin avant que toute la boucle recommence.
-    timers.push(setTimeout(() => { coin(); semis.forEach(fane); semis = []; }, t + 300));
+    //    dans le coin. Environ toutes les 2 min, pendant cette pause, elle annonce
+    //    combien de codes bonus restent à trouver en magasin.
+    timers.push(setTimeout(() => {
+      coin(); semis.forEach(fane); semis = [];
+      if (Date.now() - lastCodes >= 120000) {
+        lastCodes = Date.now();
+        apiCodesRestants().then((cr) => {
+          if (!actif || !cr || cr.restants == null) return;
+          parle(cr.restants > 0
+            ? `🔎 Il reste ${cr.restants} code${cr.restants > 1 ? "s" : ""} bonus à trouver en magasin !`
+            : `✅ Tous les codes bonus ont été trouvés !`);
+          timers.push(setTimeout(seTait, 9500));
+        });
+      }
+    }, t + 300));
     timers.push(setTimeout(cycle, t + 300 + 10000));
   }
 
