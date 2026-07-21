@@ -953,12 +953,14 @@ async function apiPlantes() {
   } catch { return null; }
 }
 async function apiJardin() {
-  if (SIMULATION && simPret.jardin) return jardin;
+  // Jardin PERSONNEL : on demande la grille de CE joueur (chacun la sienne).
+  if (SIMULATION) return jardin || {};   // en simu, la grille en mémoire du joueur courant
+  const name = joueur ? joueur.name : "";
   try {
-    const r = await fetch(`${CONFIG.api}?action=jardin`);
-    const j = r.ok ? (await r.json()).cases || {} : {};
-    if (SIMULATION) simPret.jardin = true;
-    return j;
+    const r = await fetch(`${CONFIG.api}?action=jardin`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+    });
+    return r.ok ? ((await r.json()).cases || {}) : {};
   } catch { return {}; }
 }
 async function apiSolde(name) {
@@ -1794,7 +1796,7 @@ function renderJardin() {
         const c = jardin[i];
         if (!c) return `<button class="case vide" data-case="${i}" aria-label="Case libre ${i + 1}"></button>`;
         const p = PLANTES[c.plante];
-        return `<button class="case pleine ${p?.rare ? "rare-" + p.rare : ""}" data-info="${i}" title="${esc((p?.nom || c.plante) + " — planté par " + c.par)}">${visuelPlante(c.plante)}</button>`;
+        return `<button class="case pleine ${p?.rare ? "rare-" + p.rare : ""}" data-info="${i}" title="${esc(p?.nom || c.plante)}">${visuelPlante(c.plante)}</button>`;
       }).join("")}
     </div>
     <div class="jardin-info" id="j-info">${jardinMsg ? esc(jardinMsg) : (planteChoisie ? `${iconePlante(planteChoisie)} ${esc(PLANTES[planteChoisie].nom)} sélectionné — tape une case libre !` : "")}</div>
@@ -1819,25 +1821,22 @@ function renderJardin() {
     if (!c) return;
     const p = PLANTES[c.plante];
     const info = $("#j-info");
-    const aMoi = joueur && c.par.toLowerCase() === joueur.name.toLowerCase();
-    info.innerHTML = `<span class="revente">${p ? iconePlante(c.plante) : "🌿"} ${esc(p?.nom || c.plante)} — planté par ${esc(c.par)}`
-      + (aMoi ? ` <button class="btn mini" id="j-revendre">Revendre +${p?.cout ?? 0} 🌰</button>` : "")
-      + `</span>`;
-    if (aMoi) {
-      $("#j-revendre").addEventListener("click", async () => {
-        $("#j-revendre").disabled = true;
-        const res = await apiRevendre(joueur.name, +idx).catch(() => ({ ok: false }));
-        if (res.ok) {
-          delete jardin[idx];
-          if (res.solde != null) joueur.solde = res.solde;
-          jardinMsg = `Plante revendue, +${res.rendu} 🌰 récupérées. Tu as ${joueur.solde} graines.`;
-        } else {
-          jardin = await apiJardin();
-          jardinMsg = res.reason === "pas_la_mienne" ? "On ne peut revendre que ses propres plantes." : "Petit souci, réessaie.";
-        }
-        renderJardin();
-      });
-    }
+    // C'est TON jardin : toutes les plantes sont à toi, tu peux les revendre.
+    info.innerHTML = `<span class="revente">${p ? iconePlante(c.plante) : "🌿"} ${esc(p?.nom || c.plante)}`
+      + ` <button class="btn mini" id="j-revendre">Revendre +${p?.cout ?? 0} 🌰</button></span>`;
+    $("#j-revendre").addEventListener("click", async () => {
+      $("#j-revendre").disabled = true;
+      const res = await apiRevendre(joueur.name, +idx).catch(() => ({ ok: false }));
+      if (res.ok) {
+        delete jardin[idx];
+        if (res.solde != null) joueur.solde = res.solde;
+        jardinMsg = `Plante revendue, +${res.rendu} 🌰 récupérées. Tu as ${joueur.solde} graines.`;
+      } else {
+        jardin = await apiJardin();
+        jardinMsg = "Petit souci, réessaie.";
+      }
+      renderJardin();
+    });
   }));
 
   // Une case libre : planter la plante choisie
@@ -3179,6 +3178,16 @@ function render() {
     if (conf.resultats) CONFIG.dateResultats = conf.resultats;
   }
   board = bd;
+
+  // 🎬 En SIMULATION, on garnit le classement avec des joueurs de démo (si vide)
+  // pour pouvoir TOUT tester : classement en direct, podium des 3 vainqueurs à la
+  // clôture, etc. Rien n'est envoyé au serveur (mode simulation).
+  if (SIMULATION && board.length < 3) {
+    const demo = (name, score, correct, codes) => ({ name, code: "0000", nom: "", score, bonus: 0, depensees: 0, correct, codes, codes_pris: [], time: 300 - score, quiz_fait: true });
+    board = [demo("Marie", 240, 12, 2), demo("Lucas", 190, 10, 1), demo("Emma", 150, 8, 1),
+             demo("Tom", 110, 6, 0), demo("Sofia", 80, 5, 0), demo("Noah", 50, 3, 0)].concat(board);
+    simPret.board = true;   // apiGetBoard renverra cette liste (pas de fetch réel)
+  }
 
   // 📺 La TÉLÉ garde son spectacle (compte à rebours + fée, puis classement).
   // Toutes les transitions se font TOUTES SEULES côté navigateur (aucun

@@ -426,10 +426,13 @@ switch ($action) {
     break;
   }
 
-  // 🌳 La grille du jardin collectif (lecture seule).
+  // 🌳 La grille du jardin PERSONNEL d'un joueur (lecture seule). Chacun a la
+  // sienne : le fichier est un dictionnaire pseudo(min) → { case → plante }.
   case 'jardin': {
+    $name = mb_strtolower(trim($input['name'] ?? ''));
     $j = readJson($jardinFile);
-    echo json_encode(['cases' => (object)($j['cases'] ?? [])], JSON_UNESCAPED_UNICODE);
+    $cases = ($name !== '' && isset($j[$name]) && is_array($j[$name])) ? $j[$name] : [];
+    echo json_encode(['cases' => (object)$cases], JSON_UNESCAPED_UNICODE);
     break;
   }
 
@@ -483,11 +486,12 @@ switch ($action) {
     });
     if (empty($debit['ok'])) { echo json_encode($debit, JSON_UNESCAPED_UNICODE); break; }
 
-    // Étape 2 : pose de la plante, sous verrou du jardin.
+    // Étape 2 : pose de la plante dans MON jardin (grille personnelle), sous verrou.
     $pose = withLock($jardinFile, function (&$j, &$write) use ($idx, $plante, $name) {
-      if (!isset($j['cases']) || !is_array($j['cases'])) { $j['cases'] = []; }
-      if (isset($j['cases'][$idx])) { return ['ok' => false, 'reason' => 'case_prise']; }
-      $j['cases'][$idx] = ['plante' => $plante, 'par' => $name, 'date' => date('c')];
+      $key = mb_strtolower($name);
+      if (!isset($j[$key]) || !is_array($j[$key])) { $j[$key] = []; }
+      if (isset($j[$key][$idx])) { return ['ok' => false, 'reason' => 'case_prise']; }
+      $j[$key][$idx] = ['plante' => $plante, 'par' => $name, 'date' => date('c')];
       $write = true;
       return ['ok' => true];
     });
@@ -518,14 +522,12 @@ switch ($action) {
     $name = trim($input['name'] ?? '');
     $idx  = intval($input['case'] ?? -1);
 
-    // Étape 1 : retirer la plante SI elle m'appartient, sous verrou du jardin.
+    // Étape 1 : retirer la plante de MON jardin (c'est forcément la mienne), sous verrou.
     $retiree = withLock($jardinFile, function (&$j, &$write) use ($idx, $name) {
-      if (!isset($j['cases'][$idx])) { return ['ok' => false, 'reason' => 'case_vide']; }
-      $c = $j['cases'][$idx];
-      if (mb_strtolower($c['par'] ?? '') !== mb_strtolower($name)) {
-        return ['ok' => false, 'reason' => 'pas_la_mienne'];
-      }
-      unset($j['cases'][$idx]);
+      $key = mb_strtolower($name);
+      if (!isset($j[$key][$idx])) { return ['ok' => false, 'reason' => 'case_vide']; }
+      $c = $j[$key][$idx];
+      unset($j[$key][$idx]);
       $write = true;
       return ['ok' => true, 'plante' => $c['plante']];
     });
