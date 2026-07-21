@@ -137,6 +137,20 @@ body {
 .modal h3 { font-family: 'Fredoka', sans-serif; color: var(--pousse); margin-bottom: 10px; }
 .modal p { font-size: .9rem; line-height: 1.5; margin-bottom: 10px; }
 .modal .btn { width: 100%; margin-top: 6px; }
+
+/* Grosse fenêtre « Félicitations, code trouvé » (écran /quiz/code). */
+.code-modal { max-width: 560px; text-align: center; padding: 30px 26px; }
+.code-modal .cm-emoji { font-size: clamp(3rem, 9vw, 4rem); line-height: 1; }
+.code-modal .cm-titre { font-family: 'Fredoka', sans-serif; color: var(--pousse); font-size: clamp(1.6rem, 5vw, 2.2rem); margin: 6px 0 8px; }
+.code-modal .cm-sous { font-size: 1.05rem; line-height: 1.5; margin-bottom: 16px; }
+.code-modal .cm-consigne { font-weight: 800; color: var(--foret); font-size: clamp(1.05rem, 3vw, 1.25rem); margin-bottom: 18px; }
+.cm-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+.cm-mod { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--brume); border: 3px solid transparent; border-radius: 18px; padding: clamp(22px, 4vh, 34px) 16px;
+  transition: transform .12s, border-color .15s, box-shadow .15s; }
+.cm-mod:hover, .cm-mod:active { transform: translateY(-3px); border-color: var(--pousse); box-shadow: 0 8px 24px rgba(14,59,36,.14); }
+.cm-mod-emo { font-size: clamp(2.2rem, 6vw, 3rem); line-height: 1; }
+.cm-mod-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(1.1rem, 3vw, 1.35rem); color: var(--foret); }
 .score-big {
   font-family: 'Fredoka', sans-serif; font-weight: 700;
   font-size: 4rem; color: var(--pousse); text-align: center; line-height: 1;
@@ -949,6 +963,12 @@ function metCodeAttente(c) { if (SIMULATION) return; try { localStorage.setItem(
 function litCodeAttente() { if (SIMULATION) return ""; try { return localStorage.getItem(LS_ATTENTE) || ""; } catch (e) { return ""; } }
 function videCodeAttente() { try { localStorage.removeItem(LS_ATTENTE); } catch (e) {} }
 
+// 🖥️ Sommes-nous dans le parcours BORNE ? (le flag est posé au clic d'un module.)
+function estBorne() { try { return sessionStorage.getItem("fj_borne") === "1"; } catch (e) { return false; } }
+// Retour « accueil » : dans la borne, on RESTE dans la borne (on ne s'échappe pas
+// vers le quiz). Renvoie true si on a bien géré la redirection.
+function retourAccueilBorne() { if (estBorne()) { location.href = quizBase() + "borne"; return true; } return false; }
+
 // 🔒 Petite fenêtre « politique de confidentialité ».
 function ouvrePolitique() {
   const o = document.createElement("div");
@@ -1665,7 +1685,7 @@ function renderRetrouver() {
   };
   $("#r-ok").addEventListener("click", go);
   $("#r-code").addEventListener("keydown", (e) => e.key === "Enter" && go());
-  $("#r-retour").addEventListener("click", (e) => { e.preventDefault(); jardinMsg = null; userView = "auto"; quiz = null; render(); });
+  $("#r-retour").addEventListener("click", (e) => { e.preventDefault(); jardinMsg = null; if (retourAccueilBorne()) return; userView = "auto"; quiz = null; render(); });
 }
 
 /* ============================================================
@@ -1675,8 +1695,8 @@ async function renderReclamer() {
   clearInterval(tickTimer);
   let code = (codeAReclamer || "").toUpperCase();
 
-  const retourHtml = () => `<p class="center" style="margin-top:12px;"><a href="#" id="rc-retour" class="lien">◂ ${joueur ? "Retour au jardin" : "Retour"}</a></p>`;
-  const brancheRetour = () => { const r = $("#rc-retour"); if (r) r.addEventListener("click", (e) => { e.preventDefault(); codeAReclamer = null; userView = joueur ? "jardin" : "auto"; quiz = null; render(); }); };
+  const retourHtml = () => `<p class="center" style="margin-top:12px;"><a href="#" id="rc-retour" class="lien">◂ ${estBorne() ? "Accueil" : (joueur ? "Retour au jardin" : "Retour")}</a></p>`;
+  const brancheRetour = () => { const r = $("#rc-retour"); if (r) r.addEventListener("click", (e) => { e.preventDefault(); if (retourAccueilBorne()) return; codeAReclamer = null; userView = joueur ? "jardin" : "auto"; quiz = null; render(); }); };
 
   // Aucun code fourni : petit champ pour le saisir à la main.
   if (!code) {
@@ -1717,20 +1737,29 @@ async function renderReclamer() {
     brancheRetour(); return;
   }
 
-  // Code disponible mais pas encore identifié : on le met de côté et on propose
-  // de créer un compte ou de se connecter pour récupérer les graines.
+  // Code disponible mais pas encore identifié : GROSSE FENÊTRE de félicitations,
+  // avec 2 modules (se connecter / créer un compte). Le code est mis de côté et
+  // les graines sont créditées automatiquement une fois la connexion réussie.
   if (!joueur) {
     metCodeAttente(code);
-    app.innerHTML = `<div class="card center"><div style="font-size:2.6rem;">🎁</div>
-      <h2 class="q-text">Bravo, un bonus disponible !</h2>
-      <p class="hint">Le code <b>${esc(code)}</b> vaut <b>+${CONFIG.pointsParCodeBonus} 🌱</b>. Pour l'ajouter à tes graines,
-      crée un compte ou connecte-toi — il s'ajoutera <b>tout seul</b> ensuite.</p>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-        <button class="btn" id="rc-jouer">Créer un compte 🌱</button>
-        <button class="btn ghost" id="rc-retrouver">Se connecter</button>
-      </div></div>`;
-    $("#rc-jouer").addEventListener("click", () => { codeAReclamer = null; userView = "auto"; quiz = null; render(); });
-    $("#rc-retrouver").addEventListener("click", () => { codeAReclamer = null; userView = "retrouver"; quiz = null; render(); });
+    app.innerHTML = `<div class="card center"><div style="font-size:2.4rem;">🎁</div>
+      <h2 class="q-text">Code valide !</h2><p class="hint">On y est presque…</p></div>`;
+    const o = document.createElement("div");
+    o.className = "modal-fond";
+    o.innerHTML = `<div class="modal code-modal">
+      <div class="cm-emoji">🎉</div>
+      <h2 class="cm-titre">Félicitations !</h2>
+      <p class="cm-sous">Vous avez trouvé un code bonus — <b>+${CONFIG.pointsParCodeBonus} 🌱</b> à récupérer.</p>
+      <p class="cm-consigne">Connectez-vous pour récupérer vos graines</p>
+      <div class="cm-modules">
+        <button class="cm-mod" data-cm="login"><span class="cm-mod-emo">🔑</span><span class="cm-mod-titre">Je me connecte</span></button>
+        <button class="cm-mod" data-cm="signup"><span class="cm-mod-emo">🌱</span><span class="cm-mod-titre">Je crée mon compte</span></button>
+      </div>
+    </div>`;
+    document.body.appendChild(o);
+    o.querySelector('[data-cm="login"]').addEventListener("click", () => { o.remove(); codeAReclamer = null; userView = "retrouver"; quiz = null; render(); });
+    o.querySelector('[data-cm="signup"]').addEventListener("click", () => { o.remove(); codeAReclamer = null; userView = "auto"; quiz = null; render(); });
+    o.addEventListener("click", (e) => { if (e.target === o) { o.remove(); if (retourAccueilBorne()) return; codeAReclamer = null; userView = "reclamer"; render(); } });
     return;
   }
 
