@@ -252,6 +252,8 @@ body {
    spéculaire scintille doucement. */
 .case .fleur-rare { width: 84%; height: 84%; }
 .plt .emo .fleur-rare { display: inline-block; width: 34px; height: 34px; }
+.case .arbre-glace { width: 96%; height: 96%; }
+.plt .emo .arbre-glace { display: inline-block; width: 38px; height: 38px; vertical-align: middle; }
 .fleur-rare { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); animation: fleurBrille 2.6s ease-in-out infinite; }
 @keyframes fleurBrille {
   0%, 100% { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)) drop-shadow(0 0 1px rgba(255,255,255,.4)); }
@@ -1266,10 +1268,31 @@ function fleurRareSvg(tier) {
     <ellipse class="glint" cx="43" cy="42" rx="6" ry="4" fill="rgba(255,255,255,.85)"/>
   </svg>`;
 }
-// Ce qui s'affiche dans une case : la fleur métallique pour les rares, sinon l'emoji.
+// 🍦 L'ARBRE À TICKETS GLACE : le vrai arbre que la fée fait pousser, avec les
+// tickets glace BLEUS pendus aux branches (pas un emoji). Repris du dessin de la fée.
+const TICKET_GLACE = `<rect x="2" y="2" width="166" height="100" rx="12" fill="url(#glaceTgJ)" stroke="#152c6b" stroke-width="3"></rect><rect x="10" y="12" width="106" height="80" rx="7" fill="#fff" stroke="#152c6b" stroke-width="1.6"></rect><text x="24" y="52" font-family="Arial,sans-serif" font-size="34" font-weight="900" fill="#1c1c1c" font-style="italic">1x</text><text x="18" y="72" font-family="Arial,sans-serif" font-size="15" font-weight="900" fill="#1c1c1c" font-style="italic">GRATUIT</text><path d="M118 60 L152 60 L135 98 Z" fill="#e8a94a" stroke="#152c6b" stroke-width="1.5"></path><path d="M116 58 C110 40 118 26 128 24 C126 12 146 8 150 20 C160 18 166 30 158 38 C166 44 158 58 150 56 Z" fill="#fdf6e6" stroke="#152c6b" stroke-width="1.6"></path>`;
+function arbreGlaceSvg() {
+  return `<svg class="arbre-glace" viewBox="36 16 128 162" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="glaceTgJ" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9bf5"/><stop offset="1" stop-color="#1e40af"/></linearGradient></defs>
+    <rect x="102" y="98" width="16" height="72" rx="5" fill="#8A5B36"/>
+    <circle cx="110" cy="60" r="40" fill="#2E7D3B"/><circle cx="76" cy="80" r="27" fill="#3C9147"/>
+    <circle cx="144" cy="80" r="27" fill="#3C9147"/><circle cx="110" cy="78" r="31" fill="#4E9E52"/>
+    <line x1="71" y1="66" x2="71" y2="83" stroke="#6E4A2B" stroke-width="1.5"/>
+    <line x1="145" y1="70" x2="145" y2="87" stroke="#6E4A2B" stroke-width="1.5"/>
+    <line x1="109" y1="92" x2="109" y2="107" stroke="#6E4A2B" stroke-width="1.5"/>
+    <g transform="translate(46,82) scale(0.29)">${TICKET_GLACE}</g>
+    <g transform="translate(120,86) scale(0.29)">${TICKET_GLACE}</g>
+    <g transform="translate(84,106) scale(0.29)">${TICKET_GLACE}</g>
+  </svg>`;
+}
+
+// Ce qui s'affiche dans une case : fleur métallique (rares), arbre à tickets glace,
+// sinon l'emoji de la plante.
 function visuelPlante(cle) {
   const p = PLANTES[cle];
-  return p && p.rare ? fleurRareSvg(p.rare) : (p?.emoji || "🌿");
+  if (p && p.rare) return fleurRareSvg(p.rare);
+  if (cle === "arbreglace") return arbreGlaceSvg();
+  return p?.emoji || "🌿";
 }
 
 // Classement des plus beaux jardins : par VALEUR totale des plantes posées.
@@ -1319,7 +1342,7 @@ function renderJardin() {
     <div class="catalogue">
       ${Object.entries(PLANTES).map(([cle, p]) => `
         <button class="plt ${p.rare ? "rare-" + p.rare : ""} ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${p.cout > joueur.solde ? "disabled" : ""}>
-          <span class="emo">${p.rare ? fleurRareSvg(p.rare) : p.emoji}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌱</span>
+          <span class="emo">${visuelPlante(cle)}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌱</span>
         </button>`).join("")}
     </div>
     <div class="grille">
