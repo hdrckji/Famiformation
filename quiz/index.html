@@ -341,7 +341,7 @@ body {
   animation: tvPulse 1s ease-in-out infinite; }
 @keyframes tvPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 .tv-sub { font-weight: 700; font-size: clamp(1rem, 2.4vw, 1.5rem); opacity: .8; margin-top: 12px; }
-.tv-tree { font-size: clamp(3rem, 11vw, 8rem); line-height: 1; margin-top: 18px;
+.tv-tree { font-size: clamp(2rem, 5.5vw, 3.6rem); line-height: 1; margin-top: 14px;
   animation: grow 2.4s ease-in-out infinite; }
 body.mode-tele { justify-content: center; }
 body.mode-tele .fami-head { margin-bottom: 8px; }
@@ -1783,6 +1783,7 @@ function renderSimTele() {
       <div class="tv-tree" id="tvTree">${arbreCourt(n)}</div>
       <div class="tv-sub">Regarde l'arbre grandir… 🌱</div>
     </div>`;
+    FEE.start();   // la fée est là aussi dans l'aperçu télé
     const it = setInterval(() => {
       const c = document.getElementById("tvC"), tr = document.getElementById("tvTree");
       if (!c) { clearInterval(it); return; }
@@ -1799,6 +1800,7 @@ function renderSimTele() {
   }
 
   async function phaseScore() {
+    FEE.stop();
     const q = await qrQuiz().catch(() => null);
     app.innerHTML = `<div class="tv">
       <div class="tv-phase">🏆 Le grand quiz Famiformation</div>
@@ -1846,70 +1848,35 @@ function renderSimCode() {
 
 /* ============================================================
    📺 ÉCRAN TÉLÉ (/quiz/tele) — pour la télé du magasin.
-   En BOUCLE : le VRAI compte à rebours (avec la graine qui pousse) → le VRAI
-   classement en direct + QR code pour rejoindre. Données réelles, pas de démo.
+   AVANT le lancement, il montre EXACTEMENT le compte à rebours de la page joueur
+   (avec la fée, la graine qui pousse, tout) — c'est render() qui appelle
+   renderCountdown(). APRÈS le lancement, il montre le classement en direct + QR.
+   La bascule est gérée par render() selon la phase.
    ============================================================ */
-function renderTele() {
+async function renderTeleBoard() {
   document.body.classList.add("mode-tele");
-  const timers = [];
-  const clear = () => { timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); timers.length = 0; };
-
-  function ecranChrono() {
-    clear();
-    const phase = phaseNow();
-    const target = phase === "avant" ? CONFIG.dateLancement : CONFIG.dateCloture;
-    const label = phase === "avant" ? "🚀 Lancement dans…" : phase === "ouvert" ? "⏳ Fin du quiz dans…" : "🏆 Merci à tous !";
-    app.innerHTML = `<div class="tv">
-      <div class="tv-phase">${label}</div>
-      ${phase !== "termine" ? `<div class="cd-digits">
-        <div class="cd-cell"><div class="cd-num" id="cd-j">--</div><div class="cd-lab">Jours</div></div>
-        <div class="cd-cell"><div class="cd-num" id="cd-h">--</div><div class="cd-lab">Heures</div></div>
-        <div class="cd-cell"><div class="cd-num" id="cd-m">--</div><div class="cd-lab">Minutes</div></div>
-        <div class="cd-cell sec"><div class="cd-num" id="cd-s">--</div><div class="cd-lab">Secondes</div></div>
-      </div>` : ""}
-      <div class="tv-tree" id="tv-tree">${cdPousse(CONFIG.dateLancement.getTime() - Date.now())}</div>
-      <div class="tv-sub">📱 Scanne le QR pour jouer sur ton téléphone !</div>
-    </div>`;
-    const tick = () => {
-      const diff = Math.max(0, target.getTime() - Date.now());
-      const tr = document.getElementById("tv-tree");
-      if (tr) tr.textContent = cdPousse(CONFIG.dateLancement.getTime() - Date.now());
-      if (phase !== "termine") {
-        const J = document.getElementById("cd-j"); if (!J) return;
-        J.textContent = pad(Math.floor(diff / 86400000));
-        document.getElementById("cd-h").textContent = pad(Math.floor((diff % 86400000) / 3600000));
-        document.getElementById("cd-m").textContent = pad(Math.floor((diff % 3600000) / 60000));
-        document.getElementById("cd-s").textContent = pad(Math.floor((diff % 60000) / 1000));
-      }
-    };
-    tick();
-    timers.push(setInterval(tick, 1000));
-    timers.push(setTimeout(ecranClassement, 18000));   // ~18 s de chrono, puis le classement
-  }
-
-  async function ecranClassement() {
-    clear();
-    board = await apiGetBoard().catch(() => board);
-    const q = await qrQuiz().catch(() => null);
-    const top = board.slice(0, 8);
-    app.innerHTML = `<div class="tv">
-      <div class="tv-phase">🏆 Le classement en direct</div>
-      <div class="tv-cols">
-        <div class="tv-board">
-          ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`).join("")
-            : `<div class="tv-row" style="justify-content:center;">Sois le premier à jouer ! 🌱</div>`}
-        </div>
-        <div class="tv-qr">
-          <div class="tv-qr-box">${q ? q.svg : ""}</div>
-          <div class="tv-scan">📱 Scanne pour jouer !</div>
-          <div class="tv-url">${esc(q ? q.url : "")}</div>
-        </div>
+  FEE.stop();   // une fois le quiz lancé, la fée range sa baguette
+  board = await apiGetBoard().catch(() => board);
+  const q = await qrQuiz().catch(() => null);
+  const top = board.slice(0, 8);
+  const termine = phaseNow() === "termine";
+  app.innerHTML = `<div class="tv">
+    <div class="tv-phase">${termine ? "🏆 Résultats — merci à tous !" : "🏆 Le classement en direct"}</div>
+    <div class="tv-cols">
+      <div class="tv-board">
+        ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`).join("")
+          : `<div class="tv-row" style="justify-content:center;">Sois le premier à jouer ! 🌱</div>`}
       </div>
-    </div>`;
-    timers.push(setTimeout(ecranChrono, 15000));       // ~15 s de classement, puis retour au chrono
-  }
-
-  ecranChrono();
+      <div class="tv-qr">
+        <div class="tv-qr-box">${q ? q.svg : ""}</div>
+        <div class="tv-scan">📱 Scanne pour jouer !</div>
+        <div class="tv-url">${esc(q ? q.url : "")}</div>
+      </div>
+    </div>
+  </div>`;
+  // Rafraîchissement automatique du classement (télé en direct).
+  clearInterval(tickTimer); clearTimeout(tickTimer);
+  tickTimer = setTimeout(() => { if (phaseNow() === "avant") render(); else renderTeleBoard(); }, 20000);
 }
 
 /* ============================================================
@@ -2349,6 +2316,15 @@ const EGG = (() => {
    ============================================================ */
 
 function render() {
+  // 📺 Écran télé : AVANT le lancement, on affiche le VRAI compte à rebours de la
+  // page joueur (avec la fée) ; APRÈS, le classement en direct. La bascule se fait
+  // toute seule (le tick du compte à rebours rappelle render() à zéro).
+  if (ECRAN === "tele") {
+    document.body.classList.add("mode-tele");
+    if (phaseNow() === "avant") { stopHerbes(); FEE.start(); renderCountdown(); }
+    else { renderTeleBoard(); }
+    return;
+  }
   // En simulation, les écrans de prévisualisation (menu/télé/code) passent avant
   // tout. Le mode « joueur » (et sa suite jardin/mini-jeu) suit le flux normal.
   if (SIMULATION) {
@@ -2390,10 +2366,10 @@ function render() {
   }
   board = bd;
 
-  // 🖥️ Écrans dédiés : la télé et la borne ont leur propre affichage, sans
-  // compte ni quiz. On les lance ici et on s'arrête là.
-  if (ECRAN === "tele")  { renderTele();  return; }
+  // 🖥️ La BORNE a son propre affichage. La TÉLÉ passe par render() (elle réutilise
+  // le vrai compte à rebours avec la fée, puis bascule sur le classement).
   if (ECRAN === "borne") { renderBorne(); return; }
+  if (ECRAN === "tele")  { render(); return; }
 
   // 🌱 Auto-reconnaissance : si ce téléphone a déjà une carte de jardinier, on
   // identifie la personne sans qu'elle ait à retaper quoi que ce soit.
