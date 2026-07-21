@@ -343,8 +343,11 @@ body {
 .tv-sub { font-weight: 700; font-size: clamp(1rem, 2.4vw, 1.5rem); opacity: .8; margin-top: 12px; }
 .tv-tree { font-size: clamp(2rem, 5.5vw, 3.6rem); line-height: 1; margin-top: 14px;
   animation: grow 2.4s ease-in-out infinite; }
-body.mode-tele { justify-content: center; }
-body.mode-tele .fami-head { margin-bottom: 8px; }
+/* Sur la télé, on colle le bloc (compte à rebours / classement) EN HAUT pour
+   laisser tout le bas libre à la fée (sinon elle chevauche le texte). */
+body.mode-tele { justify-content: flex-start; padding-top: 20px; }
+body.mode-tele .fami-head { margin-bottom: 6px; }
+body.mode-tele #app { flex: 0 0 auto; }
 .tv-cols { display: flex; gap: 30px; align-items: center; justify-content: center; flex-wrap: wrap; }
 .tv-board { flex: 1 1 320px; max-width: 520px; text-align: left; }
 .tv-row { display: flex; justify-content: space-between; gap: 12px; background: var(--craie); border-radius: 14px;
