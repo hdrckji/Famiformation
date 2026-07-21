@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once __DIR__ . '/includes/notifications.php';
 verifierConnexion($db);
 
 $pageLang = famiLang();
@@ -119,6 +120,29 @@ $message = '';
 $createFailed = false;
 $createFailedByday = false;
 $currentUserId = (int) ($_SESSION['user_id'] ?? 0);
+$currentUserName = trim(trim((string) ($_SESSION['prenom'] ?? '')) . ' ' . trim((string) ($_SESSION['nom'] ?? '')));
+
+// Prévient tous les admins (sauf le créateur) qu'il y a de nouvelles demandes à valider.
+$notifyAdminsNewDemands = function ($count, $departmentName, $weekLabel) use ($db, $currentUserId, $currentUserName) {
+    $count = (int) $count;
+    if ($count <= 0) {
+        return;
+    }
+    try {
+        $admins = $db->query("SELECT id FROM utilisateurs WHERE role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
+        $body = $count . ' demande(s) d\'horaire à valider'
+            . ($departmentName !== '' ? ' — ' . $departmentName : '')
+            . ($weekLabel !== '' ? ' (' . $weekLabel . ')' : '')
+            . ($currentUserName !== '' ? ', créées par ' . $currentUserName : '') . '.';
+        foreach ($admins as $adminId) {
+            $adminId = (int) $adminId;
+            if ($adminId <= 0 || $adminId === $currentUserId) {
+                continue;
+            }
+            famijobNotify($db, $adminId, 'demande_created', 'Nouvelles demandes d\'horaire', $body, 'validation_demandes_horaires.php', $currentUserId, $currentUserName);
+        }
+    } catch (Exception $e) {}
+};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireValidCSRF();
@@ -198,6 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($createdCount > 0) {
+                $notifyAdminsNewDemands($createdCount, $departmentName, (string) ($selectedWeek['label'] ?? ''));
                 $message = "<div class='alert success'>" . $createdCount . ' ' . fjdT('demande(s) enregistrée(s).', 'aanvraag/aanvragen geregistreerd.')
                     . ($rowsWithoutDay > 0 ? ' ' . $rowsWithoutDay . ' ' . fjdT('horaire(s) sans jour coché ignoré(s).', 'uurrooster(s) zonder aangevinkte dag genegeerd.') : '')
                     . "</div>";
@@ -274,6 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($createdCount > 0) {
+                $notifyAdminsNewDemands($createdCount, $departmentName, (string) ($selectedWeek['label'] ?? ''));
                 $message = "<div class='alert success'>" . $createdCount . ' ' . e(fjdT('créneau(x) enregistré(s).', 'tijdsblok(ken) geregistreerd.')) . "</div>";
             } elseif (!$hasSlot) {
                 $message = "<div class='alert error'>" . e(fjdT('Ajoute au moins un horaire dans une journée.', 'Voeg minstens één uurrooster toe in een dag.')) . "</div>";

@@ -155,6 +155,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = "<div class='alert success'>" . e(fjvT('Validation du département', 'Validatie van afdeling')) . ' ' . e($selectedDepartment) . ': ' . (int) $count . ' ' . e(fjvT('demande(s).', 'aanvraag/aanvragen.')) . "</div>";
         }
     }
+
+    // Les demandes viennent d'être traitées : on marque les notifs "nouvelles demandes"
+    // de cet admin comme lues (elles ne servent plus, il est en train de les traiter).
+    famijobNotifMarkReadByType($db, $currentUserId, 'demande_created');
 }
 
 $pendingSql =
@@ -208,6 +212,8 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
         .actions { display:flex; gap:8px; }
         .empty { background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:18px; color:var(--muted); }
         .seat-badge { display:inline-block; min-width:34px; text-align:center; background:#edf5ef; color:var(--accent); font-weight:800; font-size:.82rem; padding:3px 8px; border-radius:999px; }
+        tr.date-band td { background:linear-gradient(135deg,#264e35,#3f6b4d); color:#fff; font-weight:800; font-size:1rem; letter-spacing:.02em; padding:12px 14px; text-transform:capitalize; position:sticky; }
+        tr.date-band + tr.req-row td { border-top:none; }
         tr.req-first td { border-top:2px solid #cddccf; }
         tr.req-row:not(.req-last) td:nth-child(-n+4) { border-bottom:1px dashed #e6eee8; }
         tbody tr:hover td { background:#f9fdfa; }
@@ -272,7 +278,22 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
                 </tr>
             </thead>
             <tbody>
+                <?php
+                    $joursFr = [1 => 'Lundi', 2 => 'Mardi', 3 => 'Mercredi', 4 => 'Jeudi', 5 => 'Vendredi', 6 => 'Samedi', 7 => 'Dimanche'];
+                    $joursNl = [1 => 'Maandag', 2 => 'Dinsdag', 3 => 'Woensdag', 4 => 'Donderdag', 5 => 'Vrijdag', 6 => 'Zaterdag', 7 => 'Zondag'];
+                    $jours = famiLang() === 'nl' ? $joursNl : $joursFr;
+                    $currentBandDate = null;
+                ?>
                 <?php foreach ($pendingRequests as $request): ?>
+                    <?php
+                        $dateKey = (string) $request['shift_date'];
+                        if ($dateKey !== $currentBandDate):
+                            $currentBandDate = $dateKey;
+                            $bandD = new DateTimeImmutable($dateKey);
+                            $bandLabel = ($jours[(int) $bandD->format('N')] ?? '') . ' ' . $bandD->format('d/m/Y');
+                    ?>
+                        <tr class="date-band"><td colspan="7">📅 <?php echo e($bandLabel); ?></td></tr>
+                    <?php endif; ?>
                     <?php
                         $seats = max(1, (int) $request['seats_required']);
                         $dateLabel = e((new DateTimeImmutable((string) $request['shift_date']))->format('d/m/Y'));

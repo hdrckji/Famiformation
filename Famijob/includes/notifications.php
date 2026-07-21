@@ -136,6 +136,26 @@ if (!function_exists('famijobNotifMarkAllRead')) {
     }
 }
 
+if (!function_exists('famijobNotifMarkReadByType')) {
+    /** Marque comme lues toutes les notifs non lues d'un type donne pour un utilisateur. */
+    function famijobNotifMarkReadByType(PDO $db, $userId, $type)
+    {
+        $userId = (int) $userId;
+        $type = (string) $type;
+        if ($userId <= 0 || $type === '') {
+            return 0;
+        }
+        famijobNotifEnsureTable($db);
+        try {
+            $stmt = $db->prepare("UPDATE interim_notifications SET is_read = 1 WHERE recipient_id = ? AND type = ? AND is_read = 0");
+            $stmt->execute([$userId, $type]);
+            return $stmt->rowCount();
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+}
+
 if (!function_exists('famijobNotifMarkRead')) {
     function famijobNotifMarkRead(PDO $db, $userId, $notifId)
     {
