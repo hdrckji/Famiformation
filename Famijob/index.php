@@ -500,12 +500,6 @@ $famijobBackgroundUrl = resolvePublicAssetUrl(
                 <div class="tile-desc"><?= e(famiT('tile.interim_fixes.desc')) ?></div>
             </a>
 
-            <a href="parametres.php" class="tile">
-                <div class="tile-icon">⚙️</div>
-                <div class="tile-title"><?= e(fjT('Paramètres', 'Instellingen')) ?></div>
-                <div class="tile-desc"><?= e(fjT('Gérer les départements et la configuration de l\'app — tout en base, sans toucher au code.', 'Afdelingen en app-configuratie beheren — alles in de database, zonder code.')) ?></div>
-            </a>
-
             <a href="avis.php" class="tile">
                 <div class="tile-icon">💬</div>
                 <div class="tile-title"><?= e(fjT('Avis & suggestions', 'Feedback & suggesties')) ?></div>

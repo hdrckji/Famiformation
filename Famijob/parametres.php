@@ -33,20 +33,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (mb_strlen($name) > 120) {
             $error = 'Nom de département trop long (120 caractères max).';
         } else {
-            $target = famijobNormalizeDepartmentName($name);
-            $existingId = 0;
-            foreach ($db->query("SELECT id, department_name FROM departments")->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                if (famijobNormalizeDepartmentName($row['department_name']) === $target) {
-                    $existingId = (int) $row['id'];
-                    break;
+            try {
+                $target = famijobNormalizeDepartmentName($name);
+                $existing = null;
+                foreach ($db->query("SELECT id, department_name, is_active FROM departments")->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    if (famijobNormalizeDepartmentName($row['department_name']) === $target) {
+                        $existing = $row;
+                        break;
+                    }
                 }
-            }
-            if ($existingId > 0) {
-                $db->prepare("UPDATE departments SET is_active = 1, updated_at = NOW() WHERE id = ?")->execute([$existingId]);
-                $message = 'Département « ' . $name . ' » activé.';
-            } else {
-                $db->prepare("INSERT INTO departments (department_name, is_active) VALUES (?, 1)")->execute([$name]);
-                $message = 'Département « ' . $name . ' » ajouté.';
+                if ($existing !== null) {
+                    if ((int) $existing['is_active'] === 1) {
+                        $error = 'Le département « ' . $existing['department_name'] . ' » existe déjà.';
+                    } else {
+                        $db->prepare("UPDATE departments SET is_active = 1, updated_at = NOW() WHERE id = ?")->execute([(int) $existing['id']]);
+                        $message = 'Département « ' . $existing['department_name'] . ' » réactivé.';
+                    }
+                } else {
+                    $db->prepare("INSERT INTO departments (department_name, is_active) VALUES (?, 1)")->execute([$name]);
+                    $message = 'Département « ' . $name . ' » ajouté.';
+                }
+            } catch (Exception $e) {
+                $error = "Impossible d'enregistrer le département : " . $e->getMessage();
             }
         }
     } elseif (isset($_POST['deactivate_department'])) {
