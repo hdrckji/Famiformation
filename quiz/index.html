@@ -540,6 +540,25 @@ body.mode-tele #app { flex: 0 0 auto; }
   will-change: transform; animation: confettiFall linear forwards; }
 @keyframes confettiFall { to { transform: translate(var(--drift, 0), 116vh) rotate(var(--rot, 540deg)); } }
 
+/* 📺 Télé — écran des 3 VAINQUEURS (fin d'événement) : podium en marches. */
+.tw { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 82vh; text-align: center; }
+.tw-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
+  font-size: clamp(2rem, 6vw, 4.6rem); margin-bottom: clamp(18px, 4vh, 46px); }
+.tw-podium { display: flex; align-items: flex-end; justify-content: center; gap: clamp(10px, 2.5vw, 38px); }
+.tw-place { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.tw-medal { font-size: clamp(2.4rem, 7vw, 5rem); line-height: 1; }
+.tw-name { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--foret);
+  font-size: clamp(1.1rem, 3vw, 2.4rem); max-width: 28vw; word-break: break-word; }
+.tw-score { font-weight: 800; color: var(--pousse); font-size: clamp(1rem, 2.5vw, 2rem); }
+.tw-bar { margin-top: 8px; width: clamp(84px, 16vw, 220px); border-radius: 16px 16px 0 0; color: #fff;
+  font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(1.6rem, 4vw, 3.2rem);
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; box-shadow: inset 0 6px 16px rgba(0,0,0,.12); }
+.tw-p1 .tw-bar { height: clamp(150px, 30vh, 340px); background: linear-gradient(#F7C13A, #E0A81E); }
+.tw-p2 .tw-bar { height: clamp(115px, 22vh, 250px); background: linear-gradient(#CBD3DB, #99A6B1); }
+.tw-p3 .tw-bar { height: clamp(88px, 16vh, 190px); background: linear-gradient(#DBA470, #B87740); }
+.tw-merci { margin-top: clamp(16px, 4vh, 42px); font-family: 'Fredoka', sans-serif; font-weight: 600;
+  color: var(--foret); opacity: .85; font-size: clamp(1rem, 2.4vw, 1.8rem); }
+
 /* ============================================================
    🥚 EASTER EGGS — "graine", "famiflora", "2026"
    ============================================================ */
@@ -2445,7 +2464,7 @@ async function renderTeleBoard() {
   const top = board.filter((p) => p.quiz_fait !== false).slice(0, 8);
   const termine = phaseNow() === "termine";
   app.innerHTML = `<div class="tv">
-    <div class="tv-phase">${termine ? "🏆 Résultats — merci à tous !" : "🏆 Le classement en direct"}</div>
+    <div class="tv-phase">${termine ? "🏆 Classement final" : "🏆 Le classement en direct"}</div>
     <div class="tv-cols">
       <div class="tv-board">
         ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`).join("")
@@ -2458,9 +2477,40 @@ async function renderTeleBoard() {
       </div>
     </div>
   </div>`;
-  // Rafraîchissement automatique du classement (télé en direct).
+  // Rafraîchissement auto. À la fin, on ALTERNE avec l'écran des 3 vainqueurs.
   clearInterval(tickTimer); clearTimeout(tickTimer);
-  tickTimer = setTimeout(() => { if (phaseNow() === "avant") render(); else renderTeleBoard(); }, 20000);
+  tickTimer = setTimeout(() => {
+    const ph = phaseNow();
+    if (ph === "avant") render();
+    else if (ph === "termine") renderTeleWinners();
+    else renderTeleBoard();
+  }, termine ? 12000 : 20000);
+}
+
+// 📺 Télé — ÉCRAN DES 3 VAINQUEURS (fin d'événement) : podium en marches, puis on
+// repasse au classement complet (pour que chacun se retrouve). Boucle télé.
+async function renderTeleWinners() {
+  document.body.classList.add("mode-tele");
+  FEE.stop(); clearInterval(tickTimer); clearTimeout(tickTimer);
+  board = await apiGetBoard().catch(() => board);
+  const top = board.filter((p) => p.quiz_fait !== false).slice(0, 3);
+  if (!top.length) { renderTeleBoard(); return; }
+  const ordre = [1, 0, 2];   // 2e à gauche, 1er au centre, 3e à droite
+  app.innerHTML = `<div class="tw">
+    <div class="tw-titre">🏆 Le podium des gagnants !</div>
+    <div class="tw-podium">
+      ${ordre.map((pos) => top[pos] ? `
+        <div class="tw-place tw-p${pos + 1}">
+          <div class="tw-medal">${medals[pos]}</div>
+          <div class="tw-name">${esc(top[pos].name)}</div>
+          <div class="tw-score">${top[pos].score} 🌱</div>
+          <div class="tw-bar">${pos + 1}</div>
+        </div>` : "").join("")}
+    </div>
+    <div class="tw-merci">Bravo et merci à toutes et tous d'avoir joué 🌱</div>
+  </div>`;
+  lanceConfettis(7000);
+  tickTimer = setTimeout(() => renderTeleBoard(), 13000);
 }
 
 /* ============================================================
@@ -3066,7 +3116,8 @@ function render() {
       const diff = CONFIG.dateLancement.getTime() - Date.now();
       if (diff <= 10000) teleFinal();
       else { FEE.start(); renderCountdown(); }
-    } else { renderTeleBoard(); }
+    } else if (phaseNow() === "termine") { renderTeleWinners(); }   // fin : les 3 vainqueurs
+    else { renderTeleBoard(); }
     return;
   }
   // En simulation, les écrans de prévisualisation (menu/télé/code) passent avant
@@ -3116,7 +3167,22 @@ function render() {
   board = bd;
 
   // 📺 La TÉLÉ garde son spectacle (compte à rebours + fée, puis classement).
-  if (ECRAN === "tele") { render(); return; }
+  // Toutes les transitions se font TOUTES SEULES côté navigateur (aucun
+  // rechargement nécessaire). Par sécurité, on re-synchronise les dates de
+  // l'événement toutes les 60 s : si tu changes l'heure dans l'admin, la télé
+  // s'ajuste sans qu'on ait à recharger la page.
+  if (ECRAN === "tele") {
+    if (!SIMULATION) setInterval(async () => {
+      const c = await apiConfig().catch(() => null);
+      if (c) {
+        if (c.lancement) CONFIG.dateLancement = new Date(c.lancement);
+        if (c.cloture)   CONFIG.dateCloture = new Date(c.cloture);
+        if (c.resultats) CONFIG.dateResultats = c.resultats;
+      }
+    }, 60000);
+    render();
+    return;
+  }
 
   // 🖥️ La BORNE : appareil partagé → pas d'auto-reconnaissance (chacun repart de
   // zéro) et accueil SANS compte à rebours. Le même render() que le téléphone.
