@@ -71,11 +71,32 @@ Bouton dans l'onglet "Classement" (double confirmation), ou :
 ⚠️ À ne PAS faire après le 29/07, ça efface tout le classement !
 Les questions, elles, ne sont pas touchées par la remise à zéro.
 
-QR CODES BONUS
---------------
-Génère un QR code par code (ex : avec un générateur gratuit en ligne)
-qui affiche simplement le texte du code (FAMI-A7K2...).
-Le premier qui l'entre dans le quiz le "grille" pour les autres.
+LA CARTE DE JARDINIER (identité) 🌱
+-----------------------------------
+Pour jouer, chacun crée sa "carte de jardinier" : un PSEUDO + un
+CODE à 4 CHIFFRES (secret rigolo). Le vrai Nom+Prénom est facultatif
+(section "Aller plus loin", utile pour remettre les prix).
+
+• Le TÉLÉPHONE se souvient : après la 1re inscription, la personne
+  est reconnue toute seule à chaque visite, sans rien retaper.
+• Changement de téléphone / navigateur vidé : on récupère son jardin
+  avec PSEUDO + CODE à 4 chiffres (bouton "J'ai déjà une carte").
+  Oublié = tant pis (on prévient à l'inscription). Anti-usurpation :
+  sans le code à 4 chiffres, impossible de prendre le compte d'un autre.
+• Réglages : CONFIG dans index.html ; côté serveur, rien à faire.
+
+QR CODES BONUS 🎁
+-----------------
+20 codes uniques (api.php, $BONUS_CODES), chacun rapporte 15 graines
+(comptent dans le classement), 2 codes MAX par personne.
+
+Fais des QR codes qui pointent vers un LIEN (pas juste le texte) :
+  https://TON-SITE/quiz/?code=FAMI-A7K2
+En scannant, la page s'ouvre et dit si le code est dispo → bouton
+"Récupérer ce code" qui l'ajoute au compte. Si pas encore inscrit,
+le code est mis de côté et s'ajoute dès la création de la carte.
+Premier arrivé, premier servi : une fois pris, il est grillé.
+(Réglages : $CODE_GRAINES = 15, $MAX_CODES = 2 dans api.php.)
 
 TÉLÉ EN MODE KIOSQUE
 --------------------
@@ -88,7 +109,7 @@ BON À SAVOIR
 ------------
 • Le classement est commun à tout le monde et se rafraîchit
   automatiquement toutes les 30 secondes (pratique pour la télé).
-• Une seule participation par prénom (vérifiée côté serveur).
+• Une seule participation par nom de jardinier (vérifiée côté serveur).
 • Les réponses du quiz sont dans le code de la page : un collègue
   très malin qui ouvre le code source pourrait les trouver.
   Pour un quiz interne bon enfant, c'est largement suffisant —

@@ -29,14 +29,17 @@ if (!function_exists('mb_substr')) {
   }
 }
 
-// 🔑 Codes bonus à usage unique (les mêmes que sur tes QR codes)
+// 🔑 Codes bonus à usage unique (les mêmes que sur tes QR codes en magasin).
+// 20 codes, chacun rapporte $CODE_GRAINES graines à la PREMIÈRE personne qui le
+// récupère. Chaque joueur peut en cumuler au maximum $MAX_CODES.
 $BONUS_CODES = [
-  "FAMI-A7K2",
-  "FAMI-B3X9",
-  "FAMI-C5M1",
-  "FAMI-D8R4",
-  "FAMI-E2T7",
+  "FAMI-A7K2", "FAMI-B3X9", "FAMI-C5M1", "FAMI-D8R4", "FAMI-E2T7",
+  "FAMI-F6H8", "FAMI-G1J3", "FAMI-K9L2", "FAMI-M4N7", "FAMI-P5Q8",
+  "FAMI-R3S6", "FAMI-T2U9", "FAMI-V7W1", "FAMI-X8Y4", "FAMI-Z5A2",
+  "FAMI-B9C6", "FAMI-D1E3", "FAMI-F4G7", "FAMI-H8J5", "FAMI-K2L9",
 ];
+$CODE_GRAINES = 15;   // graines par code bonus (comptent dans le classement)
+$MAX_CODES    = 2;    // combien de codes une même personne peut cumuler
 
 // 🔐 Identifiants admin (accès au mode admin + réinitialisation des scores)
 $ADMIN_ID  = "admin";
@@ -254,12 +257,20 @@ switch ($action) {
       echo json_encode(['error' => 'Prénom invalide']);
       break;
     }
+    // « code » = le code jardinier à 4 chiffres (secret rigolo qui sert à
+    // récupérer son compte sur un autre téléphone). « nom » = Nom Prénom, saisi
+    // facultativement, utile pour remettre les prix aux vrais gagnants.
+    $codeJard = preg_replace('/\D/', '', (string)($input['code'] ?? ''));
     $entree = [
-      'name'      => $name,
+      'name'      => $name,                                   // le pseudo (nom de jardinier)
+      'code'      => substr($codeJard, 0, 4),                 // code secret à 4 chiffres
+      'nom'       => trim(mb_substr((string)($input['nom'] ?? ''), 0, 60)),
       'score'     => max(0, intval($input['score'] ?? 0)),   // graines récoltées, définitives
+      'bonus'     => 0,                                       // graines gagnées au mini-jeu
       'depensees' => 0,                                       // graines déjà plantées au jardin
       'correct'   => max(0, intval($input['correct'] ?? 0)),
-      'codes'     => max(0, intval($input['codes'] ?? 0)),
+      'codes'     => 0,                                       // nombre de codes bonus récupérés
+      'codes_pris' => [],                                     // quels codes bonus ont été pris
       'time'      => max(0, intval($input['time'] ?? 0)),
       'date'      => date('c'),
     ];
@@ -478,6 +489,98 @@ switch ($action) {
         }
       }
       return ['ok' => false, 'reason' => 'joueur_inconnu'];
+    });
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🌱 RÉCUPÉRER SON COMPTE sur un autre téléphone : pseudo + code à 4 chiffres.
+  // (Au quotidien, le téléphone reconnaît le joueur tout seul via son stockage
+  // local ; cette action ne sert qu'au rattrapage.)
+  case 'login_joueur': {
+    $name  = trim($input['name'] ?? '');
+    $code4 = preg_replace('/\D/', '', (string)($input['code'] ?? ''));
+    $board = readJson($scoresFile);
+    foreach ($board as $p) {
+      if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+        if ((string)($p['code'] ?? '') !== $code4) {
+          echo json_encode(['exists' => true, 'mauvais_code' => true]);
+          exit;
+        }
+        echo json_encode([
+          'exists'    => true,
+          'name'      => $p['name'],
+          'recoltees' => intval($p['score'] ?? 0),
+          'solde'     => soldeDe($p),
+          'nbCodes'   => intval($p['codes'] ?? 0),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
+    }
+    echo json_encode(['exists' => false]);
+    break;
+  }
+
+  // 🎁 STATUT d'un code bonus (quand on scanne son QR) : existe-t-il, est-il pris ?
+  case 'code_status': {
+    $bonus = strtoupper(trim($input['bonuscode'] ?? ''));
+    $connu = in_array($bonus, $BONUS_CODES, true);
+    $pris  = false;
+    if ($connu) { $claimed = readJson($codesFile); $pris = isset($claimed[$bonus]); }
+    echo json_encode(['connu' => $connu, 'pris' => $pris], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🎁 RÉCUPÉRER un code bonus et l'associer à son compte (+ graines).
+  // Authentifié par pseudo + code à 4 chiffres. Usage unique (premier servi),
+  // et maximum $MAX_CODES par personne. Les graines comptent dans le classement.
+  case 'code_claim': {
+    $name  = trim($input['name'] ?? '');
+    $code4 = preg_replace('/\D/', '', (string)($input['code'] ?? ''));
+    $bonus = strtoupper(trim($input['bonuscode'] ?? ''));
+
+    if (!in_array($bonus, $BONUS_CODES, true)) { echo json_encode(['ok' => false, 'reason' => 'inconnu']); break; }
+
+    // Étape 1 : authentifier + vérifier qu'il peut encore prendre un code.
+    $chk = withLock($scoresFile, function (&$board, &$write) use ($name, $code4, $bonus, $MAX_CODES) {
+      foreach ($board as $p) {
+        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+          if ((string)($p['code'] ?? '') !== $code4) { return ['ok' => false, 'reason' => 'auth']; }
+          $pris = $p['codes_pris'] ?? [];
+          if (in_array($bonus, $pris, true)) { return ['ok' => false, 'reason' => 'deja_a_toi']; }
+          if (count($pris) >= $MAX_CODES) { return ['ok' => false, 'reason' => 'max_atteint', 'max' => $MAX_CODES]; }
+          return ['ok' => true];
+        }
+      }
+      return ['ok' => false, 'reason' => 'joueur_inconnu'];
+    });
+    if (empty($chk['ok'])) {
+      if (($chk['reason'] ?? '') === 'auth' || ($chk['reason'] ?? '') === 'joueur_inconnu') { http_response_code(401); }
+      echo json_encode($chk, JSON_UNESCAPED_UNICODE);
+      break;
+    }
+
+    // Étape 2 : réserver le code globalement (premier arrivé, premier servi).
+    $prise = withLock($codesFile, function (&$claimed, &$write) use ($bonus, $name) {
+      if (isset($claimed[$bonus])) { return ['ok' => false, 'reason' => 'deja_pris']; }
+      $claimed[$bonus] = ['par' => $name, 'date' => date('c')];
+      $write = true;
+      return ['ok' => true];
+    });
+    if (empty($prise['ok'])) { echo json_encode($prise, JSON_UNESCAPED_UNICODE); break; }
+
+    // Étape 3 : créditer les graines (elles comptent dans le classement).
+    $res = withLock($scoresFile, function (&$board, &$write) use ($name, $bonus, $CODE_GRAINES) {
+      foreach ($board as &$p) {
+        if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+          $p['score'] = intval($p['score'] ?? 0) + $CODE_GRAINES;
+          $p['codes_pris'] = array_values(array_merge($p['codes_pris'] ?? [], [$bonus]));
+          $p['codes'] = count($p['codes_pris']);
+          $write = true;
+          return ['ok' => true, 'gagne' => $CODE_GRAINES, 'recoltees' => intval($p['score']), 'solde' => soldeDe($p), 'nbCodes' => $p['codes']];
+        }
+      }
+      return ['ok' => true, 'gagne' => $CODE_GRAINES];
     });
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
     break;
