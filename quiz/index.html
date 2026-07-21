@@ -377,14 +377,24 @@ body.mode-borne #app { width: 100%; }
 
 /* Site externe (page mail) affiché dans la borne, avec une barre de retour. */
 .ext-overlay { position: fixed; inset: 0; z-index: 100060; background: var(--brume); display: flex; flex-direction: column; }
-.ext-bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #0E3B24; color: #fff; }
-.ext-home { background: var(--soleil); color: #0E3B24; border: none; border-radius: 999px; font-weight: 800;
-  font-size: clamp(1rem, 2.2vw, 1.2rem); padding: 12px 24px; cursor: pointer; }
-.ext-home:hover { filter: brightness(1.06); }
-.ext-form { margin-left: auto; background: var(--craie); color: var(--pousse); border: none; border-radius: 999px;
-  font-weight: 800; font-size: clamp(.95rem, 2.2vw, 1.15rem); padding: 12px 22px; cursor: pointer; }
-.ext-form:hover { filter: brightness(1.04); }
-.ext-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.1rem; opacity: .9; }
+.ext-bar { display: flex; align-items: center; gap: 14px; padding: 12px clamp(14px, 3vw, 26px);
+  background: linear-gradient(100deg, #0B3320 0%, #16512F 55%, #1E6238 100%);
+  box-shadow: 0 4px 18px rgba(11,51,32,.28); position: relative; z-index: 2; }
+.ext-brand { font-family: 'Fredoka', sans-serif; font-weight: 700; color: #fff; letter-spacing: .3px;
+  font-size: clamp(1rem, 2.4vw, 1.35rem); text-shadow: 0 1px 2px rgba(0,0,0,.18); white-space: nowrap; }
+.ext-nav { margin-left: auto; display: flex; gap: 10px; }
+.ext-btn { display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer;
+  border-radius: 999px; font-family: 'Fredoka', sans-serif; font-weight: 700; white-space: nowrap;
+  font-size: clamp(.9rem, 2vw, 1.12rem); padding: 11px clamp(16px, 2.4vw, 22px); color: #fff;
+  background: rgba(255,255,255,.14); box-shadow: 0 1px 0 rgba(255,255,255,.12) inset;
+  transition: transform .12s ease, background .18s ease, box-shadow .18s ease; }
+.ext-btn span { font-size: 1.15em; line-height: 1; }
+.ext-btn:hover { transform: translateY(-1px); background: rgba(255,255,255,.24); }
+.ext-btn:active { transform: translateY(0); }
+.ext-btn.actif { background: #fff; color: var(--pousse); box-shadow: 0 4px 12px rgba(0,0,0,.16); }
+.ext-btn.ext-cta { background: var(--soleil); color: #0B3320; box-shadow: 0 4px 12px rgba(247,193,58,.35); }
+.ext-btn.ext-cta:hover { background: var(--soleil); filter: brightness(1.05); }
+.ext-btn.ext-cta.actif { background: var(--soleil); color: #0B3320; }
 .ext-frame { flex: 1; width: 100%; border: 0; background: #fff; }
 .borne-mod { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
   background: var(--craie); border: 3px solid transparent; border-radius: 24px; padding: clamp(30px, 6vh, 60px) 24px;
@@ -2041,21 +2051,29 @@ function ouvreMailBorne() {
   const o = document.createElement("div");
   o.className = "ext-overlay";
   o.innerHTML = `<div class="ext-bar">
-      <button class="ext-home" id="ext-retour">🏠 Retour à l'accueil</button>
-      <button class="ext-form" id="ext-toggle">📝 Aller droit au formulaire →</button>
+      <button class="ext-btn ext-home" id="ext-retour"><span>🏠</span> Accueil</button>
+      <div class="ext-brand">🌱 Famiflora</div>
+      <div class="ext-nav">
+        <button class="ext-btn" id="ext-emails"><span>📧</span> Page e-mail</button>
+        <button class="ext-btn ext-cta" id="ext-form"><span>📝</span> Le formulaire</button>
+      </div>
     </div>
-    <iframe class="ext-frame" id="ext-if" sandbox="allow-scripts allow-same-origin allow-forms" title="Famiflora"></iframe>`;
+    <iframe class="ext-frame" id="ext-if" title="Famiflora"></iframe>`;
   document.body.appendChild(o);
   const iframe = o.querySelector("#ext-if");
-  const toggle = o.querySelector("#ext-toggle");
-  let surForm = false;
-  const majCadre = () => {
+  const btnEmails = o.querySelector("#ext-emails");
+  const btnForm = o.querySelector("#ext-form");
+  // « Page e-mail » recharge la page d'accueil des emails : c'est le retour arrière
+  // fiable (les sous-pages « En savoir plus » / « Suivre le guide » n'en ont pas).
+  const va = (surForm) => {
     iframe.src = surForm ? URL_FORM : URL_EMAILS;
-    toggle.textContent = surForm ? "← Revenir à la page" : "📝 Aller droit au formulaire →";
+    btnForm.classList.toggle("actif", surForm);
+    btnEmails.classList.toggle("actif", !surForm);
   };
   o.querySelector("#ext-retour").addEventListener("click", () => o.remove());
-  toggle.addEventListener("click", () => { surForm = !surForm; majCadre(); });
-  majCadre();
+  btnEmails.addEventListener("click", () => va(false));
+  btnForm.addEventListener("click", () => va(true));
+  va(false);
 }
 
 // 🏠 Bouton maison permanent : visible sur les pages atteintes DEPUIS la borne,
