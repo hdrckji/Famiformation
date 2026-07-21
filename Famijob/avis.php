@@ -16,7 +16,7 @@ if ($fullName === '') {
     $fullName = (string) ($_SESSION['username'] ?? '');
 }
 
-// --- Table ---
+// --- Tables ---
 $db->exec(
     "CREATE TABLE IF NOT EXISTS interim_feedback (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -35,6 +35,18 @@ $db->exec(
         INDEX idx_feedback_status (status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
 );
+$db->exec(
+    "CREATE TABLE IF NOT EXISTS interim_feedback_replies (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        feedback_id INT UNSIGNED NOT NULL,
+        author_id INT NOT NULL,
+        author_name VARCHAR(160) NULL,
+        author_role VARCHAR(30) NULL,
+        message TEXT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_reply_feedback (feedback_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+);
 
 $categories = [
     'question'    => 'Question',
@@ -48,6 +60,20 @@ $formError = '';
 $oldSubject = '';
 $oldMessage = '';
 $oldCategory = 'question';
+
+// Notifie tous les admins (sauf celui qui agit).
+$notifyAdmins = function (PDO $db, $title, $body, $actorId, $actorName) use ($userId) {
+    try {
+        $admins = $db->query("SELECT id FROM utilisateurs WHERE role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($admins as $adminId) {
+            $adminId = (int) $adminId;
+            if ($adminId <= 0 || $adminId === (int) $actorId) {
+                continue;
+            }
+            famijobNotify($db, $adminId, 'feedback', $title, $body, 'avis.php', (int) $actorId, $actorName);
+        }
+    } catch (Exception $e) {}
+};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireValidCSRF();
@@ -79,55 +105,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mb_substr($body, 0, 5000),
             ]);
 
-            // Prévenir tous les admins qu'un nouvel avis est arrivé (boîte à notif).
-            try {
-                $categoryLabel = $categories[$category] ?? 'Avis';
-                $admins = $db->query("SELECT id FROM utilisateurs WHERE role = 'admin'")->fetchAll(PDO::FETCH_COLUMN);
-                foreach ($admins as $adminId) {
-                    $adminId = (int) $adminId;
-                    if ($adminId <= 0 || $adminId === $userId) {
-                        continue;
-                    }
-                    famijobNotify(
-                        $db,
-                        $adminId,
-                        'feedback',
-                        'Nouvel avis reçu',
-                        $categoryLabel . ' de ' . ($fullName !== '' ? $fullName : 'un utilisateur') . ' : ' . $subject,
-                        'avis.php',
-                        $userId,
-                        $fullName
-                    );
-                }
-            } catch (Exception $e) {}
+            $categoryLabel = $categories[$category] ?? 'Avis';
+            $notifyAdmins(
+                $db,
+                'Nouvel avis reçu',
+                $categoryLabel . ' de ' . ($fullName !== '' ? $fullName : 'un utilisateur') . ' : ' . $subject,
+                $userId,
+                $fullName
+            );
 
             $message = 'Merci ! Votre avis a bien été transmis.';
             $oldSubject = $oldMessage = '';
             $oldCategory = 'question';
         }
+    } elseif (isset($_POST['post_reply'])) {
+        // Réponse dans le fil : autorisée à l'admin (tout avis) OU à l'auteur de l'avis (le sien).
+        $fid = (int) ($_POST['feedback_id'] ?? 0);
+        $replyText = trim((string) ($_POST['reply_message'] ?? ''));
+        if ($fid > 0 && $replyText !== '') {
+            $fbStmt = $db->prepare("SELECT id, author_id, subject, status FROM interim_feedback WHERE id = ? LIMIT 1");
+            $fbStmt->execute([$fid]);
+            $fb = $fbStmt->fetch(PDO::FETCH_ASSOC);
+
+            $authorId = $fb ? (int) $fb['author_id'] : 0;
+            $canReply = $fb && ($isAdmin || $authorId === $userId);
+
+            if ($canReply) {
+                $db->prepare(
+                    "INSERT INTO interim_feedback_replies (feedback_id, author_id, author_name, author_role, message, created_at)
+                     VALUES (?, ?, ?, ?, ?, NOW())"
+                )->execute([$fid, $userId, mb_substr($fullName, 0, 160), $role, mb_substr($replyText, 0, 5000)]);
+
+                $subject = (string) $fb['subject'];
+                $extract = mb_substr($replyText, 0, 160);
+
+                if ($userId === $authorId) {
+                    // L'auteur relance : on rouvre et on prévient les admins.
+                    $db->prepare("UPDATE interim_feedback SET status = 'open', handled_at = NULL WHERE id = ?")->execute([$fid]);
+                    $notifyAdmins($db, 'Nouvelle réponse à un avis', 'Réponse de ' . ($fullName !== '' ? $fullName : 'un utilisateur') . ' sur « ' . $subject . ' » : ' . $extract, $userId, $fullName);
+                    $message = 'Votre réponse a été envoyée.';
+                } else {
+                    // Admin (ou autre) répond à l'auteur : on prévient l'auteur.
+                    if ($authorId > 0) {
+                        famijobNotify($db, $authorId, 'feedback', 'Réponse à votre avis', 'Réponse à votre avis « ' . $subject . ' » : ' . $extract, 'avis.php', $userId, $fullName);
+                    }
+                    $message = 'Réponse envoyée à ' . (string) (famijobActorName($db, $authorId) ?: 'l\'auteur') . '.';
+                }
+            }
+        }
     } elseif ($isAdmin && isset($_POST['resolve_feedback'])) {
         $fid = (int) ($_POST['feedback_id'] ?? 0);
-        $note = trim((string) ($_POST['admin_note'] ?? ''));
         if ($fid > 0) {
-            $stmt = $db->prepare(
-                "UPDATE interim_feedback
-                 SET status = 'resolved', admin_note = ?, handled_by_user_id = ?, handled_at = NOW()
-                 WHERE id = ?"
-            );
-            $stmt->execute([($note !== '' ? mb_substr($note, 0, 5000) : null), $userId, $fid]);
-
-            // Prévenir l'auteur que son avis a été traité (via la boîte à notif).
+            $db->prepare("UPDATE interim_feedback SET status = 'resolved', handled_by_user_id = ?, handled_at = NOW() WHERE id = ?")->execute([$userId, $fid]);
             try {
                 $row = $db->prepare("SELECT author_id, subject FROM interim_feedback WHERE id = ? LIMIT 1");
                 $row->execute([$fid]);
                 $fb = $row->fetch(PDO::FETCH_ASSOC);
-                if ($fb && (int) $fb['author_id'] > 0) {
-                    $notifBody = 'Votre avis « ' . (string) $fb['subject'] . ' » a été traité.'
-                        . ($note !== '' ? ' Réponse : ' . $note : '');
-                    famijobNotify($db, (int) $fb['author_id'], 'feedback', 'Avis traité', $notifBody, 'avis.php', $userId, famijobActorName($db, $userId));
+                if ($fb && (int) $fb['author_id'] > 0 && (int) $fb['author_id'] !== $userId) {
+                    famijobNotify($db, (int) $fb['author_id'], 'feedback', 'Avis traité', 'Votre avis « ' . (string) $fb['subject'] . ' » a été marqué comme traité.', 'avis.php', $userId, $fullName);
                 }
             } catch (Exception $e) {}
-
             $message = 'Avis marqué comme traité.';
         }
     } elseif ($isAdmin && isset($_POST['reopen_feedback'])) {
@@ -139,11 +176,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($isAdmin && isset($_POST['delete_feedback'])) {
         $fid = (int) ($_POST['feedback_id'] ?? 0);
         if ($fid > 0) {
+            try { $db->prepare("DELETE FROM interim_feedback_replies WHERE feedback_id = ?")->execute([$fid]); } catch (Exception $e) {}
             $db->prepare("DELETE FROM interim_feedback WHERE id = ?")->execute([$fid]);
             $message = 'Avis supprimé.';
         }
     }
+
+    // PRG : on revient proprement (evite le renvoi de formulaire au refresh).
+    $qs = [];
+    if ($isAdmin && isset($_GET['status'])) { $qs['status'] = (string) $_GET['status']; }
+    if ($message !== '') { $qs['m'] = $message; }
+    if ($formError === '') {
+        header('Location: avis.php' . (!empty($qs) ? '?' . http_build_query($qs) : ''));
+        exit();
+    }
 }
+
+if (isset($_GET['m'])) { $message = (string) $_GET['m']; }
 
 // --- Liste ---
 if ($isAdmin) {
@@ -151,9 +200,7 @@ if ($isAdmin) {
     if (!in_array($statusFilter, ['open', 'resolved', 'all'], true)) {
         $statusFilter = 'open';
     }
-    $sql = "SELECT f.*, h.prenom AS handler_prenom, h.nom AS handler_nom
-            FROM interim_feedback f
-            LEFT JOIN utilisateurs h ON h.id = f.handled_by_user_id";
+    $sql = "SELECT f.* FROM interim_feedback f";
     $params = [];
     if ($statusFilter !== 'all') {
         $sql .= " WHERE f.status = ?";
@@ -163,7 +210,6 @@ if ($isAdmin) {
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $feedbackList = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
     $openCount = (int) $db->query("SELECT COUNT(*) FROM interim_feedback WHERE status = 'open'")->fetchColumn();
 } else {
     $statusFilter = 'mine';
@@ -173,9 +219,27 @@ if ($isAdmin) {
     $openCount = 0;
 }
 
+// --- Réponses (fil) pour les avis affichés ---
+$repliesByFeedback = [];
+$fbIds = array_map(static function ($f) { return (int) $f['id']; }, $feedbackList);
+if (!empty($fbIds)) {
+    $ph = implode(',', array_fill(0, count($fbIds), '?'));
+    try {
+        $rstmt = $db->prepare("SELECT * FROM interim_feedback_replies WHERE feedback_id IN ($ph) ORDER BY created_at ASC, id ASC");
+        $rstmt->execute($fbIds);
+        foreach ($rstmt->fetchAll(PDO::FETCH_ASSOC) as $rep) {
+            $repliesByFeedback[(int) $rep['feedback_id']][] = $rep;
+        }
+    } catch (Exception $e) {}
+}
+
 function fjaCategoryLabel($cat, array $categories)
 {
     return $categories[$cat] ?? 'Autre';
+}
+function fjaFmtDate($value)
+{
+    try { return (new DateTimeImmutable((string) $value))->format('d/m/Y à H:i'); } catch (Exception $e) { return ''; }
 }
 ?>
 <!DOCTYPE html>
@@ -210,7 +274,7 @@ function fjaCategoryLabel($cat, array $categories)
         .chip.active { background:var(--accent); color:#fff; }
         .fb { background:var(--card); border-radius:16px; box-shadow:var(--shadow); padding:16px 18px; margin-bottom:12px; border-left:5px solid #cfdad3; }
         .fb.open { border-left-color:var(--accent); }
-        .fb.resolved { border-left-color:#9bb0a3; opacity:.92; }
+        .fb.resolved { border-left-color:#9bb0a3; opacity:.96; }
         .fb-head { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline; }
         .fb-subject { font-weight:800; font-size:1rem; margin:0; }
         .fb-cat { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; font-weight:800; color:#fff; background:#3f6b4d; padding:3px 9px; border-radius:999px; }
@@ -219,9 +283,18 @@ function fjaCategoryLabel($cat, array $categories)
         .fb-status { font-size:.72rem; font-weight:800; text-transform:uppercase; }
         .fb-status.open { color:var(--accent); }
         .fb-status.resolved { color:#7d8f84; }
-        .fb-note { background:#f3f8f5; border-radius:10px; padding:10px 12px; margin-top:10px; font-size:.9rem; }
-        .admin-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:flex-start; }
-        .admin-actions textarea { min-height:60px; margin-bottom:8px; }
+        .thread { margin:12px 0 4px; display:flex; flex-direction:column; gap:8px; }
+        .bubble { border-radius:12px; padding:10px 12px; font-size:.92rem; line-height:1.45; max-width:88%; white-space:pre-wrap; }
+        .bubble .who { font-weight:800; font-size:.76rem; margin-bottom:3px; }
+        .bubble .when { color:#93a29a; font-size:.72rem; margin-top:4px; }
+        .bubble.admin { background:#e9f3ec; border:1px solid #d5e8db; align-self:flex-start; }
+        .bubble.admin .who { color:var(--accent); }
+        .bubble.user { background:#eef2f7; border:1px solid #dde5ef; align-self:flex-end; }
+        .bubble.user .who { color:#3a5a80; }
+        .legacy-note { background:#f3f8f5; border-radius:10px; padding:10px 12px; margin-top:10px; font-size:.9rem; }
+        .reply-form { margin-top:12px; border-top:1px dashed var(--line); padding-top:12px; }
+        .reply-form textarea { min-height:56px; margin-bottom:8px; }
+        .row-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
         .empty { background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:28px; text-align:center; color:var(--muted); }
     </style>
 </head>
@@ -230,7 +303,7 @@ function fjaCategoryLabel($cat, array $categories)
     <div class="hero">
         <a class="back" href="index.php">⬅ Retour FamiJob</a>
         <h1>💬 Avis &amp; suggestions</h1>
-        <p><?= $isAdmin ? 'Vous voyez tous les avis émis par les utilisateurs.' : 'Une question, une idée, un souci ? Faites-le nous savoir.' ?></p>
+        <p><?= $isAdmin ? 'Vous voyez tous les avis, vous pouvez répondre et clôturer.' : 'Une question, une idée, un souci ? Faites-le nous savoir — vous serez notifié des réponses.' ?></p>
     </div>
 
     <?php if ($message !== ''): ?><div class="alert"><?= e($message) ?></div><?php endif; ?>
@@ -270,8 +343,8 @@ function fjaCategoryLabel($cat, array $categories)
         <?php foreach ($feedbackList as $fb): ?>
             <?php
                 $status = (string) $fb['status'];
-                $createdLabel = '';
-                try { $createdLabel = (new DateTimeImmutable((string) $fb['created_at']))->format('d/m/Y à H:i'); } catch (Exception $e) {}
+                $fid = (int) $fb['id'];
+                $replies = $repliesByFeedback[$fid] ?? [];
             ?>
             <div class="fb <?= $status === 'resolved' ? 'resolved' : 'open' ?>">
                 <div class="fb-head">
@@ -282,40 +355,47 @@ function fjaCategoryLabel($cat, array $categories)
                 <div class="fb-meta">
                     <?php if ($isAdmin): ?>
                         Par <strong><?= e((string) ($fb['author_name'] ?? 'Utilisateur')) ?></strong>
-                        (<?= e((string) ($fb['author_role'] ?? '')) ?>) · <?= e($createdLabel) ?>
+                        (<?= e((string) ($fb['author_role'] ?? '')) ?>) · <?= e(fjaFmtDate($fb['created_at'])) ?>
                     <?php else: ?>
-                        <?= e($createdLabel) ?>
+                        <?= e(fjaFmtDate($fb['created_at'])) ?>
                     <?php endif; ?>
                     · <span class="fb-status <?= $status ?>"><?= $status === 'resolved' ? 'Traité' : 'En attente' ?></span>
                 </div>
 
                 <?php if (trim((string) ($fb['admin_note'] ?? '')) !== ''): ?>
-                    <div class="fb-note"><strong>Réponse :</strong> <?= e((string) $fb['admin_note']) ?></div>
+                    <div class="legacy-note"><strong>Réponse :</strong> <?= e((string) $fb['admin_note']) ?></div>
                 <?php endif; ?>
 
-                <?php if ($isAdmin): ?>
-                    <div class="admin-actions">
-                        <?php if ($status !== 'resolved'): ?>
-                        <form method="post" style="flex:1; min-width:240px;">
-                            <?= csrfField() ?>
-                            <input type="hidden" name="feedback_id" value="<?= (int) $fb['id'] ?>">
-                            <textarea name="admin_note" placeholder="Réponse / note (optionnel) — l'auteur sera notifié"></textarea>
-                            <button class="btn btn-primary" type="submit" name="resolve_feedback" value="1">Marquer traité</button>
-                        </form>
-                        <?php else: ?>
-                        <form method="post">
-                            <?= csrfField() ?>
-                            <input type="hidden" name="feedback_id" value="<?= (int) $fb['id'] ?>">
-                            <button class="btn btn-soft" type="submit" name="reopen_feedback" value="1">Rouvrir</button>
-                        </form>
-                        <?php endif; ?>
-                        <form method="post" onsubmit="return confirm('Supprimer cet avis ?');">
-                            <?= csrfField() ?>
-                            <input type="hidden" name="feedback_id" value="<?= (int) $fb['id'] ?>">
-                            <button class="btn btn-ko" type="submit" name="delete_feedback" value="1">Supprimer</button>
-                        </form>
+                <?php if (!empty($replies)): ?>
+                    <div class="thread">
+                        <?php foreach ($replies as $rep): ?>
+                            <?php $repIsAdmin = ((string) ($rep['author_role'] ?? '') === 'admin'); ?>
+                            <div class="bubble <?= $repIsAdmin ? 'admin' : 'user' ?>">
+                                <div class="who"><?= e((string) ($rep['author_name'] ?? 'Utilisateur')) ?><?= $repIsAdmin ? ' · Admin' : '' ?></div>
+                                <?= e((string) $rep['message']) ?>
+                                <div class="when"><?= e(fjaFmtDate($rep['created_at'])) ?></div>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
+
+                <?php // Formulaire de réponse : admin (tout avis) ou auteur (le sien). ?>
+                <form method="post" class="reply-form">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="feedback_id" value="<?= $fid ?>">
+                    <textarea name="reply_message" maxlength="5000" placeholder="<?= $isAdmin ? 'Répondre à l\'auteur (il sera notifié)…' : 'Répondre / apporter une précision (l\'équipe sera notifiée)…' ?>"></textarea>
+                    <div class="row-actions">
+                        <button class="btn btn-primary" type="submit" name="post_reply" value="1">Répondre</button>
+                        <?php if ($isAdmin): ?>
+                            <?php if ($status !== 'resolved'): ?>
+                                <button class="btn btn-soft" type="submit" name="resolve_feedback" value="1">Marquer traité</button>
+                            <?php else: ?>
+                                <button class="btn btn-soft" type="submit" name="reopen_feedback" value="1">Rouvrir</button>
+                            <?php endif; ?>
+                            <button class="btn btn-ko" type="submit" name="delete_feedback" value="1" onclick="return confirm('Supprimer cet avis et tout son fil ?');">Supprimer</button>
+                        <?php endif; ?>
+                    </div>
+                </form>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
