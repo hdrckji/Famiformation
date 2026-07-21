@@ -1298,7 +1298,7 @@ function renderCountdown() {
   const top5 = board.slice(0, 5);
   const top5Html = (phase !== "avant" && top5.length)
     ? `<div class="cd-top5"><h3>🌟 Top 5 de la récolte</h3>${top5.map((p, i) =>
-        `<div class="cd-top5-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`
+        `<div class="cd-top5-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌰</span></div>`
       ).join("")}</div>`
     : "";
 
@@ -1477,7 +1477,7 @@ function renderQuiz() {
           <span class="emo ${quiz.vientDePousser ? "pousse-pop" : ""}">${stade.emoji}</span>
           <span class="nom">${stade.nom}</span>
         </span>
-        <span class="graines">${graines} 🌱${quiz.lastGain ? `<span class="gain">+${quiz.lastGain}</span>` : ""}</span>
+        <span class="graines">${graines} 🌰${quiz.lastGain ? `<span class="gain">+${quiz.lastGain}</span>` : ""}</span>
       </div>
       <div class="q-progress"><div style="width:${(quiz.idx / quiz.questions.length) * 100}%"></div></div>
       <div class="q-num">Question ${quiz.idx + 1} / ${quiz.questions.length}</div>
@@ -1518,12 +1518,12 @@ function renderQuiz() {
   app.innerHTML = `<div class="card center">
     <div style="font-size:4.2rem; line-height:1.1;">${stadeFinal.emoji}</div>
     <h2 class="q-text" style="margin-bottom:6px;">Bravo ${esc(quiz.pseudo)}, te voilà « ${stadeFinal.nom} » !</h2>
-    <div class="score-big">${joueur.recoltees} 🌱</div>
+    <div class="score-big">${joueur.recoltees} 🌰</div>
     <p class="hint" style="margin-top:14px;">
       ${quiz.correct} bonne${quiz.correct > 1 ? "s" : ""} réponse${quiz.correct > 1 ? "s" : ""} sur ${quiz.questions.length}.
       ${quiz.messageCode ? `<br>${esc(quiz.messageCode)}` : ""}
       <br>Ton classement est basé sur ta récolte : planter ne te fera pas reculer !
-      <br>Trouve des codes bonus en magasin (+${CONFIG.pointsParCodeBonus} 🌱 chacun, ${CONFIG.maxCodes} max) et récolte encore des graines dans le jardin !
+      <br>Trouve des codes bonus en magasin (+${CONFIG.pointsParCodeBonus} 🌰 chacun, ${CONFIG.maxCodes} max) et récolte encore des graines dans le jardin !
       <br>Remise des prix le ${CONFIG.dateResultats} — bonne chance ! 🍀</p>
     <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
       <button class="btn" id="q-jardin">🌼 Planter dans mon jardin</button>
@@ -1543,6 +1543,30 @@ function renderQuiz() {
     quiz = null;
     render();
   });
+  // Petite fenêtre qui annonce la fin du quiz (une seule fois par partie).
+  if (!quiz.modaleFinVue) { quiz.modaleFinVue = true; modaleQuizFini(joueur.recoltees || 0); }
+}
+
+// 🎉 Modale de fin de quiz : annonce la récolte et invite à planter (sans jamais
+// impacter le classement, on le répète pour lever le doute sur la thésaurisation).
+function modaleQuizFini(graines) {
+  const o = document.createElement("div");
+  o.className = "modal-fond";
+  o.innerHTML = `<div class="modal code-modal">
+    <div class="cm-emoji">🎉</div>
+    <h2 class="cm-titre">Quiz terminé !</h2>
+    <p class="cm-sous">Tu as récolté <b>${graines} 🌰</b> graines.<br>
+      Va les <b>planter dans ton jardin</b> 🌼 — et rassure-toi : <b>planter ne change RIEN à ton classement</b>.</p>
+    <div class="cm-modules">
+      <button class="cm-mod" data-qf="jardin"><span class="cm-mod-emo">🌼</span><span class="cm-mod-titre">Mon jardin</span></button>
+      <button class="cm-mod" data-qf="board"><span class="cm-mod-emo">🏆</span><span class="cm-mod-titre">Le classement</span></button>
+    </div>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => o.remove();
+  o.querySelector('[data-qf="jardin"]').addEventListener("click", async () => { ferme(); jardin = await apiJardin(); userView = "jardin"; quiz = null; render(); });
+  o.querySelector('[data-qf="board"]').addEventListener("click", () => { ferme(); userView = "board"; quiz = null; render(); });
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
 }
 
 /* ============================================================
@@ -1608,7 +1632,7 @@ function renderBoard() {
         <div class="pod p${pos + 1}${moiRang === pos ? " moi" : ""}">
           <div class="pod-medal">${medals[pos]}</div>
           <div class="pod-name">${esc(top3[pos].name)}</div>
-          <div class="pod-pts">${top3[pos].score} 🌱</div>
+          <div class="pod-pts">${top3[pos].score} 🌰</div>
         </div>` : "").join("")}
     </div>
     ${rest.map((p, i) => `
@@ -1616,7 +1640,7 @@ function renderBoard() {
         <span class="rank-pos">${i + 4}.</span>
         ${avatarDe(p.name)}
         <span class="rank-nom"><span class="qui">${esc(p.name)}</span></span>
-        <span class="rank-pts">${p.score} 🌱</span>
+        <span class="rank-pts">${p.score} 🌰</span>
       </div>`).join("")}
     <div class="center home-liens" style="margin-top:18px;">
       <button class="btn ghost" id="b-refresh">Actualiser 🔄</button>
@@ -1754,7 +1778,7 @@ function renderJardin() {
   app.innerHTML = `${DEFS_METAL}<div class="board-wrap">${pillsHtml("jardin")}<div class="card">
     <div class="jardin-solde">
       <span style="display:flex; align-items:center; gap:8px;">${avatarDe(joueur.name)} <strong>${esc(joueur.name)}</strong> <span title="${esc(stade.nom)}" style="font-size:1.3rem;">${stade.emoji}</span></span>
-      <span class="montant">${joueur.solde} 🌱 à planter</span>
+      <span class="montant">${joueur.solde} 🌰 à planter</span>
     </div>
     <p class="hint">Choisis une plante puis tape une case libre. ${nbPlantees} plante${nbPlantees > 1 ? "s" : ""} déjà en terre —
     planter ne change rien à ton classement. Plus de graines ? Chasse les mauvaises herbes ! 🌿</p>
@@ -1762,7 +1786,7 @@ function renderJardin() {
     <div class="catalogue">
       ${Object.entries(PLANTES).map(([cle, p]) => `
         <button class="plt ${p.rare ? "rare-" + p.rare : ""} ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${p.cout > joueur.solde ? "disabled" : ""}>
-          <span class="emo">${visuelPlante(cle)}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌱</span>
+          <span class="emo">${visuelPlante(cle)}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌰</span>
         </button>`).join("")}
     </div>
     <div class="grille">
@@ -1797,7 +1821,7 @@ function renderJardin() {
     const info = $("#j-info");
     const aMoi = joueur && c.par.toLowerCase() === joueur.name.toLowerCase();
     info.innerHTML = `<span class="revente">${p ? iconePlante(c.plante) : "🌿"} ${esc(p?.nom || c.plante)} — planté par ${esc(c.par)}`
-      + (aMoi ? ` <button class="btn mini" id="j-revendre">Revendre +${p?.cout ?? 0} 🌱</button>` : "")
+      + (aMoi ? ` <button class="btn mini" id="j-revendre">Revendre +${p?.cout ?? 0} 🌰</button>` : "")
       + `</span>`;
     if (aMoi) {
       $("#j-revendre").addEventListener("click", async () => {
@@ -1806,7 +1830,7 @@ function renderJardin() {
         if (res.ok) {
           delete jardin[idx];
           if (res.solde != null) joueur.solde = res.solde;
-          jardinMsg = `Plante revendue, +${res.rendu} 🌱 récupérées. Tu as ${joueur.solde} graines.`;
+          jardinMsg = `Plante revendue, +${res.rendu} 🌰 récupérées. Tu as ${joueur.solde} graines.`;
         } else {
           jardin = await apiJardin();
           jardinMsg = res.reason === "pas_la_mienne" ? "On ne peut revendre que ses propres plantes." : "Petit souci, réessaie.";
@@ -1902,7 +1926,7 @@ function renderHerbes() {
     <div class="herbe-top">
       <button class="btn ghost mini" id="h-retour">← Jardin</button>
       <span class="chrono" id="h-chrono">⏱ ${HERBE_DUREE} s</span>
-      <span class="butin" id="h-butin">🌱 0</span>
+      <span class="butin" id="h-butin">🌰 0</span>
     </div>
     <div class="herbe-zone" id="h-zone">
       <div id="h-overlay" class="herbe-overlay">
@@ -1962,7 +1986,7 @@ function demarreHerbes() {
       clearTimeout(enleve);
       HG.counts[t.k]++;
       HG.butin += t.val;
-      if (butinEl) butinEl.textContent = "🌱 " + HG.butin;
+      if (butinEl) butinEl.textContent = "🌰 " + HG.butin;
       b.classList.add("crunch");
       const g = document.createElement("div");
       g.className = "herbe-gain";
@@ -2254,7 +2278,7 @@ async function renderReclamer() {
     o.innerHTML = `<div class="modal code-modal">
       <div class="cm-emoji">🎉</div>
       <h2 class="cm-titre">Félicitations !</h2>
-      <p class="cm-sous">Vous avez trouvé un code bonus — <b>+${CONFIG.pointsParCodeBonus} 🌱</b> à récupérer.</p>
+      <p class="cm-sous">Vous avez trouvé un code bonus — <b>+${CONFIG.pointsParCodeBonus} 🌰</b> à récupérer.</p>
       <p class="cm-consigne">Connectez-vous pour récupérer vos graines</p>
       <div class="cm-modules">
         <button class="cm-mod" data-cm="login"><span class="cm-mod-emo">🔑</span><span class="cm-mod-titre">Je me connecte</span></button>
@@ -2271,7 +2295,7 @@ async function renderReclamer() {
   // Identifié + code disponible : bouton « Récupérer ».
   app.innerHTML = `${pillsHtml("reclamer")}<div class="card center"><div style="font-size:2.6rem;">🎁</div>
     <h2 class="q-text">Code disponible !</h2>
-    <p class="hint"><b>${esc(code)}</b> — ajoute-le à ton compte pour +${CONFIG.pointsParCodeBonus} 🌱.
+    <p class="hint"><b>${esc(code)}</b> — ajoute-le à ton compte pour +${CONFIG.pointsParCodeBonus} 🌰.
     Tu peux avoir ${CONFIG.maxCodes} codes maximum (tu en as ${joueur.nbCodes ?? 0}).</p>
     <div id="rc-msg"></div>
     <button class="btn" id="rc-recup">Récupérer ce code 🎁</button>${retourHtml()}</div>`;
@@ -2399,7 +2423,7 @@ function renderSimTele() {
       <div class="tv-phase">🏆 Le grand quiz Famiformation</div>
       <div class="tv-cols">
         <div class="tv-board">
-          ${demo.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`).join("")}
+          ${demo.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌰</span></div>`).join("")}
         </div>
         <div class="tv-qr">
           <div class="tv-qr-box">${q ? q.svg : "<div style='padding:40px'>QR…</div>"}</div>
@@ -2457,7 +2481,7 @@ async function renderTeleBoard() {
     <div class="tv-phase">${termine ? "🏆 Classement final" : "🏆 Le classement en direct"}</div>
     <div class="tv-cols">
       <div class="tv-board">
-        ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌱</span></div>`).join("")
+        ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌰</span></div>`).join("")
           : `<div class="tv-row" style="justify-content:center;">Sois le premier à jouer ! 🌱</div>`}
       </div>
       <div class="tv-qr">
@@ -2493,7 +2517,7 @@ async function renderTeleWinners() {
         <div class="tw-place tw-p${pos + 1}">
           <div class="tw-medal">${medals[pos]}</div>
           <div class="tw-name">${esc(top[pos].name)}</div>
-          <div class="tw-score">${top[pos].score} 🌱</div>
+          <div class="tw-score">${top[pos].score} 🌰</div>
           <div class="tw-bar">${pos + 1}</div>
         </div>` : "").join("")}
     </div>
