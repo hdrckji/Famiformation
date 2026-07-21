@@ -102,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Valide/refuse une liste de demandes et previent chaque createur via la boite a notif.
-    $bulkDecide = static function (array $ids, $decision) use ($db, $currentUserId) {
+    $bulkDecide = static function (array $ids, $decision, $reason = '') use ($db, $currentUserId) {
         $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static function ($n) { return $n > 0; })));
         if (empty($ids)) {
             return 0;
@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $stmt->execute(array_merge([$currentUserId], $ids));
         foreach ($ids as $rid) {
-            famijobNotifyRequestValidated($db, $rid, $currentUserId, $decision);
+            famijobNotifyRequestValidated($db, $rid, $currentUserId, $decision, $reason);
         }
         return $stmt->rowCount();
     };
@@ -140,7 +140,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bulkDecide([$requestId], 'approved');
         $message = "<div class='alert success'>" . e(fjvT('Demande validée.', 'Aanvraag goedgekeurd.')) . "</div>";
     } elseif ($requestId > 0 && isset($_POST['reject_request'])) {
-        $bulkDecide([$requestId], 'rejected');
+        $rejectReason = trim((string) ($_POST['reject_reason'] ?? ''));
+        $bulkDecide([$requestId], 'rejected', mb_substr($rejectReason, 0, 500));
         $message = "<div class='alert error'>" . e(fjvT('Demande refusée.', 'Aanvraag geweigerd.')) . "</div>";
     } elseif (isset($_POST['approve_all'])) {
         $ids = $pendingIdsForScope($selectedDepartment);
@@ -320,9 +321,10 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
                                             <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
                                             <button class="btn btn-ok" type="submit" name="approve_request" value="1"><?php echo e(fjvT('Valider', 'Goedkeuren')); ?></button>
                                         </form>
-                                        <form method="post" onsubmit="return confirm('<?php echo e(fjvT('Refuser cette demande ?', 'Deze aanvraag weigeren?')); ?>');">
+                                        <form method="post" onsubmit="return fjvAskReject(this);">
                                             <?php echo csrfField(); ?>
                                             <input type="hidden" name="request_id" value="<?php echo (int) $request['id']; ?>">
+                                            <input type="hidden" name="reject_reason" value="">
                                             <button class="btn btn-ko" type="submit" name="reject_request" value="1"><?php echo e(fjvT('Refuser', 'Weigeren')); ?></button>
                                         </form>
                                     </div>
@@ -335,5 +337,14 @@ $pendingRequests = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
         </table>
     <?php endif; ?>
 </div>
+<script>
+function fjvAskReject(form) {
+    var reason = window.prompt(<?php echo json_encode(fjvT('Motif du refus (optionnel) — la personne le recevra dans sa notification :', 'Reden van weigering (optioneel) — de persoon ontvangt dit in zijn melding:')); ?>, '');
+    if (reason === null) { return false; } // annulé : on ne refuse pas
+    var field = form.querySelector('input[name="reject_reason"]');
+    if (field) { field.value = reason; }
+    return true;
+}
+</script>
 </body>
 </html>

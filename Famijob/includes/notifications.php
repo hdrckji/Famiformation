@@ -260,7 +260,7 @@ if (!function_exists('famijobNotifyRequestValidated')) {
      * Prévient le créateur d'une demande que son horaire a été validé.
      * @param string $decision 'approved' | 'rejected'
      */
-    function famijobNotifyRequestValidated(PDO $db, $requestId, $validatorUserId, $decision = 'approved')
+    function famijobNotifyRequestValidated(PDO $db, $requestId, $validatorUserId, $decision = 'approved', $reason = '')
     {
         $requestId = (int) $requestId;
         if ($requestId <= 0) {
@@ -288,10 +288,12 @@ if (!function_exists('famijobNotifyRequestValidated')) {
         $shiftLabel = famijobFormatShiftLabel($req);
         $when = date('d/m/Y à H:i');
 
+        $reason = trim((string) $reason);
         if ($decision === 'rejected') {
             $title = 'Horaire refusé';
             $body = 'Votre demande d\'horaire (' . $shiftLabel . ') a été refusée'
-                . ($actorName !== '' ? ' par ' . $actorName : '') . ' le ' . $when . '.';
+                . ($actorName !== '' ? ' par ' . $actorName : '') . ' le ' . $when . '.'
+                . ($reason !== '' ? ' Motif : ' . $reason : '');
             $type = 'validation_rejected';
         } else {
             $title = 'Horaire validé';
