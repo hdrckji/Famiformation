@@ -393,7 +393,7 @@ body.mode-borne #app { width: 100%; }
 
 /* --- Accueil /quiz (téléphone/ordi) = même chose que la borne, MAIS avec le
    compte à rebours en haut. À zéro il disparaît et « Participer » s'active. --- */
-.home { width: 100%; max-width: 1000px; margin: 0 auto; text-align: center; padding: 0 2vw; }
+.home { width: 100%; margin: 0 auto; text-align: center; padding: 0 clamp(12px, 3vw, 48px); }
 /* Teaser + liens secondaires (Comment ça marche / J'ai déjà un compte) */
 .home-tease { margin: 22px auto 10px; font-weight: 600; opacity: .78; max-width: 640px;
   font-size: clamp(.95rem, 2.2vw, 1.15rem); }
@@ -406,12 +406,11 @@ body.mode-borne #app { width: 100%; }
 .bm-primaire { border-color: var(--pousse); background: #F1F8EF; }
 /* Espace (gate connexion/création) : 2 blocs centrés */
 .esp-modules { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); max-width: 760px; margin: 0 auto; }
-body.mode-borne .esp-modules { grid-template-columns: repeat(2, 1fr); }
 /* Tableau de bord */
 .dash-hello { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--foret);
   font-size: clamp(1.1rem, 2.8vw, 1.6rem); margin-bottom: 18px; }
 .dash-hello span { display: block; font-weight: 600; color: var(--pousse); font-size: .8em; }
-.dash-modules { max-width: 1000px; margin: 0 auto; }
+.dash-modules { margin: 0 auto; }
 /* Case de consentement RGPD à la création de compte */
 .rgpd { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: .9rem;
   font-weight: 500; margin: 16px 0; line-height: 1.4; opacity: .92; }
@@ -447,19 +446,22 @@ body.mode-borne .esp-modules { grid-template-columns: repeat(2, 1fr); }
 /* 🖥️ SUR LA BORNE : on enlève le plafond de largeur (le téléphone/ordi le garde
    pour rester lisible) → l'accueil prend TOUTE la largeur de l'écran, avec 3
    grosses tuiles côte à côte qui remplissent la hauteur. */
-body.mode-borne .home { max-width: none; padding: 0 clamp(16px, 3vw, 48px); }
-body.mode-borne .borne-titre { font-size: clamp(2.2rem, 5.2vw, 4.4rem); }
-body.mode-borne .borne-sous { font-size: clamp(1.2rem, 2.8vw, 1.9rem); margin-bottom: clamp(24px, 4vh, 48px); }
-body.mode-borne .borne-modules { grid-template-columns: repeat(3, 1fr); gap: clamp(18px, 2.4vw, 36px); }
-body.mode-borne .borne-mod { min-height: clamp(300px, 48vh, 660px); padding: clamp(30px, 6vh, 70px) clamp(18px, 2vw, 34px); }
-body.mode-borne .bm-emo { font-size: clamp(3.4rem, 9vw, 6rem); }
-body.mode-borne .bm-titre { font-size: clamp(1.5rem, 3vw, 2.6rem); }
-body.mode-borne .bm-desc { font-size: clamp(1rem, 1.8vw, 1.5rem); }
-body.mode-borne .bm-ticket .ticket-glace { width: clamp(120px, 15vw, 230px); }
-/* Borne étroite / portrait : on empile pour garder des tuiles lisibles. */
+/* MÊME mise en page pour /quiz (ordi/téléphone) ET /quiz/borne : grandes tuiles
+   côte à côte sur écran large, empilées sur téléphone. La SEULE différence entre
+   les deux est le compte à rebours (présent sur /quiz, absent sur la borne). */
+.home .borne-titre { font-size: clamp(2rem, 5vw, 4.4rem); }
+.home .borne-sous { font-size: clamp(1.1rem, 2.8vw, 1.9rem); margin-bottom: clamp(22px, 4vh, 46px); }
+.home .borne-modules { gap: clamp(16px, 2.4vw, 34px); }
+.home .borne-mod { min-height: clamp(220px, 46vh, 640px); padding: clamp(26px, 5vh, 66px) clamp(18px, 2vw, 34px); }
+.home .bm-emo { font-size: clamp(3rem, 9vw, 6rem); }
+.home .bm-titre { font-size: clamp(1.35rem, 3vw, 2.6rem); }
+.home .bm-desc { font-size: clamp(.95rem, 1.8vw, 1.5rem); }
+.home .bm-ticket .ticket-glace { width: clamp(110px, 15vw, 230px); }
+/* Téléphone / écran étroit : on empile en tuiles plus courtes. */
 @media (max-width: 720px) {
-  body.mode-borne .borne-modules { grid-template-columns: 1fr; }
-  body.mode-borne .borne-mod { min-height: clamp(180px, 24vh, 300px); }
+  .home .borne-modules { grid-template-columns: 1fr; }
+  .home .borne-mod { min-height: clamp(150px, 22vh, 260px); }
+  .home .bm-emo { font-size: clamp(2.6rem, 12vw, 3.8rem); }
 }
 
 /* Bouton « maison » permanent quand on est arrivé par la borne. */
