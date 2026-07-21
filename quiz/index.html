@@ -259,6 +259,39 @@ body {
   justify-content: center; text-align: center; gap: 12px; padding: 18px; background: rgba(255,255,255,.82); }
 
 /* ============================================================
+   🎬 SIMULATION — barre, menu, écran télé (kiosque)
+   ============================================================ */
+.sim-bar { background: #0E3B24; color: var(--soleil); font-weight: 700; font-size: .85rem;
+  padding: 7px 14px; border-radius: 999px; margin-bottom: 14px; text-align: center;
+  display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.sim-bar button { background: var(--soleil); color: #0E3B24; border: none; border-radius: 999px;
+  font-weight: 800; padding: 4px 12px; cursor: pointer; font-size: .82rem; }
+.sim-menu { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.sim-menu .btn { text-align: center; padding: 16px; line-height: 1.45; }
+.sim-menu .btn small { font-weight: 600; opacity: .85; font-size: .8rem; }
+
+.tv { text-align: center; width: 100%; max-width: 1100px; margin: 0 auto; padding: 10px; }
+.tv-phase { font-family: 'Fredoka', sans-serif; font-weight: 600; background: var(--foret); color: var(--soleil);
+  display: inline-block; padding: 10px 26px; border-radius: 999px; font-size: clamp(1rem, 2.4vw, 1.6rem); margin-bottom: 24px; }
+.tv-chrono { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
+  font-size: clamp(5rem, 26vw, 17rem); line-height: 1; font-variant-numeric: tabular-nums;
+  animation: tvPulse 1s ease-in-out infinite; }
+@keyframes tvPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.tv-sub { font-weight: 700; font-size: clamp(1rem, 2.4vw, 1.5rem); opacity: .8; margin-top: 12px; }
+.tv-cols { display: flex; gap: 30px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.tv-board { flex: 1 1 320px; max-width: 520px; text-align: left; }
+.tv-row { display: flex; justify-content: space-between; gap: 12px; background: var(--craie); border-radius: 14px;
+  padding: 12px 20px; margin-bottom: 10px; font-family: 'Fredoka', sans-serif; font-weight: 600;
+  font-size: clamp(1rem, 2.2vw, 1.5rem); box-shadow: 0 3px 12px rgba(14,59,36,.1); }
+.tv-qr { flex: 0 0 auto; text-align: center; }
+.tv-qr-box { background: #fff; padding: 14px; border-radius: 18px; box-shadow: 0 8px 24px rgba(14,59,36,.18);
+  width: min(280px, 62vw); }
+.tv-qr-box svg { width: 100%; height: auto; display: block; }
+.tv-scan { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
+  font-size: clamp(1.1rem, 2.6vw, 1.6rem); margin-top: 14px; }
+.tv-url { font-size: clamp(.72rem, 1.7vw, 1rem); opacity: .7; word-break: break-all; margin-top: 4px; }
+
+/* ============================================================
    🥚 EASTER EGGS — "graine", "famiflora", "2026"
    ============================================================ */
 .egg-layer { position: fixed; inset: 0; z-index: 100000; pointer-events: none; overflow: hidden; }
@@ -407,23 +440,39 @@ const CONFIG = {
 };
 
 /* ============================================================
-   🎬 MODE SIMULATION (ouvert depuis l'onglet Simulation de l'admin)
-   La page se comporte EXACTEMENT comme pour un joueur — mêmes écrans,
-   mêmes questions, même jardin — à trois différences près :
-   • le quiz est jouable même hors période (pratique avant le 29/07) ;
-   • RIEN n'est envoyé au serveur : score, codes et plantations restent
-     dans la mémoire de la page (tout s'efface en la rechargeant) ;
-   • le code bonus de test « FAMI-TEST » est toujours accepté.
+   🎬 MODE SIMULATION — un banc d'essai avec plusieurs ÉCRANS à prévisualiser.
+   RIEN n'est envoyé au serveur : tout reste en mémoire (rechargement = remise à
+   zéro). Le code bonus de test « FAMI-TEST » est toujours accepté.
+
+   ?simulation           → menu de choix des écrans
+   ?simulation=tele      → écran TÉLÉ en boucle (fin du chrono → score + QR + lien)
+   ?simulation=joueur    → la vraie vue joueur, du début à la fin
+   ?simulation=code      → la récupération d'un code bonus
    ============================================================ */
-const SIMULATION = new URLSearchParams(location.search).has("simulation");
+const SIM_PARAMS = new URLSearchParams(location.search);
+const SIMULATION = SIM_PARAMS.has("simulation");
+let simMode = SIMULATION ? (SIM_PARAMS.get("simulation") || "menu") : "";
 let simPret = { board: false, jardin: false };   // 1er chargement réel, ensuite local
-if (SIMULATION) {
-  document.addEventListener("DOMContentLoaded", () => {
-    const b = document.createElement("div");
-    b.style.cssText = "background:#0E3B24;color:#FFC53D;font-weight:700;font-size:.88rem;padding:8px 16px;border-radius:999px;margin-bottom:16px;text-align:center;";
-    b.textContent = "🎬 Simulation — rien n'est enregistré · code bonus de test : FAMI-TEST";
-    document.querySelector(".fami-head").after(b);
-  });
+let simTimers = [];
+function stopSim() { simTimers.forEach((t) => { clearTimeout(t); clearInterval(t); }); simTimers = []; }
+
+// Petite barre en haut, en simulation : rappelle l'écran courant et permet de
+// revenir au menu des écrans.
+function majBarreSim() {
+  if (!SIMULATION) return;
+  let bar = document.getElementById("simBar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "simBar";
+    bar.className = "sim-bar";
+    const head = document.querySelector(".fami-head");
+    if (head) head.after(bar); else return;
+  }
+  const noms = { menu: "menu", tele: "écran télé", joueur: "vue joueur", code: "code bonus" };
+  bar.innerHTML = `🎬 Simulation · ${noms[simMode] || ""}`
+    + (simMode !== "menu" ? ` <button id="simRetour">◂ Écrans</button>` : "");
+  const r = document.getElementById("simRetour");
+  if (r) r.onclick = () => { simMode = "menu"; userView = "auto"; quiz = null; joueur = null; stopSim(); render(); };
 }
 
 // ❓ LES QUESTIONS NE SONT PLUS ÉCRITES ICI.
@@ -1262,6 +1311,131 @@ async function finHerbes() {
 }
 
 /* ============================================================
+   🎬 LES ÉCRANS DE SIMULATION (menu, télé, code bonus)
+   ============================================================ */
+
+// La librairie QR (~56 Ko) n'est chargée QUE pour l'écran télé — jamais pour
+// les joueurs. Le QR encode l'adresse du quiz (sans le ?simulation).
+let qrCharge = null, qrCache = null;
+function chargeQR() {
+  if (window.qrcode) return Promise.resolve();
+  if (qrCharge) return qrCharge;
+  qrCharge = new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "qrcode.js"; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return qrCharge;
+}
+async function qrQuiz() {
+  if (qrCache) return qrCache;
+  await chargeQR();
+  const url = location.origin + location.pathname.replace(/[^/]*$/, "");   // .../quiz/
+  const qr = qrcode(0, "M");
+  qr.addData(url);
+  qr.make();
+  qrCache = { svg: qr.createSvgTag(6, 2), url };
+  return qrCache;
+}
+
+// Aiguillage : appelé par le routeur quand on est en simulation (hors « joueur »).
+function renderSim() {
+  stopSim();
+  clearInterval(tickTimer);
+  if (simMode === "tele") return renderSimTele();
+  if (simMode === "code") return renderSimCode();
+  return renderSimMenu();
+}
+
+function renderSimMenu() {
+  app.innerHTML = `<div class="card center">
+    <div style="font-size:2.6rem;">🎬</div>
+    <h2 class="q-text" style="margin:8px 0 2px;">Simulation — quel écran ?</h2>
+    <p class="hint">Aperçus, rien n'est enregistré.</p>
+    <div class="sim-menu">
+      <button class="btn" data-sim="tele">📺 Écran télé<br><small>fin du chrono → score + QR + lien, en boucle</small></button>
+      <button class="btn" data-sim="joueur">🎮 Vue joueur<br><small>le quiz du début à la fin</small></button>
+      <button class="btn" data-sim="code">🎁 Récupérer un code bonus<br><small>gagner des graines avec un code trouvé en magasin</small></button>
+    </div>
+  </div>`;
+  app.querySelectorAll("[data-sim]").forEach((b) => b.addEventListener("click", () => {
+    simMode = b.dataset.sim;
+    userView = "auto"; quiz = null; joueur = null;
+    render();
+  }));
+}
+
+// 📺 Écran télé (kiosque) : boucle « fin du chrono » → « score + QR + lien ».
+function renderSimTele() {
+  const demo = [
+    { name: "Sophie", score: 260 }, { name: "Karim", score: 230 }, { name: "Élodie", score: 210 },
+    { name: "Tom", score: 180 }, { name: "Nadia", score: 150 }, { name: "Luc", score: 120 },
+  ];
+
+  function phaseChrono() {
+    let n = 8;
+    app.innerHTML = `<div class="tv">
+      <div class="tv-phase">🚀 Ça commence dans…</div>
+      <div class="tv-chrono" id="tvC">${n}</div>
+      <div class="tv-sub">Prépare ton téléphone pour récolter des graines !</div>
+    </div>`;
+    const it = setInterval(() => {
+      const c = document.getElementById("tvC");
+      if (!c) { clearInterval(it); return; }
+      n--;
+      if (n > 0) { c.textContent = n; }
+      else { c.textContent = "🌱"; clearInterval(it); simTimers.push(setTimeout(phaseScore, 1500)); }
+    }, 1000);
+    simTimers.push(it);
+  }
+
+  async function phaseScore() {
+    const q = await qrQuiz().catch(() => null);
+    app.innerHTML = `<div class="tv">
+      <div class="tv-phase">🏆 Le grand quiz Famiformation</div>
+      <div class="tv-cols">
+        <div class="tv-board">
+          ${demo.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)} ${stadeDe(p.score).emoji}</span><span>${p.score} 🌱</span></div>`).join("")}
+        </div>
+        <div class="tv-qr">
+          <div class="tv-qr-box">${q ? q.svg : "<div style='padding:40px'>QR…</div>"}</div>
+          <div class="tv-scan">📱 Scanne pour jouer !</div>
+          <div class="tv-url">${esc(q ? q.url : "")}</div>
+        </div>
+      </div>
+    </div>`;
+    simTimers.push(setTimeout(phaseChrono, 12000));   // puis on reboucle sur le chrono
+  }
+
+  phaseChrono();
+}
+
+// 🎁 Récupération d'un code bonus (aperçu autonome).
+function renderSimCode() {
+  app.innerHTML = `<div class="card center">
+    <div style="font-size:2.6rem;">🎁</div>
+    <h2 class="q-text" style="margin:8px 0;">Un code bonus</h2>
+    <p class="hint">Tu as trouvé un sachet d'engrais (QR code) en magasin ? Entre son code pour gagner
+    <b>+${CONFIG.pointsParCodeBonus} graines</b>. Chaque code ne sert qu'une fois.<br>
+    <span style="opacity:.8;">En simulation, le code <b>FAMI-TEST</b> marche toujours.</span></p>
+    <div id="codeMsg"></div>
+    <input class="field" id="codeIn" placeholder="Ex : FAMI-XXXX" style="text-align:center; text-transform:uppercase;">
+    <button class="btn" id="codeOk">Valider 🎁</button>
+  </div>`;
+  const valider = async () => {
+    const code = document.getElementById("codeIn").value.trim().toUpperCase();
+    if (!code) return;
+    const res = await apiClaimCode(code, "SimuTest").catch(() => ({ ok: false, reason: "erreur" }));
+    const m = document.getElementById("codeMsg");
+    if (res.ok) m.innerHTML = `<div class="alert ok">Bravo ! Code validé, +${CONFIG.pointsParCodeBonus} graines 🎉</div>`;
+    else if (res.reason === "deja_pris") m.innerHTML = `<div class="alert">Trop tard, ce code a déjà été pris par quelqu'un d'autre ! 🏃</div>`;
+    else m.innerHTML = `<div class="alert">Code inconnu… vérifie l'orthographe.</div>`;
+  };
+  document.getElementById("codeOk").addEventListener("click", valider);
+  document.getElementById("codeIn").addEventListener("keydown", (e) => e.key === "Enter" && valider());
+}
+
+/* ============================================================
    🧚 LA FÉE FAMIFLORA — spectacle du compte à rebours (60 s en boucle)
    Reprise fidèle de la fée du site public (fee.php) : ailes = feuilles du
    logo, bras-baguette qui pivote, yeux qui clignent. Chorégraphie :
@@ -1683,6 +1857,17 @@ const EGG = (() => {
    ============================================================ */
 
 function render() {
+  // En simulation, les écrans de prévisualisation (menu/télé/code) passent avant
+  // tout. Le mode « joueur » (et sa suite jardin/mini-jeu) suit le flux normal.
+  if (SIMULATION) {
+    majBarreSim();
+    if (simMode !== "joueur") {
+      FEE.stop(); stopHerbes(); clearInterval(tickTimer);
+      renderSim();
+      return;
+    }
+    stopSim();
+  }
   const v = currentView();
   // La fée n'accompagne QUE le compte à rebours : ailleurs elle range sa baguette.
   if (v === "countdown") { FEE.start(); } else { FEE.stop(); }
