@@ -148,6 +148,25 @@ ferait une pop-up dès l'arrivée sur le site — on ne l'impose pas.
 Elle marche donc sur Android ; sur iPhone, utilise le clavier si
 besoin. Les deux autres easter eggs marchent partout.
 
+PLANTES RARES & PLUS BEAU JARDIN 🏆
+------------------------------------
+• Catalogue enrichi : 🍦 Arbre à glaces (5 graines) et 3 plantes
+  RARES et chères qui scintillent quand on les plante :
+  🏵️ Rosette de bronze (250), 💮 Fleur d'argent (500), 🪷 Lotus d'or (1000).
+• Dans le jardin : un classement « Les plus beaux jardins », par
+  VALEUR totale des plantes posées (les plantations de l'admin ne comptent pas).
+• Admin (onglet Jardin) : tu peux planter toi-même les plantes que tu
+  veux, gratuitement (au nom de « Famiflora 🌟 »).
+
+DATES DE L'ÉVÉNEMENT (onglet « Compte à rebours ») ⏱
+----------------------------------------------------
+Dans l'admin, onglet Compte à rebours : règle la date + heure de
+lancement (défaut 29/07 à midi), la clôture, et le texte des résultats.
+Les joueurs voient les nouvelles dates au chargement suivant.
+La graine du compte à rebours grandit jour après jour (🌰→🌱→🪴→🌳),
+l'arbre fleurit dans les 10 dernières secondes (🌳🌸) puis donne son
+fruit au lancement (🌳🍎).
+
 LE JARDIN COLLECTIF 🌼 (nouveau)
 --------------------------------
 • Les points sont devenus des GRAINES. Le classement se base sur les

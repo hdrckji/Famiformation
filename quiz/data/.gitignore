@@ -5,6 +5,7 @@ scores.json
 codes.json
 questions.json
 jardin.json
+config.json
 
 # En revanche on VERSIONNE .htaccess (protection) et ce fichier :
 !.htaccess

@@ -65,6 +65,19 @@ $scoresFile    = $dataDir . '/scores.json';
 $codesFile     = $dataDir . '/codes.json';
 $questionsFile = $dataDir . '/questions.json';
 $jardinFile    = $dataDir . '/jardin.json';
+$configFile    = $dataDir . '/config.json';
+
+// ⏱ Dates de l'événement, modifiables depuis l'admin (onglet Compte à rebours).
+// Par défaut : lancement le 29/07 à midi, clôture le 30/08, résultats le 31 août.
+function ladConfig($fichier) {
+  $c = is_file($fichier) ? json_decode((string)@file_get_contents($fichier), true) : null;
+  if (!is_array($c)) { $c = []; }
+  return [
+    'lancement' => $c['lancement'] ?? '2026-07-29T12:00',
+    'cloture'   => $c['cloture']   ?? '2026-08-30T23:59',
+    'resultats' => $c['resultats'] ?? '31 août',
+  ];
+}
 
 /* ============================================================
    🌼 LE JARDIN COLLECTIF
@@ -77,14 +90,19 @@ $jardinFile    = $dataDir . '/jardin.json';
 // Les coûts sont pensés pour un score max d'environ 340 graines :
 // un bon joueur plante 3-5 fois, un joueur moyen 2-3 fois.
 $PLANTES = [
-  'trefle'     => ['emoji' => '🍀', 'nom' => 'Trèfle',      'cout' => 1],
-  'brin'       => ['emoji' => '🌱', 'nom' => 'Brin d\'herbe', 'cout' => 1],
-  'paquerette' => ['emoji' => '🌼', 'nom' => 'Pâquerette',  'cout' => 20],
-  'tulipe'     => ['emoji' => '🌷', 'nom' => 'Tulipe',      'cout' => 35],
-  'lavande'    => ['emoji' => '💜', 'nom' => 'Lavande',     'cout' => 50],
-  'tournesol'  => ['emoji' => '🌻', 'nom' => 'Tournesol',   'cout' => 80],
-  'rosier'     => ['emoji' => '🌹', 'nom' => 'Rosier',      'cout' => 120],
-  'arbre'      => ['emoji' => '🌳', 'nom' => 'Petit arbre', 'cout' => 200],
+  'trefle'     => ['emoji' => '🍀', 'nom' => 'Trèfle',        'cout' => 1],
+  'brin'       => ['emoji' => '🌱', 'nom' => 'Brin d\'herbe',  'cout' => 1],
+  'arbreglace' => ['emoji' => '🍦', 'nom' => 'Arbre à glaces', 'cout' => 5],
+  'paquerette' => ['emoji' => '🌼', 'nom' => 'Pâquerette',    'cout' => 20],
+  'tulipe'     => ['emoji' => '🌷', 'nom' => 'Tulipe',        'cout' => 35],
+  'lavande'    => ['emoji' => '💜', 'nom' => 'Lavande',       'cout' => 50],
+  'tournesol'  => ['emoji' => '🌻', 'nom' => 'Tournesol',     'cout' => 80],
+  'rosier'     => ['emoji' => '🌹', 'nom' => 'Rosier',        'cout' => 120],
+  'arbre'      => ['emoji' => '🌳', 'nom' => 'Petit arbre',   'cout' => 200],
+  // 🏆 Les 3 plantes RARES : chères, magnifiques, elles scintillent au jardin.
+  'bronze'     => ['emoji' => '🏵️', 'nom' => 'Rosette de bronze', 'cout' => 250,  'rare' => 'bronze'],
+  'argent'     => ['emoji' => '💮', 'nom' => 'Fleur d\'argent',    'cout' => 500,  'rare' => 'argent'],
+  'or'         => ['emoji' => '🪷', 'nom' => 'Lotus d\'or',        'cout' => 1000, 'rare' => 'or'],
 ];
 
 // Taille de la grille (8 colonnes × 6 lignes = 48 cases).
@@ -494,6 +512,38 @@ switch ($action) {
     break;
   }
 
+  // ⏱ Les dates de l'événement (lues par la page joueur pour le compte à rebours).
+  case 'config_get': {
+    echo json_encode(ladConfig($configFile), JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // ⏱ Enregistrer les dates de l'événement (admin).
+  case 'config_set': {
+    exigeAdmin($input);
+    $lancement = trim($input['lancement'] ?? '');
+    $cloture   = trim($input['cloture'] ?? '');
+    $resultats = trim(mb_substr((string)($input['resultats'] ?? ''), 0, 40));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/', $lancement)) {
+      http_response_code(400);
+      echo json_encode(['ok' => false, 'reason' => 'date_lancement_invalide']);
+      break;
+    }
+    if ($cloture !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/', $cloture)) {
+      http_response_code(400);
+      echo json_encode(['ok' => false, 'reason' => 'date_cloture_invalide']);
+      break;
+    }
+    $actuel = ladConfig($configFile);
+    writeJson($configFile, [
+      'lancement' => $lancement,
+      'cloture'   => $cloture !== '' ? $cloture : $actuel['cloture'],
+      'resultats' => $resultats !== '' ? $resultats : $actuel['resultats'],
+    ]);
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
   // 🌱 RÉCUPÉRER SON COMPTE sur un autre téléphone : pseudo + code à 4 chiffres.
   // (Au quotidien, le téléphone reconnaît le joueur tout seul via son stockage
   // local ; cette action ne sert qu'au rattrapage.)
@@ -656,6 +706,7 @@ switch ($action) {
       'questions' => lesQuestions($questionsFile, $QUESTIONS_DEFAUT),
       'jardin'    => ['cases' => (object)($j['cases'] ?? []), 'total' => $JARDIN_CASES],
       'plantes'   => $PLANTES,
+      'config'    => ladConfig($configFile),
     ], JSON_UNESCAPED_UNICODE);
     break;
   }
@@ -688,6 +739,25 @@ switch ($action) {
       return null;
     });
     echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🌟 PLANTER librement (admin) : l'organisateur pose la plante qu'il veut, où
+  // il veut, gratuitement. Attribuée à « Famiflora 🌟 » (hors classement joueurs).
+  case 'jardin_planter': {
+    exigeAdmin($input);
+    global $PLANTES, $JARDIN_CASES;
+    $idx    = intval($input['case'] ?? -1);
+    $plante = trim($input['plante'] ?? '');
+    if (!isset($PLANTES[$plante])) { echo json_encode(['ok' => false, 'reason' => 'plante_inconnue']); break; }
+    if ($idx < 0 || $idx >= $JARDIN_CASES) { echo json_encode(['ok' => false, 'reason' => 'case_invalide']); break; }
+    $res = withLock($jardinFile, function (&$j, &$write) use ($idx, $plante) {
+      if (!isset($j['cases']) || !is_array($j['cases'])) { $j['cases'] = []; }
+      $j['cases'][$idx] = ['plante' => $plante, 'par' => 'Famiflora 🌟', 'date' => date('c')];
+      $write = true;
+      return ['ok' => true];
+    });
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
     break;
   }
 

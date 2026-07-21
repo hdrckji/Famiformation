@@ -128,6 +128,15 @@ body {
 .plus summary { cursor: pointer; font-weight: 700; color: var(--pousse); font-size: .92rem; }
 .lien { color: var(--pousse); font-weight: 700; text-decoration: none; }
 .lien:hover { text-decoration: underline; }
+.lien.conf { font-size: .82rem; opacity: .75; }
+.mini-warn { font-size: .78rem; color: #A34A00; margin: 2px 0 14px; line-height: 1.4; }
+.modal-fond { position: fixed; inset: 0; z-index: 100003; background: rgba(14,59,36,.5);
+  display: flex; align-items: center; justify-content: center; padding: 18px; }
+.modal { background: var(--craie); border-radius: 18px; padding: 22px; max-width: 460px; width: 100%;
+  max-height: 84vh; overflow-y: auto; box-shadow: 0 14px 40px rgba(0,0,0,.3); }
+.modal h3 { font-family: 'Fredoka', sans-serif; color: var(--pousse); margin-bottom: 10px; }
+.modal p { font-size: .9rem; line-height: 1.5; margin-bottom: 10px; }
+.modal .btn { width: 100%; margin-top: 6px; }
 .score-big {
   font-family: 'Fredoka', sans-serif; font-weight: 700;
   font-size: 4rem; color: var(--pousse); text-align: center; line-height: 1;
@@ -226,6 +235,36 @@ body {
 .case.pleine { background: #A7C79B; cursor: help; }
 .case.neuve { animation: pousse-pop .5s ease-out; }
 .jardin-info { margin-top: 12px; font-weight: 700; font-size: .92rem; min-height: 1.4em; }
+
+/* --- Plantes RARES : reflets métalliques + brillance qui balaie --- */
+.plt.rare-bronze, .case.rare-bronze { background: linear-gradient(135deg, #E8C79B, #B87333 60%, #8A5A28); color: #fff; }
+.plt.rare-argent, .case.rare-argent { background: linear-gradient(135deg, #FBFCFE, #C4CAD4 55%, #949BA8); color: #33383F; }
+.plt.rare-or,     .case.rare-or     { background: linear-gradient(135deg, #FFE9A0, #E9B21E 55%, #C9901A); color: #5A3E00; }
+.plt[class*="rare-"], .case[class*="rare-"] { position: relative; overflow: hidden; border-color: rgba(255,255,255,.6); box-shadow: 0 3px 10px rgba(14,59,36,.25); }
+.plt[class*="rare-"] .cout { opacity: .95; }
+.case.pleine[class*="rare-"] { box-shadow: 0 0 12px rgba(255,220,120,.6), 0 3px 10px rgba(14,59,36,.25); }
+.plt[class*="rare-"]::after, .case[class*="rare-"]::after {
+  content: ""; position: absolute; top: 0; left: -60%; width: 45%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.75), transparent);
+  transform: skewX(-18deg); animation: brille 2.6s ease-in-out infinite;
+}
+@keyframes brille { 0%, 60% { left: -60%; } 100% { left: 130%; } }
+
+/* Les étincelles projetées quand on plante une plante rare. */
+.scintille { position: fixed; z-index: 100002; pointer-events: none; font-size: 1.1rem;
+  transform: translate(-50%, -50%); animation: scintilleVole 1s ease-out forwards; }
+@keyframes scintilleVole {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.2) rotate(60deg); }
+}
+
+/* --- Classement des plus beaux jardins --- */
+.beaux { margin-top: 16px; border-top: 1px solid #e3eee6; padding-top: 10px; }
+.beaux summary { cursor: pointer; font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse); font-size: 1.05rem; }
+.beau-row { display: flex; justify-content: space-between; gap: 10px; background: var(--brume); border-radius: 12px;
+  padding: 9px 15px; margin-bottom: 7px; font-weight: 700; }
+.beau-row.moi { background: #DFF0E4; outline: 2px solid var(--pousse); }
 .btn.small { font-size: .9rem; padding: 8px 16px; }
 .btn.mini { font-size: .82rem; padding: 6px 12px; }
 
@@ -543,6 +582,14 @@ async function apiClaimCode(code, name) {
   });
   return await r.json();
 }
+// ⏱ Les dates de l'événement (réglées dans l'admin). En cas d'échec, on garde
+// les dates par défaut inscrites dans CONFIG.
+async function apiConfig() {
+  try {
+    const r = await fetch(`${CONFIG.api}?action=config_get`);
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
 // Récupère les questions saisies dans /quiz/admin. En cas d'échec on garde la
 // liste de secours déjà chargée : mieux vaut un quiz de secours qu'un écran vide.
 async function apiQuestions() {
@@ -738,12 +785,18 @@ function phaseNow() {
 // Catalogue de secours si le serveur ne répond pas (le vrai vient d'api.php,
 // pour que page et serveur soient toujours d'accord sur les coûts).
 let PLANTES = {
-  paquerette: { emoji: "🌼", nom: "Pâquerette",  cout: 20 },
-  tulipe:     { emoji: "🌷", nom: "Tulipe",      cout: 35 },
-  lavande:    { emoji: "💜", nom: "Lavande",     cout: 50 },
-  tournesol:  { emoji: "🌻", nom: "Tournesol",   cout: 80 },
-  rosier:     { emoji: "🌹", nom: "Rosier",      cout: 120 },
-  arbre:      { emoji: "🌳", nom: "Petit arbre", cout: 200 },
+  trefle:     { emoji: "🍀", nom: "Trèfle",        cout: 1 },
+  brin:       { emoji: "🌱", nom: "Brin d'herbe",  cout: 1 },
+  arbreglace: { emoji: "🍦", nom: "Arbre à glaces", cout: 5 },
+  paquerette: { emoji: "🌼", nom: "Pâquerette",    cout: 20 },
+  tulipe:     { emoji: "🌷", nom: "Tulipe",        cout: 35 },
+  lavande:    { emoji: "💜", nom: "Lavande",       cout: 50 },
+  tournesol:  { emoji: "🌻", nom: "Tournesol",     cout: 80 },
+  rosier:     { emoji: "🌹", nom: "Rosier",        cout: 120 },
+  arbre:      { emoji: "🌳", nom: "Petit arbre",   cout: 200 },
+  bronze:     { emoji: "🏵️", nom: "Rosette de bronze", cout: 250,  rare: "bronze" },
+  argent:     { emoji: "💮", nom: "Fleur d'argent",    cout: 500,  rare: "argent" },
+  or:         { emoji: "🪷", nom: "Lotus d'or",        cout: 1000, rare: "or" },
 };
 let JARDIN_CASES = 48;
 
@@ -761,6 +814,20 @@ function stadeDe(graines) {
   let s = STADES[0];
   for (const st of STADES) { if (graines >= st.min) s = st; }
   return s;
+}
+
+// 🌱 La graine du compte à rebours POUSSE en approchant du lancement : jour après
+// jour elle grandit, l'arbre fleurit dans les 10 dernières secondes, et à
+// l'arrivée il donne un fruit. (diff = millisecondes avant le lancement.)
+function cdPousse(diff) {
+  if (diff <= 0) return "🌳🍎";        // 🎉 l'arbre donne son fruit : c'est parti !
+  if (diff <= 10000) return "🌳🌸";    // 10 dernières secondes : l'arbre fleurit
+  const j = diff / 86400000;           // jours restants
+  if (j < 0.5) return "🌳";            // dernières heures : l'arbre
+  if (j < 1.5) return "🌿";            // ~1 jour : buisson
+  if (j < 3)   return "🪴";            // ~2 jours : jeune plant
+  if (j < 5)   return "🌱";            // ~3-4 jours : pousse
+  return "🌰";                         // plus loin : la graine
 }
 
 // Avatar : initiales sur fond coloré, la couleur découle du prénom (stable).
@@ -802,6 +869,24 @@ function oublieMoi() { try { localStorage.removeItem(LS_MOI); } catch (e) {} }
 function metCodeAttente(c) { if (SIMULATION) return; try { localStorage.setItem(LS_ATTENTE, c); } catch (e) {} }
 function litCodeAttente() { if (SIMULATION) return ""; try { return localStorage.getItem(LS_ATTENTE) || ""; } catch (e) { return ""; } }
 function videCodeAttente() { try { localStorage.removeItem(LS_ATTENTE); } catch (e) {} }
+
+// 🔒 Petite fenêtre « politique de confidentialité ».
+function ouvrePolitique() {
+  const o = document.createElement("div");
+  o.className = "modal-fond";
+  o.innerHTML = `<div class="modal">
+    <h3>🔒 Politique de confidentialité</h3>
+    <p><b>Ce qu'on te demande :</b> ton pseudo, un code à 4 chiffres, et — seulement si tu veux — ton nom et prénom.</p>
+    <p><b>À quoi ça sert :</b> afficher ton pseudo et ton score au classement, te reconnaître quand tu reviens jouer, et (si tu as donné ton nom) te remettre ton prix en cas de victoire.</p>
+    <p><b>Où c'est gardé :</b> uniquement sur le serveur du quiz, le temps de l'événement Famiflora. Rien n'est vendu ni partagé avec qui que ce soit, et il n'y a aucune publicité.</p>
+    <p><b>Tes droits :</b> tu peux demander aux organisateurs de supprimer ton compte à tout moment.</p>
+    <button class="btn" id="conf-ok">J'ai compris 👍</button>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => o.remove();
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
+  o.querySelector("#conf-ok").addEventListener("click", ferme);
+}
 
 // Un code bonus scanné AVANT d'avoir une carte est mis de côté ; dès qu'on est
 // identifié (inscription ou récupération), on le récupère automatiquement.
@@ -878,7 +963,7 @@ function renderCountdown() {
         <div class="cd-cell"><div class="cd-num" id="cd-m">--</div><div class="cd-lab">Minutes</div></div>
         <div class="cd-cell sec"><div class="cd-num" id="cd-s">--</div><div class="cd-lab">Secondes</div></div>
       </div>` : ""}
-      <div class="cd-sprout">🌱</div>
+      <div class="cd-sprout" id="cd-sprout">${cdPousse(CONFIG.dateLancement.getTime() - Date.now())}</div>
       <div class="cd-info">${info}</div>
       ${top5Html}
     </div>`;
@@ -887,6 +972,10 @@ function renderCountdown() {
   if (phase !== "termine") {
     const tick = () => {
       const diff = Math.max(0, target.getTime() - Date.now());
+      // La graine pousse en fonction du temps restant AVANT LE LANCEMENT :
+      // jour après jour, puis fleur à 10 s, puis fruit une fois lancé.
+      const sp = document.getElementById("cd-sprout");
+      if (sp) sp.textContent = cdPousse(CONFIG.dateLancement.getTime() - Date.now());
       if (diff === 0) { render(); return; } // bascule de phase
       $("#cd-j").textContent = pad(Math.floor(diff / 86400000));
       $("#cd-h").textContent = pad(Math.floor((diff % 86400000) / 3600000));
@@ -909,26 +998,31 @@ function renderQuiz() {
 
   if (!quiz) quiz = { step: "intro", pseudo: "", code: "", nom: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, start: 0, score: 0 };
 
-  // ---- Inscription : la « carte de jardinier » (pseudo + code à 4 chiffres) ----
+  // ---- Inscription : simple et fun (pseudo + code secret à 4 chiffres) ----
   if (quiz.step === "intro") {
     app.innerHTML = `<div class="card">
       <div class="center"><div style="font-size:2.8rem;">🌱</div>
-        <h2 class="q-text" style="margin:8px 0 12px;">Crée ta carte de jardinier</h2></div>
+        <h2 class="q-text" style="margin:8px 0 14px;">Bienvenue, futur jardinier !</h2></div>
       ${quiz.error ? `<div class="alert">${esc(quiz.error)}</div>` : ""}
-      <label class="lbl">Ton nom de jardinier</label>
+      <label class="lbl">Ton pseudo de jardinier</label>
       <input class="field" id="q-pseudo" placeholder="Ex : SuperMarie" maxlength="24" value="${esc(quiz.pseudo)}">
-      <label class="lbl">Ton code jardinier secret 🌱 (4 chiffres)</label>
+      <label class="lbl">Ton code secret de jardinier 🌱 (4 chiffres)</label>
       <input class="field" id="q-code" inputmode="numeric" maxlength="4" placeholder="Ex : ton année de naissance" value="${esc(quiz.code)}">
-      <div class="alert warn">⚠️ Retiens bien ton nom de jardinier + tes 4 chiffres : c'est ce qui te permettra de retrouver ton jardin si tu changes de téléphone. Au quotidien, ton téléphone te reconnaît tout seul !</div>
-      <details class="plus"><summary>▸ Aller plus loin (facultatif)</summary>
-        <p class="hint" style="margin-top:8px;">Si tu veux : ton vrai nom, pratique pour te remettre ton prix en cas de victoire. Pas obligatoire !</p>
+      <p class="mini-warn">⚠️ N'oublie pas ton pseudo et ton code : c'est ce qui te permet de retrouver ton jardin sur un autre téléphone.</p>
+      <details class="plus"><summary>✨ Peaufiner mon compte (optionnel)</summary>
+        <p class="hint" style="margin-top:8px;">Donne ton nom et prénom : ça permettra aux organisateurs de retrouver ton compte si tu oublies ton code — et de te remettre ton prix si tu gagnes. Pas obligatoire !</p>
         <input class="field" id="q-nom" placeholder="Nom Prénom (facultatif)" maxlength="60" value="${esc(quiz.nom)}">
       </details>
       <button class="btn" id="q-start" style="width:100%;">C'est parti ! 🚀</button>
-      <p class="center" style="margin-top:14px;"><a href="#" id="q-retrouver" class="lien">J'ai déjà une carte → retrouver mon jardin</a></p>
+      <p class="center" style="margin-top:12px;"><a href="#" id="q-retrouver" class="lien">J'ai déjà un compte</a></p>
+      <details class="plus" style="margin-top:10px;"><summary>▸ En savoir plus</summary>
+        <p class="hint" style="margin-top:8px;">Cette étape crée ton compte pour le grand quiz Famiflora : réponds aux questions, récolte des graines 🌱, trouve des codes bonus en magasin et fais fleurir le jardin collectif ! Ton pseudo apparaît au classement.</p>
+      </details>
+      <p class="center" style="margin-top:8px;"><a href="#" id="q-conf" class="lien conf">Politique de confidentialité</a></p>
     </div>`;
     $("#q-code").addEventListener("keydown", (e) => e.key === "Enter" && $("#q-start").click());
     $("#q-retrouver").addEventListener("click", (e) => { e.preventDefault(); quiz = null; userView = "retrouver"; render(); });
+    $("#q-conf").addEventListener("click", (e) => { e.preventDefault(); ouvrePolitique(); });
     $("#q-start").addEventListener("click", async () => {
       const pseudo = $("#q-pseudo").value.trim();
       const code = $("#q-code").value.replace(/\D/g, "").slice(0, 4);
@@ -1097,34 +1191,34 @@ function renderBoard() {
    solde disponible diminue.
    ============================================================ */
 
+// Classement des plus beaux jardins : par VALEUR totale des plantes posées.
+function classementJardins() {
+  const val = {};
+  for (const k in jardin) {
+    const c = jardin[k];
+    if (/^Famiflora/.test(c.par)) continue;   // les plantations de l'organisateur ne comptent pas
+    val[c.par] = (val[c.par] || 0) + (PLANTES[c.plante]?.cout || 0);
+  }
+  return Object.entries(val).map(([name, valeur]) => ({ name, valeur })).sort((a, b) => b.valeur - a.valeur);
+}
+
 function renderJardin() {
   clearInterval(tickTimer);
 
-  // Pas encore identifié (page rechargée) : on retrouve le joueur par son prénom.
+  // Pas encore identifié (nouveau téléphone) : on invite à retrouver sa carte.
   if (!joueur) {
-    app.innerHTML = `${pillsHtml("jardin")}<div class="card">
-      <h2 class="q-text">🌼 Retrouve ton jardin</h2>
-      <p class="hint">Entre le prénom utilisé au quiz pour retrouver tes graines et planter.</p>
-      ${jardinMsg ? `<div class="alert">${esc(jardinMsg)}</div>` : ""}
-      <input class="field" id="j-name" placeholder="Ton prénom (ex : Marie D.)" maxlength="24">
-      <button class="btn" id="j-retrouver">Retrouver mes graines 🌱</button>
+    app.innerHTML = `${pillsHtml("jardin")}<div class="card center">
+      <div style="font-size:2.6rem;">🌼</div>
+      <h2 class="q-text" style="margin:8px 0;">Ton jardin t'attend</h2>
+      <p class="hint">Crée ta carte de jardinier au quiz, ou retrouve-la avec ton pseudo + ton code.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+        <button class="btn" id="j-jouer">Créer ma carte 🌱</button>
+        <button class="btn ghost" id="j-retrouver">J'ai déjà une carte</button>
+      </div>
     </div>`;
     bindPills();
-    $("#j-name").addEventListener("keydown", (e) => e.key === "Enter" && $("#j-retrouver").click());
-    $("#j-retrouver").addEventListener("click", async () => {
-      const name = $("#j-name").value.trim();
-      if (name.length < 2) return;
-      $("#j-retrouver").disabled = true;
-      const s = await apiSolde(name).catch(() => null);
-      if (!s || !s.exists) {
-        jardinMsg = "Prénom introuvable... Il faut d'abord jouer au quiz pour récolter des graines !";
-        renderJardin(); return;
-      }
-      jardinMsg = null;
-      joueur = { name: s.name, solde: s.solde, recoltees: s.recoltees };
-      jardin = await apiJardin();
-      renderJardin();
-    });
+    $("#j-jouer").addEventListener("click", () => { userView = "auto"; quiz = null; render(); });
+    $("#j-retrouver").addEventListener("click", () => { userView = "retrouver"; quiz = null; render(); });
     return;
   }
 
@@ -1143,19 +1237,28 @@ function renderJardin() {
     <div style="margin-bottom:14px;"><button class="btn small" id="j-herbes">🌿 Gagner des graines</button></div>
     <div class="catalogue">
       ${Object.entries(PLANTES).map(([cle, p]) => `
-        <button class="plt ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${p.cout > joueur.solde ? "disabled" : ""}>
+        <button class="plt ${p.rare ? "rare-" + p.rare : ""} ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${p.cout > joueur.solde ? "disabled" : ""}>
           <span class="emo">${p.emoji}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌱</span>
         </button>`).join("")}
     </div>
     <div class="grille">
       ${Array.from({ length: JARDIN_CASES }, (_, i) => {
         const c = jardin[i];
-        return c
-          ? `<button class="case pleine" data-info="${i}" title="${esc((PLANTES[c.plante]?.nom || c.plante) + " — planté par " + c.par)}">${PLANTES[c.plante]?.emoji || "🌿"}</button>`
-          : `<button class="case vide" data-case="${i}" aria-label="Case libre ${i + 1}"></button>`;
+        if (!c) return `<button class="case vide" data-case="${i}" aria-label="Case libre ${i + 1}"></button>`;
+        const p = PLANTES[c.plante];
+        return `<button class="case pleine ${p?.rare ? "rare-" + p.rare : ""}" data-info="${i}" title="${esc((p?.nom || c.plante) + " — planté par " + c.par)}">${p?.emoji || "🌿"}</button>`;
       }).join("")}
     </div>
     <div class="jardin-info" id="j-info">${jardinMsg ? esc(jardinMsg) : (planteChoisie ? `${PLANTES[planteChoisie].emoji} ${esc(PLANTES[planteChoisie].nom)} sélectionné — tape une case libre !` : "")}</div>
+    ${(() => {
+      const cl = classementJardins();
+      if (!cl.length) return "";
+      return `<details class="beaux" open><summary>🏆 Les plus beaux jardins</summary>
+        <p class="hint" style="margin:8px 0;">Classé par valeur des plantes posées — à toi de composer le plus beau !</p>
+        ${cl.slice(0, 8).map((x, i) => `<div class="beau-row ${joueur && x.name.toLowerCase() === joueur.name.toLowerCase() ? "moi" : ""}">
+          <span>${medals[i] || (i + 1) + "."} ${esc(x.name)}</span><span>${x.valeur} 🌱</span></div>`).join("")}
+      </details>`;
+    })()}
   </div></div>`;
   bindPills();
 
@@ -1215,7 +1318,7 @@ function renderJardin() {
       if (p.cout > joueur.solde) planteChoisie = null; // plus les moyens pour la même
       renderJardin();
       const neuve = app.querySelector(`[data-info="${idx}"]`);
-      if (neuve) neuve.classList.add("neuve");
+      if (neuve) { neuve.classList.add("neuve"); if (p.rare) etincellesSur(neuve); }
     } else {
       jardin = await apiJardin(); // on resynchronise la grille
       if (res.reason === "case_prise") jardinMsg = "Oups, cette case vient d'être prise par quelqu'un d'autre ! Tes graines te sont rendues.";
@@ -1230,6 +1333,24 @@ function renderJardin() {
 function soldeDepense() {
   const p = board.find((x) => x.name.toLowerCase() === (joueur?.name || "").toLowerCase());
   return p ? (p.depensees || 0) : 0;
+}
+
+// ✨ Gerbe d'étincelles au-dessus d'une case : quand on plante une plante RARE.
+function etincellesSur(el) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement("span");
+    s.className = "scintille";
+    s.textContent = ["✨", "⭐", "💫", "🌟"][i % 4];
+    s.style.left = cx + "px"; s.style.top = cy + "px";
+    s.style.setProperty("--dx", (Math.random() * 100 - 50).toFixed(0) + "px");
+    s.style.setProperty("--dy", (-15 - Math.random() * 80).toFixed(0) + "px");
+    s.style.animationDelay = (Math.random() * 0.2).toFixed(2) + "s";
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1100);
+  }
 }
 
 /* ============================================================
@@ -1565,7 +1686,7 @@ function renderSimTele() {
   ];
 
   function phaseChrono() {
-    let n = 8;
+    let n = 15;
     app.innerHTML = `<div class="tv">
       <div class="tv-phase">🚀 Ça commence dans…</div>
       <div class="tv-chrono" id="tvC">${n}</div>
@@ -2079,9 +2200,15 @@ function render() {
   // échoue, QUESTIONS garde la liste de secours définie plus haut. Le catalogue
   // des plantes vient aussi du serveur : page et api.php restent d'accord sur
   // les coûts même si tu les modifies dans api.php.
-  const [dist, bd, cat] = await Promise.all([apiQuestions(), apiGetBoard(), apiPlantes()]);
+  const [dist, bd, cat, conf] = await Promise.all([apiQuestions(), apiGetBoard(), apiPlantes(), apiConfig()]);
   if (dist) { QUESTIONS = dist; }
   if (cat && cat.plantes) { PLANTES = cat.plantes; JARDIN_CASES = cat.cases || JARDIN_CASES; }
+  // Dates de l'événement réglées dans l'admin (sinon on garde celles de CONFIG).
+  if (conf) {
+    if (conf.lancement) CONFIG.dateLancement = new Date(conf.lancement);
+    if (conf.cloture)   CONFIG.dateCloture = new Date(conf.cloture);
+    if (conf.resultats) CONFIG.dateResultats = conf.resultats;
+  }
   board = bd;
 
   // 🌱 Auto-reconnaissance : si ce téléphone a déjà une carte de jardinier, on

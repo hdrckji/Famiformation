@@ -99,6 +99,7 @@ let vue = "questions";
 let data = { board: [], codes: [], questions: [] };
 let brouillon = [];      // les questions en cours d'édition
 let message = null;
+let adminPlante = null;  // plante sélectionnée pour planter librement dans le jardin
 
 async function post(action, corps = {}) {
   const r = await fetch(`${API}?action=${action}`, {
@@ -161,6 +162,7 @@ function rendre() {
     ["classement", "🏆 Classement"],
     ["jardin", "🌼 Jardin"],
     ["codes", "🎁 Codes bonus"],
+    ["countdown", "⏱ Compte à rebours"],
     ["simulation", "🎬 Simulation"],
   ];
   app.innerHTML = `
@@ -178,6 +180,7 @@ function rendre() {
   if (vue === "questions") vueQuestions();
   else if (vue === "classement") vueClassement();
   else if (vue === "jardin") vueJardin();
+  else if (vue === "countdown") vueCountdown();
   else if (vue === "simulation") vueSimulation();
   else vueCodes();
 }
@@ -300,14 +303,16 @@ function vueClassement() {
       ${b.length ? `
       <div style="overflow-x:auto">
       <table>
-        <tr><th>#</th><th>Prénom</th><th>Récoltées 🌱</th><th>Plantées</th><th>Solde</th><th>Bonnes réponses</th><th>Codes</th><th>Temps</th><th></th></tr>
+        <tr><th>#</th><th>Pseudo</th><th>Nom réel</th><th>Code</th><th>Récoltées 🌱</th><th>Plantées</th><th>Solde</th><th>Bonnes réponses</th><th>Codes</th><th>Temps</th><th></th></tr>
         ${b.map((p, i) => `
           <tr>
             <td class="num">${i + 1}</td>
             <td>${esc(p.name)} ${stadeEmoji(p.score)}</td>
+            <td>${p.nom ? esc(p.nom) : "<span style='opacity:.4'>—</span>"}</td>
+            <td class="num">${p.code ? esc(p.code) : "<span style='opacity:.4'>—</span>"}</td>
             <td class="num"><strong>${p.score}</strong></td>
             <td class="num">${p.depensees || 0}</td>
-            <td class="num">${Math.max(0, p.score - (p.depensees || 0))}</td>
+            <td class="num">${Math.max(0, (p.score || 0) + (p.bonus || 0) - (p.depensees || 0))}</td>
             <td class="num">${p.correct}</td>
             <td class="num">${p.codes}</td>
             <td class="num">${Math.floor(p.time / 60)} min ${p.time % 60} s</td>
@@ -364,14 +369,20 @@ function vueJardin() {
   c.innerHTML = `
     <div class="card">
       <h2>Le jardin collectif — ${nb} plante(s) sur ${total} cases</h2>
-      <p class="hint">Clique sur une plante pour la retirer (son planteur est <strong>remboursé</strong> de ses graines).
-      Les coûts se modifient dans <strong>api.php</strong> ($PLANTES).</p>
+      <p class="hint">Choisis une plante puis tape une case libre pour la <strong>planter toi-même</strong> (gratuit, au nom de Famiflora 🌟).
+      Tape une plante existante pour la <strong>retirer</strong> (son planteur est remboursé).</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        ${Object.entries(plantes).map(([cle, p]) => `
+          <button data-pick="${cle}" style="border:3px solid ${adminPlante === cle ? "var(--pousse)" : "transparent"};
+            background:${adminPlante === cle ? "#DFF0E4" : "var(--brume)"}; border-radius:12px; padding:6px 10px; cursor:pointer;
+            font-weight:700; color:var(--foret);"><span style="font-size:1.3rem;">${p.emoji}</span><br>${esc(p.nom)}</button>`).join("")}
+        ${adminPlante ? `<button class="btn ghost small" id="j-annuler-pick">Ne rien planter</button>` : ""}
+      </div>
       <div style="display:grid; grid-template-columns:repeat(8,1fr); gap:6px; background:#D9C7A7; border-radius:16px; padding:10px; max-width:520px;">
         ${Array.from({ length: total }, (_, i) => {
           const p = cases[i];
-          return p
-            ? `<button data-vider="${i}" title="${esc((plantes[p.plante]?.nom || p.plante) + " — " + p.par)}" style="aspect-ratio:1; border:none; border-radius:9px; background:#A7C79B; font-size:1.3rem; cursor:pointer;">${plantes[p.plante]?.emoji || "🌿"}</button>`
-            : `<div style="aspect-ratio:1; border-radius:9px; background:#CDB894;"></div>`;
+          if (p) return `<button data-vider="${i}" title="${esc((plantes[p.plante]?.nom || p.plante) + " — " + p.par)}" style="aspect-ratio:1; border:none; border-radius:9px; background:#A7C79B; font-size:1.3rem; cursor:pointer;">${plantes[p.plante]?.emoji || "🌿"}</button>`;
+          return `<button data-planter="${i}" ${adminPlante ? "" : "disabled"} style="aspect-ratio:1; border:none; border-radius:9px; background:#CDB894; cursor:${adminPlante ? "pointer" : "default"};"></button>`;
         }).join("")}
       </div>
     </div>
@@ -381,6 +392,24 @@ function vueJardin() {
       Les scores du classement ne bougent pas.</p>
       <button class="btn danger" id="j-reset">Vider tout le jardin</button>
     </div>`;
+
+  // Choisir la plante à poser.
+  c.querySelectorAll("[data-pick]").forEach((el) => el.addEventListener("click", () => {
+    adminPlante = adminPlante === el.dataset.pick ? null : el.dataset.pick;
+    rendre();
+  }));
+  const annul = $("#j-annuler-pick");
+  if (annul) annul.addEventListener("click", () => { adminPlante = null; rendre(); });
+
+  // Planter la plante choisie sur une case libre (gratuit, au nom de Famiflora).
+  c.querySelectorAll("[data-planter]").forEach((el) => el.addEventListener("click", async () => {
+    if (!adminPlante) return;
+    const i = +el.dataset.planter;
+    const r = await post("jardin_planter", { case: i, plante: adminPlante });
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    message = { ok: true, texte: `${plantes[adminPlante]?.nom || adminPlante} planté sur la case ${i + 1}.` };
+    await charger();
+  }));
 
   c.querySelectorAll("[data-vider]").forEach((el) => el.addEventListener("click", async () => {
     const i = +el.dataset.vider;
@@ -401,6 +430,49 @@ function vueJardin() {
     if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
     message = { ok: true, texte: "Jardin vidé, graines rendues à tous les joueurs." };
     await charger();
+  });
+}
+
+/* ---------------------- ONGLET COMPTE À REBOURS ---------------------- */
+
+function vueCountdown() {
+  const c = $("#contenu");
+  const cf = data.config || { lancement: "2026-07-29T12:00", cloture: "2026-08-30T23:59", resultats: "31 août" };
+  const lbl = "display:block;font-weight:700;font-size:.85rem;color:#0E3B24;margin:8px 0 4px;";
+  c.innerHTML = `
+    <div class="card">
+      <h2>⏱ Le compte à rebours</h2>
+      <p class="hint">Ces dates pilotent le compte à rebours ET l'ouverture du quiz.
+      Par défaut, le lancement est le <strong>29/07 à midi</strong>. Ne les change que si l'événement bouge.</p>
+      <div id="cd-msg"></div>
+      <label style="${lbl}">📅 Lancement (ouverture du quiz)</label>
+      <input class="field" type="datetime-local" id="cf-lancement" value="${esc(cf.lancement)}">
+      <label style="${lbl}">🏁 Clôture (fin du quiz)</label>
+      <input class="field" type="datetime-local" id="cf-cloture" value="${esc(cf.cloture)}">
+      <label style="${lbl}">🏆 Date des résultats (texte affiché aux joueurs)</label>
+      <input class="field" id="cf-resultats" maxlength="40" value="${esc(cf.resultats)}">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;">
+        <button class="btn" id="cf-save">💾 Enregistrer les dates</button>
+        <button class="btn ghost" id="cf-defaut">Remettre le 29/07 à midi</button>
+      </div>
+    </div>`;
+  $("#cf-save").addEventListener("click", async () => {
+    const lancement = $("#cf-lancement").value;
+    const cloture = $("#cf-cloture").value;
+    const resultats = $("#cf-resultats").value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(lancement)) {
+      $("#cd-msg").innerHTML = `<div class="alert">Renseigne bien une date ET une heure de lancement.</div>`; return;
+    }
+    const r = await post("config_set", { lancement, cloture, resultats });
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    if (!r.ok) { $("#cd-msg").innerHTML = `<div class="alert">Enregistrement impossible (${(r.data && r.data.reason) || "erreur"}).</div>`; return; }
+    message = { ok: true, texte: "Dates enregistrées. Les joueurs les verront au prochain chargement de la page." };
+    await charger();
+  });
+  $("#cf-defaut").addEventListener("click", () => {
+    $("#cf-lancement").value = "2026-07-29T12:00";
+    $("#cf-cloture").value = "2026-08-30T23:59";
+    $("#cf-resultats").value = "31 août";
   });
 }
 
