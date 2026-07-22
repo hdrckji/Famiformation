@@ -3284,6 +3284,12 @@ function render() {
     const demo = (name, score, correct, codes) => ({ name, code: "0000", nom: "", score, bonus: 0, depensees: 0, correct, codes, codes_pris: [], time: 300 - score, quiz_fait: true });
     board = [demo("Marie", 240, 12, 2), demo("Lucas", 190, 10, 1), demo("Emma", 150, 8, 1),
              demo("Tom", 110, 6, 0), demo("Sofia", 80, 5, 0), demo("Noah", 50, 3, 0)].concat(board);
+    // 🧪 COMPTE DE TEST « Testeur / 0000 » : quiz déjà fait, score RÉALISTE au
+    // classement (130) mais un gros « bonus » dépensable (2000) — le bonus ne
+    // compte pas au classement, donc le compte ne fausse rien tout en pouvant
+    // s'offrir TOUTES les plantes pour les essayer.
+    board.push({ name: "Testeur", code: "0000", nom: "Compte de test", score: 130, bonus: 2000,
+      depensees: 0, correct: 9, codes: 0, codes_pris: [], time: 140, quiz_fait: true });
     simPret.board = true;   // apiGetBoard renverra cette liste (pas de fetch réel)
   }
 

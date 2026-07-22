@@ -160,7 +160,7 @@ function rendre() {
   const onglets = [
     ["questions", "❓ Questions"],
     ["classement", "🏆 Classement"],
-    ["jardin", "🌼 Aperçu jardin"],
+    ["jardin", "🎮 Tester le jeu"],
     ["codes", "🎁 Codes bonus"],
     ["countdown", "⏱ Compte à rebours"],
     ["simulation", "🎬 Simulation"],
@@ -365,20 +365,30 @@ function vueJardin() {
   // en plantation GRATUITE (prix affichés pour l'immersion), rien n'est enregistré.
   c.innerHTML = `
     <div class="card">
-      <h2>🌼 Aperçu « Mon jardin » (vue joueur)</h2>
-      <p class="hint">Voici le jardin tel qu'un joueur le voit — <strong>chacun a le sien</strong> (48 cases).
-      Ici tu peux <strong>planter gratuitement</strong> pour tester l'ambiance : les <strong>prix sont
-      affichés</strong> pour l'immersion, mais rien n'est débité ni enregistré.</p>
+      <h2>🎮 Tester le jeu (immersion totale)</h2>
+      <p class="hint">Le <strong>vrai</strong> jeu, exactement comme un joueur le vit : accueil, création de compte,
+      quiz, jardin, codes, classement. <strong>Rien n'est enregistré</strong> — aucun impact sur le site réel.</p>
+      <div style="background:#FFF6E6; border:1px solid #F2C94C; border-radius:14px; padding:12px 14px; margin:12px 0;">
+        <b>🧪 Compte de test tout prêt :</b> pseudo <b>Testeur</b> · code <b>0000</b><br>
+        <span style="font-size:.9rem; opacity:.85;">Quiz déjà fait et plein de graines → file au jardin et essaie
+        <b>toutes</b> les plantes (les vrais prix sont affichés et débités, pour l'immersion).
+        Tu peux aussi <b>créer ton propre compte</b> et jouer le quiz de A à Z.<br>
+        Code bonus de test : <b>FAMI-TEST-OK</b> (et <b>FAMI-TEST-USED</b> pour voir le cas « déjà pris »).</span>
+      </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
-        <button class="btn ghost" id="j-restart">🔄 Vider l'aperçu</button>
+        <button class="btn ghost" id="j-restart">🔄 Repartir de zéro</button>
+        <button class="btn ghost" id="j-jardin">🌼 Aller direct au jardin (plantes offertes)</button>
       </div>
       <div style="display:flex; justify-content:center; background:#DDE9E0; border-radius:16px; padding:14px;">
-        <iframe id="j-frame" src="../index.html?ecran=user&simulation=jardin"
-          style="border:none; border-radius:14px; background:var(--brume); height:76vh; min-height:560px;
+        <iframe id="j-frame" src="../index.html?simulation=joueur"
+          style="border:none; border-radius:14px; background:var(--brume); height:78vh; min-height:580px;
                  width:420px; max-width:100%; box-shadow:0 8px 30px rgba(14,59,36,.18);"></iframe>
       </div>
     </div>`;
   $("#j-restart").addEventListener("click", () => {
+    $("#j-frame").src = `../index.html?simulation=joueur&_=${Date.now()}`;
+  });
+  $("#j-jardin").addEventListener("click", () => {
     $("#j-frame").src = `../index.html?ecran=user&simulation=jardin&_=${Date.now()}`;
   });
 }
