@@ -581,7 +581,9 @@ body.mode-tele #app { flex: 0 0 auto; }
 @keyframes tlBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
 
 /* 🎉 Confettis (lancement) — pluie de morceaux colorés, purement décoratif. */
-.confetti-layer { position: fixed; inset: 0; z-index: 100055; pointer-events: none; overflow: hidden; }
+/* Les confettis passent DERRIÈRE les fenêtres (z-index < .modal-fond) : la fête
+   est visible tout autour, mais le texte de la modale reste parfaitement lisible. */
+.confetti-layer { position: fixed; inset: 0; z-index: 100002; pointer-events: none; overflow: hidden; }
 .confetti { position: absolute; top: -8vh; width: 12px; height: 16px; opacity: .95;
   will-change: transform; animation: confettiFall linear forwards; }
 @keyframes confettiFall { to { transform: translate(var(--drift, 0), 116vh) rotate(var(--rot, 540deg)); } }
@@ -1702,6 +1704,7 @@ function modaleQuizFini(graines) {
     </div>
   </div>`;
   document.body.appendChild(o);
+  lanceConfettis(6000);   // 🎉 on célèbre la fin du quiz
   const ferme = () => o.remove();
   o.querySelector('[data-qf="jardin"]').addEventListener("click", async () => { ferme(); jardin = await apiJardin(); userView = "jardin"; quiz = null; render(); });
   o.querySelector('[data-qf="board"]').addEventListener("click", () => { ferme(); userView = "board"; quiz = null; render(); });
