@@ -3284,17 +3284,37 @@ function render() {
   // 🎬 En SIMULATION, on garnit le classement avec des joueurs de démo (si vide)
   // pour pouvoir TOUT tester : classement en direct, podium des 3 vainqueurs à la
   // clôture, etc. Rien n'est envoyé au serveur (mode simulation).
-  if (SIMULATION && board.length < 3) {
-    const demo = (name, score, correct, codes) => ({ name, code: "0000", nom: "", score, bonus: 0, depensees: 0, correct, codes, codes_pris: [], time: 300 - score, quiz_fait: true });
-    board = [demo("Marie", 240, 12, 2), demo("Lucas", 190, 10, 1), demo("Emma", 150, 8, 1),
-             demo("Tom", 110, 6, 0), demo("Sofia", 80, 5, 0), demo("Noah", 50, 3, 0)].concat(board);
-    // 🧪 COMPTE DE TEST « Testeur / 0000 » : quiz déjà fait, score RÉALISTE au
-    // classement (130) mais un gros « bonus » dépensable (2000) — le bonus ne
-    // compte pas au classement, donc le compte ne fausse rien tout en pouvant
-    // s'offrir TOUTES les plantes pour les essayer.
-    board.push({ name: "Testeur", code: "0000", nom: "Compte de test", score: 130, bonus: 2000,
-      depensees: 0, correct: 9, codes: 0, codes_pris: [], time: 140, quiz_fait: true });
+  if (SIMULATION) {
+    // Des joueurs de démo seulement si le classement est quasi vide (sinon on
+    // garde les vrais, plus réalistes pour l'aperçu).
+    if (board.length < 3) {
+      const demo = (name, score, correct, codes) => ({ name, code: "0000", nom: "", score, bonus: 0, depensees: 0, correct, codes, codes_pris: [], time: 300 - score, quiz_fait: true });
+      board = [demo("Marie", 240, 12, 2), demo("Lucas", 190, 10, 1), demo("Emma", 150, 8, 1),
+               demo("Tom", 110, 6, 0), demo("Sofia", 80, 5, 0), demo("Noah", 50, 3, 0)].concat(board);
+    }
+    // 🧪 COMPTE DE TEST « Testeur / 0000 » : TOUJOURS présent en simulation (quel
+    // que soit le nombre de vrais joueurs). Score réaliste au classement (130) mais
+    // gros « bonus » dépensable (2000) — le bonus ne compte pas au classement, donc
+    // il ne fausse rien tout en pouvant s'offrir TOUTES les plantes.
+    if (!board.some((p) => (p.name || "").toLowerCase() === "testeur")) {
+      board.push({ name: "Testeur", code: "0000", nom: "Compte de test", score: 130, bonus: 2000,
+        depensees: 0, correct: 9, codes: 0, codes_pris: [], time: 140, quiz_fait: true });
+    }
     simPret.board = true;   // apiGetBoard renverra cette liste (pas de fetch réel)
+  }
+
+  // 🧪 Connexion AUTOMATIQUE au compte de test (bouton de l'admin) : zéro saisie,
+  // on arrive directement sur le tableau de bord, tout débloqué.
+  if (SIMULATION && SIM_PARAMS.get("compte") === "testeur") {
+    const t = board.find((p) => (p.name || "").toLowerCase() === "testeur");
+    if (t) {
+      joueur = { name: t.name, code: t.code, recoltees: t.score, nbCodes: 0, quizFait: true,
+                 solde: t.score + (t.bonus || 0) - (t.depensees || 0) };
+      jardin = {};
+      userView = "dashboard";
+      render();
+      return;
+    }
   }
 
   // 🎨 Aperçu « mon jardin » pour l'admin : joueur de démo, entrée directe dans le

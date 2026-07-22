@@ -377,7 +377,8 @@ function vueJardin() {
         Codes bonus de test : <b>FAMI-TEST-OK</b> (marche à chaque fois) et <b>FAMI-TEST-USED</b> (cas « déjà pris »).</span>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
-        <button class="btn ghost" id="j-restart">🔄 Repartir de zéro</button>
+        <button class="btn" id="j-testeur">🧪 Entrer avec le compte de test</button>
+        <button class="btn ghost" id="j-restart">🔄 Repartir de zéro (accueil)</button>
         <button class="btn ghost" id="j-jardin">🌼 Aller direct au jardin (plantes offertes)</button>
       </div>
       <div style="display:flex; justify-content:center; background:#DDE9E0; border-radius:16px; padding:14px;">
@@ -386,6 +387,9 @@ function vueJardin() {
                  width:420px; max-width:100%; box-shadow:0 8px 30px rgba(14,59,36,.18);"></iframe>
       </div>
     </div>`;
+  $("#j-testeur").addEventListener("click", () => {
+    $("#j-frame").src = `../index.html?simulation=joueur&compte=testeur&_=${Date.now()}`;
+  });
   $("#j-restart").addEventListener("click", () => {
     $("#j-frame").src = `../index.html?simulation=joueur&_=${Date.now()}`;
   });
