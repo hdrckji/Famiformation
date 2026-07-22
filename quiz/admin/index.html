@@ -480,6 +480,18 @@ function vueJardin() {
 
 // Zones (nom + nb de codes) en cours d'édition dans l'onglet Compte à rebours.
 let zonesEdit = [];
+let recompEdit = [];   // récompenses des 3 premiers, saisies dans l'admin
+function recompRowsHtml() {
+  const rangs = ["🥇 1ʳᵉ place", "🥈 2ᵉ place", "🥉 3ᵉ place"];
+  return rangs.map((r, i) => `
+    <div class="recomp-row" style="display:flex;gap:8px;margin-bottom:6px;align-items:center;">
+      <span style="min-width:96px;font-weight:700;">${r}</span>
+      <input class="field" data-rc="${i}" placeholder="Ex : un bon d'achat de 50 €" maxlength="120" value="${esc(recompEdit[i] || "")}" style="flex:1;margin:0;">
+    </div>`).join("");
+}
+function lireRecomp(c) {
+  recompEdit = [...c.querySelectorAll("[data-rc]")].map((el) => el.value.trim());
+}
 function zoneRowsHtml() {
   if (!zonesEdit.length) return `<p class="hint">Aucune zone pour l'instant. Ajoutes-en pour aider les joueurs à J-1.</p>`;
   return zonesEdit.map((z, i) => `
@@ -501,6 +513,7 @@ function vueCountdown() {
   const cf = data.config || { lancement: "2026-07-29T12:30", cloture: "2026-08-30T23:59", resultats: "31 août à 12h30" };
   const lbl = "display:block;font-weight:700;font-size:.85rem;color:#0E3B24;margin:8px 0 4px;";
   zonesEdit = (cf.zones || []).map((z) => ({ nom: z.nom || "", nb: z.nb || 0 }));
+  recompEdit = (cf.recompenses || []).slice(0, 3);
   c.innerHTML = `
     <div class="card">
       <h2>⏱ Le compte à rebours</h2>
@@ -528,7 +541,25 @@ function vueCountdown() {
       <button class="btn ghost" id="zone-add" style="margin-top:8px;">＋ Ajouter une zone</button>
       <div id="zones-msg" style="margin-top:8px;"></div>
       <button class="btn" id="zones-save" style="margin-top:10px;">💾 Enregistrer les zones</button>
+    </div>
+    <div class="card">
+      <h2>🏆 Les récompenses des 3 premiers</h2>
+      <p class="hint">Ce que gagnent les 3 meilleures récoltes. Tant que tu ne les remplis pas, la télé
+      annonce simplement <strong>« des récompenses à gagner pour les 3 premiers »</strong>, sans détail.
+      Dès que tu en saisis, la fée les annonce à l'écran.</p>
+      <div id="recomp-liste">${recompRowsHtml()}</div>
+      <div id="recomp-msg" style="margin-top:8px;"></div>
+      <button class="btn" id="recomp-save" style="margin-top:10px;">💾 Enregistrer les récompenses</button>
     </div>`;
+  $("#recomp-save").addEventListener("click", async () => {
+    lireRecomp(c);
+    const r = await post("config_set", { lancement: $("#cf-lancement").value, cloture: $("#cf-cloture").value,
+      resultats: $("#cf-resultats").value.trim(), recompenses: recompEdit });
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    if (!r.ok) { $("#recomp-msg").innerHTML = `<div class="alert">Enregistrement impossible.</div>`; return; }
+    message = { ok: true, texte: "Récompenses enregistrées." };
+    await charger();
+  });
   const wireZoneSuppr = () => c.querySelectorAll("[data-zsup]").forEach((b) => b.addEventListener("click", () => {
     lireZones(c); zonesEdit.splice(+b.dataset.zsup, 1);
     $("#zones-liste").innerHTML = zoneRowsHtml(); wireZoneSuppr();
@@ -673,22 +704,43 @@ function vueCodes() {
       <p class="hint">Chaque code ne peut être utilisé qu'une fois : le premier qui le saisit le prend
       pour de bon. Les codes se modifient dans <strong>api.php</strong> ($BONUS_CODES), pour qu'ils
       correspondent à tes QR codes.<br>
-      🔓 Tu peux <strong>libérer</strong> un code attribué par erreur : il redevient disponible pour tout
-      le monde, et la personne qui l'avait perd les graines qu'il lui avait rapportées.</p>
+      🔓 <strong>Libérer</strong> un code attribué par erreur : il redevient disponible, et la personne
+      qui l'avait perd les graines correspondantes.<br>
+      🚫 <strong>Bloquer</strong> un code encore libre : plus personne ne pourra l'utiliser (carte perdue,
+      abîmée, retirée du magasin). Tu pourras le libérer à nouveau plus tard.<br>
+      <em>Les 2 codes de test (FAMI-TEST-OK / FAMI-TEST-USED) ne sont pas dans cette liste : ils ne comptent
+      pas dans les 20 codes du magasin.</em></p>
       <div style="overflow-x:auto">
       <table>
         <tr><th>Code</th><th>État</th><th>Récupéré par</th><th>Quand</th><th></th></tr>
         ${data.codes.map((x) => `
           <tr>
             <td><strong>${esc(x.code)}</strong></td>
-            <td class="${x.pris ? "pris" : "libre"}">${x.pris ? "Pris" : "Libre"}</td>
+            <td class="${x.pris ? "pris" : "libre"}">${x.pris ? (x.par === "Organisateur" ? "Bloqué" : "Pris") : "Libre"}</td>
             <td>${x.par ? esc(x.par) : "—"}</td>
             <td>${x.date ? esc(new Date(x.date).toLocaleString("fr-BE")) : "—"}</td>
-            <td>${x.pris ? `<button class="btn ghost" data-lib="${esc(x.code)}" data-par="${esc(x.par || "")}" style="padding:6px 12px;font-size:.85rem;white-space:nowrap;">🔓 Libérer</button>` : ""}</td>
+            <td>${x.pris
+              ? `<button class="btn ghost" data-lib="${esc(x.code)}" data-par="${esc(x.par || "")}" style="padding:6px 12px;font-size:.85rem;white-space:nowrap;">🔓 Libérer</button>`
+              : `<button class="btn ghost" data-blo="${esc(x.code)}" style="padding:6px 12px;font-size:.85rem;white-space:nowrap;">🚫 Bloquer</button>`}</td>
           </tr>`).join("")}
       </table></div>
     </div>`;
 
+  c.querySelectorAll("[data-blo]").forEach((b) => b.addEventListener("click", () => {
+    const code = b.dataset.blo;
+    modaleConfirm({
+      titre: "🚫 Bloquer ce code ?",
+      texte: `Le code <b>${esc(code)}</b> deviendra <b>inutilisable</b> pour tout le monde.<br>`
+        + `À faire si la carte est perdue, abîmée ou retirée du magasin.<br><br>Tu pourras le libérer plus tard.`,
+      ok: "Oui, bloquer ce code",
+    }, async () => {
+      const r = await post("code_bloquer", { code });
+      if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+      if (!r.ok || !(r.data && r.data.ok)) { message = { ok: false, texte: `Impossible de bloquer ${code}.` }; await charger(); return; }
+      message = { ok: true, texte: `Code ${code} bloqué — plus personne ne peut l'utiliser.` };
+      await charger();
+    });
+  }));
   c.querySelectorAll("[data-lib]").forEach((b) => b.addEventListener("click", () => {
     const code = b.dataset.lib, par = b.dataset.par;
     modaleConfirm({

@@ -93,6 +93,9 @@ function ladConfig($fichier) {
     // Zones du magasin où des codes ont été cachés (indice affiché à J-1) :
     // liste de { nom, nb }.
     'zones'     => (isset($c['zones']) && is_array($c['zones'])) ? array_values($c['zones']) : [],
+    // 🏆 Récompenses des 3 premiers, saisies dans l'admin. Tant que la liste est
+    // vide, la télé annonce simplement « des récompenses à gagner ».
+    'recompenses' => (isset($c['recompenses']) && is_array($c['recompenses'])) ? array_values($c['recompenses']) : [],
   ];
 }
 
@@ -646,11 +649,20 @@ switch ($action) {
         if ($nom !== '') { $zones[] = ['nom' => $nom, 'nb' => $nb]; }
       }
     }
+    $recompenses = $actuel['recompenses'];
+    if (isset($input['recompenses']) && is_array($input['recompenses'])) {
+      $recompenses = [];
+      foreach (array_slice($input['recompenses'], 0, 5) as $r) {
+        $t = trim(mb_substr((string)$r, 0, 120));
+        if ($t !== '') { $recompenses[] = $t; }
+      }
+    }
     writeJson($configFile, [
       'lancement' => $lancement,
       'cloture'   => $cloture !== '' ? $cloture : $actuel['cloture'],
       'resultats' => $resultats !== '' ? $resultats : $actuel['resultats'],
       'zones'     => $zones,
+      'recompenses' => $recompenses,
     ]);
     echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     break;
@@ -765,6 +777,22 @@ switch ($action) {
         }
       }
       return ['ok' => true, 'gagne' => $CODE_GRAINES];
+    });
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🚫 BLOQUER un code (admin) : il devient indisponible pour tout le monde, sans
+  // etre attribue a un joueur (code perdu, carte abimee, retiree du magasin...).
+  case 'code_bloquer': {
+    exigeAdmin($input);
+    $bonus = strtoupper(trim($input['code'] ?? ''));
+    if (!in_array($bonus, $BONUS_CODES, true)) { echo json_encode(['ok' => false, 'reason' => 'inconnu']); break; }
+    $res = withLock($codesFile, function (&$claimed, &$write) use ($bonus) {
+      if (isset($claimed[$bonus])) { return ['ok' => false, 'reason' => 'deja_pris']; }
+      $claimed[$bonus] = ['par' => 'Organisateur', 'date' => date('c'), 'bloque' => true];
+      $write = true;
+      return ['ok' => true];
     });
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
     break;
@@ -886,6 +914,7 @@ switch ($action) {
     $pris = readJson($codesFile);
     $codes = [];
     foreach ($BONUS_CODES as $c) {
+      if ($c === $CODE_TEST_OK || $c === $CODE_TEST_USED) { continue; }   // codes de test : hors liste
       $codes[] = [
         'code' => $c,
         'pris' => isset($pris[$c]),

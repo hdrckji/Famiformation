@@ -581,6 +581,30 @@ body.mode-tele #app { flex: 0 0 auto; }
 @keyframes tlBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
 
 /* 🎉 Confettis (lancement) — pluie de morceaux colorés, purement décoratif. */
+/* 📣 GRANDE ANNONCE de la fée sur la télé (codes restants / récompenses).
+   Fond vert profond, la fée entre par la gauche, le message en très grand, et le
+   compte à rebours qui continue en petit tout en haut. Durée : 10 s. */
+.anim-tele { position: fixed; inset: 0; z-index: 100040; display: flex; align-items: center;
+  justify-content: center; opacity: 0; transition: opacity .55s ease;
+  background: linear-gradient(145deg, #12502C 0%, #1E7A46 52%, #12502C 100%); }
+.anim-tele.on { opacity: 1; }
+.anim-cd { position: absolute; top: 2.6vh; left: 0; right: 0; text-align: center; color: rgba(255,255,255,.88);
+  font-family: 'Fredoka', sans-serif; font-weight: 700; letter-spacing: .5px;
+  font-size: clamp(.9rem, 1.9vw, 1.5rem); font-variant-numeric: tabular-nums; }
+.anim-scene { display: flex; align-items: center; justify-content: center;
+  gap: clamp(16px, 4vw, 64px); padding: 0 5vw; max-width: 1700px; }
+.anim-fee { flex: 0 0 auto; width: clamp(110px, 19vw, 290px);
+  animation: animFeeEntre 1.1s cubic-bezier(.22,1,.32,1) both; }
+.anim-fee svg { width: 100%; height: auto; display: block; }
+.anim-bloc { text-align: left; animation: animTexte .9s .3s ease both; }
+.anim-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; color: #fff; line-height: 1.08;
+  font-size: clamp(1.9rem, 5.6vw, 4.8rem); text-shadow: 0 5px 22px rgba(0,0,0,.28); }
+.anim-detail { margin-top: 1.6vh; color: #DCF2E1; font-weight: 600; line-height: 1.4;
+  font-size: clamp(.95rem, 2.3vw, 1.9rem); }
+@keyframes animFeeEntre { from { opacity: 0; transform: translateX(-16vw) scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes animTexte { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .anim-fee, .anim-bloc { animation: none; } }
+
 /* Les confettis passent DERRIÈRE les fenêtres (z-index < .modal-fond) : la fête
    est visible tout autour, mais le texte de la modale reste parfaitement lisible. */
 .confetti-layer { position: fixed; inset: 0; z-index: 100002; pointer-events: none; overflow: hidden; }
@@ -3175,6 +3199,58 @@ const FEE = (() => {
     return t + 1500 + 650 + 3200;
   }
 
+  // 📣 GRANDE ANNONCE plein écran — toutes les 2 min, UNE FOIS son tour terminé
+  // (elle est alors dans son coin). Deux messages en ALTERNANCE : les codes qu'il
+  // reste à trouver, puis les récompenses à gagner. Durée totale : 10 s.
+  // En simulation on raccourcit l'attente : on voit les deux annonces sans patienter 2 min.
+  const DELAI_ANNONCE = SIMULATION ? 20000 : 120000;
+  let annonceAlt = 0;
+  async function grandeAnnonce() {
+    const codesDabord = (annonceAlt++ % 2 === 0);
+    let titre = "", detail = "";
+    if (codesDabord) {
+      const cr = await apiCodesRestants().catch(() => null);
+      if (!cr || cr.restants == null || !actif) return;
+      titre  = cr.restants > 0 ? `Il reste ${cr.restants} code${cr.restants > 1 ? "s" : ""} à trouver !`
+                               : "Tous les codes ont été trouvés !";
+      detail = cr.restants > 0 ? "Cachés un peu partout dans le magasin 👀 — chacun rapporte des graines"
+                               : "Bravo à toutes les chasseuses et tous les chasseurs !";
+    } else {
+      const lots = (CONFIG.recompenses || []).filter(Boolean);
+      titre  = "Des récompenses à gagner !";
+      detail = lots.length
+        ? lots.map((l, i) => `${["🥇", "🥈", "🥉"][i] || "🎁"} ${esc(l)}`).join("<br>")
+        : "Pour les 3 meilleures récoltes du quiz 🏆";
+    }
+    if (!actif) return;
+    const o = document.createElement("div");
+    o.className = "anim-tele";
+    o.innerHTML = `<div class="anim-cd" id="anim-cd"></div>
+      <div class="anim-scene">
+        <div class="anim-fee">${FEE_SVG}</div>
+        <div class="anim-bloc">
+          <div class="anim-titre">${titre}</div>
+          <div class="anim-detail">${detail}</div>
+        </div>
+      </div>`;
+    document.body.appendChild(o);
+    requestAnimationFrame(() => o.classList.add("on"));   // transition d'entrée en douceur
+    // Le compte à rebours continue, en petit, tout en haut au milieu.
+    const majCd = () => {
+      const el = document.getElementById("anim-cd");
+      if (!el) return;
+      const diff = Math.max(0, CONFIG.dateLancement.getTime() - Date.now());
+      const j = Math.floor(diff / 86400000), h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000), sec = Math.floor((diff % 60000) / 1000);
+      el.textContent = `🚀 Lancement dans ${j} j ${pad(h)}:${pad(m)}:${pad(sec)}`;
+    };
+    majCd();
+    const tCd = setInterval(majCd, 1000);
+    timers.push(tCd);
+    timers.push(setTimeout(() => o.classList.remove("on"), 9300));      // fondu de sortie
+    timers.push(setTimeout(() => { clearInterval(tCd); o.remove(); }, 10000));
+  }
+
   function cycle() {
     if (!actif) return;
     semis.forEach(fane); semis = [];
@@ -3222,16 +3298,8 @@ const FEE = (() => {
     //    combien de codes bonus restent à trouver en magasin.
     timers.push(setTimeout(() => {
       coin(); semis.forEach(fane); semis = [];
-      if (Date.now() - lastCodes >= 120000) {
-        lastCodes = Date.now();
-        apiCodesRestants().then((cr) => {
-          if (!actif || !cr || cr.restants == null) return;
-          parle(cr.restants > 0
-            ? `🔎 Il reste ${cr.restants} code${cr.restants > 1 ? "s" : ""} bonus à trouver en magasin !`
-            : `✅ Tous les codes bonus ont été trouvés !`);
-          timers.push(setTimeout(seTait, 9500));
-        });
-      }
+      // Toutes les 2 min, une fois le tour FINI : la grande annonce plein écran.
+      if (Date.now() - lastCodes >= DELAI_ANNONCE) { lastCodes = Date.now(); grandeAnnonce(); }
     }, t + 300));
     timers.push(setTimeout(cycle, t + 300 + 10000));
   }
@@ -3448,6 +3516,7 @@ function render() {
     if (conf.cloture)   CONFIG.dateCloture = new Date(conf.cloture);
     if (conf.resultats) CONFIG.dateResultats = conf.resultats;
     CONFIG.zones = Array.isArray(conf.zones) ? conf.zones : [];
+    CONFIG.recompenses = Array.isArray(conf.recompenses) ? conf.recompenses : [];
   }
   // En simulation, des zones de démo pour tester l'affichage « où chercher » à J-1.
   if (SIMULATION && (!CONFIG.zones || !CONFIG.zones.length)) {
