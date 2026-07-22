@@ -1314,7 +1314,7 @@ function ouvreExplication() {
       <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Ta carte de jardinier</b>Un pseudo + un code à 4 chiffres, choisis en jouant. <b>Retiens-les !</b> C'est ta clé : elle garde ta récolte et te laisse retrouver ton jardin sur n'importe quel appareil.</span></div>
       <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes sont cachés en magasin : chacun te rapporte <b>+${CONFIG.pointsParCodeBonus} graines</b>. Tu peux en accumuler <b>${CONFIG.maxCodes} au maximum</b> (soit +${CONFIG.pointsParCodeBonus * CONFIG.maxCodes} graines), et elles comptent au classement. <b>Même après avoir fait le quiz</b>, tu peux encore en récupérer : ça te fait remonter ! Ouvre l'œil 👀</span></div>
       <div class="explik-step explik-star"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Un seul classement ⭐</b>Ta récolte de graines (quiz + codes), c'est tout. <b>Les 3 meilleures récoltes gagnent des récompenses</b> ! Annonce des vainqueurs le ${esc(CONFIG.dateResultats)}.</span></div>
-      <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin à toi</b>Chacun a son propre jardin. Dépense tes graines pour y planter fleurs, arbres et fleurs rares. <b>Dépense sans crainte : ton score du quiz ne bouge pas</b> — c'est lui qui compte pour le classement, les graines servent <b>uniquement</b> au jardin.</span></div>
+      <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin — après le quiz</b>Une fois ton quiz terminé, <b>ton jardin s'ouvre</b> : chacun a le sien, et c'est un espace <b>juste pour s'amuser</b> (fleurs, arbres, fleurs rares…).<br>Les graines gagnées au quiz, tu peux les <b>dépenser ici</b> pour planter. Tu verras alors ton nombre de graines à planter diminuer — <b>c'est normal, ça ne concerne que le jardin</b>.<br>👉 <b>Ton score au classement, lui, ne bouge pas.</b> Va voir dans « Classement » : il sera toujours le même.</span></div>
       <div class="explik-step"><span class="explik-ico">🌿</span><span class="explik-txt"><b class="eh">Un mini-jeu bonus</b>La chasse aux mauvaises herbes te donne des graines <b>en plus, uniquement pour planter</b> dans ton jardin. Ça ne compte pas au classement.</span></div>
     </div>
     <button class="btn" id="explik-ok" style="width:100%;">J'ai tout compris, à moi de jouer ! 🌱</button>
@@ -1671,9 +1671,9 @@ function modaleQuizFini(graines) {
     <div class="cm-emoji">🎉</div>
     <h2 class="cm-titre">Quiz terminé !</h2>
     <p class="cm-sous">Tu as récolté <b>${affG(graines)} 🌰</b> graines.<br>
-      Va les <b>planter dans ton jardin</b> 🌼 — dépense-les sans crainte :
-      <b>ton score du quiz ne bougera pas</b>, c'est lui qui compte pour le classement.
-      Les graines servent <b>uniquement</b> à jouer dans ton jardin.</p>
+      <b>Ton jardin est maintenant ouvert</b> 🌼 : va y planter tes graines, c'est un espace juste pour s'amuser.
+      Tu verras tes graines à planter diminuer — <b>c'est normal, ça ne concerne que le jardin</b> :
+      <b>ton score au classement ne bougera pas</b>.</p>
     <div class="cm-modules">
       <button class="cm-mod" data-qf="jardin"><span class="cm-mod-emo">🌼</span><span class="cm-mod-titre">Mon jardin</span></button>
       <button class="cm-mod" data-qf="board"><span class="cm-mod-emo">🏆</span><span class="cm-mod-titre">Le classement</span></button>
@@ -1907,8 +1907,9 @@ function renderJardin() {
       Choisis une plante dans le catalogue, puis tape une case libre pour la planter.
       Tape une plante déjà en terre pour la <b>revendre</b> et récupérer tes graines.
       Tu as ${JARDIN_CASES} cases rien qu'à toi (${nbPlantees} déjà occupée${nbPlantees > 1 ? "s" : ""}).
-      <span class="je-rassure">💚 Dépense tes graines sans crainte : <b>ton score du quiz ne bouge pas</b>.
-      C'est lui qui compte pour le classement — les graines servent <b>uniquement</b> à jouer dans ton jardin.</span>
+      <span class="je-rassure">💚 Ici, c'est <b>juste pour s'amuser</b>. En plantant, tu verras ton nombre de
+      graines à planter diminuer : <b>c'est normal, ça ne concerne que le jardin</b>.
+      <b>Ton score au classement ne bouge pas</b> — va voir dans « Classement », il sera toujours le même.</span>
     </div>
     ${JARDIN_LIBRE ? "" : `<div class="j-herbes-zone">
       <button class="btn" id="j-herbes">🌿 Gagner plus de graines</button>
