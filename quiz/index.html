@@ -742,9 +742,9 @@ body.mode-tele #app { flex: 0 0 auto; }
    ============================================================ */
 
 const CONFIG = {
-  dateLancement: new Date("2026-07-29T12:00:00"),
+  dateLancement: new Date("2026-07-29T12:30:00"),
   dateCloture:   new Date("2026-08-30T23:59:59"),
-  dateResultats: "31 août",
+  dateResultats: "31 août à 12h30",
   pointsParBonneReponse: 10,
   pointsParCodeBonus: 10,   // graines par code bonus (doit = $CODE_GRAINES d'api.php)
   maxCodes: 2,              // codes bonus cumulables par personne (= $MAX_CODES)
@@ -1408,7 +1408,7 @@ function renderCountdown() {
     : phase === "ouvert" ? "⏳ Fin du quiz dans..."
     : `🏆 Résultats le ${CONFIG.dateResultats} !`;
   const info = phase === "avant"
-    ? "Quelque chose se prépare... rendez-vous le 29 juillet à midi !"
+    ? "Quelque chose se prépare... rendez-vous le 29 juillet à 12h30 !"
     : phase === "ouvert"
       ? "Le quiz est ouvert ! Joue depuis ton téléphone et grimpe au classement."
       : "Le quiz est terminé. Merci à tous les participants ! 🎉";

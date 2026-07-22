@@ -498,14 +498,14 @@ function lireZones(c) {
 }
 function vueCountdown() {
   const c = $("#contenu");
-  const cf = data.config || { lancement: "2026-07-29T12:00", cloture: "2026-08-30T23:59", resultats: "31 août" };
+  const cf = data.config || { lancement: "2026-07-29T12:30", cloture: "2026-08-30T23:59", resultats: "31 août à 12h30" };
   const lbl = "display:block;font-weight:700;font-size:.85rem;color:#0E3B24;margin:8px 0 4px;";
   zonesEdit = (cf.zones || []).map((z) => ({ nom: z.nom || "", nb: z.nb || 0 }));
   c.innerHTML = `
     <div class="card">
       <h2>⏱ Le compte à rebours</h2>
       <p class="hint">Ces dates pilotent le compte à rebours ET l'ouverture du quiz.
-      Par défaut, le lancement est le <strong>29/07 à midi</strong>. Ne les change que si l'événement bouge.</p>
+      Par défaut, le lancement est le <strong>29/07 à 12h30</strong>. Ne les change que si l'événement bouge.</p>
       <div id="cd-msg"></div>
       <label style="${lbl}">📅 Lancement (ouverture du quiz)</label>
       <input class="field" type="datetime-local" id="cf-lancement" value="${esc(cf.lancement)}">
@@ -515,7 +515,7 @@ function vueCountdown() {
       <input class="field" id="cf-resultats" maxlength="40" value="${esc(cf.resultats)}">
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;">
         <button class="btn" id="cf-save">💾 Enregistrer les dates</button>
-        <button class="btn ghost" id="cf-defaut">Remettre le 29/07 à midi</button>
+        <button class="btn ghost" id="cf-defaut">Remettre le 29/07 à 12h30</button>
       </div>
     </div>
     <div class="card">
@@ -560,9 +560,9 @@ function vueCountdown() {
     await charger();
   });
   $("#cf-defaut").addEventListener("click", () => {
-    $("#cf-lancement").value = "2026-07-29T12:00";
+    $("#cf-lancement").value = "2026-07-29T12:30";
     $("#cf-cloture").value = "2026-08-30T23:59";
-    $("#cf-resultats").value = "31 août";
+    $("#cf-resultats").value = "31 août à 12h30";
   });
 }
 
@@ -583,8 +583,8 @@ function decaleLocal(iso, ms) {
 
 function vueSimulation() {
   const c = $("#contenu");
-  const cf = data.config || { lancement: "2026-07-29T12:00", cloture: "2026-08-30T23:59" };
-  const val = simQuand || cf.lancement || "2026-07-29T12:00";
+  const cf = data.config || { lancement: "2026-07-29T12:30", cloture: "2026-08-30T23:59" };
+  const val = simQuand || cf.lancement || "2026-07-29T12:30";
 
   // URL d'un aperçu : la VRAIE page joueur, en mode simulation daté (rien n'est
   // envoyé au serveur, la phase suit le moment choisi). simSeed force le rechargement.
@@ -647,7 +647,7 @@ function vueSimulation() {
     </div>`;
 
   const champ = $("#sim-quand");
-  const lancement = cf.lancement || "2026-07-29T12:00";
+  const lancement = cf.lancement || "2026-07-29T12:30";
   const cloture = cf.cloture || "2026-08-30T23:59";
   const applique = () => { simQuand = champ.value; simSeed++; vueSimulation(); };
   $("#sim-voir").addEventListener("click", applique);

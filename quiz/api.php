@@ -82,14 +82,14 @@ $jardinFile    = $dataDir . '/jardin.json';
 $configFile    = $dataDir . '/config.json';
 
 // ⏱ Dates de l'événement, modifiables depuis l'admin (onglet Compte à rebours).
-// Par défaut : lancement le 29/07 à midi, clôture le 30/08, résultats le 31 août.
+// Par défaut : lancement le 29/07 à 12h30, clôture le 30/08, annonce des vainqueurs le 31 août à 12h30.
 function ladConfig($fichier) {
   $c = is_file($fichier) ? json_decode((string)@file_get_contents($fichier), true) : null;
   if (!is_array($c)) { $c = []; }
   return [
-    'lancement' => $c['lancement'] ?? '2026-07-29T12:00',
+    'lancement' => $c['lancement'] ?? '2026-07-29T12:30',
     'cloture'   => $c['cloture']   ?? '2026-08-30T23:59',
-    'resultats' => $c['resultats'] ?? '31 août',
+    'resultats' => $c['resultats'] ?? '31 août à 12h30',
     // Zones du magasin où des codes ont été cachés (indice affiché à J-1) :
     // liste de { nom, nb }.
     'zones'     => (isset($c['zones']) && is_array($c['zones'])) ? array_values($c['zones']) : [],
