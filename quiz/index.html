@@ -209,6 +209,8 @@ body {
   animation: gain-pop .9s ease-out both;
 }
 .q-plante .serie { margin-left: 8px; color: #E4572E; font-weight: 800; font-size: .92em; white-space: nowrap; }
+/* Chrono de la question (encourage la rapidité) */
+.q-chrono { float: right; font-variant-numeric: tabular-nums; color: var(--pousse); font-weight: 800; }
 @keyframes gain-pop {
   0% { opacity: 0; transform: translateY(8px) scale(.7); }
   30% { opacity: 1; transform: translateY(0) scale(1.15); }
@@ -420,6 +422,15 @@ body.mode-borne #app { width: 100%; }
   background: var(--brume); border: 1px dashed rgba(11,51,32,.32); opacity: .85; }
 .zones-hint.zones-lock:hover { opacity: 1; background: #E6F0E6; }
 .zh-lock { font-weight: 600; opacity: .72; font-size: .88rem; margin-top: 2px; }
+/* Explication du jardin + zone du mini-jeu */
+.jardin-explik { background: var(--brume); border-radius: 16px; padding: 14px 16px; margin-bottom: 14px;
+  text-align: left; font-weight: 500; line-height: 1.5; font-size: .95rem; }
+.jardin-explik b { color: var(--foret); }
+.jardin-explik > b:first-child { display: block; font-family: 'Fredoka', sans-serif; margin-bottom: 6px; font-size: 1.05rem; }
+.je-rassure { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(11,51,32,.18); }
+.j-herbes-zone { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+  background: #E7F4E4; border: 2px solid var(--pousse); border-radius: 16px; padding: 12px 16px; margin-bottom: 16px; }
+.j-herbes-zone span { font-weight: 600; font-size: .88rem; opacity: .85; text-align: left; flex: 1 1 200px; }
 /* Bloc principal (mis en avant) sur l'accueil / l'espace */
 .bm-primaire { border-color: var(--pousse); background: #F1F8EF; }
 /* Espace (gate connexion/création) : 2 blocs centrés */
@@ -744,7 +755,11 @@ function gainReponse(tSec, serie) {
   const bonusSerie = serie >= 2 ? Math.min(serie - 1, BAREME.serieMax) : 0;
   return BAREME.base + vitesse + bonusSerie;
 }
-const arr1 = (n) => Math.round((Number(n) || 0) * 10) / 10;   // arrondi 1 décimale
+const arr1 = (n) => Math.round((Number(n) || 0) * 10) / 10;   // arrondi 1 décimale (interne)
+// 👁️ AFFICHAGE des graines : toujours un nombre ENTIER. Les décimales existent
+// bien en coulisses (elles départagent deux joueurs au classement), mais on ne
+// les montre jamais : 140,1 et 140,2 s'affichent tous les deux « 140 ».
+const affG = (n) => Math.round(Number(n) || 0);
 
 /* ============================================================
    🎬 MODE SIMULATION — un banc d'essai avec plusieurs ÉCRANS à prévisualiser.
@@ -1188,6 +1203,7 @@ let board = [];
 let userView = "auto";       // auto | board | jardin (après avoir joué)
 let quiz = null;             // état de la partie en cours
 let tickTimer = null;
+let chronoQ = null;          // chrono affiché pendant une question du quiz
 let jardin = {};             // cases plantées {index: {plante, par, date}}
 let joueur = null;           // {name, solde} — le joueur identifié (a joué ou s'est retrouvé)
 let planteChoisie = null;    // clé du catalogue sélectionnée dans la vue jardin
@@ -1274,7 +1290,7 @@ function ouvreExplication() {
       <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Ta carte de jardinier</b>Un pseudo + un code à 4 chiffres, choisis en jouant. <b>Retiens-les !</b> C'est ta clé : elle garde ta récolte et te laisse retrouver ton jardin sur n'importe quel appareil.</span></div>
       <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes sont cachés en magasin : chacun te rapporte <b>+${CONFIG.pointsParCodeBonus} graines</b>. Tu peux en accumuler <b>${CONFIG.maxCodes} au maximum</b> (soit +${CONFIG.pointsParCodeBonus * CONFIG.maxCodes} graines), et elles comptent au classement. Ouvre l'œil !</span></div>
       <div class="explik-step explik-star"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Un seul classement ⭐</b>Ta récolte de graines (quiz + codes), c'est tout. <b>Les 3 meilleures récoltes gagnent des récompenses</b> ! Annonce des vainqueurs le ${esc(CONFIG.dateResultats)}.</span></div>
-      <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin à toi</b>Dépense tes graines pour planter dans <b>ton</b> jardin (fleurs, arbres, fleurs rares…). C'est juste pour le plaisir : <b>planter ne change RIEN à ton classement</b>.</span></div>
+      <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin à toi</b>Chacun a son propre jardin. Dépense tes graines pour y planter fleurs, arbres et fleurs rares. <b>Dépense sans crainte : ton score du quiz ne bouge pas</b> — c'est lui qui compte pour le classement, les graines servent <b>uniquement</b> au jardin.</span></div>
       <div class="explik-step"><span class="explik-ico">🌿</span><span class="explik-txt"><b class="eh">Un mini-jeu bonus</b>La chasse aux mauvaises herbes te donne des graines <b>en plus, uniquement pour planter</b> dans ton jardin. Ça ne compte pas au classement.</span></div>
     </div>
     <button class="btn" id="explik-ok" style="width:100%;">J'ai tout compris, à moi de jouer ! 🌱</button>
@@ -1354,7 +1370,7 @@ function renderCountdown() {
   const top5 = board.slice(0, 5);
   const top5Html = (phase !== "avant" && top5.length)
     ? `<div class="cd-top5"><h3>🌟 Top 5 de la récolte</h3>${top5.map((p, i) =>
-        `<div class="cd-top5-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌰</span></div>`
+        `<div class="cd-top5-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${affG(p.score)} 🌰</span></div>`
       ).join("")}</div>`
     : "";
 
@@ -1535,14 +1551,25 @@ function renderQuiz() {
           <span class="emo ${quiz.vientDePousser ? "pousse-pop" : ""}">${stade.emoji}</span>
           <span class="nom">${stade.nom}</span>
         </span>
-        <span class="graines">${graines} 🌰${quiz.lastGain ? `<span class="gain">+${quiz.lastGain}</span>` : ""}${quiz.streak >= 2 ? `<span class="serie">🔥 ${quiz.streak}</span>` : ""}</span>
+        <span class="graines">${affG(graines)} 🌰${quiz.lastGain ? `<span class="gain">+${affG(quiz.lastGain)}</span>` : ""}${quiz.streak >= 2 ? `<span class="serie">🔥 ${quiz.streak}</span>` : ""}</span>
       </div>
       <div class="q-progress"><div style="width:${(quiz.idx / quiz.questions.length) * 100}%"></div></div>
-      <div class="q-num">Question ${quiz.idx + 1} / ${quiz.questions.length}</div>
+      <div class="q-num">Question ${quiz.idx + 1} / ${quiz.questions.length}
+        <span class="q-chrono" id="q-chrono" title="Plus tu réponds vite, plus tu gagnes de graines">⏱ 0,0 s</span>
+      </div>
       <div class="q-text">${esc(q.q)}</div>
       ${q.options.map((o, i) => `<button class="q-opt" data-i="${i}">${esc(o.text)}</button>`).join("")}
     </div>`;
+    // ⏱ Chrono de la question : il tourne à l'écran pour encourager la rapidité.
+    clearInterval(chronoQ);
+    chronoQ = setInterval(() => {
+      const el = document.getElementById("q-chrono");
+      if (!el) { clearInterval(chronoQ); return; }
+      el.textContent = "⏱ " + ((Date.now() - quiz.qStart) / 1000).toFixed(1).replace(".", ",") + " s";
+    }, 100);
+
     app.querySelectorAll(".q-opt").forEach((btn) => btn.addEventListener("click", async () => {
+      clearInterval(chronoQ);
       const avant = stadeDe(quiz.score);
       const tSec = (Date.now() - quiz.qStart) / 1000;   // temps de réponse (avec décimales)
       if (q.options[btn.dataset.i].good) {
@@ -1561,6 +1588,7 @@ function renderQuiz() {
       // Dernière question : on inscrit la récolte sur le compte (déjà créé).
       quiz.step = "fin"; renderQuiz();
       const time = Math.round((Date.now() - quiz.start) / 1000);
+      quiz.tempsTotal = time;          // pour l'afficher sur l'écran de fin
       quiz.score = arr1(quiz.score);   // score final à virgule (les décimales départagent)
       await apiSubmit({ name: quiz.pseudo, code: quiz.code, nom: quiz.nom, score: quiz.score, correct: quiz.correct, time }).catch(() => {});
       sauveMoi(quiz.pseudo, quiz.code);                    // l'appareil perso se souvient
@@ -1581,13 +1609,13 @@ function renderQuiz() {
   app.innerHTML = `<div class="card center">
     <div style="font-size:4.2rem; line-height:1.1;">${stadeFinal.emoji}</div>
     <h2 class="q-text" style="margin-bottom:6px;">Bravo ${esc(quiz.pseudo)}, te voilà « ${stadeFinal.nom} » !</h2>
-    <div class="score-big">${joueur.recoltees} 🌰</div>
+    <div class="score-big">${affG(joueur.recoltees)} 🌰</div>
     <p class="hint" style="margin-top:14px;">
-      ${quiz.correct} bonne${quiz.correct > 1 ? "s" : ""} réponse${quiz.correct > 1 ? "s" : ""} sur ${quiz.questions.length}.
+      <b>${quiz.correct} bonne${quiz.correct > 1 ? "s" : ""} réponse${quiz.correct > 1 ? "s" : ""} sur ${quiz.questions.length}</b>
+      · ⏱ ${quiz.tempsTotal ?? 0} s au total (soit ${((quiz.tempsTotal ?? 0) / quiz.questions.length).toFixed(1).replace(".", ",")} s par question).
       ${quiz.messageCode ? `<br>${esc(quiz.messageCode)}` : ""}
-      <br>Ton classement est basé sur ta récolte : planter ne te fera pas reculer !
-      <br>Trouve des codes bonus en magasin (+${CONFIG.pointsParCodeBonus} 🌰 chacun, ${CONFIG.maxCodes} max) et récolte encore des graines dans le jardin !
-      <br>Remise des prix le ${CONFIG.dateResultats} — bonne chance ! 🍀</p>
+      <br>Trouve des codes bonus en magasin (+${CONFIG.pointsParCodeBonus} 🌰 chacun, ${CONFIG.maxCodes} max) : eux comptent au classement !
+      <br>Annonce des vainqueurs le ${CONFIG.dateResultats} — bonne chance ! 🍀</p>
     <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
       <button class="btn" id="q-jardin">🌼 Planter dans mon jardin</button>
       <button class="btn ghost" id="q-board">Voir le classement 🏆</button>
@@ -1618,8 +1646,10 @@ function modaleQuizFini(graines) {
   o.innerHTML = `<div class="modal code-modal">
     <div class="cm-emoji">🎉</div>
     <h2 class="cm-titre">Quiz terminé !</h2>
-    <p class="cm-sous">Tu as récolté <b>${graines} 🌰</b> graines.<br>
-      Va les <b>planter dans ton jardin</b> 🌼 — et rassure-toi : <b>planter ne change RIEN à ton classement</b>.</p>
+    <p class="cm-sous">Tu as récolté <b>${affG(graines)} 🌰</b> graines.<br>
+      Va les <b>planter dans ton jardin</b> 🌼 — dépense-les sans crainte :
+      <b>ton score du quiz ne bougera pas</b>, c'est lui qui compte pour le classement.
+      Les graines servent <b>uniquement</b> à jouer dans ton jardin.</p>
     <div class="cm-modules">
       <button class="cm-mod" data-qf="jardin"><span class="cm-mod-emo">🌼</span><span class="cm-mod-titre">Mon jardin</span></button>
       <button class="cm-mod" data-qf="board"><span class="cm-mod-emo">🏆</span><span class="cm-mod-titre">Le classement</span></button>
@@ -1640,8 +1670,9 @@ function modaleQuizFini(graines) {
 // (ou s'est identifié) : il peut circuler entre les deux librement.
 function pillsHtml(active) {
   return `<div class="pills">
+    ${joueur ? `<button data-p="dashboard">🏠 Mon espace</button>` : ""}
     <button data-p="board" class="${active === "board" ? "on" : ""}">🏆 Classement</button>
-    <button data-p="jardin" class="${active === "jardin" ? "on" : ""}">🌼 Le jardin</button>
+    <button data-p="jardin" class="${active === "jardin" ? "on" : ""}">🌼 Mon jardin</button>
     <button data-p="reclamer" class="${active === "reclamer" ? "on" : ""}">🎁 Code</button>
   </div>`;
 }
@@ -1680,7 +1711,7 @@ function renderBoard() {
       <div class="moi-rang">${moiRang < 3 ? medals[moiRang] : "#" + (moiRang + 1)}</div>
       <div class="moi-info">
         <div class="moi-nom">${esc(lignes[moiRang].name)} — c'est toi ! 🌱</div>
-        <div class="moi-pts">${lignes[moiRang].score} graines récoltées${moiRang < 3 ? " · sur le podium ! 🎉" : ""}</div>
+        <div class="moi-pts">${affG(lignes[moiRang].score)} graines récoltées${moiRang < 3 ? " · sur le podium ! 🎉" : ""}</div>
       </div>
       <button class="btn" id="moi-jardin">🌼 Mon jardin</button>
     </div>` : "";
@@ -1695,7 +1726,7 @@ function renderBoard() {
         <div class="pod p${pos + 1}${moiRang === pos ? " moi" : ""}">
           <div class="pod-medal">${medals[pos]}</div>
           <div class="pod-name">${esc(top3[pos].name)}</div>
-          <div class="pod-pts">${top3[pos].score} 🌰</div>
+          <div class="pod-pts">${affG(top3[pos].score)} 🌰</div>
         </div>` : "").join("")}
     </div>
     ${rest.map((p, i) => `
@@ -1703,7 +1734,7 @@ function renderBoard() {
         <span class="rank-pos">${i + 4}.</span>
         ${avatarDe(p.name)}
         <span class="rank-nom"><span class="qui">${esc(p.name)}</span></span>
-        <span class="rank-pts">${p.score} 🌰</span>
+        <span class="rank-pts">${affG(p.score)} 🌰</span>
       </div>`).join("")}
     <div class="center home-liens" style="margin-top:18px;">
       <button class="btn ghost" id="b-refresh">Actualiser 🔄</button>
@@ -1845,11 +1876,20 @@ function renderJardin() {
   app.innerHTML = `${DEFS_METAL}<div class="board-wrap">${pillsHtml("jardin")}<div class="card">
     <div class="jardin-solde">
       <span style="display:flex; align-items:center; gap:8px;">${avatarDe(joueur.name)} <strong>${esc(joueur.name)}</strong> <span title="${esc(stade.nom)}" style="font-size:1.3rem;">${stade.emoji}</span></span>
-      <span class="montant">${JARDIN_LIBRE ? "🎨 Aperçu — plantes offertes" : joueur.solde + " 🌰 à planter"}</span>
+      <span class="montant">${JARDIN_LIBRE ? "🎨 Aperçu — plantes offertes" : affG(joueur.solde) + " 🌰 à planter"}</span>
     </div>
-    <p class="hint">Choisis une plante puis tape une case libre. ${nbPlantees} plante${nbPlantees > 1 ? "s" : ""} déjà en terre —
-    planter ne change rien à ton classement.${JARDIN_LIBRE ? "" : " Plus de graines ? Chasse les mauvaises herbes ! 🌿"}</p>
-    ${JARDIN_LIBRE ? "" : `<div style="margin-bottom:14px;"><button class="btn small" id="j-herbes">🌿 Gagner des graines</button></div>`}
+    <div class="jardin-explik">
+      <b>🌼 Ton jardin, comment ça marche ?</b>
+      Choisis une plante dans le catalogue, puis tape une case libre pour la planter.
+      Tape une plante déjà en terre pour la <b>revendre</b> et récupérer tes graines.
+      Tu as ${JARDIN_CASES} cases rien qu'à toi (${nbPlantees} déjà occupée${nbPlantees > 1 ? "s" : ""}).
+      <span class="je-rassure">💚 Dépense tes graines sans crainte : <b>ton score du quiz ne bouge pas</b>.
+      C'est lui qui compte pour le classement — les graines servent <b>uniquement</b> à jouer dans ton jardin.</span>
+    </div>
+    ${JARDIN_LIBRE ? "" : `<div class="j-herbes-zone">
+      <button class="btn" id="j-herbes">🌿 Gagner plus de graines</button>
+      <span>Un mini-jeu rapide : ces graines-là servent aussi <b>uniquement au jardin</b>.</span>
+    </div>`}
     <div class="catalogue">
       ${Object.entries(PLANTES).map(([cle, p]) => `
         <button class="plt ${p.rare ? "rare-" + p.rare : ""} ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${(!JARDIN_LIBRE && p.cout > joueur.solde) ? "disabled" : ""}>
@@ -1896,7 +1936,7 @@ function renderJardin() {
       if (res.ok) {
         delete jardin[idx];
         if (res.solde != null) joueur.solde = res.solde;
-        jardinMsg = `Plante revendue, +${res.rendu} 🌰 récupérées. Tu as ${joueur.solde} graines.`;
+        jardinMsg = `Plante revendue, +${affG(res.rendu)} 🌰 récupérées. Tu as ${affG(joueur.solde)} graines.`;
       } else {
         jardin = await apiJardin();
         jardinMsg = "Petit souci, réessaie.";
@@ -1918,7 +1958,7 @@ function renderJardin() {
       jardin[idx] = { plante: planteChoisie, par: joueur.name, date: new Date().toISOString() };
       joueur.solde = res.solde;
       const p = PLANTES[planteChoisie];
-      jardinMsg = JARDIN_LIBRE ? `${p.emoji} ${p.nom} planté !` : `${p.emoji} ${p.nom} planté ! Il te reste ${joueur.solde} graines.`;
+      jardinMsg = JARDIN_LIBRE ? `${p.emoji} ${p.nom} planté !` : `${p.emoji} ${p.nom} planté ! Il te reste ${affG(joueur.solde)} graines.`;
       if (!JARDIN_LIBRE && p.cout > joueur.solde) planteChoisie = null; // plus les moyens pour la même
       renderJardin();
       const neuve = app.querySelector(`[data-info="${idx}"]`);
@@ -2087,7 +2127,7 @@ async function finHerbes() {
     o.className = "herbe-overlay";
     o.innerHTML = `<div style="font-size:2.6rem;">🌱</div>
       <h2 class="q-text" style="margin:0;">+${gagne} graines récoltées !</h2>
-      <p class="hint" style="margin:0;">${res.ok ? `Tu as maintenant <b>${joueur.solde}</b> graines à planter.` : "La récolte n'a pas pu être enregistrée, réessaie."}
+      <p class="hint" style="margin:0;">${res.ok ? `Tu as maintenant <b>${affG(joueur.solde)}</b> graines à planter.` : "La récolte n'a pas pu être enregistrée, réessaie."}
       ${gagne >= 80 ? "<br>Plafond de la partie atteint 🌟" : ""}</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
         <button class="btn" id="h-rejouer">Rejouer 🌿</button>
@@ -2233,7 +2273,7 @@ function renderDashboard() {
   const quizFait = SIMULATION ? false : !!joueur.quizFait;
   const jardinOk = SIMULATION ? true : quizFait;
   app.innerHTML = `<div class="home">
-    <div class="dash-hello">Salut <b>${esc(joueur.name)}</b> 🌱 <span>${joueur.recoltees || 0} graines récoltées</span></div>
+    <div class="dash-hello">Salut <b>${esc(joueur.name)}</b> 🌱 <span>${affG(joueur.recoltees)} graines récoltées</span></div>
     ${jardinMsg ? `<div class="alert" style="max-width:640px;margin:0 auto 16px;">${esc(jardinMsg)}</div>` : ""}
     <div class="borne-modules dash-modules">
       <button class="borne-mod${quizOuvert && !quizFait ? "" : " mod-inactif"}" id="dash-quiz">
@@ -2242,7 +2282,7 @@ function renderDashboard() {
         <span class="bm-desc">${quizFait ? "✅ Quiz déjà fait" : (quizOuvert ? "Réponds et récolte tes graines" : "🔒 Dispo le " + labelLancement())}</span>
       </button>
       <button class="borne-mod${jardinOk ? "" : " mod-inactif"}" id="dash-jardin">
-        <span class="bm-ticket">${ticketGlaceSvg()}</span>
+        <span class="bm-emo">🌼</span>
         <span class="bm-titre">Mon espace jardin</span>
         <span class="bm-desc">${jardinOk ? "Plante tes graines, gagne des tickets glace" : "🔒 Fais le quiz d'abord"}</span>
       </button>
@@ -2547,7 +2587,7 @@ function renderSimTele() {
       <div class="tv-phase">🏆 Le grand quiz Famiformation</div>
       <div class="tv-cols">
         <div class="tv-board">
-          ${demo.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌰</span></div>`).join("")}
+          ${demo.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${affG(p.score)} 🌰</span></div>`).join("")}
         </div>
         <div class="tv-qr">
           <div class="tv-qr-box">${q ? q.svg : "<div style='padding:40px'>QR…</div>"}</div>
@@ -2605,7 +2645,7 @@ async function renderTeleBoard() {
     <div class="tv-phase">${termine ? "🏆 Classement final" : "🏆 Le classement en direct"}</div>
     <div class="tv-cols">
       <div class="tv-board">
-        ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${p.score} 🌰</span></div>`).join("")
+        ${top.length ? top.map((p, i) => `<div class="tv-row"><span>${medals[i] || (i + 1) + "."} ${esc(p.name)}</span><span>${affG(p.score)} 🌰</span></div>`).join("")
           : `<div class="tv-row" style="justify-content:center;">Sois le premier à jouer ! 🌱</div>`}
       </div>
       <div class="tv-qr">
@@ -2641,7 +2681,7 @@ async function renderTeleWinners() {
         <div class="tw-place tw-p${pos + 1}">
           <div class="tw-medal">${medals[pos]}</div>
           <div class="tw-name">${esc(top[pos].name)}</div>
-          <div class="tw-score">${top[pos].score} 🌰</div>
+          <div class="tw-score">${affG(top[pos].score)} 🌰</div>
           <div class="tw-bar">${pos + 1}</div>
         </div>` : "").join("")}
     </div>
