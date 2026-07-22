@@ -43,6 +43,15 @@ $BONUS_CODES = [
 ];
 $CODE_TEST_OK   = "FAMI-TEST-OK";
 $CODE_TEST_USED = "FAMI-TEST-USED";
+// 🧪 COMPTES DE TEST : ces pseudos servent a essayer le jeu EN VRAI (borne,
+// telephone, ordi) sans deranger personne. Ils n'apparaissent PAS au classement
+// public ni sur la tele, et ils peuvent refaire le quiz autant de fois qu'ils
+// veulent. Cree-les comme un compte normal avec ce pseudo.
+$COMPTES_TEST = ['testeur'];
+function estCompteTest($p) {
+  global $COMPTES_TEST;
+  return in_array(mb_strtolower((string)(is_array($p) ? ($p['name'] ?? '') : $p)), $COMPTES_TEST, true);
+}
 $CODE_GRAINES = 10;   // graines par code bonus (comptent dans le classement)
 $MAX_CODES    = 2;    // combien de codes une même personne peut cumuler
 
@@ -278,7 +287,7 @@ switch ($action) {
     $board = readJson($scoresFile);
     // Au classement, on ne montre QUE ceux qui ont réellement joué : un compte
     // créé (réservé) mais pas encore joué (quiz_fait=false) ne pollue pas la liste.
-    $board = array_values(array_filter($board, fn($p) => ($p['quiz_fait'] ?? true)));
+    $board = array_values(array_filter($board, fn($p) => ($p['quiz_fait'] ?? true) && !estCompteTest($p)));
     sortBoard($board);
     echo json_encode($board, JSON_UNESCAPED_UNICODE);
     break;
@@ -332,7 +341,7 @@ switch ($action) {
             return ['conflit' => true];
           }
           // Quiz déjà fait : on ne réécrase pas la récolte (on renvoie l'état actuel).
-          if (!empty($board[$i]['quiz_fait'])) {
+          if (!empty($board[$i]['quiz_fait']) && !estCompteTest($board[$i])) {
             sortBoard($board);
             return ['deja' => true, 'board' => $board];
           }

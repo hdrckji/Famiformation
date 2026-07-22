@@ -766,6 +766,12 @@ const arr1 = (n) => Math.round((Number(n) || 0) * 10) / 10;   // arrondi 1 déci
 // bien en coulisses (elles départagent deux joueurs au classement), mais on ne
 // les montre jamais : 140,1 et 140,2 s'affichent tous les deux « 140 ».
 const affG = (n) => Math.round(Number(n) || 0);
+// 🧪 Compte de test : le pseudo « Testeur » sert à essayer le jeu EN VRAI (borne,
+// téléphone, ordi) sans déranger personne — il n'apparaît pas au classement et
+// rien ne lui est verrouillé (quiz rejouable, jardin toujours ouvert).
+const COMPTES_TEST = ["testeur"];
+function estCompteTest() { return !!joueur && COMPTES_TEST.includes((joueur.name || "").toLowerCase()); }
+const toutOuvert = () => SIMULATION || estCompteTest();
 
 /* ============================================================
    🎬 MODE SIMULATION — un banc d'essai avec plusieurs ÉCRANS à prévisualiser.
@@ -1272,7 +1278,7 @@ function modaleCode(emoji, titre, texte) {
   const ferme = () => {
     o.remove();
     if (retourAccueilBorne()) return;                 // borne : on rentre à l'accueil
-    codeAReclamer = null; userView = joueur ? "jardin" : "reclamer"; render();
+    codeAReclamer = null; userView = joueur ? "dashboard" : "reclamer"; render();
   };
   o.querySelector("#cm-ok").addEventListener("click", ferme);
   o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
@@ -1508,7 +1514,7 @@ function renderQuiz() {
   // s'afficher même si quizFait vient de passer à true.
   if (!joueur) { userView = "espace"; render(); return; }
   // En mode test (simulation), on peut REJOUER le quiz autant de fois qu'on veut.
-  if (!quiz && joueur.quizFait && !SIMULATION) { userView = "dashboard"; render(); return; }
+  if (!quiz && joueur.quizFait && !toutOuvert()) { userView = "dashboard"; render(); return; }
 
   // On démarre directement le quiz avec la carte déjà en poche (plus d'intro).
   if (!quiz) quiz = { step: "play", pseudo: joueur.name, code: joueur.code, nom: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, start: Date.now(), score: 0, streak: 0, qStart: Date.now() };
@@ -1721,7 +1727,7 @@ function renderBoard() {
   const titre = `<div class="board-titre">${fini ? "🏆 Résultats finaux <span>— merci d'avoir joué !</span>" : "🏆 Classement en direct"}</div>`;
   // On ne montre QUE ceux qui ont joué (un compte réservé mais pas encore joué
   // n'apparaît pas). Le serveur filtre déjà ; ici c'est utile en simulation.
-  const lignes = board.filter((p) => p.quiz_fait !== false);
+  const lignes = board.filter((p) => p.quiz_fait !== false && !COMPTES_TEST.includes((p.name || "").toLowerCase()));
   if (!lignes.length) {
     app.innerHTML = `${pillsHtml("board")}<div class="card center">${titre}
       <p class="hint">${fini ? "Le quiz est terminé." : "Sois le premier ou la première à jouer ! 🌱"}</p></div>`;
@@ -2299,8 +2305,8 @@ function renderDashboard() {
   // 🧪 En mode TEST (simulation), on ne verrouille rien : le quiz est rejouable
   // autant de fois qu'on veut et le jardin est toujours ouvert, pour pouvoir TOUT
   // essayer. En vrai, le quiz ne se fait qu'une fois et le jardin s'ouvre après.
-  const quizFait = SIMULATION ? false : !!joueur.quizFait;
-  const jardinOk = SIMULATION ? true : quizFait;
+  const quizFait = toutOuvert() ? false : !!joueur.quizFait;
+  const jardinOk = toutOuvert() ? true : quizFait;
   app.innerHTML = `<div class="home">
     <div class="dash-hello">Salut <b>${esc(joueur.name)}</b> 🌱 <span>${affG(joueur.recoltees)} graines récoltées</span></div>
     ${jardinMsg ? `<div class="alert" style="max-width:640px;margin:0 auto 16px;">${esc(jardinMsg)}</div>` : ""}
@@ -2377,9 +2383,9 @@ function labelMoment(ts) {
 }
 function zonesHintHtml() {
   const zones = (CONFIG.zones || []).filter((z) => z.nom && z.nb > 0);
-  if (!zones.length) return "";
-  // Avant l'ouverture des indices : le bloc reste VISIBLE mais verrouillé (au clic,
-  // on dit quand il sera dispo). Ça fait patienter sans frustrer.
+  // Avant l'ouverture : le bloc est TOUJOURS visible (même si les zones ne sont
+  // pas encore renseignées côté admin), mais verrouillé — au clic on dit quand il
+  // sera dispo. C'est ce qui garantit un affichage identique partout.
   if (Date.now() < zonesDispoLe()) {
     return `<button class="zones-hint zones-lock" id="rc-indice">
       <div class="zh-titre">🔒 Indices : où chercher les codes</div>
@@ -2436,8 +2442,8 @@ async function renderReclamer() {
   clearInterval(tickTimer);
   let code = (codeAReclamer || "").toUpperCase();
 
-  const retourHtml = () => `<p class="center" style="margin-top:12px;"><a href="#" id="rc-retour" class="lien">◂ ${estBorne() ? "Accueil" : (joueur ? "Retour au jardin" : "Retour")}</a></p>`;
-  const brancheRetour = () => { const r = $("#rc-retour"); if (r) r.addEventListener("click", (e) => { e.preventDefault(); if (retourAccueilBorne()) return; codeAReclamer = null; userView = joueur ? "jardin" : "auto"; quiz = null; render(); }); };
+  const retourHtml = () => `<p class="center" style="margin-top:12px;"><a href="#" id="rc-retour" class="lien">◂ ${estBorne() ? "Accueil" : (joueur ? "Mon espace" : "Retour")}</a></p>`;
+  const brancheRetour = () => { const r = $("#rc-retour"); if (r) r.addEventListener("click", (e) => { e.preventDefault(); if (retourAccueilBorne()) return; codeAReclamer = null; userView = joueur ? "dashboard" : "auto"; quiz = null; render(); }); };
 
   // Aucun code fourni : petit champ pour le saisir à la main.
   if (!code) {
@@ -2703,7 +2709,7 @@ async function renderTeleBoard() {
   FEE.stop();   // une fois le quiz lancé, la fée range sa baguette
   board = await apiGetBoard().catch(() => board);
   const q = await qrQuiz().catch(() => null);
-  const top = board.filter((p) => p.quiz_fait !== false).slice(0, 8);
+  const top = board.filter((p) => p.quiz_fait !== false && !COMPTES_TEST.includes((p.name || "").toLowerCase())).slice(0, 8);
   const termine = phaseNow() === "termine";
   app.innerHTML = `<div class="tv">
     <div class="tv-phase">${termine ? "🏆 Classement final" : "🏆 Le classement en direct"}</div>
@@ -2735,7 +2741,7 @@ async function renderTeleWinners() {
   document.body.classList.add("mode-tele");
   FEE.stop(); clearInterval(tickTimer); clearTimeout(tickTimer);
   board = await apiGetBoard().catch(() => board);
-  const top = board.filter((p) => p.quiz_fait !== false).slice(0, 3);
+  const top = board.filter((p) => p.quiz_fait !== false && !COMPTES_TEST.includes((p.name || "").toLowerCase())).slice(0, 3);
   if (!top.length) { renderTeleBoard(); return; }
   const ordre = [1, 0, 2];   // 2e à gauche, 1er au centre, 3e à droite
   app.innerHTML = `<div class="tw">
@@ -3496,6 +3502,13 @@ function render() {
     try { sessionStorage.setItem("fj_borne", "1"); } catch (e) {}
     render();
     return;
+  }
+
+  // 🧹 On arrive sur /quiz DIRECTEMENT (téléphone/ordi, pas depuis la borne) : on
+  // oublie le mode borne d'une éventuelle session précédente. Sinon les boutons
+  // « retour » renverraient vers /quiz/borne alors qu'on est sur son téléphone.
+  if (ECRAN === "user" && !SIM_PARAMS.get("espace") && !SIM_PARAMS.get("play")) {
+    try { sessionStorage.removeItem("fj_borne"); } catch (e) {}
   }
 
   injecteHomeBorne();   // bouton maison si on vient de la borne
