@@ -234,7 +234,7 @@ function vueQuestions() {
   dessineListe();
 
   $("#q-ajouter").addEventListener("click", () => {
-    brouillon.push({ q: "", options: ["", "", "", ""], correct: 0 });
+    brouillon.push({ q: "", options: ["", "", "", ""], correct: 0, theme: "entreprise" });
     dessineListe();
   });
   $("#q-annuler").addEventListener("click", () => {
@@ -270,6 +270,14 @@ function dessineListe() {
         </span>
       </div>
       <input class="field" data-q="${i}" placeholder="Intitulé de la question" value="${esc(q.q)}">
+      <label style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;font-weight:700;font-size:.85rem;color:#0E3B24;">
+        🎯 Thème
+        <select class="field" data-theme="${i}" style="margin:0;max-width:230px;">
+          <option value="entreprise" ${(q.theme || "entreprise") === "entreprise" ? "selected" : ""}>L'entreprise / le magasin</option>
+          <option value="culture" ${q.theme === "culture" ? "selected" : ""}>Culture générale (jardinage)</option>
+          <option value="anecdote" ${q.theme === "anecdote" ? "selected" : ""}>Anecdote</option>
+        </select>
+      </label>
       ${q.options.map((o, j) => `
         <div class="opt">
           <label><input type="radio" name="bonne${i}" data-bonne="${i}-${j}" ${q.correct === j ? "checked" : ""}> bonne</label>
@@ -280,12 +288,23 @@ function dessineListe() {
     </div>`).join("") || `<p class="hint">Aucune question pour l'instant. Clique sur « Ajouter une question ».</p>`;
 
   const cpt = $("#q-compte");
-  if (cpt) cpt.textContent = `${brouillon.length} question(s) dans le quiz`;
+  if (cpt) {
+    const nb = (t) => brouillon.filter((q) => (q.theme || "entreprise") === t).length;
+    const e = nb("entreprise"), cg = nb("culture"), an = nb("anecdote");
+    const court = e < 10 || cg < 5 || an < 5;
+    cpt.innerHTML = `${brouillon.length} question(s) — <b>${e}</b> entreprise · <b>${cg}</b> culture G · <b>${an}</b> anecdote`
+      + ` <span style="opacity:.7;">(chaque joueur en tire 20 : 10 / 5 / 5)</span>`
+      + (court ? `<br><span style="color:#E4572E;font-weight:800;">⚠️ Il en faut au moins 10 / 5 / 5. En dessous, on complète avec les autres thèmes.</span>` : "");
+  }
 
   // Saisie : on met à jour le brouillon sans redessiner (sinon on perdrait le
   // curseur à chaque lettre tapée).
   liste.querySelectorAll("[data-q]").forEach((el) => el.addEventListener("input", () => {
     brouillon[+el.dataset.q].q = el.value;
+  }));
+  liste.querySelectorAll("[data-theme]").forEach((el) => el.addEventListener("change", () => {
+    brouillon[+el.dataset.theme].theme = el.value;
+    rendre();   // pour rafraîchir le compteur par thème
   }));
   liste.querySelectorAll("[data-opt]").forEach((el) => el.addEventListener("input", () => {
     const [i, j] = el.dataset.opt.split("-").map(Number);
@@ -326,16 +345,20 @@ function vueClassement() {
   const b = data.board;
   c.innerHTML = `
     <div class="card">
-      <h2>Classement complet — ${b.length} participant(s)</h2>
+      <h2>Tous les comptes — ${b.length} inscrit(s)</h2>
+      <p class="hint">Les <strong>décimales</strong> du score viennent du bonus de rapidité : elles ne sont
+      pas montrées aux joueurs (ils voient un entier) mais c'est ce qui <strong>départage</strong> deux
+      personnes à égalité. Le mot de passe sert au joueur pour se reconnecter (avec son pseudo ou son nom).</p>
       ${b.length ? `
       <div style="overflow-x:auto">
       <table>
-        <tr><th>#</th><th>Pseudo</th><th>Nom réel</th><th>Code</th><th>Récoltées 🌱</th><th>Plantées</th><th>Solde</th><th>Bonnes réponses</th><th>Codes</th><th>Temps</th><th></th></tr>
+        <tr><th>#</th><th>Prénom</th><th>Nom</th><th>Pseudo</th><th>Mot de passe</th><th>Récoltées 🌰</th><th>Plantées</th><th>Solde</th><th>Bonnes réponses</th><th>Codes</th><th>Temps</th><th></th></tr>
         ${b.map((p, i) => `
-          <tr>
-            <td class="num">${i + 1}</td>
-            <td>${esc(p.name)} ${stadeEmoji(p.score)}</td>
+          <tr${p.quiz_fait === false ? ` style="opacity:.6;" title="Compte créé mais quiz pas encore fait"` : ""}>
+            <td class="num">${p.quiz_fait === false ? "—" : i + 1}</td>
+            <td>${p.prenom ? esc(p.prenom) : "<span style='opacity:.4'>—</span>"}</td>
             <td>${p.nom ? esc(p.nom) : "<span style='opacity:.4'>—</span>"}</td>
+            <td>${esc(p.name)} ${stadeEmoji(p.score)}</td>
             <td class="num">${p.code ? esc(p.code) : "<span style='opacity:.4'>—</span>"}</td>
             <td class="num"><strong>${p.score}</strong></td>
             <td class="num">${p.depensees || 0}</td>

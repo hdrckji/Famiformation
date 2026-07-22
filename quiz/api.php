@@ -43,7 +43,7 @@ $BONUS_CODES = [
 ];
 $CODE_TEST_OK   = "FAMI-TEST-OK";
 $CODE_TEST_USED = "FAMI-TEST-USED";
-$CODE_GRAINES = 15;   // graines par code bonus (comptent dans le classement)
+$CODE_GRAINES = 10;   // graines par code bonus (comptent dans le classement)
 $MAX_CODES    = 2;    // combien de codes une même personne peut cumuler
 
 // 🔐 Identifiants admin (accès au mode admin + réinitialisation des scores)
@@ -155,7 +155,11 @@ function nettoieQuestion($item) {
   $correct = (int)($item['correct'] ?? 0);
   if ($q === '' || count($opts) < 2) { return null; }          // inutilisable
   if ($correct < 0 || $correct >= count($opts)) { $correct = 0; } // index hors liste
-  return ['q' => mb_substr($q, 0, 300), 'options' => $opts, 'correct' => $correct];
+  // 🎯 Thème de la question : sert à composer le quiz (10 entreprise, 5 culture
+  // générale, 5 anecdotes). Valeur inconnue ou absente → « entreprise ».
+  $theme = strtolower(trim((string)($item['theme'] ?? '')));
+  if (!in_array($theme, ['entreprise', 'culture', 'anecdote'], true)) { $theme = 'entreprise'; }
+  return ['q' => mb_substr($q, 0, 300), 'options' => $opts, 'correct' => $correct, 'theme' => $theme];
 }
 
 /** Les questions en vigueur (fichier si présent, sinon la liste par défaut). */
@@ -389,7 +393,8 @@ switch ($action) {
       http_response_code(400); echo json_encode(['error' => 'code_invalide']); break;
     }
     $nom = trim(mb_substr((string)($input['nom'] ?? ''), 0, 60));
-    $res = withLock($scoresFile, function (&$board, &$write) use ($name, $code4, $nom) {
+    $prenom = trim(mb_substr((string)($input['prenom'] ?? ''), 0, 40));
+    $res = withLock($scoresFile, function (&$board, &$write) use ($name, $code4, $nom, $prenom) {
       foreach ($board as $p) {
         if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
           if ((string)($p['code'] ?? '') === $code4) {
@@ -400,7 +405,7 @@ switch ($action) {
           return ['pris' => true];
         }
       }
-      $board[] = ['name' => $name, 'code' => $code4, 'nom' => $nom, 'score' => 0, 'bonus' => 0,
+      $board[] = ['name' => $name, 'code' => $code4, 'nom' => $nom, 'prenom' => $prenom, 'score' => 0, 'bonus' => 0,
         'depensees' => 0, 'correct' => 0, 'codes' => 0, 'codes_pris' => [], 'time' => 0,
         'quiz_fait' => false, 'date' => date('c')];
       $write = true;
@@ -652,7 +657,8 @@ switch ($action) {
     $board = readJson($scoresFile);
     foreach ($board as $p) {
       $parPseudo = mb_strtolower($p['name'] ?? '') === mb_strtolower($name);
-      $parNom    = trim((string)($p['nom'] ?? '')) !== '' && mb_strtolower($p['nom']) === mb_strtolower($name);
+      $complet   = trim(trim((string)($p['prenom'] ?? '')) . ' ' . trim((string)($p['nom'] ?? '')));
+      $parNom    = $complet !== '' && mb_strtolower($complet) === mb_strtolower($name);
       if ($parPseudo || $parNom) {
         if ((string)($p['code'] ?? '') !== $code4) {
           echo json_encode(['exists' => true, 'mauvais_code' => true]);

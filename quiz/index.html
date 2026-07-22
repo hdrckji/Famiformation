@@ -405,6 +405,12 @@ body.mode-borne #app { width: 100%; }
   font-weight: 700; color: var(--pousse); font-size: clamp(.95rem, 2.2vw, 1.15rem); padding: 6px 4px;
   text-decoration: underline; text-underline-offset: 3px; }
 .lien-explik:hover { color: var(--foret); }
+/* Bloc d'accueil de /quiz/code : explique l'événement à qui débarque via un QR */
+.code-intro { background: #E7F4E4; border: 2px solid var(--pousse); border-radius: 18px;
+  padding: 14px 16px; margin-bottom: 14px; text-align: left; font-weight: 500; line-height: 1.5; font-size: .95rem; }
+.code-intro > b:first-child { display: block; font-family: 'Fredoka', sans-serif; color: var(--pousse);
+  font-size: 1.1rem; margin-bottom: 6px; }
+.code-intro span { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(11,51,32,.2); }
 /* Badge « il reste N codes à trouver » sur /quiz/code */
 .rc-restants { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--pousse);
   background: var(--brume); border-radius: 999px; padding: 8px 16px; display: inline-block;
@@ -729,7 +735,7 @@ const CONFIG = {
   dateCloture:   new Date("2026-08-30T23:59:59"),
   dateResultats: "31 août",
   pointsParBonneReponse: 10,
-  pointsParCodeBonus: 15,   // graines par code bonus (doit = $CODE_GRAINES d'api.php)
+  pointsParCodeBonus: 10,   // graines par code bonus (doit = $CODE_GRAINES d'api.php)
   maxCodes: 2,              // codes bonus cumulables par personne (= $MAX_CODES)
   // 🔐 Les identifiants admin ne sont PLUS ici : ils sont vérifiés par api.php
   // (action=login). Les écrire dans cette page les rendrait lisibles par
@@ -942,7 +948,8 @@ async function apiLoginJoueur(name, code) {
   if (SIMULATION) {
     // On accepte le PSEUDO ou le NOM comme identifiant (comme le serveur).
     const id = name.toLowerCase();
-    const p = board.find((x) => (x.name || "").toLowerCase() === id || ((x.nom || "").trim() !== "" && x.nom.toLowerCase() === id));
+    const complet = (x) => [x.prenom, x.nom].filter(Boolean).join(" ").trim().toLowerCase();
+    const p = board.find((x) => (x.name || "").toLowerCase() === id || (complet(x) !== "" && complet(x) === id));
     if (!p) return { exists: false };
     if ((p.code || "") !== code) return { exists: true, mauvais_code: true };
     return { exists: true, name: p.name, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: (p.codes_pris || []).length, quiz_fait: p.quiz_fait !== false };
@@ -953,18 +960,18 @@ async function apiLoginJoueur(name, code) {
   return await r.json();
 }
 // ✨ Créer (réserver) son compte AVANT de jouer (pseudo + code à 4 chiffres).
-async function apiRegister(name, code, nom) {
+async function apiRegister(name, code, nom, prenom) {
   if (SIMULATION) {
     const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
     if (p) {
       if ((p.code || "") !== code) return { pris: true };
       return { ok: true, exist: true, name: p.name, quiz_fait: p.quiz_fait !== false, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: (p.codes_pris || []).length };
     }
-    board.push({ name, code, nom: nom || "", score: 0, bonus: 0, depensees: 0, correct: 0, codes: 0, codes_pris: [], time: 0, quiz_fait: false, date: new Date().toISOString() });
+    board.push({ name, code, nom: nom || "", prenom: prenom || "", score: 0, bonus: 0, depensees: 0, correct: 0, codes: 0, codes_pris: [], time: 0, quiz_fait: false, date: new Date().toISOString() });
     return { ok: true, exist: false, name, quiz_fait: false, recoltees: 0, solde: 0, nbCodes: 0 };
   }
   const r = await fetch(`${CONFIG.api}?action=register`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, code, nom: nom || "" }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, code, nom: nom || "", prenom: prenom || "" }),
   });
   if (r.status === 409) return { pris: true };
   if (!r.ok) return { erreur: true };
@@ -1117,8 +1124,24 @@ function shuffle(arr) {
   }
   return a;
 }
+// 🎯 COMPOSITION DU QUIZ : 20 questions tirées AU HASARD dans un plus grand
+// réservoir — 10 sur l'entreprise, 5 de culture générale (jardinage), 5 anecdotes.
+// Deux personnes n'ont donc pas le même questionnaire : ça limite la triche.
+const QUIZ_THEMES = { entreprise: 10, culture: 5, anecdote: 5 };
+const QUIZ_TOTAL = Object.values(QUIZ_THEMES).reduce((a, b) => a + b, 0);
 function prepareQuestions() {
-  return shuffle(QUESTIONS).map((item) => ({
+  const parTheme = { entreprise: [], culture: [], anecdote: [] };
+  QUESTIONS.forEach((q) => { (parTheme[q.theme] || parTheme.entreprise).push(q); });
+  let choix = [], restes = [];
+  for (const t in QUIZ_THEMES) {
+    const dispo = shuffle(parTheme[t]);
+    choix = choix.concat(dispo.slice(0, QUIZ_THEMES[t]));
+    restes = restes.concat(dispo.slice(QUIZ_THEMES[t]));
+  }
+  // S'il n'y a pas assez de questions dans un thème, on complète avec les autres
+  // (mieux vaut un quiz complet qu'un quiz tronqué).
+  if (choix.length < QUIZ_TOTAL) choix = choix.concat(shuffle(restes).slice(0, QUIZ_TOTAL - choix.length));
+  return shuffle(choix).map((item) => ({
     q: item.q,
     options: shuffle(item.options.map((text, i) => ({ text, good: i === item.correct }))),
   }));
@@ -1286,9 +1309,10 @@ function ouvreExplication() {
     <h2 class="explik-titre">🌱 Comment ça marche ?</h2>
     <p class="explik-sous">Le grand jeu Famiflora, de la graine au ticket glace.</p>
     <div class="explik-steps">
-      <div class="explik-step"><span class="explik-ico">🎯</span><span class="explik-txt"><b class="eh">Réponds au quiz</b>Chaque bonne réponse te fait récolter des graines 🌱. Ta récolte, c'est ta place au classement.</span></div>
+      <div class="explik-step"><span class="explik-ico">🎯</span><span class="explik-txt"><b class="eh">Réponds au quiz</b><b>${QUIZ_TOTAL} questions</b> tirées au hasard dans un grand réservoir : <b>${QUIZ_THEMES.entreprise} sur l'entreprise et le magasin</b>, <b>${QUIZ_THEMES.culture} de culture générale</b> (jardinage) et <b>${QUIZ_THEMES.anecdote} anecdotes</b>. Deux personnes n'ont donc pas le même questionnaire !</span></div>
+      <div class="explik-step"><span class="explik-ico">🌰</span><span class="explik-txt"><b class="eh">Comment on gagne des graines</b>Chaque bonne réponse rapporte <b>${BAREME.base} graines</b>, plus deux bonus :<br>⚡ <b>la rapidité</b> — jusqu'à +${BAREME.vitesseMax} : plus tu réponds vite, plus tu gagnes (un chrono tourne à l'écran) ;<br>🔥 <b>la série</b> — les bonnes réponses d'affilée rapportent de plus en plus (jusqu'à +${BAREME.serieMax}), une erreur remet le compteur à zéro.<br>Une mauvaise réponse ne retire rien, elle rapporte juste 0.</span></div>
       <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Ta carte de jardinier</b>Un pseudo + un code à 4 chiffres, choisis en jouant. <b>Retiens-les !</b> C'est ta clé : elle garde ta récolte et te laisse retrouver ton jardin sur n'importe quel appareil.</span></div>
-      <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes sont cachés en magasin : chacun te rapporte <b>+${CONFIG.pointsParCodeBonus} graines</b>. Tu peux en accumuler <b>${CONFIG.maxCodes} au maximum</b> (soit +${CONFIG.pointsParCodeBonus * CONFIG.maxCodes} graines), et elles comptent au classement. Ouvre l'œil !</span></div>
+      <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes sont cachés en magasin : chacun te rapporte <b>+${CONFIG.pointsParCodeBonus} graines</b>. Tu peux en accumuler <b>${CONFIG.maxCodes} au maximum</b> (soit +${CONFIG.pointsParCodeBonus * CONFIG.maxCodes} graines), et elles comptent au classement. <b>Même après avoir fait le quiz</b>, tu peux encore en récupérer : ça te fait remonter ! Ouvre l'œil 👀</span></div>
       <div class="explik-step explik-star"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Un seul classement ⭐</b>Ta récolte de graines (quiz + codes), c'est tout. <b>Les 3 meilleures récoltes gagnent des récompenses</b> ! Annonce des vainqueurs le ${esc(CONFIG.dateResultats)}.</span></div>
       <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin à toi</b>Chacun a son propre jardin. Dépense tes graines pour y planter fleurs, arbres et fleurs rares. <b>Dépense sans crainte : ton score du quiz ne bouge pas</b> — c'est lui qui compte pour le classement, les graines servent <b>uniquement</b> au jardin.</span></div>
       <div class="explik-step"><span class="explik-ico">🌿</span><span class="explik-txt"><b class="eh">Un mini-jeu bonus</b>La chasse aux mauvaises herbes te donne des graines <b>en plus, uniquement pour planter</b> dans ton jardin. Ça ne compte pas au classement.</span></div>
@@ -2209,15 +2233,17 @@ function renderRetrouver() {
 
 // ✨ CRÉER SA CARTE DE JARDINIER (avant de jouer). Pseudo + code + (option) nom,
 // avec consentement RGPD. Réserve le compte côté serveur, puis → tableau de bord.
-let creationSaisie = { pseudo: "", code: "", nom: "" };
+let creationSaisie = { pseudo: "", code: "", nom: "", prenom: "" };
 function renderCreation() {
   clearInterval(tickTimer);
   app.innerHTML = `<div class="card">
     <div class="center"><div style="font-size:2.6rem;">✨</div>
       <h2 class="q-text" style="margin:8px 0 12px;">Crée ton compte</h2></div>
     ${jardinMsg ? `<div class="alert">${esc(jardinMsg)}</div>` : ""}
-    <label class="lbl">Ton prénom et ton nom</label>
-    <input class="field" id="c-nom" placeholder="Ex : Marie Dupont" maxlength="60" value="${esc(creationSaisie.nom)}">
+    <label class="lbl">Ton prénom</label>
+    <input class="field" id="c-prenom" placeholder="Ex : Marie" maxlength="30" value="${esc(creationSaisie.prenom)}">
+    <label class="lbl">Ton nom</label>
+    <input class="field" id="c-nom" placeholder="Ex : Dupont" maxlength="30" value="${esc(creationSaisie.nom)}">
     <label class="lbl">Ton pseudo <span style="font-weight:600; opacity:.65;">(facultatif)</span></label>
     <input class="field" id="c-pseudo" placeholder="Ex : SuperMarie" maxlength="24" value="${esc(creationSaisie.pseudo)}">
     <p class="hint" style="margin:-6px 0 12px;">Si tu mets un pseudo, c'est <b>lui</b> qui s'affichera au classement. Sinon, ce sera ton nom.</p>
@@ -2229,25 +2255,27 @@ function renderCreation() {
     <button class="btn" id="c-ok" style="width:100%;">Créer mon compte 🌱</button>
     <p class="center" style="margin-top:12px;"><a href="#" id="c-retour" class="lien">◂ J'ai déjà un compte / Retour</a></p>
   </div>`;
-  const memo = () => { creationSaisie = { pseudo: $("#c-pseudo").value, code: $("#c-code").value, nom: $("#c-nom").value }; };
+  const memo = () => { creationSaisie = { pseudo: $("#c-pseudo").value, code: $("#c-code").value, nom: $("#c-nom").value, prenom: $("#c-prenom").value }; };
   $("#c-conf").addEventListener("click", (e) => { e.preventDefault(); memo(); ouvrePolitique(); });
   const go = async () => {
-    const nom = $("#c-nom").value.trim();
+    const prenom = $("#c-prenom").value.trim();
+    const nomFam = $("#c-nom").value.trim();
     const pseudo = $("#c-pseudo").value.trim();
     const code = $("#c-code").value.replace(/\D/g, "").slice(0, 4);
-    creationSaisie = { pseudo, code, nom };
+    creationSaisie = { pseudo, code, nom: nomFam, prenom };
+    const nom = [prenom, nomFam].filter(Boolean).join(" ").trim();   // « Prénom Nom »
     // Ce qui s'affiche au classement (et sert d'identifiant) : le pseudo s'il y en
     // a un, sinon le nom. Il faut donc au moins l'un des deux.
     const identite = pseudo || nom;
     if (identite.length < 2) { jardinMsg = "Donne au moins ton nom (ou un pseudo) 🙂"; renderCreation(); return; }
     if (code.length !== 4) { jardinMsg = "Ton mot de passe doit faire 4 chiffres 🔢"; renderCreation(); return; }
     $("#c-ok").disabled = true;
-    const res = await apiRegister(identite, code, nom).catch(() => ({ erreur: true }));
+    const res = await apiRegister(identite, code, nomFam, prenom).catch(() => ({ erreur: true }));
     if (res.pris) { jardinMsg = `« ${identite} » est déjà utilisé ! Ajoute un pseudo différent — ou connecte-toi si c'est bien toi.`; renderCreation(); return; }
     if (!res.ok) { jardinMsg = "Petit souci, réessaie."; renderCreation(); return; }
     joueur = { name: res.name, code, solde: res.solde || 0, recoltees: res.recoltees || 0, nbCodes: res.nbCodes || 0, quizFait: res.quiz_fait !== false };
     sauveMoi(res.name, code);
-    creationSaisie = { pseudo: "", code: "", nom: "" };
+    creationSaisie = { pseudo: "", code: "", nom: "", prenom: "" };
     const msg = await reclamerEnAttente();
     jardinMsg = msg || null;
     userView = "dashboard"; quiz = null;
@@ -2362,6 +2390,31 @@ function zonesHintHtml() {
     ${zones.map((z) => `<div class="zh-row"><span>${esc(z.nom)}</span><span>${z.nb} code${z.nb > 1 ? "s" : ""}</span></div>`).join("")}
   </div>`;
 }
+// ✨ « Comment ça marche ? » version CODES — tout sur la chasse aux codes bonus.
+function ouvreExplicationCodes() {
+  const o = document.createElement("div");
+  o.className = "modal-fond";
+  o.innerHTML = `<div class="modal explik">
+    <button class="explik-x" id="explik-x" aria-label="Fermer">✕</button>
+    <h2 class="explik-titre">🎁 Les codes bonus</h2>
+    <p class="explik-sous">La chasse aux codes, mode d'emploi.</p>
+    <div class="explik-steps">
+      <div class="explik-step"><span class="explik-ico">🔎</span><span class="explik-txt"><b class="eh">Des codes cachés en magasin</b>Des petites cartes avec un code sont dissimulées un peu partout dans le magasin. À toi de les dénicher !</span></div>
+      <div class="explik-step explik-star"><span class="explik-ico">🌰</span><span class="explik-txt"><b class="eh">Chacun rapporte +${CONFIG.pointsParCodeBonus} graines ⭐</b>Et ces graines <b>comptent au classement</b> : un code trouvé, c'est de l'avance sur les autres.</span></div>
+      <div class="explik-step"><span class="explik-ico">🔒</span><span class="explik-txt"><b class="eh">${CONFIG.maxCodes} codes maximum par personne</b>Et c'est <b>premier arrivé, premier servi</b> : un code déjà récupéré par quelqu'un d'autre ne vaut plus rien. Ne le laisse pas traîner !</span></div>
+      <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Il te faut un compte</b>Crée ton compte (ou connecte-toi) pour que les graines soient créditées. Ça prend 30 secondes.</span></div>
+      <div class="explik-step"><span class="explik-ico">⏳</span><span class="explik-txt"><b class="eh">Même après le quiz !</b>Tu as déjà fait le quiz ? Tu peux <b>toujours</b> récupérer des codes : ils s'ajoutent à ta récolte et te font remonter au classement.</span></div>
+      <div class="explik-step"><span class="explik-ico">🎯</span><span class="explik-txt"><b class="eh">Des indices arrivent</b>À partir de la veille du lancement, cette page t'indiquera <b>dans quelles zones du magasin</b> des codes sont cachés (et combien).</span></div>
+    </div>
+    <button class="btn" id="explik-ok" style="width:100%;">Compris, je pars à la chasse ! 🔎</button>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => o.remove();
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
+  o.querySelector("#explik-x").addEventListener("click", ferme);
+  o.querySelector("#explik-ok").addEventListener("click", ferme);
+}
+
 // 🔒 Message quand on tape sur les indices encore verrouillés.
 function modaleIndices() {
   const o = document.createElement("div");
@@ -2388,6 +2441,15 @@ async function renderReclamer() {
   // Aucun code fourni : petit champ pour le saisir à la main.
   if (!code) {
     app.innerHTML = `${joueur ? pillsHtml("reclamer") : ""}<div class="card center">
+      <div class="code-intro">
+        <b>🎉 Tu as trouvé un code ? Bravo !</b>
+        Pour le lancement de <b>Famiformation</b>, Famiflora organise un grand jeu : un quiz où l'on récolte
+        des <b>graines</b>, et les <b>3 meilleures récoltes gagnent des récompenses</b>.
+        Ce code te rapporte <b>+${CONFIG.pointsParCodeBonus} graines</b> et te fait prendre de l'avance.
+        <span>👉 Si tu travailles chez Famiflora, <b>garde-le précieusement</b> : il est rare et un seul
+        collègue pourra l'utiliser !</span>
+      </div>
+      <p class="center" style="margin:0 0 16px;"><button class="lien-explik" id="rc-explik">✨ Comment ça marche ? (tout sur les codes)</button></p>
       <div style="font-size:2.6rem;">🎁</div>
       <h2 class="q-text" style="margin:8px 0;">J'ai un code bonus</h2>
       <p class="hint">Entre le code trouvé en magasin (ou scanne son QR code).</p>
@@ -2401,6 +2463,7 @@ async function renderReclamer() {
     brancheRetour();
     const bi = $("#rc-indice");
     if (bi) bi.addEventListener("click", modaleIndices);
+    $("#rc-explik").addEventListener("click", ouvreExplicationCodes);
     apiCodesRestants().then((cr) => {
       const el = $("#rc-restants");
       if (el && cr && cr.restants != null) {
