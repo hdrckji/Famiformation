@@ -415,6 +415,11 @@ body.mode-borne #app { width: 100%; }
 .zh-row { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; padding: 4px 0;
   border-top: 1px dashed rgba(11,51,32,.15); }
 .zh-row:first-of-type { border-top: none; }
+/* Indices encore verrouillés : visibles mais pas accessibles (clic = message). */
+.zones-hint.zones-lock { display: block; width: 100%; cursor: pointer; font: inherit; color: inherit;
+  background: var(--brume); border: 1px dashed rgba(11,51,32,.32); opacity: .85; }
+.zones-hint.zones-lock:hover { opacity: 1; background: #E6F0E6; }
+.zh-lock { font-weight: 600; opacity: .72; font-size: .88rem; margin-top: 2px; }
 /* Bloc principal (mis en avant) sur l'accueil / l'espace */
 .bm-primaire { border-color: var(--pousse); background: #F1F8EF; }
 /* Espace (gate connexion/création) : 2 blocs centrés */
@@ -1267,8 +1272,8 @@ function ouvreExplication() {
     <div class="explik-steps">
       <div class="explik-step"><span class="explik-ico">🎯</span><span class="explik-txt"><b class="eh">Réponds au quiz</b>Chaque bonne réponse te fait récolter des graines 🌱. Ta récolte, c'est ta place au classement.</span></div>
       <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Ta carte de jardinier</b>Un pseudo + un code à 4 chiffres, choisis en jouant. <b>Retiens-les !</b> C'est ta clé : elle garde ta récolte et te laisse retrouver ton jardin sur n'importe quel appareil.</span></div>
-      <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes cachés en magasin te donnent +${CONFIG.pointsParCodeBonus} graines chacun (jusqu'à ${CONFIG.maxCodes}) — et ces graines comptent au classement. Ouvre l'œil !</span></div>
-      <div class="explik-step explik-star"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Un seul classement ⭐</b>Ta récolte de graines (quiz + codes), c'est tout. <b>Les 3 meilleures récoltes gagnent des prix</b> ! Remise le ${esc(CONFIG.dateResultats)}.</span></div>
+      <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes sont cachés en magasin : chacun te rapporte <b>+${CONFIG.pointsParCodeBonus} graines</b>. Tu peux en accumuler <b>${CONFIG.maxCodes} au maximum</b> (soit +${CONFIG.pointsParCodeBonus * CONFIG.maxCodes} graines), et elles comptent au classement. Ouvre l'œil !</span></div>
+      <div class="explik-step explik-star"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Un seul classement ⭐</b>Ta récolte de graines (quiz + codes), c'est tout. <b>Les 3 meilleures récoltes gagnent des récompenses</b> ! Annonce des vainqueurs le ${esc(CONFIG.dateResultats)}.</span></div>
       <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin à toi</b>Dépense tes graines pour planter dans <b>ton</b> jardin (fleurs, arbres, fleurs rares…). C'est juste pour le plaisir : <b>planter ne change RIEN à ton classement</b>.</span></div>
       <div class="explik-step"><span class="explik-ico">🌿</span><span class="explik-txt"><b class="eh">Un mini-jeu bonus</b>La chasse aux mauvaises herbes te donne des graines <b>en plus, uniquement pour planter</b> dans ton jardin. Ça ne compte pas au classement.</span></div>
     </div>
@@ -2294,15 +2299,43 @@ function modaleJardinVerrouille() {
 // 🎯 Indice « où chercher » : les zones où l'orga a caché des codes. Affiché à
 // partir de la VEILLE DU LANCEMENT (dernières 24 h du compte à rebours), puis il
 // reste visible pendant l'événement pour aider à dénicher les codes.
+function zonesDispoLe() { return CONFIG.dateLancement.getTime() - 86400000; }   // veille du lancement
+// Moment lisible, ex. « 28/07 à 12h ».
+function labelMoment(ts) {
+  const d = new Date(ts);
+  const h = d.getMinutes() ? `${d.getHours()}h${pad(d.getMinutes())}` : `${d.getHours()}h`;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} à ${h}`;
+}
 function zonesHintHtml() {
   const zones = (CONFIG.zones || []).filter((z) => z.nom && z.nb > 0);
   if (!zones.length) return "";
-  const lancement = CONFIG.dateLancement.getTime();
-  if (Date.now() < lancement - 86400000) return "";   // plus de 24 h avant le lancement
+  // Avant l'ouverture des indices : le bloc reste VISIBLE mais verrouillé (au clic,
+  // on dit quand il sera dispo). Ça fait patienter sans frustrer.
+  if (Date.now() < zonesDispoLe()) {
+    return `<button class="zones-hint zones-lock" id="rc-indice">
+      <div class="zh-titre">🔒 Indices : où chercher les codes</div>
+      <div class="zh-lock">Bientôt disponible — appuie pour savoir quand</div>
+    </button>`;
+  }
   return `<div class="zones-hint">
-    <div class="zh-titre">🎯 Où chercher les derniers codes</div>
+    <div class="zh-titre">🎯 Où chercher les codes</div>
     ${zones.map((z) => `<div class="zh-row"><span>${esc(z.nom)}</span><span>${z.nb} code${z.nb > 1 ? "s" : ""}</span></div>`).join("")}
   </div>`;
+}
+// 🔒 Message quand on tape sur les indices encore verrouillés.
+function modaleIndices() {
+  const o = document.createElement("div");
+  o.className = "modal-fond";
+  o.innerHTML = `<div class="modal code-modal">
+    <div class="cm-emoji">🔒</div>
+    <h2 class="cm-titre">Les indices arrivent bientôt !</h2>
+    <p class="cm-sous">À partir du <b>${labelMoment(zonesDispoLe())}</b>, tu verras ici <b>dans quelles zones du magasin</b> les codes sont cachés (et combien il y en a dans chacune).<br>En attendant… ouvre l'œil ! 👀</p>
+    <button class="btn" id="cm-ok" style="min-width:180px;">Compris !</button>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => o.remove();
+  o.querySelector("#cm-ok").addEventListener("click", ferme);
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
 }
 
 async function renderReclamer() {
@@ -2326,6 +2359,8 @@ async function renderReclamer() {
     </div>`;
     if (joueur) bindPills();
     brancheRetour();
+    const bi = $("#rc-indice");
+    if (bi) bi.addEventListener("click", modaleIndices);
     apiCodesRestants().then((cr) => {
       const el = $("#rc-restants");
       if (el && cr && cr.restants != null) {
