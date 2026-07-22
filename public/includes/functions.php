@@ -1515,7 +1515,11 @@ if (!function_exists('clearUserAccountAccessToken')) {
 }
 
 if (!function_exists('sendAccountActivationEmail')) {
-    function sendAccountActivationEmail(PDO $db, $userId)
+    // $heures : durée de validité du lien. 72 h par défaut (création par un admin),
+    // mais les inscriptions faites depuis le quiz de lancement ont besoin de plus :
+    // quelqu'un qui s'inscrit une semaine avant l'événement doit encore pouvoir
+    // activer son compte le jour J.
+    function sendAccountActivationEmail(PDO $db, $userId, $heures = 72)
     {
         ensureUserAccountAccessColumns($db);
 
@@ -1527,7 +1531,8 @@ if (!function_exists('sendAccountActivationEmail')) {
             return false;
         }
 
-        $token = issueUserAccountAccessToken($db, $user['id'], 'activation', 72);
+        $heures = max(1, (int) $heures);
+        $token = issueUserAccountAccessToken($db, $user['id'], 'activation', $heures);
         $activationUrl = famiBuildAppUrl('set_password.php', ['token' => $token]);
         $loginUrl = famiBuildAppUrl('login.php');
         $firstName = trim((string) ($user['prenom'] ?? ''));
@@ -1549,7 +1554,7 @@ if (!function_exists('sendAccountActivationEmail')) {
             . '<p style="margin:0 0 10px;font-size:16px;"><strong>Identifiant :</strong> ' . e($user['identifiant']) . '</p>'
             . '<p style="margin:0;font-size:16px;"><strong>Lien de connexion :</strong> <a href="' . e($loginUrl) . '" style="color:#2d5a37;font-weight:700;">' . e($loginUrl) . '</a></p>'
             . '</div>'
-            . '<p style="margin:0 0 24px;font-size:16px;line-height:1.7;">Cliquez sur le bouton ci-dessous pour définir votre mot de passe. Ce lien est valable pendant 72 heures.</p>'
+            . '<p style="margin:0 0 24px;font-size:16px;line-height:1.7;">Cliquez sur le bouton ci-dessous pour définir votre mot de passe. Ce lien est valable pendant ' . ($heures >= 48 ? (int) round($heures / 24) . ' jours' : (int) $heures . ' heures') . '.</p>'
             . '<p style="margin:0 0 24px;"><a href="' . e($activationUrl) . '" style="display:inline-block;padding:14px 22px;border-radius:999px;background:#d6a21a;color:#ffffff;font-weight:700;text-decoration:none;">Définir mon mot de passe</a></p>'
             . '<p style="margin:0;font-size:15px;line-height:1.7;color:#617268;">Si vous n’êtes pas à l’origine de cette demande, vous pouvez ignorer ce message.</p>'
             . '</div>'

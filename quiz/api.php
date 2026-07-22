@@ -55,6 +55,12 @@ function estCompteTest($p) {
 $CODE_GRAINES = 10;   // graines par code bonus (comptent dans le classement)
 $MAX_CODES    = 2;    // combien de codes une même personne peut cumuler
 
+// ✉️ Combien de temps le lien « Définir mon mot de passe » reste valable pour
+// quelqu'un qui s'inscrit depuis le quiz. 72 h (le défaut de l'app) ne suffit
+// pas : on doit pouvoir s'inscrire une semaine avant l'événement et n'activer
+// son compte que le jour J.
+$ACTIVATION_HEURES = 30 * 24;
+
 // 🔐 Identifiants admin (accès au mode admin + réinitialisation des scores)
 $ADMIN_ID  = "admin";
 $ADMIN_PWD = "a";
@@ -280,6 +286,148 @@ function sortBoard(&$board) {
   });
 }
 
+/* ============================================================
+   🔗 LES COMPTES VIENNENT DE FAMIFORMATION
+   Le quiz ne gère plus ses propres comptes : pour jouer, il faut un compte
+   Famiformation (le même que pour se connecter au site). Le quiz tourne dans le
+   MÊME conteneur que l'app, donc il lit la même base.
+
+   On ne charge surtout PAS config.php : il ouvre une session, fait des
+   redirections (header Location) et injecte du HTML dans la sortie — trois
+   choses qui casseraient des réponses JSON. includes/functions.php, lui, se
+   suffit à lui-même : famiGetEnv(), sendMail(), sendAccountActivationEmail()...
+   ============================================================ */
+function famiDb() {
+  static $db = null, $deja = false;
+  if ($deja) { return $db; }
+  $deja = true;
+  // Deux dispositions : dans le conteneur, quiz/ est DANS public/ (Dockerfile) ;
+  // dans le dépôt, quiz/ et public/ sont côte à côte.
+  $lib = null;
+  foreach ([__DIR__ . '/../includes/functions.php', __DIR__ . '/../public/includes/functions.php'] as $piste) {
+    if (is_file($piste)) { $lib = $piste; break; }
+  }
+  if ($lib === null) { return null; }
+  // Ceinture et bretelles : si ce fichier émettait quoi que ce soit (avertissement,
+  // espace avant <?php), ça se collerait dans notre JSON et le joueur verrait une
+  // erreur incompréhensible. On avale tout ce qui pourrait sortir.
+  ob_start();
+  require_once $lib;
+  ob_end_clean();
+  try {
+    // QUIZ_DB_DSN sert aux essais hors ligne (SQLite) ; en production, ce sont
+    // les mêmes variables que l'app.
+    $dsn = (string) famiGetEnv('QUIZ_DB_DSN', '');
+    if ($dsn !== '') {
+      $db = new PDO($dsn, (string) famiGetEnv('QUIZ_DB_USER', ''), (string) famiGetEnv('QUIZ_DB_PASS', ''));
+    } else {
+      $db = new PDO(
+        'mysql:host=' . famiGetEnv('DB_HOST', 'localhost') . ';dbname=' . famiGetEnv('DB_NAME', '') . ';charset=utf8mb4',
+        (string) famiGetEnv('DB_USER', ''), (string) famiGetEnv('DB_PASSWORD', '')
+      );
+    }
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+  } catch (Throwable $e) {
+    $db = null;
+  }
+  return $db;
+}
+
+// 🔐 Le jeton de session du joueur. On ne garde JAMAIS son mot de passe côté
+// navigateur : à la connexion on lui remet un jeton signé, qu'il renvoie ensuite.
+// Signature HMAC avec un secret tiré une fois pour toutes dans le dossier de
+// données — donc rien à stocker par joueur, et un jeton bricolé est rejeté.
+function quizSecret() {
+  global $dataDir;
+  static $secret = null;
+  if ($secret !== null) { return $secret; }
+  $f = $dataDir . '/secret.txt';
+  if (is_file($f)) { $secret = trim((string) @file_get_contents($f)); }
+  if (empty($secret)) {
+    $secret = bin2hex(random_bytes(32));
+    @file_put_contents($f, $secret);
+    @chmod($f, 0600);
+  }
+  return $secret;
+}
+// Séparateur « | » et identifiant encodé : les identifiants contiennent un POINT
+// (prenom.nom), donc découper sur le point casserait la relecture du jeton.
+function faitJeton($uid, $identifiant, $jours = 60) {
+  $exp = time() + $jours * 86400;
+  $corps = ((int) $uid) . '|' . ($exp) . '|' . rawurlencode((string) $identifiant);
+  return $corps . '|' . hash_hmac('sha256', $corps, quizSecret());
+}
+function litJeton($jeton) {
+  $p = explode('|', (string) $jeton);
+  if (count($p) !== 4) { return null; }
+  [$uid, $exp, $ident, $sig] = $p;
+  $corps = $uid . '|' . $exp . '|' . $ident;
+  if (!hash_equals(hash_hmac('sha256', $corps, quizSecret()), $sig)) { return null; }
+  if ((int) $exp < time()) { return null; }
+  return ['uid' => (int) $uid, 'identifiant' => rawurldecode($ident)];
+}
+
+// Un identifiant libre, construit à partir du prénom et du nom (jimmy.hendrickx,
+// puis jimmy.hendrickx2, etc.). C'est ce que la personne tapera pour se connecter
+// — mais son email marchera aussi.
+function identifiantLibre(PDO $db, $prenom, $nom) {
+  $sansAccent = function ($s) {
+    $s = (string) $s;
+    $tr = ['à'=>'a','á'=>'a','â'=>'a','ä'=>'a','ã'=>'a','å'=>'a','ç'=>'c','è'=>'e','é'=>'e','ê'=>'e','ë'=>'e',
+           'ì'=>'i','í'=>'i','î'=>'i','ï'=>'i','ñ'=>'n','ò'=>'o','ó'=>'o','ô'=>'o','ö'=>'o','õ'=>'o',
+           'ù'=>'u','ú'=>'u','û'=>'u','ü'=>'u','ý'=>'y','ÿ'=>'y','œ'=>'oe','æ'=>'ae'];
+    return strtr(mb_strtolower($s), $tr);
+  };
+  $base = trim(preg_replace('/[^a-z0-9]+/', '', $sansAccent($prenom)) . '.' . preg_replace('/[^a-z0-9]+/', '', $sansAccent($nom)), '.');
+  if ($base === '' || $base === '.') { $base = 'joueur'; }
+  $base = substr($base, 0, 40);
+  $stmt = $db->prepare('SELECT COUNT(*) FROM utilisateurs WHERE identifiant = ?');
+  for ($i = 0; $i < 200; $i++) {
+    $essai = $i === 0 ? $base : $base . ($i + 1);
+    $stmt->execute([$essai]);
+    if ((int) $stmt->fetchColumn() === 0) { return $essai; }
+  }
+  return $base . '.' . bin2hex(random_bytes(3));
+}
+
+// 🛡️ GARDE-FOU sur les actions qui ENVOIENT UN MAIL ou CRÉENT UN COMPTE.
+// Sans ça, n'importe qui peut marteler l'inscription : boîte mail d'un tiers
+// inondée, table des utilisateurs remplie de faux comptes.
+//
+// ⚠️ ATTENTION au réglage : à la borne du magasin, TOUS les visiteurs sortent
+// par la MÊME adresse IP. Une limite serrée par IP bloquerait donc de vrais
+// clients le jour de l'événement. On protège donc surtout PAR ADRESSE MAIL
+// (3 envois/heure : personne ne peut inonder la boîte de quelqu'un), et on garde
+// un plafond par IP très large, uniquement contre un script automatisé.
+function tropDEnvois($cle, $max, $fenetre = 3600) {
+  global $dataDir;
+  $trop = false;
+  withLock($dataDir . '/envois.json', function (&$journal, &$write) use ($cle, $max, $fenetre, &$trop) {
+    $maintenant = time();
+    if (!is_array($journal)) { $journal = []; }
+    // On nettoie au passage tout ce qui est sorti de la fenêtre (le fichier ne
+    // grossit donc jamais).
+    foreach ($journal as $k => $dates) {
+      $journal[$k] = array_values(array_filter((array) $dates, fn($t) => $maintenant - (int) $t < $fenetre));
+      if (!$journal[$k]) { unset($journal[$k]); }
+    }
+    $miens = $journal[$cle] ?? [];
+    if (count($miens) >= $max) { $trop = true; }
+    else { $miens[] = $maintenant; $journal[$cle] = $miens; }
+    $write = true;
+    return null;
+  });
+  return $trop;
+}
+
+// Les deux garde-fous d'un envoi de mail : l'adresse visée d'abord (le vrai
+// risque), l'IP ensuite (très large, pour ne pas gêner la borne du magasin).
+function envoiRefuse($email) {
+  $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? 'inconnu');
+  return tropDEnvois('mail:' . mb_strtolower($email), 3) || tropDEnvois('ip:' . $ip, 120);
+}
+
 $action = $_GET['action'] ?? '';
 $input  = json_decode(file_get_contents('php://input'), true) ?: [];
 
@@ -428,6 +576,153 @@ switch ($action) {
       http_response_code(409); echo json_encode(['error' => 'nom_pris']); break;
     }
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  /* ---------- CONNEXION AVEC SON COMPTE FAMIFORMATION ---------- */
+
+  // 🔑 Se connecter : identifiant OU email + mot de passe Famiformation.
+  // Le quiz ne connaît aucun mot de passe : il demande à la base de l'app.
+  case 'login_fami': {
+    $ident = trim((string) ($input['identifiant'] ?? ''));
+    $mdp   = (string) ($input['mdp'] ?? '');
+    if ($ident === '' || $mdp === '') { echo json_encode(['ok' => false, 'reason' => 'vide']); break; }
+    $db = famiDb();
+    if (!$db) { http_response_code(503); echo json_encode(['ok' => false, 'reason' => 'base_indisponible']); break; }
+    $stmt = $db->prepare('SELECT id, identifiant, prenom, nom, email, mot_de_passe, account_activation_pending
+                          FROM utilisateurs WHERE identifiant = ? OR email = ? LIMIT 1');
+    $stmt->execute([$ident, mb_strtolower($ident)]);
+    $u = $stmt->fetch();
+    if (!$u) { echo json_encode(['ok' => false, 'reason' => 'inconnu']); break; }
+    // Compte créé mais jamais activé : inutile de parler de mot de passe, il n'en
+    // a pas encore — on le renvoie vers son mail.
+    if (!empty($u['account_activation_pending']) || empty($u['mot_de_passe'])) {
+      echo json_encode(['ok' => false, 'reason' => 'a_activer']); break;
+    }
+    if (!password_verify($mdp, (string) $u['mot_de_passe'])) {
+      echo json_encode(['ok' => false, 'reason' => 'mauvais_mdp']); break;
+    }
+    // Première partie ? On lui ouvre sa fiche de joueur. La clé reste le champ
+    // `name` (= son identifiant Famiformation), ce qui garde tout le reste du
+    // quiz inchangé : codes bonus, jardin, classement.
+    $fiche = withLock($scoresFile, function (&$board, &$write) use ($u) {
+      foreach ($board as &$p) {
+        if (mb_strtolower((string) ($p['name'] ?? '')) === mb_strtolower((string) $u['identifiant'])) {
+          $p['uid'] = (int) $u['id'];
+          $p['prenom'] = $u['prenom']; $p['nom'] = $u['nom'];
+          $write = true;
+          return ['quiz_fait' => ($p['quiz_fait'] ?? true), 'recoltees' => round(floatval($p['score'] ?? 0), 1),
+                  'solde' => soldeDe($p), 'nbCodes' => intval($p['codes'] ?? 0)];
+        }
+      }
+      unset($p);
+      $board[] = ['name' => $u['identifiant'], 'uid' => (int) $u['id'], 'nom' => $u['nom'], 'prenom' => $u['prenom'],
+        'score' => 0, 'bonus' => 0, 'depensees' => 0, 'correct' => 0, 'codes' => 0, 'codes_pris' => [],
+        'time' => 0, 'quiz_fait' => false, 'date' => date('c')];
+      $write = true;
+      return ['quiz_fait' => false, 'recoltees' => 0, 'solde' => 0, 'nbCodes' => 0];
+    });
+    echo json_encode(['ok' => true, 'jeton' => faitJeton($u['id'], $u['identifiant']),
+      'joueur' => ['name' => $u['identifiant'], 'uid' => (int) $u['id'],
+                   'prenom' => $u['prenom'], 'nom' => $u['nom']] + $fiche], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 👤 « C'est bien moi » : au chargement de la page, le navigateur renvoie son
+  // jeton et on lui rend son état de jeu. Un jeton trafiqué ou périmé est rejeté
+  // — c'est ça qui empêche de se faire passer pour quelqu'un d'autre.
+  case 'moi': {
+    $j = litJeton($input['jeton'] ?? '');
+    if (!$j) { echo json_encode(['ok' => false, 'reason' => 'jeton_invalide']); break; }
+    $board = readJson($scoresFile);
+    foreach ($board as $p) {
+      if (mb_strtolower((string) ($p['name'] ?? '')) === mb_strtolower($j['identifiant'])) {
+        echo json_encode(['ok' => true, 'joueur' => [
+          'name' => $p['name'], 'uid' => intval($p['uid'] ?? 0),
+          'prenom' => $p['prenom'] ?? '', 'nom' => $p['nom'] ?? '',
+          'quiz_fait' => ($p['quiz_fait'] ?? true), 'recoltees' => round(floatval($p['score'] ?? 0), 1),
+          'solde' => soldeDe($p), 'nbCodes' => intval($p['codes'] ?? 0),
+        ]], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
+    }
+    echo json_encode(['ok' => false, 'reason' => 'inconnu']);
+    break;
+  }
+
+  // ✉️ Pas encore de compte : prénom + nom + email. On crée le compte
+  // Famiformation et le mail « Définir mon mot de passe » part DANS LA SECONDE.
+  // Le lien reste valable $ACTIVATION_HEURES (assez pour s'inscrire bien avant
+  // l'événement et n'activer que le jour J).
+  case 'inscription_fami': {
+    $prenom = trim(mb_substr((string) ($input['prenom'] ?? ''), 0, 40));
+    $nom    = trim(mb_substr((string) ($input['nom'] ?? ''), 0, 60));
+    $email  = mb_strtolower(trim((string) ($input['email'] ?? '')));
+    if (mb_strlen($prenom) < 2 || mb_strlen($nom) < 2) {
+      echo json_encode(['ok' => false, 'reason' => 'nom_manquant']); break;
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      echo json_encode(['ok' => false, 'reason' => 'email_invalide']); break;
+    }
+    if (envoiRefuse($email)) { http_response_code(429); echo json_encode(['ok' => false, 'reason' => 'trop_dessais']); break; }
+    $db = famiDb();
+    if (!$db) { http_response_code(503); echo json_encode(['ok' => false, 'reason' => 'base_indisponible']); break; }
+
+    $stmt = $db->prepare('SELECT id, mot_de_passe, account_activation_pending FROM utilisateurs WHERE email = ? LIMIT 1');
+    $stmt->execute([$email]);
+    $deja = $stmt->fetch();
+    if ($deja) {
+      // Compte déjà là : soit il est actif (qu'il se connecte), soit il attend
+      // toujours son activation (on lui renvoie le mail).
+      if (empty($deja['account_activation_pending']) && !empty($deja['mot_de_passe'])) {
+        echo json_encode(['ok' => false, 'reason' => 'deja_inscrit']); break;
+      }
+      $envoye = sendAccountActivationEmail($db, (int) $deja['id'], $ACTIVATION_HEURES);
+      echo json_encode(['ok' => (bool) $envoye, 'renvoye' => true,
+        'reason' => $envoye ? null : 'mail_impossible'], JSON_UNESCAPED_UNICODE);
+      break;
+    }
+
+    try {
+      ensureUserAccountAccessColumns($db);
+      $identifiant = identifiantLibre($db, $prenom, $nom);
+      $ins = $db->prepare('INSERT INTO utilisateurs (identifiant, nom, prenom, email, mot_de_passe, role, account_activation_pending, statut_date)
+                           VALUES (?, ?, ?, ?, ?, ?, 1, ?)');
+      $ins->execute([$identifiant, $nom, $prenom, $email,
+        password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), 'etudiant', date('Y-m-d H:i:s')]);
+      $uid = (int) $db->lastInsertId();
+    } catch (Throwable $e) {
+      http_response_code(500); echo json_encode(['ok' => false, 'reason' => 'creation_impossible']); break;
+    }
+
+    // Comme dans l'admin de l'app : un compte sans mail parti ne sert à rien, on
+    // ne laisse pas de compte fantôme derrière nous.
+    if (!sendAccountActivationEmail($db, $uid, $ACTIVATION_HEURES)) {
+      try { $db->prepare('DELETE FROM utilisateurs WHERE id = ?')->execute([$uid]); } catch (Throwable $e) {}
+      http_response_code(500); echo json_encode(['ok' => false, 'reason' => 'mail_impossible']); break;
+    }
+    echo json_encode(['ok' => true, 'identifiant' => $identifiant], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
+  // 🔁 « Je n'ai pas reçu le mail » : on renvoie le lien d'activation.
+  case 'renvoyer_activation': {
+    $email = mb_strtolower(trim((string) ($input['email'] ?? '')));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      echo json_encode(['ok' => false, 'reason' => 'email_invalide']); break;
+    }
+    if (envoiRefuse($email)) { http_response_code(429); echo json_encode(['ok' => false, 'reason' => 'trop_dessais']); break; }
+    $db = famiDb();
+    if (!$db) { http_response_code(503); echo json_encode(['ok' => false, 'reason' => 'base_indisponible']); break; }
+    $stmt = $db->prepare('SELECT id, mot_de_passe, account_activation_pending FROM utilisateurs WHERE email = ? LIMIT 1');
+    $stmt->execute([$email]);
+    $u = $stmt->fetch();
+    // On ne dit jamais si l'adresse est connue ou non : ça éviterait de pouvoir
+    // deviner qui a un compte. Le message affiché est le même dans tous les cas.
+    if ($u && (!empty($u['account_activation_pending']) || empty($u['mot_de_passe']))) {
+      sendAccountActivationEmail($db, (int) $u['id'], $ACTIVATION_HEURES);
+    }
+    echo json_encode(['ok' => true]);
     break;
   }
 
