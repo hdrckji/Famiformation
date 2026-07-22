@@ -469,9 +469,14 @@ body.mode-borne #app { width: 100%; }
   border-radius: 16px; padding: 14px 16px; }
 .explik-step.explik-star { background: #E7F4E4; box-shadow: 0 0 0 2px var(--pousse) inset; }
 .explik-ico { font-size: 1.9rem; line-height: 1; flex: 0 0 auto; }
-.explik-txt { display: flex; flex-direction: column; gap: 3px; font-weight: 500; font-size: .98rem; line-height: 1.4; }
+.explik-txt { display: block; font-weight: 500; font-size: .97rem; line-height: 1.55; }
 .explik-txt b { font-weight: 700; color: var(--foret); }
-.explik-txt b.eh { display: block; font-family: 'Fredoka', sans-serif; font-size: 1.05rem; margin-bottom: 2px; }
+.explik-txt b.eh { display: block; font-family: 'Fredoka', sans-serif; font-size: 1.06rem;
+  margin-bottom: 4px; line-height: 1.3; }
+/* Petite liste à puces des bonus (plus lisible qu'une suite de retours à la ligne) */
+.explik-liste { display: flex; flex-direction: column; gap: 5px; margin: 8px 0 6px; padding-left: 2px; }
+.explik-liste > span { display: block; padding: 6px 10px; background: rgba(255,255,255,.65);
+  border-radius: 10px; line-height: 1.45; }
 .home-cd { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 auto 26px;
   background: linear-gradient(100deg, #0B3320, #1E6238); color: #fff; border-radius: 22px;
   padding: 16px clamp(18px, 4vw, 30px); max-width: 640px; box-shadow: 0 8px 26px rgba(11,51,32,.22); }
@@ -1323,10 +1328,15 @@ function ouvreExplication() {
     <div class="explik-steps">
       <div class="explik-step explik-star"><span class="explik-ico">🏆</span><span class="explik-txt"><b class="eh">Un seul classement ⭐</b>Ta récolte de graines (quiz + codes), c'est tout. <b>Les 3 meilleures récoltes gagnent des récompenses</b> ! Annonce des vainqueurs le ${esc(CONFIG.dateResultats)}.</span></div>
       <div class="explik-step"><span class="explik-ico">🎯</span><span class="explik-txt"><b class="eh">Réponds au quiz</b><b>${QUIZ_TOTAL} questions</b> tirées au hasard dans un grand réservoir : <b>${QUIZ_THEMES.entreprise} sur l'entreprise et le magasin</b>, <b>${QUIZ_THEMES.culture} de culture générale</b> (jardinage) et <b>${QUIZ_THEMES.anecdote} anecdotes</b>. Deux personnes n'ont donc pas le même questionnaire !</span></div>
-      <div class="explik-step"><span class="explik-ico">🌰</span><span class="explik-txt"><b class="eh">Comment on gagne des graines</b>Chaque bonne réponse rapporte <b>${BAREME.base} graines</b>, plus deux bonus :<br>⚡ <b>la rapidité</b> — jusqu'à +${BAREME.vitesseMax} : plus tu réponds vite, plus tu gagnes (un chrono tourne à l'écran) ;<br>🔥 <b>la série</b> — les bonnes réponses d'affilée rapportent de plus en plus (jusqu'à +${BAREME.serieMax}), une erreur remet le compteur à zéro.<br>Une mauvaise réponse ne retire rien, elle rapporte juste 0.<br>🎁 Et les <b>codes bonus</b> trouvés en magasin ajoutent encore des graines (juste en dessous).</span></div>
-      <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Ta carte de jardinier</b>Un pseudo + un code à 4 chiffres, choisis en jouant. <b>Retiens-les !</b> C'est ta clé : elle garde ta récolte et te laisse retrouver ton jardin sur n'importe quel appareil.</span></div>
+      <div class="explik-step"><span class="explik-ico">🌰</span><span class="explik-txt"><b class="eh">Comment on gagne des graines</b>Chaque bonne réponse rapporte <b>${BAREME.base} graines</b>, avec deux bonus.
+        <span class="explik-liste">
+          <span>⚡ <b>Rapidité</b> — jusqu'à +${BAREME.vitesseMax}, plus tu réponds vite (un chrono tourne à l'écran)</span>
+          <span>🔥 <b>Série</b> — jusqu'à +${BAREME.serieMax} pour les bonnes réponses d'affilée, remis à zéro à la moindre erreur</span>
+        </span>
+        Une mauvaise réponse ne retire rien. Les codes bonus rapportent aussi des graines.</span></div>
+      <div class="explik-step"><span class="explik-ico">🪪</span><span class="explik-txt"><b class="eh">Ton compte</b>Ton prénom et ton nom (indispensables pour recevoir une récompense), un pseudo si tu veux — c'est lui qui s'affichera au classement — et un mot de passe à 4 chiffres. <b>Retiens ton pseudo (ou ton nom) et ton mot de passe</b> : c'est avec ça que tu te reconnectes, depuis n'importe quel appareil.</span></div>
       <div class="explik-step"><span class="explik-ico">🎁</span><span class="explik-txt"><b class="eh">Traque les codes bonus</b>Des codes sont cachés en magasin : chacun te rapporte <b>+${CONFIG.pointsParCodeBonus} graines</b>. Tu peux en accumuler <b>${CONFIG.maxCodes} au maximum</b> (soit +${CONFIG.pointsParCodeBonus * CONFIG.maxCodes} graines), et elles comptent au classement. <b>Même après avoir fait le quiz</b>, tu peux encore en récupérer : ça te fait remonter ! Ouvre l'œil 👀</span></div>
-      <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin — après le quiz</b>Une fois ton quiz terminé, <b>ton jardin s'ouvre</b> : chacun a le sien, et c'est un espace <b>juste pour s'amuser</b> (fleurs, arbres, fleurs rares…).<br>Les graines gagnées au quiz, tu peux les <b>dépenser ici</b> pour planter. Tu verras alors ton nombre de graines à planter diminuer — <b>c'est normal, ça ne concerne que le jardin</b>.<br>👉 <b>Ton score au classement, lui, ne bouge pas.</b> Va voir dans « Classement » : il sera toujours le même.</span></div>
+      <div class="explik-step"><span class="explik-ico">🌼</span><span class="explik-txt"><b class="eh">Ton jardin — après le quiz</b>Une fois ton quiz terminé, <b>ton jardin s'ouvre</b> : chacun a le sien, et c'est un espace juste pour s'amuser. Tu y dépenses tes graines pour planter des fleurs, des arbres, des variétés rares… Tu les verras diminuer, <b>c'est normal, ça ne concerne que le jardin</b> : <b>ton score au classement ne bouge pas</b>, va le vérifier dans « Classement ».</span></div>
       <div class="explik-step"><span class="explik-ico">🌿</span><span class="explik-txt"><b class="eh">Un mini-jeu bonus</b>La chasse aux mauvaises herbes te donne des graines <b>en plus, uniquement pour planter</b> dans ton jardin. Ça ne compte pas au classement.</span></div>
     </div>
     <button class="btn" id="explik-ok" style="width:100%;">J'ai tout compris, à moi de jouer ! 🌱</button>
@@ -3523,10 +3533,12 @@ function render() {
 
   injecteHomeBorne();   // bouton maison si on vient de la borne
 
-  // 🎁 Page /quiz/code : appareil potentiellement PARTAGÉ (borne) → pas d'auto-
-  // reconnaissance. On ouvre directement la saisie du code ; l'identification
-  // (créer un compte / se connecter) se fait au moment de récupérer les graines.
-  if (ECRAN === "code") { codeAReclamer = null; userView = "reclamer"; render(); return; }
+  // 🎁 Page /quiz/code : on ouvre directement la saisie du code. On NE sort PAS
+  // ici : la suite (auto-reconnaissance) doit s'appliquer comme sur /quiz, sinon
+  // la même personne serait reconnue sur /quiz mais pas sur /quiz/code — et ne
+  // pourrait pas récupérer son code. Sur une BORNE, l'auto-reconnaissance est de
+  // toute façon désactivée plus bas (appareil partagé).
+  if (ECRAN === "code") { codeAReclamer = null; userView = "reclamer"; }
 
   // 🌱 Depuis la borne, « Quiz & mon espace jardin » ouvre /quiz?espace=1 : on
   // entre direct dans l'espace (connexion/création → tableau de bord).
