@@ -920,7 +920,9 @@ async function apiSubmit(entry) {
 // 🌱 Récupérer son compte (autre téléphone) : pseudo + code à 4 chiffres.
 async function apiLoginJoueur(name, code) {
   if (SIMULATION) {
-    const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    // On accepte le PSEUDO ou le NOM comme identifiant (comme le serveur).
+    const id = name.toLowerCase();
+    const p = board.find((x) => (x.name || "").toLowerCase() === id || ((x.nom || "").trim() !== "" && x.nom.toLowerCase() === id));
     if (!p) return { exists: false };
     if ((p.code || "") !== code) return { exists: true, mauvais_code: true };
     return { exists: true, name: p.name, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: (p.codes_pris || []).length, quiz_fait: p.quiz_fait !== false };
@@ -1237,9 +1239,10 @@ function ouvrePolitique() {
   const o = document.createElement("div");
   o.className = "modal-fond";
   o.innerHTML = `<div class="modal">
-    <h3>🔒 Politique de confidentialité</h3>
-    <p><b>Ce qu'on te demande :</b> ton pseudo, un code à 4 chiffres, et — seulement si tu veux — ton nom et prénom.</p>
-    <p><b>À quoi ça sert :</b> afficher ton pseudo et ton score au classement, te reconnaître quand tu reviens jouer, et (si tu as donné ton nom) te remettre ton prix en cas de victoire.</p>
+    <h3>🔒 Pourquoi on te demande ces informations</h3>
+    <p><b>Ton prénom et ton nom :</b> uniquement pour pouvoir <b>te remettre ta récompense</b> si tu fais partie des 3 meilleurs. Sans eux, on ne peut pas t'identifier le jour de la remise des prix — tu peux jouer quand même, mais tu ne seras pas éligible.</p>
+    <p><b>Ton pseudo (facultatif) :</b> c'est le nom qui s'affiche au <b>classement</b>, si tu préfères ne pas y voir ton vrai nom.</p>
+    <p><b>Ton mot de passe (4 chiffres) :</b> il sert juste à <b>te reconnecter</b> à ton compte depuis un autre appareil (avec ton pseudo ou ton nom).</p>
     <p><b>Où c'est gardé :</b> uniquement sur le serveur du quiz, le temps de l'événement Famiflora. Rien n'est vendu ni partagé avec qui que ce soit, et il n'y a aucune publicité.</p>
     <p><b>Tes droits :</b> tu peux demander aux organisateurs de supprimer ton compte à tout moment.</p>
     <button class="btn" id="conf-ok">J'ai compris 👍</button>
@@ -2132,9 +2135,9 @@ function renderRetrouver() {
     <div class="center"><div style="font-size:2.6rem;">🔑</div>
       <h2 class="q-text" style="margin:8px 0 12px;">Me connecter</h2></div>
     ${jardinMsg ? `<div class="alert">${esc(jardinMsg)}</div>` : ""}
-    <label class="lbl">Ton nom de jardinier</label>
-    <input class="field" id="r-pseudo" placeholder="Ton pseudo" maxlength="24">
-    <label class="lbl">Ton code jardinier (4 chiffres)</label>
+    <label class="lbl">Ton pseudo <b>ou</b> ton nom</label>
+    <input class="field" id="r-pseudo" placeholder="Ex : SuperMarie ou Marie Dupont" maxlength="60">
+    <label class="lbl">Ton mot de passe (4 chiffres)</label>
     <input class="field" id="r-code" inputmode="numeric" maxlength="4" placeholder="••••">
     <button class="btn" id="r-ok" style="width:100%;">Me connecter 🌱</button>
     <p class="center" style="margin-top:12px;"><a href="#" id="r-retour" class="lien">◂ Retour</a></p>
@@ -2142,11 +2145,11 @@ function renderRetrouver() {
   const go = async () => {
     const pseudo = $("#r-pseudo").value.trim();
     const code = $("#r-code").value.replace(/\D/g, "").slice(0, 4);
-    if (pseudo.length < 2 || code.length !== 4) { jardinMsg = "Entre ton nom de jardinier et tes 4 chiffres."; renderRetrouver(); return; }
+    if (pseudo.length < 2 || code.length !== 4) { jardinMsg = "Entre ton pseudo (ou ton nom) et ton mot de passe à 4 chiffres."; renderRetrouver(); return; }
     $("#r-ok").disabled = true;
     const res = await apiLoginJoueur(pseudo, code).catch(() => null);
-    if (!res || !res.exists) { jardinMsg = "Aucun compte à ce nom… Vérifie ton pseudo, ou crée ta carte."; renderRetrouver(); return; }
-    if (res.mauvais_code) { jardinMsg = "Code jardinier incorrect 🔒"; renderRetrouver(); return; }
+    if (!res || !res.exists) { jardinMsg = "Aucun compte trouvé… Essaie avec ton pseudo OU ton nom, ou crée ton compte."; renderRetrouver(); return; }
+    if (res.mauvais_code) { jardinMsg = "Mot de passe incorrect 🔒"; renderRetrouver(); return; }
     joueur = { name: res.name, code, solde: res.solde, recoltees: res.recoltees, nbCodes: res.nbCodes, quizFait: res.quiz_fait !== false };
     sauveMoi(res.name, code);
     const msg = await reclamerEnAttente();
@@ -2166,34 +2169,36 @@ function renderCreation() {
   clearInterval(tickTimer);
   app.innerHTML = `<div class="card">
     <div class="center"><div style="font-size:2.6rem;">✨</div>
-      <h2 class="q-text" style="margin:8px 0 12px;">Crée ta carte de jardinier</h2></div>
+      <h2 class="q-text" style="margin:8px 0 12px;">Crée ton compte</h2></div>
     ${jardinMsg ? `<div class="alert">${esc(jardinMsg)}</div>` : ""}
-    <label class="lbl">Ton pseudo de jardinier</label>
+    <label class="lbl">Ton prénom et ton nom</label>
+    <input class="field" id="c-nom" placeholder="Ex : Marie Dupont" maxlength="60" value="${esc(creationSaisie.nom)}">
+    <label class="lbl">Ton pseudo <span style="font-weight:600; opacity:.65;">(facultatif)</span></label>
     <input class="field" id="c-pseudo" placeholder="Ex : SuperMarie" maxlength="24" value="${esc(creationSaisie.pseudo)}">
-    <label class="lbl">Choisis un code secret 🌱 (4 chiffres)</label>
+    <p class="hint" style="margin:-6px 0 12px;">Si tu mets un pseudo, c'est <b>lui</b> qui s'affichera au classement. Sinon, ce sera ton nom.</p>
+    <label class="lbl">Ton mot de passe (4 chiffres)</label>
     <input class="field" id="c-code" inputmode="numeric" maxlength="4" placeholder="Ex : ton année de naissance" value="${esc(creationSaisie.code)}">
-    <p class="mini-warn">⚠️ Note bien ton pseudo et ton code : c'est ta carte pour retrouver ton jardin sur un autre appareil.</p>
-    <details class="plus"><summary>🌿 Ajouter mon nom (optionnel)</summary>
-      <p class="hint" style="margin-top:8px;">Nom et prénom : utile pour te remettre ton prix si tu gagnes. Pas obligatoire.</p>
-      <input class="field" id="c-nom" placeholder="Nom Prénom (facultatif)" maxlength="60" value="${esc(creationSaisie.nom)}">
-    </details>
-    <label class="rgpd"><input type="checkbox" id="c-rgpd"> J'accepte que mon pseudo (et mon nom si donné) soient utilisés pour le jeu et le classement, le temps de l'événement. <a href="#" id="c-conf" class="lien">Politique de confidentialité</a></label>
-    <button class="btn" id="c-ok" style="width:100%;">Créer ma carte 🌱</button>
+    <p class="mini-warn">⚠️ Retiens bien ton <b>pseudo (ou ton nom)</b> et ton <b>mot de passe</b> : c'est avec ça que tu te reconnectes.</p>
+    <p class="mini-warn" style="background:#FFF6E6; border-color:#F2C94C;">🏆 Sans ton <b>prénom et nom</b>, tu ne pourras pas recevoir de récompense.</p>
+    <p class="center" style="margin:12px 0;"><a href="#" id="c-conf" class="lien conf">🔒 Pourquoi on te demande ça ?</a></p>
+    <button class="btn" id="c-ok" style="width:100%;">Créer mon compte 🌱</button>
     <p class="center" style="margin-top:12px;"><a href="#" id="c-retour" class="lien">◂ J'ai déjà un compte / Retour</a></p>
   </div>`;
-  const memo = () => { creationSaisie = { pseudo: $("#c-pseudo").value, code: $("#c-code").value, nom: ($("#c-nom") ? $("#c-nom").value : creationSaisie.nom) }; };
+  const memo = () => { creationSaisie = { pseudo: $("#c-pseudo").value, code: $("#c-code").value, nom: $("#c-nom").value }; };
   $("#c-conf").addEventListener("click", (e) => { e.preventDefault(); memo(); ouvrePolitique(); });
   const go = async () => {
+    const nom = $("#c-nom").value.trim();
     const pseudo = $("#c-pseudo").value.trim();
     const code = $("#c-code").value.replace(/\D/g, "").slice(0, 4);
-    const nom = $("#c-nom") ? $("#c-nom").value.trim() : "";
     creationSaisie = { pseudo, code, nom };
-    if (pseudo.length < 2) { jardinMsg = "Choisis un pseudo (au moins 2 lettres) 🙂"; renderCreation(); return; }
-    if (code.length !== 4) { jardinMsg = "Ton code doit faire 4 chiffres 🔢"; renderCreation(); return; }
-    if (!$("#c-rgpd").checked) { jardinMsg = "Coche la case pour accepter (RGPD) avant de continuer."; renderCreation(); return; }
+    // Ce qui s'affiche au classement (et sert d'identifiant) : le pseudo s'il y en
+    // a un, sinon le nom. Il faut donc au moins l'un des deux.
+    const identite = pseudo || nom;
+    if (identite.length < 2) { jardinMsg = "Donne au moins ton nom (ou un pseudo) 🙂"; renderCreation(); return; }
+    if (code.length !== 4) { jardinMsg = "Ton mot de passe doit faire 4 chiffres 🔢"; renderCreation(); return; }
     $("#c-ok").disabled = true;
-    const res = await apiRegister(pseudo, code, nom).catch(() => ({ erreur: true }));
-    if (res.pris) { jardinMsg = "Ce pseudo est déjà pris ! Choisis-en un autre — ou connecte-toi si c'est toi."; renderCreation(); return; }
+    const res = await apiRegister(identite, code, nom).catch(() => ({ erreur: true }));
+    if (res.pris) { jardinMsg = `« ${identite} » est déjà utilisé ! Ajoute un pseudo différent — ou connecte-toi si c'est bien toi.`; renderCreation(); return; }
     if (!res.ok) { jardinMsg = "Petit souci, réessaie."; renderCreation(); return; }
     joueur = { name: res.name, code, solde: res.solde || 0, recoltees: res.recoltees || 0, nbCodes: res.nbCodes || 0, quizFait: res.quiz_fait !== false };
     sauveMoi(res.name, code);
@@ -2286,13 +2291,14 @@ function modaleJardinVerrouille() {
 /* ============================================================
    🎁 RÉCUPÉRER UN CODE BONUS (scan du QR ?code=… ou saisie manuelle)
    ============================================================ */
-// 🎯 Indice « où chercher » : les zones où l'orga a caché des codes. Affiché
-// UNIQUEMENT à partir de la veille de la clôture (dernières 24 h), pour la fin.
+// 🎯 Indice « où chercher » : les zones où l'orga a caché des codes. Affiché à
+// partir de la VEILLE DU LANCEMENT (dernières 24 h du compte à rebours), puis il
+// reste visible pendant l'événement pour aider à dénicher les codes.
 function zonesHintHtml() {
   const zones = (CONFIG.zones || []).filter((z) => z.nom && z.nb > 0);
   if (!zones.length) return "";
-  const cloture = CONFIG.dateCloture.getTime();
-  if (Date.now() < cloture - 86400000) return "";   // pas encore J-1
+  const lancement = CONFIG.dateLancement.getTime();
+  if (Date.now() < lancement - 86400000) return "";   // plus de 24 h avant le lancement
   return `<div class="zones-hint">
     <div class="zh-titre">🎯 Où chercher les derniers codes</div>
     ${zones.map((z) => `<div class="zh-row"><span>${esc(z.nom)}</span><span>${z.nb} code${z.nb > 1 ? "s" : ""}</span></div>`).join("")}
@@ -2657,7 +2663,7 @@ function renderHome() {
         <span class="bm-desc">Ticket glace à gagner 🎁</span>
       </button>
     </div>
-    <div class="home-tease">🎯 Le but : récolte un max de <b>graines</b> au quiz — les <b>3 meilleurs gagnent</b> ! Puis fais pousser ton <b>jardin</b>.</div>
+    <div class="home-tease">🎯 Le but : récolte un max de <b>graines</b> au quiz. Les <b>3 meilleurs gagnent des récompenses</b> !</div>
     <div class="home-liens">
       <button class="lien-explik" id="home-explik">✨ Comment ça marche ?</button>
       <button class="lien-explik" id="home-board">🏆 Voir le classement</button>

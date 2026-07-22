@@ -646,11 +646,14 @@ switch ($action) {
   // (Au quotidien, le téléphone reconnaît le joueur tout seul via son stockage
   // local ; cette action ne sert qu'au rattrapage.)
   case 'login_joueur': {
+    // On se connecte avec SON PSEUDO **ou** SON NOM (l'un ou l'autre), + le mot de passe.
     $name  = trim($input['name'] ?? '');
     $code4 = preg_replace('/\D/', '', (string)($input['code'] ?? ''));
     $board = readJson($scoresFile);
     foreach ($board as $p) {
-      if (mb_strtolower($p['name'] ?? '') === mb_strtolower($name)) {
+      $parPseudo = mb_strtolower($p['name'] ?? '') === mb_strtolower($name);
+      $parNom    = trim((string)($p['nom'] ?? '')) !== '' && mb_strtolower($p['nom']) === mb_strtolower($name);
+      if ($parPseudo || $parNom) {
         if ((string)($p['code'] ?? '') !== $code4) {
           echo json_encode(['exists' => true, 'mauvais_code' => true]);
           exit;
