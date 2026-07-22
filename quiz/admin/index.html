@@ -433,11 +433,16 @@ function vueJardin() {
         Codes bonus de test : <b>FAMI-TEST-OK</b> (marche à chaque fois) et <b>FAMI-TEST-USED</b> (cas « déjà pris »).</span>
         <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(11,51,32,.25);font-size:.9rem;">
           <b>🌍 Tester sur le VRAI site (borne, téléphone, ordi)</b><br>
-          Le pseudo <b>Testeur</b> est <b>réservé</b> : crée-le une fois comme un compte normal (avec le mot de
-          passe que tu veux), puis connecte-toi avec depuis <b>n'importe quel appareil</b>. Ce compte
-          <b>n'apparaît jamais au classement</b> ni sur la télé, et il peut <b>refaire le quiz autant de fois</b>
-          que tu veux — les autres joueurs ne sont pas dérangés. Pour les codes, utilise <b>FAMI-TEST-OK</b>
-          afin de ne pas consommer un vrai code du magasin.
+          ⚠️ Le compte ci-dessus n'existe que dans cet aperçu. Pour l'utiliser <b>pour de vrai</b>, clique une
+          fois sur le bouton ci-dessous : il crée le compte <b>Testeur / 0000</b> sur le serveur. Tu pourras
+          alors t'y connecter depuis <b>n'importe quel appareil</b> (borne, téléphone, ordi).<br>
+          Ce compte <b>n'apparaît jamais au classement</b> ni sur la télé et peut <b>refaire le quiz autant de
+          fois</b> que tu veux — les autres joueurs ne sont pas dérangés. Pour les codes, utilise
+          <b>FAMI-TEST-OK</b> afin de ne pas consommer un vrai code du magasin.
+          <div style="margin-top:10px;">
+            <button class="btn" id="j-creer-test">🧪 Créer / réinitialiser le compte Testeur sur le vrai site</button>
+            <div id="j-test-msg" style="margin-top:8px;"></div>
+          </div>
         </div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
@@ -451,6 +456,15 @@ function vueJardin() {
                  width:420px; max-width:100%; box-shadow:0 8px 30px rgba(14,59,36,.18);"></iframe>
       </div>
     </div>`;
+  $("#j-creer-test").addEventListener("click", async () => {
+    const zone = $("#j-test-msg");
+    zone.innerHTML = `<span class="hint">Création en cours…</span>`;
+    const r = await post("compte_test_creer");
+    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+    if (!r.ok || !(r.data && r.data.ok)) { zone.innerHTML = `<div class="alert">Création impossible, réessaie.</div>`; return; }
+    zone.innerHTML = `<div class="alert ok">✅ Compte ${r.data.remis ? "réinitialisé" : "créé"} sur le vrai site —
+      connecte-toi avec <b>${esc(r.data.pseudo)}</b> / <b>${esc(r.data.mdp)}</b> depuis la borne, ton téléphone ou ton ordi.</div>`;
+  });
   $("#j-testeur").addEventListener("click", () => {
     $("#j-frame").src = `../index.html?simulation=joueur&compte=testeur&_=${Date.now()}`;
   });

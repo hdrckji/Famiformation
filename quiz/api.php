@@ -812,6 +812,32 @@ switch ($action) {
     break;
   }
 
+  // 🧪 Créer (ou remettre à zéro) le COMPTE DE TEST sur le VRAI site, pour pouvoir
+  // essayer le jeu depuis la borne, un téléphone ou un ordi. Pseudo « Testeur »,
+  // mot de passe « 0000 ». Il n'apparaît jamais au classement public.
+  case 'compte_test_creer': {
+    exigeAdmin($input);
+    $nomTest = 'Testeur'; $mdpTest = '0000';
+    $res = withLock($scoresFile, function (&$board, &$write) use ($nomTest, $mdpTest) {
+      for ($i = 0; $i < count($board); $i++) {
+        if (mb_strtolower($board[$i]['name'] ?? '') === mb_strtolower($nomTest)) {
+          $board[$i]['code'] = $mdpTest;
+          $board[$i]['score'] = 0; $board[$i]['bonus'] = 0; $board[$i]['depensees'] = 0;
+          $board[$i]['codes'] = 0; $board[$i]['codes_pris'] = []; $board[$i]['quiz_fait'] = false;
+          $write = true;
+          return ['ok' => true, 'remis' => true];
+        }
+      }
+      $board[] = ['name' => $nomTest, 'code' => $mdpTest, 'nom' => 'Test', 'prenom' => 'Compte',
+        'score' => 0, 'bonus' => 0, 'depensees' => 0, 'correct' => 0, 'codes' => 0,
+        'codes_pris' => [], 'time' => 0, 'quiz_fait' => false, 'date' => date('c')];
+      $write = true;
+      return ['ok' => true, 'remis' => false];
+    });
+    echo json_encode(array_merge($res, ['pseudo' => $nomTest, 'mdp' => $mdpTest]), JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
   // 🔐 Connexion admin. La vérification se fait ICI, côté serveur : ainsi le mot
   // de passe n'apparaît PAS dans le code source de la page (contrairement à
   // l'ancien PIN, que n'importe qui pouvait lire avec « afficher la source »).
