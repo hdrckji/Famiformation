@@ -1749,19 +1749,21 @@ function fleurRareSvg(tier) {
 // tickets glace BLEUS pendus aux branches (pas un emoji). Repris du dessin de la fée.
 const TICKET_GLACE = `<rect x="2" y="2" width="166" height="100" rx="12" fill="url(#glaceTgJ)" stroke="#152c6b" stroke-width="3"></rect><rect x="10" y="12" width="106" height="80" rx="7" fill="#fff" stroke="#152c6b" stroke-width="1.6"></rect><text x="24" y="52" font-family="Arial,sans-serif" font-size="34" font-weight="900" fill="#1c1c1c" font-style="italic">1x</text><text x="18" y="72" font-family="Arial,sans-serif" font-size="15" font-weight="900" fill="#1c1c1c" font-style="italic">GRATUIT</text><path d="M118 60 L152 60 L135 98 Z" fill="#e8a94a" stroke="#152c6b" stroke-width="1.5"></path><path d="M116 58 C110 40 118 26 128 24 C126 12 146 8 150 20 C160 18 166 30 158 38 C166 44 158 58 150 56 Z" fill="#fdf6e6" stroke="#152c6b" stroke-width="1.6"></path>`;
 function arbreGlaceSvg() {
-  // Un ticket bleu accroché par une petite ficelle, à la position (x,y).
-  const ticket = (x, y) => `<g transform="translate(${x},${y}) scale(0.4)">
-    <line x1="85" y1="-34" x2="85" y2="4" stroke="#6E4A2B" stroke-width="4"/>${TICKET_GLACE}</g>`;
-  return `<svg class="arbre-glace" viewBox="0 0 200 204" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="glaceTgJ" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9bf5"/><stop offset="1" stop-color="#1e40af"/></linearGradient></defs>
-    <rect x="93" y="126" width="14" height="70" rx="5" fill="#8A5B36"/>
-    <circle cx="100" cy="64" r="52" fill="#2E7D3B"/>
-    <circle cx="54" cy="86" r="34" fill="#3C9147"/>
-    <circle cx="146" cy="86" r="34" fill="#3C9147"/>
-    <circle cx="100" cy="84" r="44" fill="#4E9E52"/>
-    ${ticket(22, 96)}
-    ${ticket(110, 96)}
-    ${ticket(66, 120)}
+  // 🍦 EXACTEMENT l'arbre à tickets glace que la fée fait pousser : un pot en
+  // terre cuite + l'arbre avec ses tickets bleus « 1x GRATUIT ».
+  const T = (x, y) => `<g transform="translate(${x},${y}) scale(0.3)">${TICKET_GLACE}</g>`;
+  return `<svg class="arbre-glace" viewBox="40 24 140 236" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="feePotJ" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C97B4A"/><stop offset="1" stop-color="#9C5730"/></linearGradient>
+      <linearGradient id="glaceTgJ" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b9bf5"/><stop offset="1" stop-color="#1e40af"/></linearGradient>
+    </defs>
+    <rect x="102" y="98" width="16" height="74" rx="5" fill="#8A5B36"/>
+    <circle cx="110" cy="60" r="40" fill="#2E7D3B"/><circle cx="76" cy="80" r="27" fill="#3C9147"/>
+    <circle cx="144" cy="80" r="27" fill="#3C9147"/><circle cx="110" cy="78" r="31" fill="#4E9E52"/>
+    ${T(46, 82)}${T(120, 86)}${T(84, 104)}
+    <path d="M56 168 L164 168 L152 246 Q 110 254 68 246 Z" fill="url(#feePotJ)"/>
+    <rect x="48" y="150" width="124" height="24" rx="7" fill="#D98A57"/>
+    <ellipse cx="110" cy="172" rx="52" ry="9" fill="#5C3A21"/>
   </svg>`;
 }
 
