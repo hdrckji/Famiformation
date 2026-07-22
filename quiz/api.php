@@ -752,6 +752,48 @@ switch ($action) {
     break;
   }
 
+  // 🔓 LIBÉRER un code déjà attribué (admin) : le code redevient disponible pour
+  // tout le monde, et la personne qui l'avait perd les graines correspondantes.
+  // Deux verrous pris l'un APRÈS l'autre (jamais imbriqués).
+  case 'code_liberer': {
+    exigeAdmin($input);
+    $bonus = strtoupper(trim($input['code'] ?? ''));
+    if (!in_array($bonus, $BONUS_CODES, true)) {
+      echo json_encode(['ok' => false, 'reason' => 'inconnu']); break;
+    }
+    // Étape 1 : retirer le code du registre (et retenir à qui il appartenait).
+    $lib = withLock($codesFile, function (&$claimed, &$write) use ($bonus) {
+      if (!isset($claimed[$bonus])) return ['ok' => false, 'reason' => 'pas_pris'];
+      $par = $claimed[$bonus]['par'] ?? '';
+      unset($claimed[$bonus]);
+      $write = true;
+      return ['ok' => true, 'par' => $par];
+    });
+    if (empty($lib['ok'])) { echo json_encode($lib, JSON_UNESCAPED_UNICODE); break; }
+
+    // Étape 2 : le retirer au joueur et lui reprendre les graines du code.
+    $par = (string)($lib['par'] ?? '');
+    if ($par !== '') {
+      withLock($scoresFile, function (&$board, &$write) use ($par, $bonus, $CODE_GRAINES) {
+        for ($i = 0; $i < count($board); $i++) {
+          if (mb_strtolower($board[$i]['name'] ?? '') === mb_strtolower($par)) {
+            $pris = array_values(array_filter($board[$i]['codes_pris'] ?? [],
+              fn($c) => strtoupper((string)$c) !== $bonus));
+            $board[$i]['codes_pris'] = $pris;
+            $board[$i]['codes'] = count($pris);
+            $board[$i]['score'] = max(0, round(floatval($board[$i]['score'] ?? 0) - $CODE_GRAINES, 1));
+            sortBoard($board);
+            $write = true;
+            break;
+          }
+        }
+        return null;
+      });
+    }
+    echo json_encode(['ok' => true, 'par' => $par, 'graines' => $CODE_GRAINES], JSON_UNESCAPED_UNICODE);
+    break;
+  }
+
   // 🔐 Connexion admin. La vérification se fait ICI, côté serveur : ainsi le mot
   // de passe n'apparaît PAS dans le code source de la page (contrairement à
   // l'ancien PIN, que n'importe qui pouvait lire avec « afficher la source »).

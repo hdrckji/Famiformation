@@ -63,6 +63,14 @@ td.num { font-variant-numeric: tabular-nums; }
              flex-wrap: wrap; box-shadow: 0 -4px 20px rgba(14,59,36,.12); }
 .pris { color: var(--corail); font-weight: 800; }
 .libre { color: var(--pousse); font-weight: 800; }
+/* Petite fenêtre de confirmation (libérer un code, etc.) */
+.mfond { position: fixed; inset: 0; background: rgba(11,51,32,.5); z-index: 9000;
+  display: flex; align-items: center; justify-content: center; padding: 20px; }
+.mbox { background: #fff; border-radius: 20px; padding: 22px 24px; max-width: 460px; width: 100%;
+  box-shadow: 0 18px 50px rgba(0,0,0,.28); }
+.mbox h3 { margin: 0 0 10px; color: var(--foret); }
+.mbox p { margin: 0 0 6px; font-weight: 600; line-height: 1.45; }
+.mbox .mact { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
 .center { text-align: center; }
 .login { max-width: 380px; margin: 60px auto; }
 </style>
@@ -91,6 +99,25 @@ const API = "../api.php";
 const $ = (s, r = document) => r.querySelector(s);
 const app = $("#app");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// 🪟 Petite fenêtre de confirmation. onOui() n'est appelé QUE si on confirme.
+function modaleConfirm({ titre, texte, ok = "Confirmer" }, onOui) {
+  const o = document.createElement("div");
+  o.className = "mfond";
+  o.innerHTML = `<div class="mbox">
+    <h3>${titre}</h3>
+    <p>${texte}</p>
+    <div class="mact">
+      <button class="btn ghost" data-m="non">Annuler</button>
+      <button class="btn danger" data-m="oui">${ok}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(o);
+  const ferme = () => o.remove();
+  o.querySelector('[data-m="non"]').addEventListener("click", ferme);
+  o.querySelector('[data-m="oui"]').addEventListener("click", () => { ferme(); onOui(); });
+  o.addEventListener("click", (e) => { if (e.target === o) ferme(); });
+}
 
 // Identifiants gardés en mémoire le temps de la session (jamais dans le stockage
 // du navigateur : sur un PC de magasin partagé, ça resterait après le départ).
@@ -593,19 +620,41 @@ function vueCodes() {
       <h2>Codes bonus — ${libres} libre(s) sur ${data.codes.length}</h2>
       <p class="hint">Chaque code ne peut être utilisé qu'une fois : le premier qui le saisit le prend
       pour de bon. Les codes se modifient dans <strong>api.php</strong> ($BONUS_CODES), pour qu'ils
-      correspondent à tes QR codes.</p>
+      correspondent à tes QR codes.<br>
+      🔓 Tu peux <strong>libérer</strong> un code attribué par erreur : il redevient disponible pour tout
+      le monde, et la personne qui l'avait perd les graines qu'il lui avait rapportées.</p>
       <div style="overflow-x:auto">
       <table>
-        <tr><th>Code</th><th>État</th><th>Récupéré par</th><th>Quand</th></tr>
+        <tr><th>Code</th><th>État</th><th>Récupéré par</th><th>Quand</th><th></th></tr>
         ${data.codes.map((x) => `
           <tr>
             <td><strong>${esc(x.code)}</strong></td>
             <td class="${x.pris ? "pris" : "libre"}">${x.pris ? "Pris" : "Libre"}</td>
             <td>${x.par ? esc(x.par) : "—"}</td>
             <td>${x.date ? esc(new Date(x.date).toLocaleString("fr-BE")) : "—"}</td>
+            <td>${x.pris ? `<button class="btn ghost" data-lib="${esc(x.code)}" data-par="${esc(x.par || "")}" style="padding:6px 12px;font-size:.85rem;white-space:nowrap;">🔓 Libérer</button>` : ""}</td>
           </tr>`).join("")}
       </table></div>
     </div>`;
+
+  c.querySelectorAll("[data-lib]").forEach((b) => b.addEventListener("click", () => {
+    const code = b.dataset.lib, par = b.dataset.par;
+    modaleConfirm({
+      titre: "🔓 Libérer ce code ?",
+      texte: `Le code <b>${esc(code)}</b> redeviendra <b>disponible</b> pour tout le monde.`
+        + (par ? `<br><b>${esc(par)}</b> ne l'aura plus, et <b>les graines de ce code lui seront retirées</b>.` : "")
+        + `<br><br>Cette action est immédiate.`,
+      ok: "Oui, libérer ce code",
+    }, async () => {
+      const r = await post("code_liberer", { code });
+      if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
+      if (!r.ok || !(r.data && r.data.ok)) {
+        message = { ok: false, texte: `Impossible de libérer ${code}.` }; await charger(); return;
+      }
+      message = { ok: true, texte: `Code ${code} libéré${par ? ` — retiré à ${par}, ses graines ont été reprises.` : "."}` };
+      await charger();
+    });
+  }));
 }
 
 /* ---------------------- DÉMARRAGE ---------------------- */
