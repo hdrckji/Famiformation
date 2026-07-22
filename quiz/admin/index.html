@@ -160,7 +160,7 @@ function rendre() {
   const onglets = [
     ["questions", "❓ Questions"],
     ["classement", "🏆 Classement"],
-    ["jardin", "🌼 Jardin"],
+    ["jardin", "🌼 Aperçu jardin"],
     ["codes", "🎁 Codes bonus"],
     ["countdown", "⏱ Compte à rebours"],
     ["simulation", "🎬 Simulation"],
@@ -361,75 +361,25 @@ function stadeEmoji(graines) {
 
 function vueJardin() {
   const c = $("#contenu");
-  const cases = (data.jardin && data.jardin.cases) || {};
-  const total = (data.jardin && data.jardin.total) || 48;
-  const plantes = data.plantes || {};
-  const nb = Object.keys(cases).length;
-
+  // Chaque joueur a SON jardin. Ici : un aperçu de « mon jardin » côté joueur,
+  // en plantation GRATUITE (prix affichés pour l'immersion), rien n'est enregistré.
   c.innerHTML = `
     <div class="card">
-      <h2>Le jardin collectif — ${nb} plante(s) sur ${total} cases</h2>
-      <p class="hint">Choisis une plante puis tape une case libre pour la <strong>planter toi-même</strong> (gratuit, au nom de Famiflora 🌟).
-      Tape une plante existante pour la <strong>retirer</strong> (son planteur est remboursé).</p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-        ${Object.entries(plantes).map(([cle, p]) => `
-          <button data-pick="${cle}" style="border:3px solid ${adminPlante === cle ? "var(--pousse)" : "transparent"};
-            background:${adminPlante === cle ? "#DFF0E4" : "var(--brume)"}; border-radius:12px; padding:6px 10px; cursor:pointer;
-            font-weight:700; color:var(--foret);"><span style="font-size:1.3rem;">${p.emoji}</span><br>${esc(p.nom)}</button>`).join("")}
-        ${adminPlante ? `<button class="btn ghost small" id="j-annuler-pick">Ne rien planter</button>` : ""}
+      <h2>🌼 Aperçu « Mon jardin » (vue joueur)</h2>
+      <p class="hint">Voici le jardin tel qu'un joueur le voit — <strong>chacun a le sien</strong> (48 cases).
+      Ici tu peux <strong>planter gratuitement</strong> pour tester l'ambiance : les <strong>prix sont
+      affichés</strong> pour l'immersion, mais rien n'est débité ni enregistré.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+        <button class="btn ghost" id="j-restart">🔄 Vider l'aperçu</button>
       </div>
-      <div style="display:grid; grid-template-columns:repeat(8,1fr); gap:6px; background:#D9C7A7; border-radius:16px; padding:10px; max-width:520px;">
-        ${Array.from({ length: total }, (_, i) => {
-          const p = cases[i];
-          if (p) return `<button data-vider="${i}" title="${esc((plantes[p.plante]?.nom || p.plante) + " — " + p.par)}" style="aspect-ratio:1; border:none; border-radius:9px; background:#A7C79B; font-size:1.3rem; cursor:pointer;">${plantes[p.plante]?.emoji || "🌿"}</button>`;
-          return `<button data-planter="${i}" ${adminPlante ? "" : "disabled"} style="aspect-ratio:1; border:none; border-radius:9px; background:#CDB894; cursor:${adminPlante ? "pointer" : "default"};"></button>`;
-        }).join("")}
+      <div style="display:flex; justify-content:center; background:#DDE9E0; border-radius:16px; padding:14px;">
+        <iframe id="j-frame" src="../index.html?ecran=user&simulation=jardin"
+          style="border:none; border-radius:14px; background:var(--brume); height:76vh; min-height:560px;
+                 width:420px; max-width:100%; box-shadow:0 8px 30px rgba(14,59,36,.18);"></iframe>
       </div>
-    </div>
-    <div class="card">
-      <h2>Réinitialiser le jardin</h2>
-      <p class="hint">Vide toute la grille et rend à chacun l'<strong>intégralité</strong> de ses graines.
-      Les scores du classement ne bougent pas.</p>
-      <button class="btn danger" id="j-reset">Vider tout le jardin</button>
     </div>`;
-
-  // Choisir la plante à poser.
-  c.querySelectorAll("[data-pick]").forEach((el) => el.addEventListener("click", () => {
-    adminPlante = adminPlante === el.dataset.pick ? null : el.dataset.pick;
-    rendre();
-  }));
-  const annul = $("#j-annuler-pick");
-  if (annul) annul.addEventListener("click", () => { adminPlante = null; rendre(); });
-
-  // Planter la plante choisie sur une case libre (gratuit, au nom de Famiflora).
-  c.querySelectorAll("[data-planter]").forEach((el) => el.addEventListener("click", async () => {
-    if (!adminPlante) return;
-    const i = +el.dataset.planter;
-    const r = await post("jardin_planter", { case: i, plante: adminPlante });
-    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
-    message = { ok: true, texte: `${plantes[adminPlante]?.nom || adminPlante} planté sur la case ${i + 1}.` };
-    await charger();
-  }));
-
-  c.querySelectorAll("[data-vider]").forEach((el) => el.addEventListener("click", async () => {
-    const i = +el.dataset.vider;
-    const p = cases[i];
-    const nom = plantes[p.plante]?.nom || p.plante;
-    const cout = plantes[p.plante]?.cout || 0;
-    if (!confirm(`Retirer « ${nom} » planté par ${p.par} ?\n\n${p.par} sera remboursé de ${cout} graines.`)) return;
-    const r = await post("jardin_vider", { case: i });
-    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
-    message = { ok: true, texte: `${nom} retiré, ${p.par} remboursé de ${cout} graines.` };
-    await charger();
-  }));
-
-  $("#j-reset").addEventListener("click", async () => {
-    if (!confirm("Vider TOUT le jardin ?\n\nChaque joueur récupérera toutes ses graines.")) return;
-    if (!confirm("Confirmation : toutes les plantes seront retirées. Continuer ?")) return;
-    const r = await post("jardin_reset");
-    if (r.status === 401) { auth = null; vueConnexion("Session expirée, reconnecte-toi."); return; }
-    message = { ok: true, texte: "Jardin vidé, graines rendues à tous les joueurs." };
-    await charger();
+  $("#j-restart").addEventListener("click", () => {
+    $("#j-frame").src = `../index.html?ecran=user&simulation=jardin&_=${Date.now()}`;
   });
 }
 

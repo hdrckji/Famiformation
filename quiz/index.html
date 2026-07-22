@@ -761,6 +761,10 @@ let simMode = SIMULATION ? (SIM_PARAMS.get("simulation") || "menu") : "";
 // l'horloge pour voir l'affichage à une date/heure précise (elle avance ensuite
 // en temps réel : les secondes défilent depuis ce moment).
 const APERCU = SIMULATION && SIM_PARAMS.get("simulation") === "apercu";
+// 🎨 Aperçu « mon jardin » pour l'admin : ?simulation=jardin. On entre direct dans
+// le jardin d'un joueur de démo, les plantes sont GRATUITES (mais leurs prix sont
+// affichés, pour l'immersion). Rien n'est envoyé au serveur.
+const JARDIN_LIBRE = SIMULATION && SIM_PARAMS.get("simulation") === "jardin";
 if (APERCU && SIM_PARAMS.has("simnow")) {
   const cible = new Date(SIM_PARAMS.get("simnow")).getTime();
   if (!isNaN(cible)) {
@@ -1021,6 +1025,7 @@ async function apiPlanter(name, caseIdx, plante) {
   if (SIMULATION) {
     // Mêmes règles que le serveur, appliquées à la copie en mémoire.
     if (jardin[caseIdx]) return { ok: false, reason: "case_prise" };
+    if (JARDIN_LIBRE) return { ok: true, solde: joueur ? joueur.solde : 0 };   // aperçu : gratuit
     const p = board.find((x) => x.name.toLowerCase() === name.toLowerCase());
     if (!p) return { ok: false, reason: "joueur_inconnu" };
     const solde = p.score + (p.bonus || 0) - (p.depensees || 0);
@@ -1831,14 +1836,14 @@ function renderJardin() {
   app.innerHTML = `${DEFS_METAL}<div class="board-wrap">${pillsHtml("jardin")}<div class="card">
     <div class="jardin-solde">
       <span style="display:flex; align-items:center; gap:8px;">${avatarDe(joueur.name)} <strong>${esc(joueur.name)}</strong> <span title="${esc(stade.nom)}" style="font-size:1.3rem;">${stade.emoji}</span></span>
-      <span class="montant">${joueur.solde} 🌰 à planter</span>
+      <span class="montant">${JARDIN_LIBRE ? "🎨 Aperçu — plantes offertes" : joueur.solde + " 🌰 à planter"}</span>
     </div>
     <p class="hint">Choisis une plante puis tape une case libre. ${nbPlantees} plante${nbPlantees > 1 ? "s" : ""} déjà en terre —
-    planter ne change rien à ton classement. Plus de graines ? Chasse les mauvaises herbes ! 🌿</p>
-    <div style="margin-bottom:14px;"><button class="btn small" id="j-herbes">🌿 Gagner des graines</button></div>
+    planter ne change rien à ton classement.${JARDIN_LIBRE ? "" : " Plus de graines ? Chasse les mauvaises herbes ! 🌿"}</p>
+    ${JARDIN_LIBRE ? "" : `<div style="margin-bottom:14px;"><button class="btn small" id="j-herbes">🌿 Gagner des graines</button></div>`}
     <div class="catalogue">
       ${Object.entries(PLANTES).map(([cle, p]) => `
-        <button class="plt ${p.rare ? "rare-" + p.rare : ""} ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${p.cout > joueur.solde ? "disabled" : ""}>
+        <button class="plt ${p.rare ? "rare-" + p.rare : ""} ${planteChoisie === cle ? "choisi" : ""}" data-plt="${cle}" ${(!JARDIN_LIBRE && p.cout > joueur.solde) ? "disabled" : ""}>
           <span class="emo">${visuelPlante(cle)}</span>${esc(p.nom)}<br><span class="cout">${p.cout} 🌰</span>
         </button>`).join("")}
     </div>
@@ -1854,8 +1859,9 @@ function renderJardin() {
   </div></div>`;
   bindPills();
 
-  // Aller au mini-jeu pour récolter des graines.
-  $("#j-herbes").addEventListener("click", () => { userView = "herbes"; render(); });
+  // Aller au mini-jeu pour récolter des graines (absent en mode aperçu gratuit).
+  const jh = $("#j-herbes");
+  if (jh) jh.addEventListener("click", () => { userView = "herbes"; render(); });
 
   // Choisir une plante dans le catalogue
   app.querySelectorAll("[data-plt]").forEach((b) => b.addEventListener("click", () => {
@@ -1903,8 +1909,8 @@ function renderJardin() {
       jardin[idx] = { plante: planteChoisie, par: joueur.name, date: new Date().toISOString() };
       joueur.solde = res.solde;
       const p = PLANTES[planteChoisie];
-      jardinMsg = `${p.emoji} ${p.nom} planté ! Il te reste ${joueur.solde} graines.`;
-      if (p.cout > joueur.solde) planteChoisie = null; // plus les moyens pour la même
+      jardinMsg = JARDIN_LIBRE ? `${p.emoji} ${p.nom} planté !` : `${p.emoji} ${p.nom} planté ! Il te reste ${joueur.solde} graines.`;
+      if (!JARDIN_LIBRE && p.cout > joueur.solde) planteChoisie = null; // plus les moyens pour la même
       renderJardin();
       const neuve = app.querySelector(`[data-info="${idx}"]`);
       if (neuve) { neuve.classList.add("neuve"); if (p.rare) etincellesSur(neuve); }
@@ -3226,7 +3232,7 @@ function render() {
   // (télé / borne / téléphone) tel qu'il sera au moment simulé.
   if (SIMULATION && !APERCU) {
     majBarreSim();
-    if (simMode !== "joueur") {
+    if (simMode !== "joueur" && simMode !== "jardin") {
       FEE.stop(); stopHerbes(); clearInterval(tickTimer);
       renderSim();
       return;
@@ -3279,6 +3285,16 @@ function render() {
     board = [demo("Marie", 240, 12, 2), demo("Lucas", 190, 10, 1), demo("Emma", 150, 8, 1),
              demo("Tom", 110, 6, 0), demo("Sofia", 80, 5, 0), demo("Noah", 50, 3, 0)].concat(board);
     simPret.board = true;   // apiGetBoard renverra cette liste (pas de fetch réel)
+  }
+
+  // 🎨 Aperçu « mon jardin » pour l'admin : joueur de démo, entrée directe dans le
+  // jardin, plantes gratuites (prix affichés). On court-circuite tout le reste.
+  if (JARDIN_LIBRE) {
+    joueur = { name: "Aperçu", code: "0000", solde: 999, recoltees: 999, nbCodes: 0, quizFait: true };
+    jardin = {};
+    userView = "jardin";
+    render();
+    return;
   }
 
   // 📺 La TÉLÉ garde son spectacle (compte à rebours + fée, puis classement).
