@@ -3111,14 +3111,12 @@ const FEE = (() => {
 
   // L'âge du jour : la pousse suit le compte à rebours. Le jour J et pendant tout
   // l'événement, elle est en fleur.
+  const FENETRE_POUSSE = 6;   // elle grandit sur les 6 derniers jours avant le lancement
   function ageDuJour() {
     const jours = (CONFIG.dateLancement.getTime() - Date.now()) / 86400000;
-    if (jours <= 1) return 5;
-    if (jours <= 3) return 4;
-    if (jours <= 7) return 3;
-    if (jours <= 14) return 2;
-    if (jours <= 30) return 1;
-    return 0;
+    if (jours <= 0) return AGES.length - 1;                 // jour J et pendant l'événement : en fleur
+    const avance = (FENETRE_POUSSE - jours) / FENETRE_POUSSE;   // 0 à J-6, 1 le jour J
+    return Math.max(0, Math.min(AGES.length - 1, Math.floor(avance * AGES.length)));
   }
 
   // --- Deux registres de phrases (elle ne dit qu'UNE phrase a la fois) ---
@@ -3557,6 +3555,7 @@ function render() {
     if (conf.resultats) CONFIG.dateResultats = conf.resultats;
     CONFIG.zones = Array.isArray(conf.zones) ? conf.zones : [];
     CONFIG.recompenses = Array.isArray(conf.recompenses) ? conf.recompenses : [];
+    CONFIG.version = conf.version || "";   // sert à la télé pour se recharger après une mise en ligne
   }
   // En simulation, des zones de démo pour tester l'affichage « où chercher » à J-1.
   if (SIMULATION && (!CONFIG.zones || !CONFIG.zones.length)) {
@@ -3616,14 +3615,24 @@ function render() {
   // l'événement toutes les 60 s : si tu changes l'heure dans l'admin, la télé
   // s'ajuste sans qu'on ait à recharger la page.
   if (ECRAN === "tele") {
-    if (!SIMULATION) setInterval(async () => {
-      const c = await apiConfig().catch(() => null);
-      if (c) {
+    if (!SIMULATION) {
+      const versionAuChargement = CONFIG.version || "";
+      setInterval(async () => {
+        const c = await apiConfig().catch(() => null);
+        if (!c) return;
         if (c.lancement) CONFIG.dateLancement = new Date(c.lancement);
         if (c.cloture)   CONFIG.dateCloture = new Date(c.cloture);
         if (c.resultats) CONFIG.dateResultats = c.resultats;
-      }
-    }, 60000);
+        CONFIG.recompenses = Array.isArray(c.recompenses) ? c.recompenses : [];
+        // 🔄 Une télé reste allumée des jours entiers : sans ça, elle garderait
+        // l'ancienne page indéfiniment après une mise en ligne. Dès que la
+        // version du site change, elle se recharge TOUTE SEULE — mais jamais
+        // pendant une annonce ni dans la dernière heure avant le lancement.
+        const enPleineAnnonce = !!document.querySelector(".anim-tele");
+        const bientot = CONFIG.dateLancement.getTime() - Date.now() < 3600000;
+        if ((c.version || "") !== versionAuChargement && !enPleineAnnonce && !bientot) location.reload();
+      }, 60000);
+    }
     render();
     return;
   }

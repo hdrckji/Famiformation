@@ -617,8 +617,13 @@ switch ($action) {
   }
 
   // ⏱ Les dates de l'événement (lues par la page joueur pour le compte à rebours).
+  // On y joint la « version » du site (date du dernier déploiement de la page) :
+  // la télé, qui reste allumée des jours entiers, s'en sert pour se recharger
+  // toute seule après une mise en ligne au lieu de garder l'ancienne page.
   case 'config_get': {
-    echo json_encode(ladConfig($configFile), JSON_UNESCAPED_UNICODE);
+    $conf = ladConfig($configFile);
+    $conf['version'] = (string) (@filemtime(__DIR__ . '/index.html') ?: 0);
+    echo json_encode($conf, JSON_UNESCAPED_UNICODE);
     break;
   }
 
