@@ -3,11 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
 <title>Famiformation — Le grand quiz de lancement</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
+  /* 🌗 Le site est conçu EN CLAIR. Sans ça, les navigateurs à « mode sombre
+     forcé » (Samsung Internet, Firefox, Chrome auto-dark) réinventent les
+     couleurs et cassent la mise en page et les dessins (la fée notamment). */
+  color-scheme: light;
   --pousse: #1E7A46;
   --foret: #0E3B24;
   --brume: #EAF4EC;
@@ -3164,6 +3170,10 @@ const FEE = (() => {
     // Ecrans « mouvement reduit » : la fee reste dans son coin et se contente de parler.
     if (reduit) {
       coin();
+      // Quelques plantes POSÉES (sans animation, le CSS les fige) pour que la
+      // scène ne paraisse pas vide/cassée sur un téléphone en économie d'énergie.
+      const deco = tournee4();
+      seme(deco[0], SPOTS[0]); seme(deco[1], SPOTS[3]);
       let i = 0; const pool = PHRASES_PRESENTE.concat(PHRASES_EVENT);
       parle(pool[0]);
       timers.push(setInterval(() => { i = (i + 1) % pool.length; parle(pool[i]); }, 7000));
