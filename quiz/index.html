@@ -1459,7 +1459,8 @@ function renderQuiz() {
   // DÉMARRAGE (quiz null) : une partie en cours ou son écran final doivent pouvoir
   // s'afficher même si quizFait vient de passer à true.
   if (!joueur) { userView = "espace"; render(); return; }
-  if (!quiz && joueur.quizFait) { userView = "dashboard"; render(); return; }
+  // En mode test (simulation), on peut REJOUER le quiz autant de fois qu'on veut.
+  if (!quiz && joueur.quizFait && !SIMULATION) { userView = "dashboard"; render(); return; }
 
   // On démarre directement le quiz avec la carte déjà en poche (plus d'intro).
   if (!quiz) quiz = { step: "play", pseudo: joueur.name, code: joueur.code, nom: "", error: "", questions: prepareQuestions(), idx: 0, correct: 0, start: Date.now(), score: 0, streak: 0, qStart: Date.now() };
@@ -2216,8 +2217,11 @@ function renderDashboard() {
   document.body.classList.toggle("mode-borne", ECRAN === "borne");
   const phase = phaseNow();
   const quizOuvert = (phase === "ouvert");
-  const quizFait = !!joueur.quizFait;
-  const jardinOk = quizFait;
+  // 🧪 En mode TEST (simulation), on ne verrouille rien : le quiz est rejouable
+  // autant de fois qu'on veut et le jardin est toujours ouvert, pour pouvoir TOUT
+  // essayer. En vrai, le quiz ne se fait qu'une fois et le jardin s'ouvre après.
+  const quizFait = SIMULATION ? false : !!joueur.quizFait;
+  const jardinOk = SIMULATION ? true : quizFait;
   app.innerHTML = `<div class="home">
     <div class="dash-hello">Salut <b>${esc(joueur.name)}</b> 🌱 <span>${joueur.recoltees || 0} graines récoltées</span></div>
     ${jardinMsg ? `<div class="alert" style="max-width:640px;margin:0 auto 16px;">${esc(jardinMsg)}</div>` : ""}
