@@ -32,17 +32,29 @@ if (!function_exists('mb_substr')) {
 // 🔑 Codes bonus à usage unique (les mêmes que sur tes QR codes en magasin).
 // 20 codes, chacun rapporte $CODE_GRAINES graines à la PREMIÈRE personne qui le
 // récupère. Chaque joueur peut en cumuler au maximum $MAX_CODES.
-$BONUS_CODES = [
-  "FAMI-A7K2", "FAMI-B3X9", "FAMI-C5M1", "FAMI-D8R4", "FAMI-E2T7",
-  "FAMI-F6H8", "FAMI-G1J3", "FAMI-K9L2", "FAMI-M4N7", "FAMI-P5Q8",
-  "FAMI-R3S6", "FAMI-T2U9", "FAMI-V7W1", "FAMI-X8Y4", "FAMI-Z5A2",
-  "FAMI-B9C6", "FAMI-D1E3", "FAMI-F4G7", "FAMI-H8J5", "FAMI-K2L9",
-  // 🧪 Codes de TEST : le premier marche toujours (jamais consommé, re-testable),
-  // le second est toujours vu comme « déjà utilisé ». Pratique pour tester /quiz/code.
-  "FAMI-TEST-OK", "FAMI-TEST-USED",
+// ⛳ DEUX MAGASINS, DEUX LOTS DE CODES DISTINCTS. Les QR de Mouscron (préfixe
+// FAMI-) et ceux de La Panne (préfixe FAPA-) n'ont aucun code en commun : un
+// code trouvé à Mouscron est « inconnu » à La Panne, et réciproquement. Les deux
+// événements ne peuvent donc pas se mélanger, même par erreur de manipulation.
+$BONUS_CODES_PAR_SITE = [
+  'mouscron' => [
+    "FAMI-A7K2", "FAMI-B3X9", "FAMI-C5M1", "FAMI-D8R4", "FAMI-E2T7",
+    "FAMI-F6H8", "FAMI-G1J3", "FAMI-K9L2", "FAMI-M4N7", "FAMI-P5Q8",
+    "FAMI-R3S6", "FAMI-T2U9", "FAMI-V7W1", "FAMI-X8Y4", "FAMI-Z5A2",
+    "FAMI-B9C6", "FAMI-D1E3", "FAMI-F4G7", "FAMI-H8J5", "FAMI-K2L9",
+  ],
+  'lapanne' => [
+    "FAPA-N3B7", "FAPA-C8D2", "FAPA-E5F9", "FAPA-G1H4", "FAPA-J6K3",
+    "FAPA-L2M8", "FAPA-P7Q1", "FAPA-R4S9", "FAPA-T3U6", "FAPA-V8W2",
+    "FAPA-X5Y7", "FAPA-Z1A4", "FAPA-B6C9", "FAPA-D2E5", "FAPA-F8G3",
+    "FAPA-H4J7", "FAPA-K9L1", "FAPA-M3N6", "FAPA-P5Q8", "FAPA-R2S4",
+  ],
 ];
+// 🧪 Codes de TEST (communs aux deux sites) : le premier marche toujours (jamais
+// consommé, re-testable), le second est toujours vu comme « déjà utilisé ».
 $CODE_TEST_OK   = "FAMI-TEST-OK";
 $CODE_TEST_USED = "FAMI-TEST-USED";
+// $BONUS_CODES est fixé plus bas, une fois le site de la requête connu.
 // 🧪 COMPTES DE TEST : ces pseudos servent a essayer le jeu EN VRAI (borne,
 // telephone, ordi) sans deranger personne. Ils n'apparaissent PAS au classement
 // public ni sur la tele, et ils peuvent refaire le quiz autant de fois qu'ils
@@ -81,11 +93,26 @@ if (!is_dir($dataDir)) {
   echo json_encode(['error' => 'Dossier de données inaccessible']);
   exit;
 }
-$scoresFile    = $dataDir . '/scores.json';
-$codesFile     = $dataDir . '/codes.json';
-$questionsFile = $dataDir . '/questions.json';
-$jardinFile    = $dataDir . '/jardin.json';
-$configFile    = $dataDir . '/config.json';
+// 🏬 LES DEUX MAGASINS. Le nom sert à l'affichage et au tag du compte (site_id).
+// Toute donnée du jeu (scores, codes, questions, jardin, dates) est rangée dans
+// un fichier PROPRE À CHAQUE SITE — voir plus bas, une fois la requête lue.
+$SITES = [
+  'mouscron' => ['nom' => 'Famiflora Mouscron', 'ville' => 'Mouscron'],
+  'lapanne'  => ['nom' => 'Famiflora La Panne', 'ville' => 'La Panne'],
+];
+$SITE_DEFAUT = 'mouscron';
+
+// Le site d'une requête vient du champ `site` (corps JSON ou ?site=). S'il est
+// absent ou farfelu, on retombe sur le site par défaut plutôt que d'échouer :
+// mieux vaut un quiz qui tourne qu'une page cassée. En pratique le client envoie
+// toujours son site (il le tient de son URL).
+function siteDe($input, $sites, $defaut) {
+  $s = strtolower(trim((string)($input['site'] ?? $_GET['site'] ?? '')));
+  return isset($sites[$s]) ? $s : $defaut;
+}
+
+// ⚠️ Les fichiers de données ($scoresFile, etc.) sont fixés juste avant le switch,
+// après lecture de la requête, car ils dépendent du site. Ne pas les utiliser avant.
 
 // ⏱ Dates de l'événement, modifiables depuis l'admin (onglet Compte à rebours).
 // Par défaut : lancement le 29/07 à 12h30, clôture le 30/08, annonce des vainqueurs le 31 août à 12h30.
@@ -431,6 +458,18 @@ function envoiRefuse($email) {
 $action = $_GET['action'] ?? '';
 $input  = json_decode(file_get_contents('php://input'), true) ?: [];
 
+// 🏬 ON CLOISONNE PAR SITE. Chaque magasin a ses propres fichiers : un joueur, un
+// score, un code, une question de Mouscron ne touchent JAMAIS ceux de La Panne.
+// Le suffixe « -<site> » sur chaque fichier suffit à garantir qu'ils ne se
+// croisent pas. Les jetons de session et le journal anti-abus restent communs.
+$SITE = siteDe($input, $SITES, $SITE_DEFAUT);
+$scoresFile    = $dataDir . "/scores-$SITE.json";
+$codesFile     = $dataDir . "/codes-$SITE.json";
+$questionsFile = $dataDir . "/questions-$SITE.json";
+$jardinFile    = $dataDir . "/jardin-$SITE.json";
+$configFile    = $dataDir . "/config-$SITE.json";
+$BONUS_CODES   = array_merge($BONUS_CODES_PAR_SITE[$SITE], [$CODE_TEST_OK, $CODE_TEST_USED]);
+
 switch ($action) {
 
   // 📊 Récupérer le classement (lecture seule)
@@ -683,13 +722,24 @@ switch ($action) {
       break;
     }
 
+    // 🏬 Le magasin où la personne s'inscrit → son `site_id` dans la base, pour
+    // pouvoir distinguer les inscrits de Mouscron de ceux de La Panne. On lit
+    // l'id réel dans la table des sites de l'app (plutôt que de le supposer).
+    $siteId = null;
+    try {
+      $qs = $db->prepare('SELECT id FROM widget_sites WHERE ville = ? LIMIT 1');
+      $qs->execute([$SITES[$SITE]['ville']]);
+      $trouve = $qs->fetchColumn();
+      if ($trouve !== false) { $siteId = (int) $trouve; }
+    } catch (Throwable $e) { /* table absente en test : on laissera site_id à NULL */ }
+
     try {
       ensureUserAccountAccessColumns($db);
       $identifiant = identifiantLibre($db, $prenom, $nom);
-      $ins = $db->prepare('INSERT INTO utilisateurs (identifiant, nom, prenom, email, mot_de_passe, role, account_activation_pending, statut_date)
-                           VALUES (?, ?, ?, ?, ?, ?, 1, ?)');
+      $ins = $db->prepare('INSERT INTO utilisateurs (identifiant, nom, prenom, email, mot_de_passe, role, account_activation_pending, site_id, statut_date)
+                           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)');
       $ins->execute([$identifiant, $nom, $prenom, $email,
-        password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), 'etudiant', date('Y-m-d H:i:s')]);
+        password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), 'etudiant', $siteId, date('Y-m-d H:i:s')]);
       $uid = (int) $db->lastInsertId();
     } catch (Throwable $e) {
       http_response_code(500); echo json_encode(['ok' => false, 'reason' => 'creation_impossible']); break;

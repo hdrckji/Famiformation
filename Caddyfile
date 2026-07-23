@@ -52,6 +52,20 @@
 		@quizEcrans path /quiz/tele /quiz/borne /quiz/code
 		rewrite @quizEcrans /quiz/index.html
 
+		# 🏬 DEUX MAGASINS : /quiz/mouscron et /quiz/lapanne (Mouscron / La Panne),
+		# avec leurs propres ecrans /quiz/<site>/tele, /quiz/<site>/borne,
+		# /quiz/<site>/code. Tout sert la MEME page ; c'est elle qui lit le magasin
+		# et l'ecran dans l'URL. Le "api.php" relatif doit toujours pointer sur
+		# /quiz/api.php : ces URL ont 2 ou 3 segments sous /quiz, donc le relatif
+		# ne retomberait pas au bon endroit -> on l'ecrit sur /quiz/index.html en
+		# gardant l'URL affichee (rewrite, pas redir).
+		redir /quiz/mouscron/ /quiz/mouscron 308
+		redir /quiz/lapanne/ /quiz/lapanne 308
+		@quizSiteEcran path_regexp quizSiteEcran ^/quiz/(mouscron|lapanne)/(tele|borne|code)/?$
+		rewrite @quizSiteEcran /quiz/index.html
+		@quizSite path /quiz/mouscron /quiz/lapanne
+		rewrite @quizSite /quiz/index.html
+
 		# Bloque les fichiers caches (.env, .htaccess, .gitignore, ...)
 		@dotfiles path_regexp dotfiles /\.[^/]+$
 		respond @dotfiles 403

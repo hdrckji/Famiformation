@@ -49,6 +49,17 @@ h2 { font-family: 'Fredoka', sans-serif; font-size: 1.2rem; margin-bottom: 14px;
          color: #A34A00; margin-bottom: 14px; }
 .alert.ok { background: #E7F6EC; color: var(--pousse); }
 .hint { font-size: .88rem; opacity: .72; line-height: 1.55; margin-bottom: 14px; }
+/* 🏬 Sélecteur de magasin : bien visible, au-dessus des onglets. La couleur de
+   fond change avec le magasin choisi, pour qu'on ne confonde JAMAIS les deux. */
+.site-switch { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--craie); padding: 10px 16px; border-radius: 18px; margin-bottom: 14px;
+  box-shadow: 0 4px 18px rgba(14,59,36,.09); border: 2px solid #e3eee6; }
+.ss-lab { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--foret); }
+.ss-btn { border: 2px solid #d7e6da; background: #f2f8f3; cursor: pointer; font-family: 'Fredoka', sans-serif;
+  font-weight: 600; color: var(--foret); padding: 8px 16px; border-radius: 999px; transition: all .12s; }
+.ss-btn.on { background: var(--pousse); color: #fff; border-color: var(--pousse); box-shadow: 0 3px 12px rgba(30,122,70,.3); }
+.ss-note { font-size: .82rem; color: #6a7d72; margin-left: auto; }
+
 .tabs { display: flex; gap: 8px; background: var(--craie); padding: 6px; border-radius: 999px;
         margin-bottom: 22px; flex-wrap: wrap; box-shadow: 0 4px 18px rgba(14,59,36,.09); }
 .tabs button { border: none; background: transparent; cursor: pointer; font-family: 'Fredoka', sans-serif;
@@ -129,6 +140,12 @@ function modaleConfirm({ titre, texte, ok = "Confirmer" }, onOui) {
 // du navigateur : sur un PC de magasin partagé, ça resterait après le départ).
 let auth = null;
 let vue = "questions";
+// 🏬 Le magasin en cours de gestion. TOUT ce qu'on voit et modifie (questions,
+// classement, codes, dates, récompenses) ne concerne QUE ce magasin. On garde le
+// choix d'une fois sur l'autre (confort de l'organisateur), ce n'est pas sensible.
+const SITES = { mouscron: "Famiflora Mouscron", lapanne: "Famiflora La Panne" };
+let siteAdmin = localStorage.getItem("fj_admin_site") || "mouscron";
+if (!SITES[siteAdmin]) siteAdmin = "mouscron";
 let data = { board: [], codes: [], questions: [] };
 let brouillon = [];      // les questions en cours d'édition
 let message = null;
@@ -137,7 +154,9 @@ let adminPlante = null;  // plante sélectionnée pour planter librement dans le
 async function post(action, corps = {}) {
   const r = await fetch(`${API}?action=${action}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...(auth || {}), ...corps }),
+    // On joint TOUJOURS le magasin courant : le serveur range/lit dans les
+    // fichiers de ce site-là. (corps peut le surcharger si besoin.)
+    body: JSON.stringify({ ...(auth || {}), site: siteAdmin, ...corps }),
   });
   let d = null;
   try { d = await r.json(); } catch { d = null; }
@@ -199,6 +218,11 @@ function rendre() {
     ["simulation", "🎬 Simulation"],
   ];
   app.innerHTML = `
+    <div class="site-switch">
+      <span class="ss-lab">🏬 Magasin géré :</span>
+      ${Object.entries(SITES).map(([k, l]) => `<button data-site="${k}" class="ss-btn ${siteAdmin === k ? "on" : ""}">${l}</button>`).join("")}
+      <span class="ss-note">Tout ci-dessous ne concerne que ce magasin.</span>
+    </div>
     <div class="tabs">
       ${onglets.map(([k, l]) => `<button data-v="${k}" class="${vue === k ? "on" : ""}">${l}</button>`).join("")}
       <button data-v="deconnexion">🚪 Déconnexion</button>
@@ -208,6 +232,13 @@ function rendre() {
   app.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
     if (b.dataset.v === "deconnexion") { auth = null; vueConnexion(); return; }
     vue = b.dataset.v; message = null; rendre();
+  }));
+  app.querySelectorAll(".ss-btn").forEach((b) => b.addEventListener("click", async () => {
+    if (siteAdmin === b.dataset.site) return;
+    siteAdmin = b.dataset.site;
+    localStorage.setItem("fj_admin_site", siteAdmin);
+    message = null;
+    await charger();   // on recharge TOUTES les données du nouveau magasin
   }));
 
   if (vue === "questions") vueQuestions();
@@ -396,7 +427,7 @@ function vueClassement() {
   $("#c-reset").addEventListener("click", async () => {
     if (!confirm("Effacer TOUS les scores et libérer TOUS les codes bonus ?\n\nCette action est irréversible.")) return;
     if (!confirm("Confirmation : le classement sera définitivement vidé. Continuer ?")) return;
-    const r = await fetch(`${API}?action=reset&pin=${encodeURIComponent(auth.pwd)}`).catch(() => null);
+    const r = await fetch(`${API}?action=reset&site=${siteAdmin}&pin=${encodeURIComponent(auth.pwd)}`).catch(() => null);
     if (!r || !r.ok) { message = { ok: false, texte: "La remise à zéro a échoué." }; rendre(); return; }
     message = { ok: true, texte: "Scores et codes remis à zéro." };
     await charger();
@@ -451,7 +482,7 @@ function vueJardin() {
         <button class="btn ghost" id="j-jardin">🌼 Aller direct au jardin (plantes offertes)</button>
       </div>
       <div style="display:flex; justify-content:center; background:#DDE9E0; border-radius:16px; padding:14px;">
-        <iframe id="j-frame" src="../index.html?simulation=joueur"
+        <iframe id="j-frame" src="../index.html?simulation=joueur&site=${siteAdmin}"
           style="border:none; border-radius:14px; background:var(--brume); height:78vh; min-height:580px;
                  width:420px; max-width:100%; box-shadow:0 8px 30px rgba(14,59,36,.18);"></iframe>
       </div>
@@ -466,13 +497,13 @@ function vueJardin() {
       connecte-toi avec <b>${esc(r.data.pseudo)}</b> / <b>${esc(r.data.mdp)}</b> depuis la borne, ton téléphone ou ton ordi.</div>`;
   });
   $("#j-testeur").addEventListener("click", () => {
-    $("#j-frame").src = `../index.html?simulation=joueur&compte=testeur&_=${Date.now()}`;
+    $("#j-frame").src = `../index.html?simulation=joueur&site=${siteAdmin}&compte=testeur&_=${Date.now()}`;
   });
   $("#j-restart").addEventListener("click", () => {
-    $("#j-frame").src = `../index.html?simulation=joueur&_=${Date.now()}`;
+    $("#j-frame").src = `../index.html?simulation=joueur&site=${siteAdmin}&_=${Date.now()}`;
   });
   $("#j-jardin").addEventListener("click", () => {
-    $("#j-frame").src = `../index.html?ecran=user&simulation=jardin&_=${Date.now()}`;
+    $("#j-frame").src = `../index.html?ecran=user&simulation=jardin&site=${siteAdmin}&_=${Date.now()}`;
   });
 }
 
@@ -619,7 +650,7 @@ function vueSimulation() {
 
   // URL d'un aperçu : la VRAIE page joueur, en mode simulation daté (rien n'est
   // envoyé au serveur, la phase suit le moment choisi). simSeed force le rechargement.
-  const src = (ecran) => `../index.html?ecran=${ecran}&simulation=apercu`
+  const src = (ecran) => `../index.html?ecran=${ecran}&simulation=apercu&site=${siteAdmin}`
     + (simQuand ? `&simnow=${encodeURIComponent(simQuand)}` : "")
     + `&_=${simSeed}`;
 

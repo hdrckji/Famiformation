@@ -33,6 +33,9 @@ body {
   padding: 24px 16px 60px;
 }
 .fami-head { text-align: center; margin-bottom: 18px; }
+.fami-magasin { margin-top: 4px; font-family: 'Fredoka', sans-serif; font-weight: 600;
+  font-size: clamp(.82rem, 2.2vw, 1rem); color: var(--pousse); letter-spacing: .3px; }
+body.mode-tele .fami-magasin { font-size: clamp(1rem, 2.4vw, 1.4rem); }
 .fami-logo {
   font-family: 'Fredoka', sans-serif; font-weight: 700;
   font-size: clamp(1.6rem, 4vw, 2.4rem); color: var(--pousse); letter-spacing: 0.5px;
@@ -541,7 +544,9 @@ body.mode-borne #app { width: 100%; }
 .borne-mod { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
   background: var(--craie); border: 3px solid transparent; border-radius: 24px; padding: clamp(30px, 6vh, 60px) 24px;
   min-height: clamp(200px, 34vh, 340px); box-shadow: 0 6px 24px rgba(14,59,36,.1);
-  transition: transform .12s, border-color .15s, box-shadow .15s; }
+  transition: transform .12s, border-color .15s, box-shadow .15s;
+  text-decoration: none; color: var(--foret); }   /* aussi valable quand la tuile est un lien <a> */
+.borne-mod .bm-titre, .borne-mod .bm-desc { text-decoration: none; }
 .borne-mod:hover, .borne-mod:active { transform: translateY(-3px); border-color: var(--pousse); box-shadow: 0 10px 30px rgba(14,59,36,.16); }
 .bm-emo { font-size: clamp(2.8rem, 8vw, 4.4rem); line-height: 1; }
 .bm-titre { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: clamp(1.3rem, 3.4vw, 1.9rem); color: var(--foret); }
@@ -758,6 +763,7 @@ body.mode-tele #app { flex: 0 0 auto; }
 <header class="fami-head">
   <div class="fami-logo">Famiformation <span>●</span></div>
   <div class="fami-tag">Le grand quiz de lancement</div>
+  <div class="fami-magasin" id="fami-magasin"></div>
 </header>
 
 <main id="app" style="width:100%; display:flex; flex-direction:column; align-items:center;"></main>
@@ -779,6 +785,16 @@ const CONFIG = {
   // n'importe qui avec « afficher le code source ».
   api: "api.php",
 };
+
+// 🛣️ api.php vit à la RACINE du quiz (/quiz/api.php), quelle que soit la
+// profondeur de l'URL affichée (/quiz, /quiz/mouscron, /quiz/mouscron/tele…).
+// Sans ce calcul, le relatif « api.php » depuis /quiz/mouscron/tele pointerait
+// sur /quiz/mouscron/api.php → 404. On fixe donc un chemin ABSOLU.
+(function () {
+  const i = location.pathname.indexOf("/quiz");
+  const racine = i >= 0 ? location.pathname.slice(0, i) + "/quiz/" : "/quiz/";
+  CONFIG.api = racine + "api.php";
+})();
 
 // 🎯 BARÈME DU QUIZ. Chaque bonne réponse rapporte :
 //   • une base fixe (validité),
@@ -857,7 +873,24 @@ const ECRAN =
   (/\/tele\/?$/.test(_path)  || _ecranParam === "tele")  ? "tele"  :
   (/\/borne\/?$/.test(_path) || _ecranParam === "borne") ? "borne" :
   (/\/code\/?$/.test(_path)  || _ecranParam === "code")  ? "code"  : "user";
-// Adresse du quiz des joueurs (pour le QR / les redirections), sans /tele /borne /code.
+
+/* ============================================================
+   🏬 LE MAGASIN (Mouscron ou La Panne)
+   Il vient de l'URL : /quiz/mouscron/... ou /quiz/lapanne/... Le QR de chaque
+   magasin (et chaque borne) porte donc son site, impossible de se tromper. Tout
+   le reste du jeu — questions, classement, codes, dates — est cloisonné par
+   site côté serveur. SITE vaut "" tant qu'aucun magasin n'est choisi : on montre
+   alors un petit écran « Tu es à Mouscron ou à La Panne ? ».
+   ============================================================ */
+const SITES = { mouscron: "Famiflora Mouscron", lapanne: "Famiflora La Panne" };
+const _siteParam = SIM_PARAMS.get("site") || "";
+const SITE =
+  (/\/mouscron(\/|$)/.test(_path) || _siteParam === "mouscron") ? "mouscron" :
+  (/\/lapanne(\/|$)/.test(_path)  || _siteParam === "lapanne")  ? "lapanne"  : "";
+const SITE_NOM = SITES[SITE] || "";
+
+// Adresse du quiz des joueurs (pour le QR / les redirections), sans /tele /borne
+// /code — mais on GARDE le segment du magasin (/quiz/mouscron/).
 function quizBase() {
   let p = location.pathname.replace(/\/(tele|borne|code)\/?$/, "/").replace(/[^/]*$/, "");
   return location.origin + p;
@@ -922,7 +955,7 @@ async function apiGetBoard() {
   // effacerait les participations simulées.
   if (SIMULATION && simPret.board) return board;
   try {
-    const r = await fetch(`${CONFIG.api}?action=board`);
+    const r = await fetch(`${CONFIG.api}?site=${SITE}&action=board`);
     const b = r.ok ? await r.json() : [];
     if (SIMULATION) simPret.board = true;
     return b;
@@ -930,7 +963,7 @@ async function apiGetBoard() {
 }
 async function apiCheckName(name) {
   if (SIMULATION) return board.some((p) => p.name.toLowerCase() === name.toLowerCase());
-  const r = await fetch(`${CONFIG.api}?action=check`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=check`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
@@ -940,7 +973,7 @@ async function apiClaimCode(code, name) {
   if (SIMULATION) {
     return code === "FAMI-TEST" ? { ok: true } : { ok: false, reason: "inconnu" };
   }
-  const r = await fetch(`${CONFIG.api}?action=claim`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=claim`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code, name }),
   });
@@ -950,7 +983,7 @@ async function apiClaimCode(code, name) {
 // les dates par défaut inscrites dans CONFIG.
 async function apiConfig() {
   try {
-    const r = await fetch(`${CONFIG.api}?action=config_get`);
+    const r = await fetch(`${CONFIG.api}?site=${SITE}&action=config_get`);
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
@@ -958,7 +991,7 @@ async function apiConfig() {
 // liste de secours déjà chargée : mieux vaut un quiz de secours qu'un écran vide.
 async function apiQuestions() {
   try {
-    const r = await fetch(`${CONFIG.api}?action=questions`);
+    const r = await fetch(`${CONFIG.api}?site=${SITE}&action=questions`);
     if (!r.ok) return null;
     const d = await r.json();
     return (Array.isArray(d) && d.length) ? d : null;
@@ -980,7 +1013,7 @@ async function apiSubmit(entry) {
     board.sort((a, b) => b.score - a.score || a.time - b.time);
     return true;
   }
-  const r = await fetch(`${CONFIG.api}?action=submit`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=submit`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(entry),
   });
@@ -997,7 +1030,7 @@ async function apiLoginJoueur(name, code) {
     if ((p.code || "") !== code) return { exists: true, mauvais_code: true };
     return { exists: true, name: p.name, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: (p.codes_pris || []).length, quiz_fait: p.quiz_fait !== false };
   }
-  const r = await fetch(`${CONFIG.api}?action=login_joueur`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=login_joueur`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, code }),
   });
   return await r.json();
@@ -1013,7 +1046,7 @@ async function apiRegister(name, code, nom, prenom) {
     board.push({ name, code, nom: nom || "", prenom: prenom || "", score: 0, bonus: 0, depensees: 0, correct: 0, codes: 0, codes_pris: [], time: 0, quiz_fait: false, date: new Date().toISOString() });
     return { ok: true, exist: false, name, quiz_fait: false, recoltees: 0, solde: 0, nbCodes: 0 };
   }
-  const r = await fetch(`${CONFIG.api}?action=register`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=register`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, code, nom: nom || "", prenom: prenom || "" }),
   });
   if (r.status === 409) return { pris: true };
@@ -1029,7 +1062,7 @@ async function apiCodeStatus(bonuscode, name) {
     return { connu: /^FAMI-/i.test(bonuscode), pris: (window.__simCodes || new Set()).has(bc),
              parMoi: !!(p && (p.codes_pris || []).includes(bc)) };
   }
-  const r = await fetch(`${CONFIG.api}?action=code_status`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=code_status`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bonuscode, name: name || "" }),
   });
   return await r.json();
@@ -1049,7 +1082,7 @@ async function apiCodeClaim(name, code, bonuscode) {
     window.__simCodes.add(bc); p.codes_pris.push(bc); p.codes = p.codes_pris.length; p.score += CONFIG.pointsParCodeBonus;
     return { ok: true, gagne: CONFIG.pointsParCodeBonus, recoltees: p.score, solde: p.score + (p.bonus || 0) - (p.depensees || 0), nbCodes: p.codes };
   }
-  const r = await fetch(`${CONFIG.api}?action=code_claim`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=code_claim`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, code, bonuscode }),
   });
   return await r.json();
@@ -1057,7 +1090,7 @@ async function apiCodeClaim(name, code, bonuscode) {
 // 🌼 Le jardin collectif
 async function apiPlantes() {
   try {
-    const r = await fetch(`${CONFIG.api}?action=plantes`);
+    const r = await fetch(`${CONFIG.api}?site=${SITE}&action=plantes`);
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
@@ -1065,7 +1098,7 @@ async function apiPlantes() {
 async function apiCodesRestants() {
   if (SIMULATION) { const pris = (window.__simCodes || new Set()).size; return { total: 20, restants: Math.max(0, 13 - pris), pris: 7 + pris }; }
   try {
-    const r = await fetch(`${CONFIG.api}?action=codes_restants`);
+    const r = await fetch(`${CONFIG.api}?site=${SITE}&action=codes_restants`);
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
@@ -1074,7 +1107,7 @@ async function apiJardin() {
   if (SIMULATION) return jardin || {};   // en simu, la grille en mémoire du joueur courant
   const name = joueur ? joueur.name : "";
   try {
-    const r = await fetch(`${CONFIG.api}?action=jardin`, {
+    const r = await fetch(`${CONFIG.api}?site=${SITE}&action=jardin`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
     });
     return r.ok ? ((await r.json()).cases || {}) : {};
@@ -1087,7 +1120,7 @@ async function apiSolde(name) {
       ? { exists: true, name: p.name, recoltees: p.score, depensees: p.depensees || 0, solde: p.score + (p.bonus || 0) - (p.depensees || 0) }
       : { exists: false };
   }
-  const r = await fetch(`${CONFIG.api}?action=solde`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=solde`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
@@ -1106,7 +1139,7 @@ async function apiPlanter(name, caseIdx, plante) {
     p.depensees = (p.depensees || 0) + cout;
     return { ok: true, solde: solde - cout };
   }
-  const r = await fetch(`${CONFIG.api}?action=planter`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=planter`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, case: caseIdx, plante }),
   });
@@ -1124,7 +1157,7 @@ async function apiRevendre(name, caseIdx) {
     delete jardin[caseIdx];
     return { ok: true, rendu: cout, solde: p ? p.score + (p.bonus || 0) - (p.depensees || 0) : null };
   }
-  const r = await fetch(`${CONFIG.api}?action=revendre`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=revendre`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, case: caseIdx }),
   });
@@ -1142,7 +1175,7 @@ async function apiRecolteHerbes(name, herbes) {
     p.bonus = (p.bonus || 0) + gain;
     return { ok: true, gain, solde: p.score + (p.bonus || 0) - (p.depensees || 0) };
   }
-  const r = await fetch(`${CONFIG.api}?action=recolte_herbes`, {
+  const r = await fetch(`${CONFIG.api}?site=${SITE}&action=recolte_herbes`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, herbes }),
   });
@@ -2615,7 +2648,12 @@ function chargeQR() {
 async function qrQuiz() {
   if (qrCache) return qrCache;
   await chargeQR();
-  const url = "https://famiformation.com/quiz";   // adresse publique des joueurs
+  // 🏬 Le QR de la télé envoie vers le quiz DE CE MAGASIN. En vrai la télé tourne
+  // sur /quiz/<site>/tele → on pointe sur /quiz/<site>. En secours (site inconnu),
+  // on met l'accueil, qui demandera de choisir le magasin.
+  const url = SITE
+    ? "https://famiformation.com/quiz/" + SITE
+    : "https://famiformation.com/quiz";   // adresse publique des joueurs
   const qr = qrcode(0, "M");
   qr.addData(url);
   qr.make();
@@ -2814,6 +2852,41 @@ async function renderTeleWinners() {
 // différence : le téléphone/ordi affichent le compte à rebours en haut tant qu'on
 // n'a pas atteint le lancement ; la borne, jamais. À zéro le compte à rebours
 // disparaît partout et le module « Participer au quiz » s'active tout seul.
+// URL de la MÊME page pour un magasin donné, en gardant l'écran courant
+// (/tele, /borne, /code). Sert aux boutons du choix de magasin.
+function urlSite(site) {
+  let p = location.pathname.replace(/\/+$/, "");
+  let suf = "";
+  const m = p.match(/\/(tele|borne|code)$/);
+  if (m) { suf = m[0]; p = p.slice(0, -suf.length); }
+  return location.origin + p + "/" + site + suf + location.search;
+}
+
+// 🏬 FILET DE SÉCURITÉ : on est arrivé sans magasin dans l'URL (quelqu'un a tapé
+// /quiz au lieu de scanner le QR du magasin). Plutôt que de le laisser bloqué ou,
+// pire, de mélanger les deux événements, on lui demande où il se trouve.
+function renderChoixSite() {
+  clearInterval(tickTimer);
+  document.body.classList.remove("mode-borne");
+  app.innerHTML = `<div class="home">
+    <h2 class="borne-titre">Tu es dans quel magasin ? 🏬</h2>
+    <p class="borne-sous">Choisis ton magasin pour rejoindre le bon quiz.</p>
+    <div class="borne-modules">
+      <a class="borne-mod bm-primaire" href="${urlSite("mouscron")}">
+        <span class="bm-emo">🌸</span>
+        <span class="bm-titre">Famiflora Mouscron</span>
+        <span class="bm-desc">Le quiz du magasin de Mouscron</span>
+      </a>
+      <a class="borne-mod bm-primaire" href="${urlSite("lapanne")}">
+        <span class="bm-emo">🌊</span>
+        <span class="bm-titre">Famiflora La Panne</span>
+        <span class="bm-desc">Le quiz du magasin de La Panne</span>
+      </a>
+    </div>
+    <div class="home-tease">Chaque magasin a son propre quiz et son propre classement 🎯</div>
+  </div>`;
+}
+
 function renderHome() {
   clearInterval(tickTimer);
   const borne = (ECRAN === "borne");
@@ -3505,6 +3578,17 @@ function render() {
 }
 
 (async () => {
+  // 🏬 AVANT TOUT : quel magasin ? Sans magasin dans l'URL (et hors simulation),
+  // on montre le choix Mouscron / La Panne et on s'arrête là — impossible de
+  // jouer « nulle part » ni de mélanger les deux événements.
+  if (!SITE && !SIMULATION) { renderChoixSite(); return; }
+  // Le nom du magasin s'affiche sous le logo, pour qu'on sache toujours dans quel
+  // quiz on se trouve (et qu'on ne confonde jamais Mouscron et La Panne).
+  if (SITE_NOM) {
+    const mag = document.getElementById("fami-magasin");
+    if (mag) mag.textContent = "📍 " + SITE_NOM;
+  }
+
   // Les questions viennent du serveur (saisies dans /quiz/admin). Si l'appel
   // échoue, QUESTIONS garde la liste de secours définie plus haut. Le catalogue
   // des plantes vient aussi du serveur : page et api.php restent d'accord sur
